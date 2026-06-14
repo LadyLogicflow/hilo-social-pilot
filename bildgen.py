@@ -91,7 +91,7 @@ def _slogan_lines(dr, slogan, font, max_w):
         lines.append(last[-1])
     return lines
 
-def render(fields, photo_path, slogan, out_path):
+def render(fields, photo_path, slogan, out_path, portrait=None):
     cut = None
     if photo_path and os.path.exists(photo_path):
         try:
@@ -153,7 +153,7 @@ def render(fields, photo_path, slogan, out_path):
     for ln in CL:
         dr.text((W//2, ty), ln, font=fc, fill=WHITE, anchor="mm"); ty += fc.size + 4
 
-    _draw_circles(base, slogan, pos)   # schwebende Kreise, Eckposition variiert je Beitrag
+    _draw_circles(base, slogan, pos, portrait)   # schwebende Kreise, Eckposition variiert je Beitrag
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     base.save(out_path)
@@ -216,11 +216,29 @@ def _content_bounds(pos):
     cb = BOTB_BAND if pos == "oben" else CBOT         # nur bei 'oben' kein unterer Kreis
     return ct, cb
 
-def _draw_circles(base, slogan, pos="unten"):
+def _circle_portrait(base, cx, cy, R, portrait):
+    """Setzt ein kreisrund zugeschnittenes Portraet (mit weissem Rand) an die Kreis-Position -
+    ersetzt den blauen Slogan-Kreis. Liefert True bei Erfolg, sonst False (dann blauer Punkt)."""
+    try:
+        ImageDraw.Draw(base).ellipse([cx-R, cy-R, cx+R, cy+R], fill=WHITE)  # weisser Rand
+        ring = 7; d = 2*(R-ring)
+        pim = Image.open(portrait).convert("RGB")
+        pw, ph = pim.size; s = min(pw, ph)
+        pim = pim.crop(((pw-s)//2, (ph-s)//2, (pw-s)//2+s, (ph-s)//2+s)).resize((d, d), Image.LANCZOS)
+        mask = Image.new("L", (d, d), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, d-1, d-1], fill=255)
+        base.paste(pim, (int(cx-R+ring), int(cy-R+ring)), mask)
+        return True
+    except Exception:
+        return False
+
+def _draw_circles(base, slogan, pos="unten", portrait=None):
     """Logo-Kreis (links) und Slogan-Kreis (rechts) als schwebende Erkennungszeichen in den
     Ecken. pos = 'unten' (beide unten), 'oben' (beide oben),
     'diagonal' (Logo oben-links + Slogan unten-rechts) oder
-    'diagonal2' (Logo unten-links + Slogan oben-rechts) - Abwechslung je Beitrag."""
+    'diagonal2' (Logo unten-links + Slogan oben-rechts) - Abwechslung je Beitrag.
+    portrait = optionaler Bildpfad; ist er gesetzt, ersetzt ein Kreis-Portraet den blauen
+    Slogan-Kreis (z.B. das Foto/Logo der Beratungsstelle)."""
     dr = ImageDraw.Draw(base)
     R = 102; CCY_TOP, CCY_BOT = 134, 946
     logo_y = CCY_TOP if pos in ("oben", "diagonal") else CCY_BOT
@@ -238,6 +256,8 @@ def _draw_circles(base, slogan, pos="unten"):
         logo = Image.open(LOGO_PATH).convert("RGBA"); lw = 170; lh2 = int(logo.height*lw/logo.width)
         logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(logo_y-lh2/2)), logo)
     rx = W - R - 22; shadow(rx, slogan_y)
+    if portrait and os.path.exists(portrait) and _circle_portrait(base, rx, slogan_y, R, portrait):
+        return   # Kreis-Portraet ersetzt den blauen Slogan-Punkt
     dr.ellipse([rx-R, slogan_y-R, rx+R, slogan_y+R], fill=BLUE)
     fsl = _font(_BOLD, 33); lines = _slogan_lines(dr, slogan, fsl, 2*R - 36)
     sy = slogan_y - (len(lines)-1)*(fsl.size+4)//2
@@ -266,7 +286,7 @@ def _fit_photo(cut, max_h, max_w):
         sc = max_w / cut.width
     return cut.resize((max(1, int(cut.width*sc)), max(1, int(cut.height*sc))), Image.LANCZOS)
 
-def _slide_title(fields, photo_path, slogan, idx, total, pos="unten"):
+def _slide_title(fields, photo_path, slogan, idx, total, pos="unten", portrait=None):
     cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
@@ -298,11 +318,11 @@ def _slide_title(fields, photo_path, slogan, idx, total, pos="unten"):
     # "Weiterwischen"-Hinweis unten-zentriert (klart die Eck-Kreise in jeder Position)
     fc = _font(_BOLD, 30)
     dr.text((W//2, (BOTB + H)//2 + 12), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
-    _draw_circles(base, slogan, pos)
+    _draw_circles(base, slogan, pos, portrait)
     _draw_pager(base, idx, total)
     return base
 
-def _slide_bullet(text, slogan, idx, total, nummer, pos="unten"):
+def _slide_bullet(text, slogan, idx, total, nummer, pos="unten", portrait=None):
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
     ct, cb = _content_bounds(pos)
@@ -316,11 +336,11 @@ def _slide_bullet(text, slogan, idx, total, nummer, pos="unten"):
     y = top + (cb - top - th)//2 + f.size//2   # Text bleibt frei von den Kreisen
     for ln in L:
         dr.text((W//2, y), ln, font=f, fill=NAVY, anchor="mm"); y += f.size + 12
-    _draw_circles(base, slogan, pos)
+    _draw_circles(base, slogan, pos, portrait)
     _draw_pager(base, idx, total)
     return base
 
-def _slide_cta(fields, photo_path, slogan, idx, total, pos="unten"):
+def _slide_cta(fields, photo_path, slogan, idx, total, pos="unten", portrait=None):
     cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
@@ -344,11 +364,11 @@ def _slide_cta(fields, photo_path, slogan, idx, total, pos="unten"):
     y = gy + fc.size//2
     for ln in CL:
         dr.text((W//2, y), ln, font=fc, fill=NAVY, anchor="mm"); y += fc.size + 12
-    _draw_circles(base, slogan, pos)
+    _draw_circles(base, slogan, pos, portrait)
     _draw_pager(base, idx, total)
     return base
 
-def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6):
+def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, portrait=None):
     """Rendert ein Karussell: Title-Slide + je Bullet eine Slide + CTA-Slide.
     Liefert die Liste der Slide-Pfade in Reihenfolge. max_slides begrenzt die Gesamtzahl."""
     os.makedirs(out_dir, exist_ok=True)
@@ -356,10 +376,10 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6):
     bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
     total = 1 + len(bullets) + 1
     pos = pick_circle_pos()   # Eckposition der Kreise einmal je Beitrag (alle Slides gleich)
-    slides = [_slide_title(fields, photo_path, slogan, 0, total, pos)]
+    slides = [_slide_title(fields, photo_path, slogan, 0, total, pos, portrait)]
     for i, b in enumerate(bullets):
-        slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1, pos))
-    slides.append(_slide_cta(fields, photo_path, slogan, total - 1, total, pos))
+        slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1, pos, portrait))
+    slides.append(_slide_cta(fields, photo_path, slogan, total - 1, total, pos, portrait))
     paths = []
     for i, img in enumerate(slides):
         p = os.path.join(out_dir, "%s_%02d.png" % (prefix, i + 1))
