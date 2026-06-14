@@ -407,7 +407,7 @@ button:disabled{opacity:.45;cursor:not-allowed}</style>
     {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
   </select></form>{% else %}{{fb_name.get(b.fb_seite|string, b.fb_seite) or '-'}}{% endif %}</td>
 <td><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  {% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #1f428d">{% endif %}
+  {% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:44px;height:44px;border-radius:50%;object-fit:cover">{% endif %}
   <form method=post enctype="multipart/form-data" style="margin:0;display:flex;align-items:center;gap:7px">
     <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
     <label class=filebtn>{% if b.portrait_pfad %}Anderes Bild …{% else %}Bild wählen …{% endif %}
