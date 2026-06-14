@@ -11,6 +11,8 @@ Secrets (aus secrets_store):
 
 Tokens werden NIE geloggt oder ausgegeben.
 """
+import json
+import time
 import logging
 import requests
 from secrets_store import get_secret, set_secret
@@ -108,6 +110,52 @@ def publish_facebook(page_id, image_path, caption):
 
 
 # ---------------------------------------------------------------------------
+# Facebook: Karussell-Beitrag (mehrere Fotos in einem Post)
+# ---------------------------------------------------------------------------
+def _delete_fb_photos(media_ids, token):
+    """Raeumt teilweise hochgeladene, unveroeffentlichte Fotos nach einem Abbruch auf
+    (best effort - Fehler werden geschluckt, damit der eigentliche Fehler sichtbar bleibt)."""
+    for mid in media_ids:
+        try:
+            requests.post(GRAPH + "/%s" % mid, timeout=30,
+                          data={"method": "delete", "access_token": token})
+        except Exception:
+            pass
+
+
+def publish_facebook_carousel(page_id, image_paths, caption):
+    """Veroeffentlicht mehrere Bilder als Karussell-Beitrag auf einer Facebook-Seite.
+    Jedes Foto wird zunaechst unveroeffentlicht (published=false) hochgeladen, danach
+    werden alle Foto-IDs in einem Feed-Beitrag zusammengefuehrt (attached_media).
+    Scheitert ein Schritt, werden bereits hochgeladene Fotos wieder geloescht."""
+    if not image_paths:
+        return False, "Keine Bilder fuer Karussell uebergeben."
+    token = _page_token(page_id)
+    media_ids = []
+    for path in image_paths:
+        with open(path, "rb") as fh:
+            r = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
+                              data={"published": "false", "access_token": token},
+                              files={"source": fh})
+        if r.status_code != 200:
+            _delete_fb_photos(media_ids, token)
+            return False, _err(r)
+        mid = r.json().get("id")
+        if not mid:
+            _delete_fb_photos(media_ids, token)
+            return False, "Foto-Upload ohne ID-Rueckgabe."
+        media_ids.append(mid)
+    data = {"message": caption or "", "access_token": token}
+    for i, mid in enumerate(media_ids):
+        data["attached_media[%d]" % i] = json.dumps({"media_fbid": mid})
+    r = requests.post(GRAPH + "/%s/feed" % page_id, timeout=120, data=data)
+    if r.status_code == 200:
+        return True, (r.json().get("id") or "")
+    _delete_fb_photos(media_ids, token)   # Feed-Beitrag fehlgeschlagen -> Fotos nicht verwaisen lassen
+    return False, _err(r)
+
+
+# ---------------------------------------------------------------------------
 # Instagram: zweistufige Veroeffentlichung (benoetigt oeffentliche Bild-URL)
 # ---------------------------------------------------------------------------
 def publish_instagram(ig_user_id, image_url, caption):
@@ -119,6 +167,62 @@ def publish_instagram(ig_user_id, image_url, caption):
     if c.status_code != 200:
         return False, _err(c)
     creation_id = c.json().get("id")
+    pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
+                        data={"creation_id": creation_id, "access_token": token})
+    if pub.status_code == 200:
+        return True, pub.json().get("id", "")
+    return False, _err(pub)
+
+
+def _wait_ig_container(container_id, token, attempts=12, delay=2):
+    """Pollt einen Instagram-Container, bis er fertig verarbeitet ist (status_code=FINISHED).
+    Meta laedt das Bild von der image_url asynchron herunter - vor dem Publish muss der
+    Container bereit sein, sonst schlaegt media_publish fehl. Liefert (ok, fehler)."""
+    for _ in range(attempts):
+        r = requests.get(GRAPH + "/%s" % container_id, timeout=30,
+                         params={"fields": "status_code", "access_token": token})
+        if r.status_code == 200:
+            sc = r.json().get("status_code")
+            if sc == "FINISHED":
+                return True, ""
+            if sc == "ERROR":
+                return False, "Instagram-Container-Verarbeitung fehlgeschlagen (status ERROR)."
+        time.sleep(delay)
+    return False, "Instagram-Container nicht rechtzeitig bereit (Timeout)."
+
+
+def publish_instagram_carousel(ig_user_id, image_urls, caption):
+    """Veroeffentlicht mehrere Bilder als Karussell auf einem Instagram-Business-Konto.
+    Jede image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ablauf:
+    je Bild einen Kind-Container (is_carousel_item=true) -> auf FINISHED warten,
+    dann einen CAROUSEL-Container mit allen Kindern -> auf FINISHED warten -> Publish.
+    Hinweis: wie publish_instagram noch nicht in der Web-Oberflaeche verdrahtet -
+    wird scharfgeschaltet, sobald die Bilder oeffentlich erreichbar sind (IG-Anbindung)."""
+    if not image_urls:
+        return False, "Keine Bild-URLs fuer Karussell uebergeben."
+    token = _user_token()
+    child_ids = []
+    for url in image_urls:
+        c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120,
+                          data={"image_url": url, "is_carousel_item": "true", "access_token": token})
+        if c.status_code != 200:
+            return False, _err(c)
+        cid = c.json().get("id")
+        if not cid:
+            return False, "Kind-Container ohne ID-Rueckgabe."
+        ok, err = _wait_ig_container(cid, token)
+        if not ok:
+            return False, err
+        child_ids.append(cid)
+    cont = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120,
+                         data={"media_type": "CAROUSEL", "children": ",".join(child_ids),
+                               "caption": caption or "", "access_token": token})
+    if cont.status_code != 200:
+        return False, _err(cont)
+    creation_id = cont.json().get("id")
+    ok, err = _wait_ig_container(creation_id, token)
+    if not ok:
+        return False, err
     pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
                         data={"creation_id": creation_id, "access_token": token})
     if pub.status_code == 200:

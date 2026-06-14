@@ -156,6 +156,149 @@ def render(fields, photo_path, slogan, out_path):
     base.save(out_path)
     return out_path
 
+# ---------------------------------------------------------------------------
+# R1 Karussell - mehrere Slides je Thema (Title -> je Bullet eine Slide -> CTA)
+# Gleiches HILO-Design (zwei Verlaufsbaender, Logo-/Slogan-Kreise) wie das Einzelbild.
+# ---------------------------------------------------------------------------
+def _load_cut(photo_path):
+    if photo_path and os.path.exists(photo_path):
+        try:
+            cut = Image.open(photo_path).convert("RGBA")
+            bb = cut.getchannel("A").getbbox()
+            if bb:
+                cut = cut.crop(bb)
+            return cut
+        except Exception:
+            return None
+    return None
+
+def _draw_bands(base):
+    """Zeichnet die zwei Verlaufsbaender (oben/unten) und liefert deren Innenkanten."""
+    grad = _gradient()
+    TOPB, BOTB = 192, 905
+    mt = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mt).polygon([(0,0),(W,0)]+[(x, TOPB+22*math.sin((x/W)*2*math.pi)) for x in range(W,-1,-15)], fill=255)
+    base.paste(grad, (0, 0), mt)
+    mb = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
+    base.paste(grad, (0, 0), mb)
+    return TOPB, BOTB
+
+def _draw_circles(base, slogan):
+    """Logo-Kreis (links) und Slogan-Kreis (rechts) im unteren Band - identisch zum Einzelbild."""
+    dr = ImageDraw.Draw(base)
+    R = 102; ccy = 946
+    def shadow(cx, cy):
+        sh = Image.new("RGBA", base.size, (0,0,0,0))
+        ImageDraw.Draw(sh).ellipse([cx-R+5, cy-R+13, cx+R+5, cy+R+13], fill=(0,0,0,100))
+        blr = sh.filter(ImageFilter.GaussianBlur(15)); base.paste(blr, (0,0), blr)
+    lx = R + 22; shadow(lx, ccy)
+    dr.ellipse([lx-R, ccy-R, lx+R, ccy+R], fill=WHITE)
+    if os.path.exists(LOGO_PATH):
+        logo = Image.open(LOGO_PATH).convert("RGBA"); lw = 170; lh2 = int(logo.height*lw/logo.width)
+        logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(ccy-lh2/2)), logo)
+    rx = W - R - 22; shadow(rx, ccy)
+    dr.ellipse([rx-R, ccy-R, rx+R, ccy+R], fill=BLUE)
+    fsl = _font(_BOLD, 33); lines = _slogan_lines(dr, slogan, fsl, 2*R - 36)
+    sy = ccy - (len(lines)-1)*(fsl.size+4)//2
+    for ln in lines:
+        dr.text((rx, sy), ln, font=fsl, fill=WHITE, anchor="mm"); sy += fsl.size + 4
+
+def _draw_pager(base, idx, total):
+    """Seitenpunkte im oberen Band zeigen die Position in der Karussell-Folge."""
+    if total <= 1:
+        return
+    dr = ImageDraw.Draw(base)
+    r = 7; gap = 26; x0 = W//2 - (total-1)*gap//2; y = 168
+    for i in range(total):
+        cx = x0 + i*gap
+        if i == idx:
+            dr.ellipse([cx-r, y-r, cx+r, y+r], fill=WHITE)
+        else:
+            dr.ellipse([cx-r, y-r, cx+r, y+r], outline=WHITE, width=2)
+
+def _slide_title(fields, photo_path, slogan, idx, total):
+    cut = _load_cut(photo_path)
+    base = Image.new("RGB", (W, H), LIGHT)
+    grad = _gradient()
+    TOPB, BOTB = 192, 905
+    mt = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mt).polygon([(0,0),(W,0)]+[(x, TOPB+22*math.sin((x/W)*2*math.pi)) for x in range(W,-1,-15)], fill=255)
+    base.paste(grad, (0, 0), mt)
+    if cut is not None:
+        pw = 625; sc = pw / cut.width; chh = int(cut.height * sc)
+        cut2 = cut.resize((pw, chh), Image.LANCZOS)
+        base.paste(cut2, (W - 16 - pw, 205), cut2)
+    mb = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
+    base.paste(grad, (0, 0), mb)
+    dr = ImageDraw.Draw(base); margin = 54
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, W - 2*margin, 2)
+    yy = 72 if len(HL) == 2 else 96
+    for ln in HL:
+        dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
+    LCOL = 430 if cut is not None else (W - margin)
+    fsb = _font(_REG, 33); SL = _wrap(dr, fields.get("subline", ""), fsb, LCOL - margin)
+    bh = len(SL)*(fsb.size+10)
+    y = TOPB + (BOTB - TOPB - bh)//2 + fsb.size//2
+    for ln in SL:
+        dr.text((margin, y), ln, font=fsb, fill=NAVY, anchor="lm"); y += fsb.size + 10
+    fc = _font(_BOLD, 30)
+    dr.text((W//2, (BOTB + H)//2 + 12), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
+    _draw_circles(base, slogan)
+    _draw_pager(base, idx, total)
+    return base
+
+def _slide_bullet(text, slogan, idx, total, nummer):
+    base = Image.new("RGB", (W, H), LIGHT)
+    TOPB, BOTB = _draw_bands(base)
+    dr = ImageDraw.Draw(base); margin = 78
+    nr = 44; ncx = W//2; ncy = TOPB + 96
+    dr.ellipse([ncx-nr, ncy-nr, ncx+nr, ncy+nr], fill=GREEN)
+    dr.text((ncx, ncy), str(nummer), font=_font(_BOLD, 46), fill=WHITE, anchor="mm")
+    f, L = _fit(dr, text, _BOLD, 58, 32, W - 2*margin, 6)
+    top = ncy + nr + 40
+    th = len(L)*(f.size+12)
+    y = top + (BOTB - top - th)//2 + f.size//2
+    for ln in L:
+        dr.text((W//2, y), ln, font=f, fill=NAVY, anchor="mm"); y += f.size + 12
+    _draw_circles(base, slogan)
+    _draw_pager(base, idx, total)
+    return base
+
+def _slide_cta(fields, slogan, idx, total):
+    base = Image.new("RGB", (W, H), LIGHT)
+    TOPB, BOTB = _draw_bands(base)
+    dr = ImageDraw.Draw(base); margin = 78
+    head = _font(_BOLD, 34)
+    dr.text((W//2, TOPB + 86), "Jetzt aktiv werden", font=head, fill=GREEN2, anchor="mm")
+    fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 5)
+    top = TOPB + 150
+    th = len(CL)*(fc.size+12)
+    y = top + (BOTB - top - th)//2 + fc.size//2
+    for ln in CL:
+        dr.text((W//2, y), ln, font=fc, fill=NAVY, anchor="mm"); y += fc.size + 12
+    _draw_circles(base, slogan)
+    _draw_pager(base, idx, total)
+    return base
+
+def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6):
+    """Rendert ein Karussell: Title-Slide + je Bullet eine Slide + CTA-Slide.
+    Liefert die Liste der Slide-Pfade in Reihenfolge. max_slides begrenzt die Gesamtzahl."""
+    os.makedirs(out_dir, exist_ok=True)
+    bullets = [b for b in (fields.get("bullets") or []) if b]
+    bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
+    total = 1 + len(bullets) + 1
+    slides = [_slide_title(fields, photo_path, slogan, 0, total)]
+    for i, b in enumerate(bullets):
+        slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1))
+    slides.append(_slide_cta(fields, slogan, total - 1, total))
+    paths = []
+    for i, img in enumerate(slides):
+        p = os.path.join(out_dir, "%s_%02d.png" % (prefix, i + 1))
+        img.save(p); paths.append(p)
+    return paths
+
 def render_drafts():
     import bildmotiv
     from db import get_conn
