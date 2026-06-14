@@ -352,13 +352,13 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
   </div>
 {% endfor %}
 </div>
-<form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an alle {{items|length}} gezeigten Ziele veröffentlichen?')">
+<form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an die {{ziel_count}} gültigen Ziele veröffentlichen?')">
   {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}">{% endfor %}
   {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}">{% endfor %}
   <input type=hidden name=format value="{{fmt}}"><input type=hidden name=kanal value="{{kanal}}">
   <div class=foot><a href="/einplanung">&larr; Auswahl ändern</a>
-    <span class=hint>Kanal: <b>{{kanal_de}}</b> · {{items|length}} Ziel(e)</span>
-    <button>Jetzt veröffentlichen</button></div>
+    <span class=hint>Kanal: <b>{{kanal_de}}</b> · {{ziel_count}} Ziel(e)</span>
+    <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
 </form>"""
 
 KALENDER = """<!doctype html><meta charset=utf-8><title>Content-Kalender</title>
@@ -1091,6 +1091,15 @@ def vorschau(eid):
         except Exception:
             f = {}
         pdir = os.path.join(DATA_DIR, "preview"); os.makedirs(pdir, exist_ok=True)
+        # alte Vorschaubilder aufraeumen (aelter als 6 Stunden) - der Ordner ist nur ein Cache
+        try:
+            grenze = time.time() - 6 * 3600
+            for fn in os.listdir(pdir):
+                fp = os.path.join(pdir, fn)
+                if os.path.isfile(fp) and os.path.getmtime(fp) < grenze:
+                    os.remove(fp)
+        except Exception:
+            pass
         import personalisierung
         for sid in stelle_ids:
             stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
@@ -1105,17 +1114,20 @@ def vorschau(eid):
                 items.append({"label": "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else ""),
                               "ok": True, "caption": pf.get("caption") or f.get("caption") or "",
                               "url": url_for("preview_bild", eid=eid, sid=int(stelle["id"])) + "?v=%d" % v})
-            except Exception as ex:
-                items.append({"label": stelle["name"], "ok": False, "caption": "Vorschau-Fehler: %s" % ex})
+            except Exception:
+                log.exception("Vorschau-Render fehlgeschlagen (Entwurf %s / Stelle %s)", eid, sid)
+                items.append({"label": stelle["name"], "ok": False,
+                              "caption": "Vorschau konnte nicht erstellt werden."})
         for pid in page_ids:
             items.append({"label": "Facebook-Seite %s" % pid, "ok": True,
                           "caption": f.get("caption") or f.get("ueberschrift") or "",
                           "url": url_for("bild", eid=eid)})
+    ziel_count = sum(1 for it in items if it.get("ok"))
     return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt=fmt, kanal=kanal, kanal_de=kanal_de,
-                                  items=items, stelle_ids=stelle_ids, page_ids=page_ids))
+                                  items=items, ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids))
 
 @app.route("/preview-bild/<int:eid>/<int:sid>")
-@login_required
+@rolle_required("freigeber")
 def preview_bild(eid, sid):
     p = os.path.join(DATA_DIR, "preview", "e%d_stelle_%d.png" % (eid, sid))
     if not os.path.exists(p):
