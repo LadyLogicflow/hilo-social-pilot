@@ -288,6 +288,9 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button class=no name=aktion value=verwerfen>Verwerfen</button>
       <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
+    <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <button style="background:#6b7280" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
@@ -313,7 +316,10 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
          <input type=date name=geplant_fuer value="{{e.geplant_fuer}}" style="padding:5px">
          <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form>
        <form method=post action="/beitrag-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag nach den aktuellen Vorgaben neu erzeugen (Text + Bild)? Der geplante Termin bleibt erhalten.')">
-         <button style="background:#4c7b2d;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form></p>
+         <button style="background:#4c7b2d;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form>
+       <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
+         <input type=hidden name=zurueck value=einplanung>
+         <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
@@ -741,6 +747,36 @@ def beitrag_neu(eid):
         flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
               "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
     return redirect(url_for("einplanung"))
+
+@app.route("/bild-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def bild_neu(eid):
+    """Rendert NUR das Bild eines Beitrags neu (aktuelles Layout, bestehendes Motiv aus dem Cache) -
+    ohne Text- oder Motiv-Neuerzeugung, also ohne KI-Kosten. Text, Status und Termin bleiben."""
+    zurueck = request.form.get("zurueck", "einplanung")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bild von Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+    try:
+        import bildmotiv
+        data = json.loads(e["text"])
+        photo = bildmotiv.ensure_photo(data.get("bild_motiv"))   # Cache -> kein neuer KI-Aufruf
+        slogan = bildgen.pick_slogan(data.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(data, photo, slogan, out)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, eid))
+            audit_log(conn, session["user"], "bild_neu_erzeugt", eid)
+            conn.commit()
+        flash("Bild von Beitrag %d neu erzeugt (Text unverändert)." % eid)
+    except Exception as ex:
+        flash("Bild konnte nicht neu erzeugt werden: %s" % ex)
+    return redirect(ziel)
 
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
           "September", "Oktober", "November", "Dezember"]
