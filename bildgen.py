@@ -11,6 +11,10 @@ W = H = 1080
 # Text-Unterkante: Schriften enden oberhalb der schwebenden Kreise (Kreis-Oberkante 844,
 # inkl. weichem Schatten-Halo) - so wird kein Text vom Kreis oder Schatten verdeckt.
 CBOT = 788
+CTOPTEXT = H - CBOT        # = 292: Text-Oberkante, wenn die Kreise oben stehen (gespiegelt)
+TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender
+# Eckpositionen der beiden CI-Kreise (Erkennungszeichen) - sorgen fuer Abwechslung je Beitrag
+CIRCLE_POSITIONS = ["unten", "oben", "diagonal"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
@@ -172,10 +176,42 @@ def _draw_bands(base):
     base.paste(grad, (0, 0), mb)
     return TOPB, BOTB
 
-def _draw_circles(base, slogan):
-    """Logo-Kreis (links) und Slogan-Kreis (rechts) im unteren Band - identisch zum Einzelbild."""
+def _last_circlepos_path():
+    return os.path.join(DATA_DIR, "last_circlepos.txt")
+
+def pick_circle_pos():
+    """Waehlt die Eckposition der beiden CI-Kreise je Beitrag (Abwechslung) - bevorzugt
+    eine andere als zuletzt: 'unten' (beide unten), 'oben' (beide oben),
+    'diagonal' (Logo oben-links + Slogan unten-rechts)."""
+    last = ""
+    try:
+        last = open(_last_circlepos_path(), encoding="utf-8").read().strip()
+    except Exception:
+        pass
+    opts = [p for p in CIRCLE_POSITIONS if p != last] or CIRCLE_POSITIONS
+    chosen = random.choice(opts)
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        open(_last_circlepos_path(), "w", encoding="utf-8").write(chosen)
+    except Exception:
+        pass
+    return chosen
+
+def _content_bounds(pos):
+    """Vertikale Textgrenzen je nach Kreisposition, damit kein Text einen Kreis beruehrt:
+    bei Kreisen oben startet der Text tiefer, bei Kreisen unten endet er hoeher."""
+    ct = CTOPTEXT if pos in ("oben", "diagonal") else TOPB_BAND
+    cb = CBOT if pos in ("unten", "diagonal") else BOTB_BAND
+    return ct, cb
+
+def _draw_circles(base, slogan, pos="unten"):
+    """Logo-Kreis (links) und Slogan-Kreis (rechts) als schwebende Erkennungszeichen in den
+    Ecken. pos = 'unten' (beide unten), 'oben' (beide oben) oder 'diagonal'
+    (Logo oben-links + Slogan unten-rechts) - sorgt fuer Abwechslung je Beitrag."""
     dr = ImageDraw.Draw(base)
-    R = 102; ccy = 946
+    R = 102; CCY_TOP, CCY_BOT = 134, 946
+    logo_y = CCY_TOP if pos in ("oben", "diagonal") else CCY_BOT
+    slogan_y = CCY_TOP if pos == "oben" else CCY_BOT
     def shadow(cx, cy):
         # weicher, etwas groesserer Schlagschatten mit Versatz nach unten-rechts -
         # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass
@@ -183,15 +219,15 @@ def _draw_circles(base, slogan):
         sh = Image.new("RGBA", base.size, (0,0,0,0))
         ImageDraw.Draw(sh).ellipse([cx-R-6, cy-R+2, cx+R+16, cy+R+22], fill=(0,0,0,165))
         blr = sh.filter(ImageFilter.GaussianBlur(22)); base.paste(blr, (0,0), blr)
-    lx = R + 22; shadow(lx, ccy)
-    dr.ellipse([lx-R, ccy-R, lx+R, ccy+R], fill=WHITE)
+    lx = R + 22; shadow(lx, logo_y)
+    dr.ellipse([lx-R, logo_y-R, lx+R, logo_y+R], fill=WHITE)
     if os.path.exists(LOGO_PATH):
         logo = Image.open(LOGO_PATH).convert("RGBA"); lw = 170; lh2 = int(logo.height*lw/logo.width)
-        logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(ccy-lh2/2)), logo)
-    rx = W - R - 22; shadow(rx, ccy)
-    dr.ellipse([rx-R, ccy-R, rx+R, ccy+R], fill=BLUE)
+        logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(logo_y-lh2/2)), logo)
+    rx = W - R - 22; shadow(rx, slogan_y)
+    dr.ellipse([rx-R, slogan_y-R, rx+R, slogan_y+R], fill=BLUE)
     fsl = _font(_BOLD, 33); lines = _slogan_lines(dr, slogan, fsl, 2*R - 36)
-    sy = ccy - (len(lines)-1)*(fsl.size+4)//2
+    sy = slogan_y - (len(lines)-1)*(fsl.size+4)//2
     for ln in lines:
         dr.text((rx, sy), ln, font=fsl, fill=WHITE, anchor="mm"); sy += fsl.size + 4
 
@@ -217,80 +253,85 @@ def _fit_photo(cut, max_h, max_w):
         sc = max_w / cut.width
     return cut.resize((max(1, int(cut.width*sc)), max(1, int(cut.height*sc))), Image.LANCZOS)
 
-def _slide_title(fields, photo_path, slogan, idx, total):
+def _slide_title(fields, photo_path, slogan, idx, total, pos="unten"):
     cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
+    ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 54
-    # Ueberschrift gross, fett, zentriert im oberen Band
-    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 56, 36, W - 2*margin, 2)
+    # Ueberschrift gross, fett, zentriert im oberen Band; bei Kreisen oben schmaler,
+    # damit sie die Eck-Kreise nicht beruehrt
+    head_w = (W - 2*246) if pos in ("oben", "diagonal") else (W - 2*margin)
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 56, 36, head_w, 2)
     yy = 64 if len(HL) == 2 else 92
     for ln in HL:
         dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
     # Eyecatcher (zentriert) + subline (fett, gross, zentriert) als vertikal+horizontal
-    # zentrierte Gruppe im weissen Feld
+    # zentrierte Gruppe im freien Feld zwischen den Kreis-Grenzen (ct..cb)
     fsb = _font(_BOLD, 42); SL = _wrap(dr, fields.get("subline", ""), fsb, W - 2*margin)
     sub_h = len(SL)*(fsb.size + 12)
-    # Foto-Hoehe adaptiv aus Restplatz; Gruppe endet oberhalb der Kreise (CBOT)
-    photo_max = max(140, (CBOT - TOPB) - sub_h - 30 - 36)
+    photo_max = max(140, (cb - ct) - sub_h - 30 - 36)
     cut2 = _fit_photo(cut, min(440, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 30 if cut2 is not None else 0
     group_h = ph + gap + sub_h
-    gy = TOPB + (CBOT - TOPB - group_h)//2
+    gy = ct + (cb - ct - group_h)//2
     if cut2 is not None:
         base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
         gy += ph + gap
     sy = gy + fsb.size//2
     for ln in SL:
         dr.text((W//2, sy), ln, font=fsb, fill=NAVY, anchor="mm"); sy += fsb.size + 12
+    # "Weiterwischen"-Hinweis unten-zentriert (klart die Eck-Kreise in jeder Position)
     fc = _font(_BOLD, 30)
     dr.text((W//2, (BOTB + H)//2 + 12), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
-    _draw_circles(base, slogan)
+    _draw_circles(base, slogan, pos)
     _draw_pager(base, idx, total)
     return base
 
-def _slide_bullet(text, slogan, idx, total, nummer):
+def _slide_bullet(text, slogan, idx, total, nummer, pos="unten"):
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
+    ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 78
-    nr = 44; ncx = W//2; ncy = TOPB + 96
+    nr = 44; ncx = W//2; ncy = ct + 96   # Nummern-Badge unter der oberen Grenze
     dr.ellipse([ncx-nr, ncy-nr, ncx+nr, ncy+nr], fill=GREEN)
     dr.text((ncx, ncy), str(nummer), font=_font(_BOLD, 46), fill=WHITE, anchor="mm")
     f, L = _fit(dr, text, _BOLD, 58, 32, W - 2*margin, 6)
     top = ncy + nr + 40
     th = len(L)*(f.size+12)
-    y = top + (CBOT - top - th)//2 + f.size//2   # Text endet oberhalb der Kreise
+    y = top + (cb - top - th)//2 + f.size//2   # Text bleibt frei von den Kreisen
     for ln in L:
         dr.text((W//2, y), ln, font=f, fill=NAVY, anchor="mm"); y += f.size + 12
-    _draw_circles(base, slogan)
+    _draw_circles(base, slogan, pos)
     _draw_pager(base, idx, total)
     return base
 
-def _slide_cta(fields, photo_path, slogan, idx, total):
+def _slide_cta(fields, photo_path, slogan, idx, total, pos="unten"):
     cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
+    ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 78
     head = _font(_BOLD, 40)
-    dr.text((W//2, TOPB + 70), "Aktiv werden!", font=head, fill=GREEN2, anchor="mm")
+    dr.text((W//2, ct + 70), "Aktiv werden!", font=head, fill=GREEN2, anchor="mm")
     fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 4)
     sub_h = len(CL)*(fc.size + 12)
-    top = TOPB + 128
-    # Foto-Hoehe adaptiv aus Restplatz; Gruppe endet oberhalb der Kreise (CBOT)
-    photo_max = max(140, (CBOT - top) - sub_h - 28 - 30)
+    top = ct + 128
+    # Foto-Hoehe adaptiv aus Restplatz; Gruppe bleibt frei von den Kreisen
+    photo_max = max(140, (cb - top) - sub_h - 28 - 30)
     cut2 = _fit_photo(cut, min(360, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 28 if cut2 is not None else 0
     group_h = ph + gap + sub_h
-    gy = top + (CBOT - top - group_h)//2
+    gy = top + (cb - top - group_h)//2
     if cut2 is not None:
         base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
         gy += ph + gap
     y = gy + fc.size//2
     for ln in CL:
         dr.text((W//2, y), ln, font=fc, fill=NAVY, anchor="mm"); y += fc.size + 12
-    _draw_circles(base, slogan)
+    _draw_circles(base, slogan, pos)
     _draw_pager(base, idx, total)
     return base
 
@@ -301,10 +342,11 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6):
     bullets = [b for b in (fields.get("bullets") or []) if b]
     bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
     total = 1 + len(bullets) + 1
-    slides = [_slide_title(fields, photo_path, slogan, 0, total)]
+    pos = pick_circle_pos()   # Eckposition der Kreise einmal je Beitrag (alle Slides gleich)
+    slides = [_slide_title(fields, photo_path, slogan, 0, total, pos)]
     for i, b in enumerate(bullets):
-        slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1))
-    slides.append(_slide_cta(fields, photo_path, slogan, total - 1, total))
+        slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1, pos))
+    slides.append(_slide_cta(fields, photo_path, slogan, total - 1, total, pos))
     paths = []
     for i, img in enumerate(slides):
         p = os.path.join(out_dir, "%s_%02d.png" % (prefix, i + 1))
