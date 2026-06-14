@@ -384,7 +384,7 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Ve
 
 {% if bereich=='stellen' %}
 {% if pages_err %}<p class=hint style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}} – du kannst die Seiten-ID solange manuell eintragen.</p>{% endif %}
-<table><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Buchung</th></tr>
+<table><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th></tr>
 {% for b in stellen %}<tr><td>{{b.name}}</td><td>{{b.ort}}</td><td>{{b.leitung}}</td>
 <td>{% if pages %}<form method=post style="margin:0">
   <input type=hidden name=formular value=stelle_fb><input type=hidden name=stelle_id value="{{b.id}}">
@@ -393,6 +393,11 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Ve
     {% if b.fb_seite and (b.fb_seite|string) not in page_id_set %}<option value="{{b.fb_seite}}" selected>{{b.fb_seite}} (alt)</option>{% endif %}
     {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
   </select></form>{% else %}{{fb_name.get(b.fb_seite|string, b.fb_seite) or '-'}}{% endif %}</td>
+<td>{% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:42px;height:42px;border-radius:50%;object-fit:cover;vertical-align:middle;border:1px solid #d4d9e2"> {% endif %}<form method=post enctype="multipart/form-data" style="margin:0;display:inline">
+  <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
+  <input type=file name=portrait accept="image/*" style="width:140px;font-size:12px">
+  <button style="padding:4px 8px">Hochladen</button></form>{% if b.portrait_pfad %}
+  <form method=post style="margin:0;display:inline" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:4px 9px">×</button></form>{% endif %}</td>
 <td>{{b.buchungs_url}}</td></tr>{% endfor %}</table>
 <form method=post><input type=hidden name=formular value=stelle_save>
 <input name=name placeholder="Name der Beratungsstelle" required>
@@ -977,6 +982,39 @@ def verwaltung():
                     audit_log(conn, session["user"], "beratungsstelle_fb_gesetzt", None,
                               "Stelle %s -> %s" % (sid, fb or "(keine)"))
                     flash("Facebook-Seite aktualisiert." if fb else "Facebook-Seite entfernt.")
+            elif formular == "stelle_portrait":
+                sid = request.form.get("stelle_id", "").strip()
+                file = request.files.get("portrait")
+                if sid and sid.isdigit() and file and file.filename:
+                    try:
+                        from PIL import Image
+                        pdir = os.path.join(DATA_DIR, "portraits"); os.makedirs(pdir, exist_ok=True)
+                        dest = os.path.join(pdir, "stelle_%s.png" % sid)
+                        img = Image.open(file.stream).convert("RGB")
+                        w, h = img.size; s = min(w, h)          # mittig quadratisch zuschneiden
+                        img = img.crop(((w-s)//2, (h-s)//2, (w-s)//2+s, (h-s)//2+s))
+                        if s > 400:
+                            img = img.resize((400, 400), Image.LANCZOS)
+                        img.save(dest)
+                        conn.execute("UPDATE beratungsstellen SET portrait_pfad=? WHERE id=?", (dest, sid))
+                        audit_log(conn, session["user"], "beratungsstelle_portrait_gesetzt", None, "Stelle %s" % sid)
+                        flash("Porträt gespeichert.")
+                    except Exception as ex:
+                        flash("Porträt-Upload fehlgeschlagen: %s" % ex)
+                else:
+                    flash("Bitte eine Bilddatei wählen.")
+            elif formular == "stelle_portrait_del":
+                sid = request.form.get("stelle_id", "").strip()
+                if sid:
+                    row = conn.execute("SELECT portrait_pfad FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+                    if row and row["portrait_pfad"]:
+                        try:
+                            os.remove(row["portrait_pfad"])
+                        except Exception:
+                            pass
+                    conn.execute("UPDATE beratungsstellen SET portrait_pfad=NULL WHERE id=?", (sid,))
+                    audit_log(conn, session["user"], "beratungsstelle_portrait_entfernt", None, "Stelle %s" % sid)
+                    flash("Porträt entfernt – wieder blauer Punkt.")
             elif formular == "anlass_save":
                 datum = request.form.get("datum", "").strip(); anlass = request.form.get("anlass", "").strip()
                 if datum and anlass:
@@ -1034,6 +1072,15 @@ def logo():
     if not os.path.exists(p):
         abort(404)
     return send_file(p, mimetype="image/png")
+
+@app.route("/portrait/<int:sid>")
+@login_required
+def portrait(sid):
+    with get_conn() as conn:
+        row = conn.execute("SELECT portrait_pfad FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+    if not row or not row["portrait_pfad"] or not os.path.exists(row["portrait_pfad"]):
+        abort(404)
+    return send_file(row["portrait_pfad"], mimetype="image/png")
 
 def serve(host="0.0.0.0", port=None):
     init_db()

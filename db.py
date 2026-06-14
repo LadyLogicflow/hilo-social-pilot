@@ -174,6 +174,10 @@ def migrate(conn):
     bcols = [r[1] for r in conn.execute("PRAGMA table_info(beratungsstellen)")]
     if "fb_seite" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN fb_seite TEXT")
+    # Kreisportraet je Beratungsstelle: optionales Bild, das im gerenderten Beitrag den
+    # blauen Slogan-Kreis ersetzt (leer = blauer Punkt).
+    if "portrait_pfad" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN portrait_pfad TEXT")
     # R1 Karussell: Format je Beitrag (einzelbild | karussell)
     ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
     if "format" not in ecols:

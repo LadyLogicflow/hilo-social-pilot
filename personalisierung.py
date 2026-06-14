@@ -28,25 +28,33 @@ def fuer_stelle(fields, stelle):
     return f
 
 
+def _portrait(stelle):
+    """Pfad zum Kreisportraet der Stelle, falls hinterlegt und vorhanden - sonst None
+    (dann zeigt das Bild den blauen Slogan-Punkt)."""
+    p = (stelle["portrait_pfad"] or "").strip() if _has(stelle, "portrait_pfad") else ""
+    return p if (p and os.path.exists(p)) else None
+
+
 def render_fuer_stelle(fields, stelle, out_path):
-    """Rendert das Bild mit personalisiertem CTA (gleiches Foto/Design). Liefert (felder, pfad)."""
+    """Rendert das Bild mit personalisiertem CTA (gleiches Foto/Design). Liefert (felder, pfad).
+    Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
     photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
     slogan = bildgen.pick_slogan(f.get("slogan"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    bildgen.render(f, photo, slogan, out_path)
+    bildgen.render(f, photo, slogan, out_path, portrait=_portrait(stelle))
     return f, out_path
 
 
 def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     """Rendert ein Karussell mit personalisiertem CTA (gleiches Foto/Design je Stelle).
-    Liefert (felder, [pfade])."""
+    Liefert (felder, [pfade]). Kreisportraet der Stelle ersetzt ggf. den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
     photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
     slogan = bildgen.pick_slogan(f.get("slogan"))
-    paths = bildgen.render_slides(f, photo, slogan, out_dir, prefix)
+    paths = bildgen.render_slides(f, photo, slogan, out_dir, prefix, portrait=_portrait(stelle))
     return f, paths
 
 
