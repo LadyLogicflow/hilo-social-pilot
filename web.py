@@ -736,10 +736,16 @@ def thema_loeschen(tid):
     """Loescht ein einzelnes Thema endgueltig (aus Themen-Liste oder Erzeugen-Uebersicht)."""
     zurueck = request.form.get("zurueck", "themen")
     with get_conn() as conn:
-        conn.execute("DELETE FROM themen WHERE id=?", (tid,))
-        audit_log(conn, session["user"], "thema_geloescht", None, "Thema %d" % tid)
+        # nur loeschen, solange das Thema KEINEN Entwurf hat (schliesst das Zeitfenster zwischen
+        # Anzeige und Klick - kein verwaister entwuerfe-Eintrag, da SQLite hier keine FK erzwingt)
+        cur = conn.execute("DELETE FROM themen WHERE id=? "
+                           "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id)", (tid,))
+        if cur.rowcount > 0:
+            audit_log(conn, session["user"], "thema_geloescht", None, "Thema %d" % tid)
+            flash("Thema gelöscht.")
+        else:
+            flash("Thema wurde nicht gelöscht (es hat bereits einen Entwurf oder existiert nicht mehr).")
         conn.commit()
-    flash("Thema gelöscht.")
     return redirect(url_for("erzeugen") if zurueck == "erzeugen" else url_for("themen"))
 
 @app.route("/quellen", methods=["GET", "POST"])
