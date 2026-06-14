@@ -62,6 +62,7 @@ def upload(local_path, remote_name=None):
     if not os.path.exists(local_path):
         raise FileNotFoundError(local_path)
     remote_name = remote_name or os.path.basename(local_path)
+    remote_name = posixpath.basename(remote_name)   # Pfad-Anteile entfernen (kein '../', kein Unterordner)
     remote_path = posixpath.join(remote_dir, remote_name) if remote_dir else remote_name
 
     transport = paramiko.Transport((host, port))
