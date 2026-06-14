@@ -83,14 +83,12 @@ def pick_slogan(s):
 def _slogan_lines(dr, slogan, font, max_w):
     # in maximal 3 kurze Zeilen umbrechen
     lines = _wrap(dr, slogan, font, max_w)[:3]
-    # Orphan vermeiden: ein einzelnes letztes Wort (z.B. "HILO") nicht allein in der
-    # Zeile stehen lassen - mit dem vorletzten Wort zusammenziehen, sofern es passt
-    if len(lines) >= 2 and len(lines[-1].split()) == 1 and len(lines[-2].split()) >= 2:
-        prev = lines[-2].split()
-        zusammen = prev[-1] + " " + lines[-1]
-        if dr.textlength(zusammen, font=font) <= max_w:
-            lines[-2] = " ".join(prev[:-1])
-            lines[-1] = zusammen
+    # Markenwort "HILO" soll allein in seiner Zeile stehen (Hervorhebung): endet die
+    # letzte Zeile auf HILO mit weiteren Woertern davor, wird HILO abgetrennt
+    last = lines[-1].split()
+    if len(last) >= 2 and last[-1].rstrip(".!,").upper() == "HILO" and len(lines) < 3:
+        lines[-1] = " ".join(last[:-1])
+        lines.append(last[-1])
     return lines
 
 def render(fields, photo_path, slogan, out_path):
