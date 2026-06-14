@@ -247,6 +247,10 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}</style>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
+      <select name=kanal title="Kanal">
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="beide">Facebook + Instagram</option></select>
       <button>Personalisiert veröffentlichen</button>
     </form>
     <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst.</p>
@@ -257,6 +261,10 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}</style>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
+      <select name=kanal title="Kanal">
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="beide">Facebook + Instagram</option></select>
       <button>Jetzt veröffentlichen</button>
     </form>
     <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
@@ -768,6 +776,30 @@ def aktion(eid):
         conn.commit()
     return redirect(url_for("entwuerfe"))
 
+def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id):
+    """Instagram-Veroeffentlichung: Bild(er) oeffentlich hochladen (IONOS) -> https-URL(s),
+    das mit der Facebook-Seite verknuepfte IG-Konto ermitteln, dann posten. (ok, info)."""
+    import uploader, time
+    if not uploader.configured():
+        return False, ("Instagram-Bild-Upload nicht konfiguriert (Secrets ionos_sftp_* + "
+                       "ionos_public_base_url auf dem Pi setzen).")
+    ig_id = None
+    for pg in publish.list_pages():
+        if str(pg.get("id")) == str(fb_page_id):
+            ig_id = pg.get("ig_id"); break
+    if not ig_id:
+        return False, "Keine Instagram-Verknuepfung fuer diese Facebook-Seite gefunden."
+    valid = [b for b in bilder if b and os.path.exists(b)]
+    if not valid:
+        return False, "Kein Bild zum Hochladen vorhanden."
+    stamp = int(time.time())
+    urls = [uploader.upload(b, remote_name="e%d_%s_%d_%d.png" % (eid, stelle_id or "p", stamp, i))
+            for i, b in enumerate(valid)]
+    if fmt == "karussell" and len(urls) > 1:
+        return publish.publish_instagram_carousel(ig_id, urls, caption)
+    return publish.publish_instagram(ig_id, urls[0], caption)
+
+
 @app.route("/veroeffentlichen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def veroeffentlichen(eid):
@@ -777,6 +809,9 @@ def veroeffentlichen(eid):
     if not stelle_id and not page_id:
         flash("Bitte eine Beratungsstelle bzw. Facebook-Seite wählen."); return redirect(url_for("einplanung"))
     fmt = request.form.get("format", "").strip()
+    kanal = request.form.get("kanal", "facebook").strip()
+    if kanal not in ("facebook", "instagram", "beide"):
+        kanal = "facebook"
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
@@ -814,26 +849,39 @@ def veroeffentlichen(eid):
             flash("Kein Bild vorhanden - Veröffentlichung abgebrochen."); return redirect(url_for("einplanung"))
         # gewaehltes Format am Entwurf festhalten (Format ist Entwurfs-Eigenschaft, unabhaengig vom Publish-Erfolg)
         conn.execute("UPDATE entwuerfe SET format=? WHERE id=?", (fmt, eid))
-        try:
-            import publish
-            if fmt == "karussell":
-                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, caption)
+        import publish
+        ergebnisse = []   # (kanal, ok, info)
+        if kanal in ("facebook", "beide"):
+            try:
+                if fmt == "karussell":
+                    ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, caption)
+                else:
+                    ok, info = publish.publish_facebook(ziel_seite, bilder[0], caption)
+            except Exception as ex:
+                ok, info = False, str(ex)
+            ergebnisse.append(("facebook", ok, info))
+        if kanal in ("instagram", "beide"):
+            try:
+                ok, info = _publish_instagram(publish, ziel_seite, bilder, caption, fmt, eid, stelle_id)
+            except Exception as ex:
+                ok, info = False, str(ex)
+            ergebnisse.append(("instagram", ok, info))
+        erfolg = False
+        for k, ok, info in ergebnisse:
+            if ok:
+                erfolg = True
+                conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, "
+                             "veroeffentlicht_am, status) VALUES (?,?,?,datetime('now'),'veroeffentlicht')",
+                             (eid, k, info))
+                audit_log(conn, user, "veroeffentlicht_%s" % k, eid, "Format %s / Ziel %s / Post %s" % (fmt, ziel_seite, info))
             else:
-                ok, info = publish.publish_facebook(ziel_seite, bilder[0], caption)
-        except Exception as ex:
-            ok, info = False, str(ex)
-        if ok:
-            conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, "
-                         "veroeffentlicht_am, status) VALUES (?,?,?,datetime('now'),'veroeffentlicht')",
-                         (eid, "facebook", info))
+                conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
+                             (eid, k, "fehler", info))
+                audit_log(conn, user, "veroeffentlichung_fehler_%s" % k, eid, info)
+        if erfolg:
             conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (eid,))
-            audit_log(conn, user, "veroeffentlicht_facebook", eid, "Format %s / Seite %s / Post %s" % (fmt, ziel_seite, info))
-            flash("Beitrag %d als %s auf Facebook veröffentlicht." % (eid, "Karussell" if fmt == "karussell" else "Einzelbild"))
-        else:
-            conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
-                         (eid, "facebook", "fehler", info))
-            audit_log(conn, user, "veroeffentlichung_fehler", eid, info)
-            flash("Veröffentlichung fehlgeschlagen: %s" % info)
+        teile = ["%s: %s" % (k.capitalize(), ("OK" if ok else "Fehler – %s" % info)) for k, ok, info in ergebnisse]
+        flash("Beitrag %d (%s) → %s" % (eid, "Karussell" if fmt == "karussell" else "Einzelbild", " | ".join(teile)))
         conn.commit()
     return redirect(url_for("einplanung"))
 
