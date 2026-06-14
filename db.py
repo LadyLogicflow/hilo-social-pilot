@@ -70,6 +70,41 @@ ANLASS_SEED = [
     ("12-24", "Heiligabend", "Frohe Weihnachten - und der Hinweis: Spenden bis 31.12. mindern noch die Steuer dieses Jahres."),
 ]
 
+# Steuerlicher Contentkalender (von Catrin, 2026-06-14) - besondere Tage mit Steuer-Bezug.
+# Einmalig per seed_contentkalender() eingespielt (auch in bereits bestehende DBs).
+CONTENT_KALENDER = [
+    ("01-11", "Tag des deutschen Apfels", "Sachbezüge und die 50-Euro-Freigrenze für Arbeitnehmer."),
+    ("01-28", "Datenschutztag", "Homeoffice-Pauschale und häusliches Arbeitszimmer absetzen."),
+    ("02-10", "Safer Internet Day", "Heimcomputer und Arbeitsmittel von der Steuer absetzen."),
+    ("03-05", "Energiespar-Tag", "Energetische Sanierung: Steuerbonus nach §35c EStG."),
+    ("03-08", "Internationaler Frauentag", "Steuerklassenwahl und Ehegattensplitting."),
+    ("04-01", "Tag der älteren Generation", "Rentenbesteuerung und Altersentlastungsbetrag."),
+    ("04-23", "Girls' Day", "Ausbildungsfreibetrag und Kindergeld."),
+    ("04-28", "Tag für Gesundheit am Arbeitsplatz", "Gesundheitsförderung durch den Arbeitgeber (§3 Nr. 34 EStG)."),
+    ("05-03", "Welttag der Pressefreiheit", "Werbungskosten für nebenberufliche Journalisten."),
+    ("05-15", "Tag der Familie", "Kinderfreibetrag oder Kindergeld und Betreuungskosten."),
+    ("05-27", "Tag des Purzelbaums", "Ist das Fitnessstudio absetzbar? (meistens leider nicht)"),
+    ("06-01", "Internationaler Kindertag", "Kinderbetreuungskosten nach §10 Abs. 1 Nr. 5 EStG."),
+    ("06-03", "Tag des Fahrrades", "Dienstrad-Leasing und die 0,25-Prozent-Regelung."),
+    ("06-20", "Weltflüchtlingstag", "Ehrenamtspauschale für ehrenamtliche Helfer."),
+    ("07-26", "Tag der Seenotretter", "Spenden von der Steuer absetzen (§10b EStG)."),
+    ("08-07", "Internationaler Tag des Bieres", "Bewirtungskosten und betriebliche Feiern."),
+    ("08-12", "Tag der Jugend", "Ausbildungsfreibetrag sowie BAföG und Steuer."),
+    ("09-05", "Tag des Kaffees", "Sachbezüge und Bewirtungskosten beim Arbeitgeber."),
+    ("09-13", "Tag der Heimat", "Doppelte Haushaltsführung steuerlich nutzen."),
+    ("09-25", "Tag der Zahngesundheit", "Zahnarztkosten als außergewöhnliche Belastung."),
+    ("10-01", "Tag der Älteren", "Pflegekosten absetzen und Rentenbesteuerung."),
+    ("10-17", "Tag gegen Armut", "Grundfreibetrag und steuerliches Existenzminimum."),
+    ("10-29", "Welt-Schlaganfall-Tag", "Pflegekosten und Behinderten-Pauschbetrag absetzen."),
+    ("10-30", "Weltspartag", "Freistellungsauftrag und Sparer-Pauschbetrag."),
+    ("11-05", "Tsunami-Tag", "Spenden nach Katastrophen von der Steuer absetzen."),
+    ("11-14", "Weltdiabetestag", "Außergewöhnliche Belastungen und Behinderten-Pauschbetrag."),
+    ("11-16", "Vorlesetag", "Sind Nachhilfekosten absetzbar?"),
+    ("11-28", "Kauf-Nix-Tag", "Was ist eigentlich NICHT von der Steuer absetzbar?"),
+    ("12-05", "Tag der Freiwilligen", "Ehrenamts- und Übungsleiterpauschale."),
+    ("12-09", "Anti-Korruptions-Tag", "Bestechungsgelder sind nicht abziehbar (§4 Abs. 5 EStG)."),
+]
+
 # Zeitlose Wissens-Themen (Evergreen) - fuellen leere Kalendertage
 WISSEN_SEED = [
     ("Wer muss eine Steuererklaerung machen?", "Wer ist zur Abgabe verpflichtet, wer gibt freiwillig ab - und warum sich Letzteres oft lohnt."),
@@ -114,6 +149,16 @@ def seed_wissen(conn):
     if conn.execute("SELECT COUNT(*) FROM wissensthemen").fetchone()[0] == 0:
         conn.executemany("INSERT OR IGNORE INTO wissensthemen(titel, hook) VALUES (?,?)", WISSEN_SEED)
 
+def seed_contentkalender(conn):
+    """Spielt Catrins Steuer-Contentkalender EINMALIG ein - auch in bereits bestehende DBs
+    (anders als die seed_*-Startlisten, die nur bei leerer Tabelle greifen). Sentinel-Eintrag
+    'Datenschutztag' verhindert erneutes Einspielen; manuell geloeschte Tage bleiben geloescht.
+    INSERT OR IGNORE: Namensgleiche Tage (UNIQUE anlass) bleiben unveraendert erhalten."""
+    if conn.execute("SELECT 1 FROM anlasstage WHERE anlass=?", ("Datenschutztag",)).fetchone():
+        return
+    conn.executemany("INSERT OR IGNORE INTO anlasstage(datum, anlass, steuer_hook) VALUES (?,?,?)",
+                     CONTENT_KALENDER)
+
 def init_db():
     with get_conn() as conn:
         conn.execute("PRAGMA journal_mode=WAL")   # gleichzeitiges Lesen/Schreiben (Webserver + Subprozesse)
@@ -121,6 +166,7 @@ def init_db():
         migrate(conn)
         seed_anlasstage(conn)
         seed_wissen(conn)
+        seed_contentkalender(conn)
 
 def audit_log(conn, benutzer, aktion, entwurf_id=None, details=""):
     conn.execute("INSERT INTO audit(benutzer, aktion, entwurf_id, details) VALUES (?,?,?,?)",
