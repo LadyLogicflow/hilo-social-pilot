@@ -1,0 +1,13 @@
+[Unit]
+Description=HILO Social-Media-Pilot (Tageslauf)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=hilo
+WorkingDirectory=/opt/hilo-pilot
+ExecStart=/opt/hilo-pilot/.venv/bin/python /opt/hilo-pilot/main.py --once
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+# Vorlage. Normalerweise wird die echte Unit-Datei von
+# deploy/install-dashboard-service.sh automatisch mit deinen Pfaden erzeugt.
+# Falls du sie von Hand einrichtest: Pfade und Benutzer anpassen.
+[Unit]
+Description=HILO Social-Media-Pilot - Freigabe-Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=DEIN_BENUTZER
+WorkingDirectory=/pfad/zu/hilo-social-pilot
+ExecStart=/pfad/zu/hilo-social-pilot/.venv/bin/python /pfad/zu/hilo-social-pilot/main.py --serve
+Environment=HILO_DASHBOARD_PORT=8530
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+Pillow>=10.0
+requests>=2.31
+anthropic>=0.39
+openai>=1.40
+Flask>=3.0
+feedparser>=6.0
+pypdf>=4.0
+beautifulsoup4>=4.12
+python-dotenv>=1.0
