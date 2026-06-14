@@ -311,7 +311,9 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
     <p><b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:8px">
          <input type=date name=geplant_fuer value="{{e.geplant_fuer}}" style="padding:5px">
-         <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form></p>
+         <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form>
+       <form method=post action="/beitrag-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag nach den aktuellen Vorgaben neu erzeugen (Text + Bild)? Der geplante Termin bleibt erhalten.')">
+         <button style="background:#4c7b2d;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
@@ -685,6 +687,59 @@ def umplanen(eid):
             audit_log(conn, session["user"], "umgeplant", eid, datum)
             flash("Beitrag %d auf %s umgeplant." % (eid, _de_datum(datum)))
             conn.commit()
+    return redirect(url_for("einplanung"))
+
+@app.route("/beitrag-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def beitrag_neu(eid):
+    """Erzeugt einen (auch bereits freigegebenen) Beitrag nach aktuellen Vorgaben neu - Text + Bild.
+    Status und geplanter Termin bleiben erhalten (render_drafts() nimmt nur Entwuerfe, daher hier direkt)."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        if e["status"] not in ("freigegeben", "entwurf"):
+            flash("Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+            return redirect(url_for("einplanung"))
+        thema = conn.execute("SELECT titel, url, volltext FROM themen WHERE id=?",
+                             (e["thema_id"],)).fetchone() if e["thema_id"] else None
+        kanal = e["kanal"] or "google"
+    # Text neu (falls ein Thema hinterlegt ist), sonst bestehenden Text beibehalten
+    try:
+        if thema:
+            data = textgen.generate({"titel": thema["titel"], "volltext": thema["volltext"],
+                                     "url": thema["url"]}, kanal)
+        else:
+            data = json.loads(e["text"])
+    except Exception as ex:
+        flash("Neu-Erzeugung fehlgeschlagen (Text): %s" % ex); return redirect(url_for("einplanung"))
+    # Bild direkt neu rendern (unabhaengig vom Status)
+    out = None
+    try:
+        import bildmotiv
+        photo = bildmotiv.ensure_photo(data.get("bild_motiv"))
+        slogan = bildgen.pick_slogan(data.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(data, photo, slogan, out)
+    except Exception as ex:
+        out = None
+        flash("Hinweis: Bild konnte nicht neu erzeugt werden (%s) - der Text wurde aktualisiert." % ex)
+    with get_conn() as conn:
+        if out:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), out, eid))
+        else:
+            # Bild fehlgeschlagen: neuer Text wuerde nicht zum alten Bild passen -> nicht freigegeben/
+            # geplant mit Mismatch stehen lassen, sondern zurueck in die Entwurfs-Pruefung (Termin bleibt).
+            conn.execute("UPDATE entwuerfe SET text=?, status='entwurf' WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), eid))
+        audit_log(conn, session["user"], "beitrag_neu_erzeugt", eid)
+        conn.commit()
+    if out:
+        flash("Beitrag %d nach den aktuellen Vorgaben neu erzeugt - bitte vor dem Veröffentlichen prüfen." % eid)
+    else:
+        flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
+              "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
     return redirect(url_for("einplanung"))
 
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
