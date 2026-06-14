@@ -51,7 +51,21 @@ def main():
     p.add_argument("--page", metavar="PAGE_ID", help="Ziel-Facebook-Seite fuer --publish")
     p.add_argument("--test-upload", action="store_true",
                    help="Test: ein Bild per SFTP hochladen und die oeffentliche URL anzeigen (fuer Instagram)")
+    p.add_argument("--extend-token", action="store_true",
+                   help="Meta-Token in einen Langzeit-Token (~60 Tage) tauschen (braucht meta_app_id + meta_app_secret)")
     args = p.parse_args()
+
+    if args.extend_token:
+        import publish
+        try:
+            if publish.ensure_long_lived():
+                log.info("Langzeit-Token (~60 Tage) erzeugt und gespeichert.")
+            else:
+                log.info("Kein Tausch durchgefuehrt - meta_app_id/meta_app_secret fehlen oder der "
+                         "Tausch war nicht moeglich (Token gueltig?).")
+        except Exception as ex:
+            log.error("Token-Verlaengerung fehlgeschlagen: %s", ex)
+        return
 
     if args.test_upload:
         import uploader, tempfile

@@ -3,7 +3,7 @@
 Startseite mit Workflow-Kacheln, Stufe 1 (Themenauswahl), Texte/Bilder erzeugen,
 Stufe 2 (Entwuerfe freigeben), Einplanung/Veroeffentlichung, eigene Quellen,
 Admin-Verwaltung (Benutzer + Beratungsstellen). Taeglicher Radar-Lauf um 7 Uhr."""
-import json, os, time, sys, subprocess, threading, functools
+import json, os, time, sys, subprocess, threading, functools, logging
 from flask import (Flask, request, redirect, url_for, session, send_file,
                    render_template_string, flash, abort)
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -14,6 +14,7 @@ from config import BASE_DIR, DATA_DIR
 import textgen, bildgen
 
 app = Flask(__name__)
+log = logging.getLogger("hilo.web")
 
 def _flask_secret():
     sk = get_secret("flask_secret") or os.environ.get("HILO_FLASK_SECRET")
@@ -977,6 +978,14 @@ def logo():
 
 def serve(host="0.0.0.0", port=None):
     init_db()
+    # Beim Start den Meta-Token (falls vorhanden) in einen Langzeit-Token tauschen/erneuern -
+    # best effort, blockiert den Start nie.
+    try:
+        import publish
+        if publish.ensure_long_lived():
+            log.info("Meta-Langzeit-Token erneuert (~60 Tage).")
+    except Exception as ex:
+        log.info("Token-Verlaengerung beim Start uebersprungen: %s", ex)
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))
     app.run(host=host, port=port, threaded=True)
