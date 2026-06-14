@@ -22,7 +22,7 @@ _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/sh
 _REG  = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
 
 STANDARD_SLOGANS = ["Wir sind HILO", "HILO - wir machen's einfach", "Steuern? Machen wir.",
-                    "Mehr Netto fuer Sie", "Ihr gutes Recht", "Einfach mehr rausholen"]
+                    "Mehr Netto für Sie", "Ihr gutes Recht", "Einfach mehr rausholen"]
 
 def _font(paths, size):
     for p in paths:
@@ -82,7 +82,16 @@ def pick_slogan(s):
 
 def _slogan_lines(dr, slogan, font, max_w):
     # in maximal 3 kurze Zeilen umbrechen
-    return _wrap(dr, slogan, font, max_w)[:3]
+    lines = _wrap(dr, slogan, font, max_w)[:3]
+    # Orphan vermeiden: ein einzelnes letztes Wort (z.B. "HILO") nicht allein in der
+    # Zeile stehen lassen - mit dem vorletzten Wort zusammenziehen, sofern es passt
+    if len(lines) >= 2 and len(lines[-1].split()) == 1 and len(lines[-2].split()) >= 2:
+        prev = lines[-2].split()
+        zusammen = prev[-1] + " " + lines[-1]
+        if dr.textlength(zusammen, font=font) <= max_w:
+            lines[-2] = " ".join(prev[:-1])
+            lines[-1] = zusammen
+    return lines
 
 def render(fields, photo_path, slogan, out_path):
     cut = None

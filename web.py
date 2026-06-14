@@ -159,16 +159,20 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
 .run{color:#4c7b2d;font-weight:bold;font-size:13px;margin-top:8px}</style>
 """ + _NAV + """
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-<div class=info>&#x1F552; Themen werden t&auml;glich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
+<div class=info>&#x1F552; Themen werden täglich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
 <div class=grid>
-  <a class=tile href="/themen">{% if themen_offen %}<span class=badge>{{themen_offen}}</span>{% endif %}<h3>1. Freigabe: Themen</h3><p>Themen f&uuml;r die Kampagne ausw&auml;hlen (Stufe 1).</p></a>
-  <div class="tile action"><h3>2. Texte &amp; Bilder erzeugen</h3><p>F&uuml;r ausgew&auml;hlte Themen Beitr&auml;ge erstellen.</p>
-    {% if gen_running %}<div class=run>&#x23F3; L&auml;uft im Hintergrund &hellip;</div>
-    {% else %}<form method=post action="/generieren"><button>Jetzt erzeugen{% if bereit %} ({{bereit}}){% endif %}</button></form>{% endif %}</div>
-  <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entw&uuml;rfe pr&uuml;fen, &uuml;berarbeiten, freigeben (Stufe 2).</p></a>
-  <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Ver&ouml;ffentlichung</h3><p>Freigegebene Beitr&auml;ge ver&ouml;ffentlichen.</p></a>
+  <a class=tile href="/themen">{% if themen_offen %}<span class=badge>{{themen_offen}}</span>{% endif %}<h3>1. Freigabe: Themen</h3><p>Themen für die Kampagne auswählen (Stufe 1).</p></a>
+  <div class="tile action"><h3>2. Texte &amp; Bilder erzeugen</h3><p>Für ausgewählte Themen Beiträge erstellen.</p>
+    {% if gen_running %}<div class=run>&#x23F3; Läuft im Hintergrund &hellip;</div>
+    {% elif bereit %}<form method=post action="/generieren">
+      <label style="font-size:13px;color:#15336e">Anzahl: <input type=number name=anzahl min=1 max="{{bereit}}" value="{{ [5, bereit]|min }}" style="width:64px;padding:6px"></label>
+      <button>Jetzt erzeugen</button></form>
+      <div class=hint>{{bereit}} Themen verfügbar – wähle, wie viele Beiträge erzeugt werden sollen.</div>
+    {% else %}<p class=hint>Keine ausgewählten Themen offen. Erst unter „1. Freigabe: Themen" auswählen.</p>{% endif %}</div>
+  <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entwürfe prüfen, überarbeiten, freigeben (Stufe 2).</p></a>
+  <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monats&uuml;bersicht: geplante Beitr&auml;ge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>"""
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>"""
 
 ENTWUERFE = """<!doctype html><meta charset=utf-8><title>Freigabe: Texte & Bilder</title>
 <style>""" + _TOP + """
@@ -188,13 +192,13 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <p><span class=cta>{{e.f.cta}}</span></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     <form method=post action="/aktion/{{e.id}}">
-      <textarea name=feedback placeholder="&Auml;nderungswunsch (z.B. 'Bild freundlicher') &ndash; dann '&Uuml;berarbeiten'"></textarea>
+      <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
       <button class=ok name=aktion value=freigeben>Freigeben</button>
-      <button class=re name=aktion value=ueberarbeiten>&Uuml;berarbeiten</button>
+      <button class=re name=aktion value=ueberarbeiten>Überarbeiten</button>
       <button class=no name=aktion value=verwerfen>Verwerfen</button>
     </form>
   </div></div>
-{% else %}<p style="text-align:center">Keine offenen Entw&uuml;rfe. Erst Themen ausw&auml;hlen und Beitr&auml;ge erzeugen.</p>{% endfor %}"""
+{% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
 EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentlichung</title>
 <style>""" + _TOP + """
@@ -203,9 +207,9 @@ EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentl
 .t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
 select,button{padding:9px;border-radius:8px;margin:4px 6px 4px 0}
 button{border:0;background:#2e7d32;color:#fff;cursor:pointer}</style>
-<div class=top><h2 style="margin:0;color:#1f428d">Einplanung Ver&ouml;ffentlichung</h2><a href="/">&larr; Startseite</a></div>
+<div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-<p class=hint style="max-width:1040px;margin:0 auto 12px">Freigegebene Beitr&auml;ge werden automatisch auf die n&auml;chsten freien <b>Werktage</b> verteilt (max. 1 pro Tag, Sa+So frei). Termin unten anpassbar. Sondertage &amp; Fristen-Countdown folgen.</p>
+<p class=hint style="max-width:1040px;margin:0 auto 12px">Freigegebene Beiträge werden automatisch auf die nächsten freien <b>Werktage</b> verteilt (max. 1 pro Tag, Sa+So frei). Termin unten anpassbar. Sondertage &amp; Fristen-Countdown folgen.</p>
 {% if pages_err %}<div class=flash style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}}</div>{% endif %}
 {% for e in freigegeben %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
@@ -213,31 +217,31 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}</style>
     <p><b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:8px">
          <input type=date name=geplant_fuer value="{{e.geplant_fuer}}" style="padding:5px">
-         <button style="background:#1f428d;padding:6px 10px">Termin &auml;ndern</button></form></p>
+         <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     {% if stellen %}
-    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return confirm('Diesen Beitrag personalisiert f&uuml;r die gew&auml;hlte Beratungsstelle ver&ouml;ffentlichen?')">
-      <select name=stelle_id required><option value="" disabled selected>Beratungsstelle w&auml;hlen &hellip;</option>
+    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return confirm('Diesen Beitrag personalisiert für die gewählte Beratungsstelle veröffentlichen?')">
+      <select name=stelle_id required><option value="" disabled selected>Beratungsstelle wählen &hellip;</option>
         {% for s in stellen %}<option value="{{s.id}}">{{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</option>{% endfor %}</select>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
-      <button>Personalisiert ver&ouml;ffentlichen</button>
+      <button>Personalisiert veröffentlichen</button>
     </form>
     <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst.</p>
     {% elif pages %}
-    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return confirm('Diesen Beitrag jetzt auf der gew&auml;hlten Facebook-Seite ver&ouml;ffentlichen?')">
-      <select name=page_id required><option value="" disabled selected>Facebook-Seite w&auml;hlen &hellip;</option>
+    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return confirm('Diesen Beitrag jetzt auf der gewählten Facebook-Seite veröffentlichen?')">
+      <select name=page_id required><option value="" disabled selected>Facebook-Seite wählen &hellip;</option>
         {% for p in pages %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}</select>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
-      <button>Jetzt ver&ouml;ffentlichen</button>
+      <button>Jetzt veröffentlichen</button>
     </form>
-    <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beitr&auml;ge automatisch personalisiert.</p>
+    <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
     {% else %}<p class=sub>Kein Facebook-Zugang/keine Beratungsstelle aktiv.</p>{% endif %}
   </div></div>
-{% else %}<p style="text-align:center">Keine freigegebenen Beitr&auml;ge zur Einplanung.</p>{% endfor %}"""
+{% else %}<p style="text-align:center">Keine freigegebenen Beiträge zur Einplanung.</p>{% endfor %}"""
 
 KALENDER = """<!doctype html><meta charset=utf-8><title>Content-Kalender</title>
 <style>""" + _TOP + """
@@ -269,13 +273,13 @@ table.kal{max-width:1120px;margin:0 auto;border-collapse:collapse;width:100%;bac
 </td>{% endfor %}
 </tr>{% endfor %}
 </table>
-<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Gr&uuml;n = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (gr&uuml;n = bereits ver&ouml;ffentlicht)</p>"""
+<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)</p>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
 .q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}</style>
 <div class=box style="max-width:980px">
 <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Freigabe: Themen (Stufe 1)</h2><a href="/">&larr; Startseite</a></div>
-<p class=hint>W&auml;hle die Themen aus, die in die Kampagne sollen. Erst f&uuml;r <b>ausgew&auml;hlte</b> Themen werden danach Text und Bild erzeugt (spart Token).</p>
+<p class=hint>Wähle die Themen aus, die in die Kampagne sollen. Erst für <b>ausgewählte</b> Themen werden danach Text und Bild erzeugt (spart Token).</p>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 {% if themen %}
 <form method=post>
@@ -289,7 +293,7 @@ THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><s
 </table>
 <p><button name=aktion value=auswaehlen>Markierte freigeben &rarr; Stufe 2</button></p>
 </form>
-{% else %}<p>Keine offenen Themen. Der t&auml;gliche 7-Uhr-Lauf f&uuml;llt diese Liste automatisch.</p>{% endif %}
+{% else %}<p>Keine offenen Themen. Der tägliche 7-Uhr-Lauf füllt diese Liste automatisch.</p>{% endif %}
 </div>"""
 
 QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><style>""" + _STYLE + """
@@ -297,7 +301,7 @@ QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><st
 .drop{border:2px dashed #ccd3df;border-radius:12px;padding:18px;margin:8px 0;background:#fafbfc}</style>
 <div class=box>
 <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Eigene Quellen einwerfen</h2><a href="/">&larr; Startseite</a></div>
-<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. HISOME liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur &ouml;ffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
+<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. HISOME liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur öffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=drop><h3>PDF hochladen</h3>
 <form method=post enctype=multipart/form-data><input type=file name=pdf accept="application/pdf,.pdf" required>
@@ -337,27 +341,27 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><sty
 <input name=homepage_url placeholder="Link Homepage">
 <input name=buchungs_url placeholder="Link Buchungskalender">
 <button>Beratungsstelle speichern</button></form>
-<p class=hint>Die Facebook-Seite verkn&uuml;pft die Stelle f&uuml;r personalisierte Beitr&auml;ge und die richtige Ver&ouml;ffentlichung.</p>
+<p class=hint>Die Facebook-Seite verknüpft die Stelle für personalisierte Beiträge und die richtige Veröffentlichung.</p>
 
 <h3 style="margin-top:26px">Anlass-Tage</h3>
-<p class=hint>Besondere Tage mit Steuer-Aufh&auml;nger. Datum als MM-TT (z.B. 04-23). F&auml;llt der Tag aufs Wochenende, erscheint der Beitrag am Freitag davor.</p>
-<table><tr><th>Datum</th><th>Anlass</th><th>Steuer-Aufh&auml;nger</th><th>Aktiv</th><th></th></tr>
+<p class=hint>Besondere Tage mit Steuer-Aufhänger. Datum als MM-TT (z.B. 04-23). Fällt der Tag aufs Wochenende, erscheint der Beitrag am Freitag davor.</p>
+<table><tr><th>Datum</th><th>Anlass</th><th>Steuer-Aufhänger</th><th>Aktiv</th><th></th></tr>
 {% for a in anlasstage %}<tr><td>{{a.datum}}</td><td>{{a.anlass}}</td><td>{{a.steuer_hook}}</td><td>{{'ja' if a.aktiv else 'nein'}}</td>
 <td><form method=post style=display:inline><input type=hidden name=formular value=anlass_toggle><input type=hidden name=anlass value="{{a.anlass}}"><button>{{'Aus' if a.aktiv else 'Ein'}}</button></form></td></tr>{% endfor %}</table>
 <form method=post><input type=hidden name=formular value=anlass_save>
 <input name=datum placeholder="MM-TT" size=6 required>
 <input name=anlass placeholder="Anlass (z.B. Tag des Bieres)" required>
-<input name=steuer_hook placeholder="Steuer-Aufh&auml;nger" style="width:40%">
+<input name=steuer_hook placeholder="Steuer-Aufhänger" style="width:40%">
 <button>Anlass-Tag speichern</button></form>
 
 <h3 style="margin-top:26px">Wissens-Serie (zeitlose Themen)</h3>
-<p class=hint>Diese Themen f&uuml;llen leere Kalendertage, wenn sonst nichts ansteht.</p>
-<table><tr><th>Thema</th><th>Aufh&auml;nger</th><th>Aktiv</th><th></th></tr>
+<p class=hint>Diese Themen füllen leere Kalendertage, wenn sonst nichts ansteht.</p>
+<table><tr><th>Thema</th><th>Aufhänger</th><th>Aktiv</th><th></th></tr>
 {% for w in wissen %}<tr><td>{{w.titel}}</td><td>{{w.hook}}</td><td>{{'ja' if w.aktiv else 'nein'}}</td>
 <td><form method=post style=display:inline><input type=hidden name=formular value=wissen_toggle><input type=hidden name=titel value="{{w.titel}}"><button>{{'Aus' if w.aktiv else 'Ein'}}</button></form></td></tr>{% endfor %}</table>
 <form method=post><input type=hidden name=formular value=wissen_save>
 <input name=titel placeholder="Thema (z.B. Wer muss abgeben?)" required style="width:35%">
-<input name=hook placeholder="Kurzer Aufh&auml;nger" style="width:40%">
+<input name=hook placeholder="Kurzer Aufhänger" style="width:40%">
 <button>Wissens-Thema speichern</button></form>
 </div>"""
 
@@ -591,18 +595,23 @@ def radar_starten():
 @login_required
 def generieren():
     if _generation_running():
-        flash("Erzeugung l&auml;uft bereits - einen Moment, dann Seite neu laden.")
+        flash("Erzeugung läuft bereits - einen Moment, dann Seite neu laden.")
     else:
         with get_conn() as conn:
             offen = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
                                  "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
         if not offen:
-            flash("Keine ausgew&auml;hlten Themen offen. Erst unter 'Freigabe: Themen' Themen freigeben.")
+            flash("Keine ausgewählten Themen offen. Erst unter 'Freigabe: Themen' Themen freigeben.")
         else:
             try:
-                _start_generation(offen)
-                flash("Erzeugung f&uuml;r %d Themen gestartet - l&auml;uft im Hintergrund. "
-                      "In ein bis zwei Minuten die Seite neu laden." % offen)
+                anzahl = int(request.form.get("anzahl", offen))
+            except (TypeError, ValueError):
+                anzahl = offen
+            anzahl = max(1, min(anzahl, offen))   # auf die verfügbaren Themen begrenzen
+            try:
+                _start_generation(anzahl)
+                flash("Erzeugung für %d von %d Themen gestartet - läuft im Hintergrund. "
+                      "In ein bis zwei Minuten die Seite neu laden." % (anzahl, offen))
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
     return redirect(url_for("index"))
@@ -632,13 +641,13 @@ def aktion(eid):
             termin = vorhanden or _naechster_freier_werktag(conn, eid)
             conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=? WHERE id=?", (termin, eid))
             audit_log(conn, user, "freigegeben", eid, "geplant fuer %s" % termin)
-            flash("Entwurf %d freigegeben und f&uuml;r %s eingeplant." % (eid, _de_datum(termin)))
+            flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
         elif aktion == "verwerfen":
             conn.execute("UPDATE entwuerfe SET status='verworfen' WHERE id=?", (eid,))
             audit_log(conn, user, "verworfen", eid); flash("Entwurf %d verworfen." % eid)
         elif aktion == "ueberarbeiten":
             if not feedback:
-                flash("Bitte einen &Auml;nderungswunsch angeben."); return redirect(url_for("entwuerfe"))
+                flash("Bitte einen Änderungswunsch angeben."); return redirect(url_for("entwuerfe"))
             t = conn.execute("SELECT titel, volltext FROM themen WHERE id=?", (e["thema_id"],)).fetchone()
             thema = {"titel": t["titel"] if t else "", "volltext": (t["volltext"] if t else "") or ""}
             try:
@@ -653,9 +662,9 @@ def aktion(eid):
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?", (json.dumps(neu, ensure_ascii=False), eid))
                 conn.commit(); bildgen.render_drafts()
                 audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
-                flash("Entwurf %d &uuml;berarbeitet (neuer Vorschlag erstellt)." % eid)
+                flash("Entwurf %d überarbeitet (neuer Vorschlag erstellt)." % eid)
             except Exception as ex:
-                flash("&Uuml;berarbeitung fehlgeschlagen: %s" % ex)
+                flash("Überarbeitung fehlgeschlagen: %s" % ex)
         conn.commit()
     return redirect(url_for("entwuerfe"))
 
@@ -666,7 +675,7 @@ def veroeffentlichen(eid):
     page_id = request.form.get("page_id", "").strip()
     user = session["user"]
     if not stelle_id and not page_id:
-        flash("Bitte eine Beratungsstelle bzw. Facebook-Seite w&auml;hlen."); return redirect(url_for("einplanung"))
+        flash("Bitte eine Beratungsstelle bzw. Facebook-Seite wählen."); return redirect(url_for("einplanung"))
     fmt = request.form.get("format", "").strip()
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -680,7 +689,7 @@ def veroeffentlichen(eid):
             f = {}
         # Einzelbild braucht das vorgerenderte Bild; Karussell wird frisch gerendert.
         if fmt == "einzelbild" and (not e["bild_pfad"] or not os.path.exists(e["bild_pfad"])):
-            flash("Kein Bild vorhanden - Ver&ouml;ffentlichung abgebrochen."); return redirect(url_for("einplanung"))
+            flash("Kein Bild vorhanden - Veröffentlichung abgebrochen."); return redirect(url_for("einplanung"))
         ziel_seite, bilder, caption = page_id, [e["bild_pfad"]], (f.get("caption") or f.get("ueberschrift") or "")
         if stelle_id:
             stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (stelle_id,)).fetchone()
@@ -702,7 +711,7 @@ def veroeffentlichen(eid):
             bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
         # Sicherstellen, dass tatsaechlich Bilder vorliegen (symmetrisch zum Einzelbild-Check)
         if not [b for b in bilder if b and os.path.exists(b)]:
-            flash("Kein Bild vorhanden - Ver&ouml;ffentlichung abgebrochen."); return redirect(url_for("einplanung"))
+            flash("Kein Bild vorhanden - Veröffentlichung abgebrochen."); return redirect(url_for("einplanung"))
         # gewaehltes Format am Entwurf festhalten (Format ist Entwurfs-Eigenschaft, unabhaengig vom Publish-Erfolg)
         conn.execute("UPDATE entwuerfe SET format=? WHERE id=?", (fmt, eid))
         try:
@@ -719,12 +728,12 @@ def veroeffentlichen(eid):
                          (eid, "facebook", info))
             conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (eid,))
             audit_log(conn, user, "veroeffentlicht_facebook", eid, "Format %s / Seite %s / Post %s" % (fmt, ziel_seite, info))
-            flash("Beitrag %d als %s auf Facebook ver&ouml;ffentlicht." % (eid, "Karussell" if fmt == "karussell" else "Einzelbild"))
+            flash("Beitrag %d als %s auf Facebook veröffentlicht." % (eid, "Karussell" if fmt == "karussell" else "Einzelbild"))
         else:
             conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
                          (eid, "facebook", "fehler", info))
             audit_log(conn, user, "veroeffentlichung_fehler", eid, info)
-            flash("Ver&ouml;ffentlichung fehlgeschlagen: %s" % info)
+            flash("Veröffentlichung fehlgeschlagen: %s" % info)
         conn.commit()
     return redirect(url_for("einplanung"))
 
@@ -746,10 +755,10 @@ def verwaltung():
                     except Exception as ex:
                         flash("Fehler: %s" % ex)
                 else:
-                    flash("Name und Passwort n&ouml;tig.")
+                    flash("Name und Passwort nötig.")
             elif formular == "benutzer_toggle":
                 name = request.form.get("name", "").strip()
-                conn.execute("UPDATE benutzer SET aktiv=1-aktiv WHERE name=?", (name,)); flash("'%s' ge&auml;ndert." % name)
+                conn.execute("UPDATE benutzer SET aktiv=1-aktiv WHERE name=?", (name,)); flash("'%s' geändert." % name)
             elif formular == "stelle_save":
                 name = request.form.get("name", "").strip(); ort = request.form.get("ort", "").strip()
                 if name and ort:
@@ -763,7 +772,7 @@ def verwaltung():
                     audit_log(conn, session["user"], "beratungsstelle_gespeichert", None, name)
                     flash("Beratungsstelle '%s' gespeichert." % name)
                 else:
-                    flash("Name und Ort n&ouml;tig.")
+                    flash("Name und Ort nötig.")
             elif formular == "anlass_save":
                 datum = request.form.get("datum", "").strip(); anlass = request.form.get("anlass", "").strip()
                 if datum and anlass:
@@ -773,11 +782,11 @@ def verwaltung():
                     audit_log(conn, session["user"], "anlasstag_gespeichert", None, anlass)
                     flash("Anlass-Tag '%s' gespeichert." % anlass)
                 else:
-                    flash("Datum und Anlass n&ouml;tig.")
+                    flash("Datum und Anlass nötig.")
             elif formular == "anlass_toggle":
                 anlass = request.form.get("anlass", "").strip()
                 conn.execute("UPDATE anlasstage SET aktiv=1-aktiv WHERE anlass=?", (anlass,))
-                flash("Anlass-Tag '%s' ge&auml;ndert." % anlass)
+                flash("Anlass-Tag '%s' geändert." % anlass)
             elif formular == "wissen_save":
                 titel = request.form.get("titel", "").strip()
                 if titel:
@@ -787,11 +796,11 @@ def verwaltung():
                     audit_log(conn, session["user"], "wissensthema_gespeichert", None, titel)
                     flash("Wissens-Thema '%s' gespeichert." % titel)
                 else:
-                    flash("Thema n&ouml;tig.")
+                    flash("Thema nötig.")
             elif formular == "wissen_toggle":
                 titel = request.form.get("titel", "").strip()
                 conn.execute("UPDATE wissensthemen SET aktiv=1-aktiv WHERE titel=?", (titel,))
-                flash("Wissens-Thema '%s' ge&auml;ndert." % titel)
+                flash("Wissens-Thema '%s' geändert." % titel)
             conn.commit()
         users = conn.execute("SELECT name, rolle, aktiv FROM benutzer ORDER BY name").fetchall()
         stellen = conn.execute("SELECT * FROM beratungsstellen ORDER BY ort").fetchall()
