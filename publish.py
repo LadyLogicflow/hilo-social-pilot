@@ -108,6 +108,37 @@ def publish_facebook(page_id, image_path, caption):
 
 
 # ---------------------------------------------------------------------------
+# Facebook: Karussell-Beitrag (mehrere Fotos in einem Post)
+# ---------------------------------------------------------------------------
+def publish_facebook_carousel(page_id, image_paths, caption):
+    """Veroeffentlicht mehrere Bilder als Karussell-Beitrag auf einer Facebook-Seite.
+    Jedes Foto wird zunaechst unveroeffentlicht (published=false) hochgeladen, danach
+    werden alle Foto-IDs in einem Feed-Beitrag zusammengefuehrt (attached_media)."""
+    if not image_paths:
+        return False, "Keine Bilder fuer Karussell uebergeben."
+    token = _page_token(page_id)
+    media_ids = []
+    for path in image_paths:
+        with open(path, "rb") as fh:
+            r = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
+                              data={"published": "false", "access_token": token},
+                              files={"source": fh})
+        if r.status_code != 200:
+            return False, _err(r)
+        mid = r.json().get("id")
+        if not mid:
+            return False, "Foto-Upload ohne ID-Rueckgabe."
+        media_ids.append(mid)
+    data = {"message": caption or "", "access_token": token}
+    for i, mid in enumerate(media_ids):
+        data["attached_media[%d]" % i] = '{"media_fbid":"%s"}' % mid
+    r = requests.post(GRAPH + "/%s/feed" % page_id, timeout=120, data=data)
+    if r.status_code == 200:
+        return True, (r.json().get("id") or "")
+    return False, _err(r)
+
+
+# ---------------------------------------------------------------------------
 # Instagram: zweistufige Veroeffentlichung (benoetigt oeffentliche Bild-URL)
 # ---------------------------------------------------------------------------
 def publish_instagram(ig_user_id, image_url, caption):
@@ -119,6 +150,37 @@ def publish_instagram(ig_user_id, image_url, caption):
     if c.status_code != 200:
         return False, _err(c)
     creation_id = c.json().get("id")
+    pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
+                        data={"creation_id": creation_id, "access_token": token})
+    if pub.status_code == 200:
+        return True, pub.json().get("id", "")
+    return False, _err(pub)
+
+
+def publish_instagram_carousel(ig_user_id, image_urls, caption):
+    """Veroeffentlicht mehrere Bilder als Karussell auf einem Instagram-Business-Konto.
+    Jede image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ablauf:
+    je Bild einen Kind-Container (is_carousel_item=true), dann einen CAROUSEL-Container
+    mit allen Kindern, danach Publish."""
+    if not image_urls:
+        return False, "Keine Bild-URLs fuer Karussell uebergeben."
+    token = _user_token()
+    child_ids = []
+    for url in image_urls:
+        c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60,
+                          data={"image_url": url, "is_carousel_item": "true", "access_token": token})
+        if c.status_code != 200:
+            return False, _err(c)
+        cid = c.json().get("id")
+        if not cid:
+            return False, "Kind-Container ohne ID-Rueckgabe."
+        child_ids.append(cid)
+    cont = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60,
+                         data={"media_type": "CAROUSEL", "children": ",".join(child_ids),
+                               "caption": caption or "", "access_token": token})
+    if cont.status_code != 200:
+        return False, _err(cont)
+    creation_id = cont.json().get("id")
     pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
                         data={"creation_id": creation_id, "access_token": token})
     if pub.status_code == 200:

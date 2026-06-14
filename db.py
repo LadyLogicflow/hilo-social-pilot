@@ -97,6 +97,10 @@ def migrate(conn):
     bcols = [r[1] for r in conn.execute("PRAGMA table_info(beratungsstellen)")]
     if "fb_seite" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN fb_seite TEXT")
+    # R1 Karussell: Format je Beitrag (einzelbild | karussell)
+    ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
+    if "format" not in ecols:
+        conn.execute("ALTER TABLE entwuerfe ADD COLUMN format TEXT NOT NULL DEFAULT 'einzelbild'")
     # BVL- und HILO-Meldungen gehoeren nicht in Stufe 1 -> bestehende Eintraege heilen
     conn.execute("UPDATE themen SET status='ausgewaehlt' "
                  "WHERE status='vorgeschlagen' AND quelle IN ('bvl_pm','bvl_dpa','hilo')")

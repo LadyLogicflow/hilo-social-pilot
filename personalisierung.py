@@ -32,6 +32,17 @@ def render_fuer_stelle(fields, stelle, out_path):
     return f, out_path
 
 
+def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
+    """Rendert ein Karussell mit personalisiertem CTA (gleiches Foto/Design je Stelle).
+    Liefert (felder, [pfade])."""
+    import bildgen, bildmotiv
+    f = fuer_stelle(fields, stelle)
+    photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
+    slogan = bildgen.pick_slogan(f.get("slogan"))
+    paths = bildgen.render_slides(f, photo, slogan, out_dir, prefix)
+    return f, paths
+
+
 def _has(row, key):
     try:
         return key in row.keys()
