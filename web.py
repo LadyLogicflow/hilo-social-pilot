@@ -377,7 +377,10 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
 </div>"""
 
-VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """</style>
+VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
+.filebtn{display:inline-block;background:#eef2f8;border:1px solid #cfd8e6;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:13px;color:#1f428d;white-space:nowrap}
+.filebtn:hover{background:#e2e9f4}
+button:disabled{opacity:.45;cursor:not-allowed}</style>
 <div class=box><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 
@@ -403,11 +406,18 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Ve
     {% if b.fb_seite and (b.fb_seite|string) not in page_id_set %}<option value="{{b.fb_seite}}" selected>{{b.fb_seite}} (alt)</option>{% endif %}
     {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
   </select></form>{% else %}{{fb_name.get(b.fb_seite|string, b.fb_seite) or '-'}}{% endif %}</td>
-<td>{% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:42px;height:42px;border-radius:50%;object-fit:cover;vertical-align:middle;border:1px solid #d4d9e2"> {% endif %}<form method=post enctype="multipart/form-data" style="margin:0;display:inline">
-  <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
-  <input type=file name=portrait accept="image/*" style="width:140px;font-size:12px">
-  <button style="padding:4px 8px">Hochladen</button></form>{% if b.portrait_pfad %}
-  <form method=post style="margin:0;display:inline" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:4px 9px">×</button></form>{% endif %}</td>
+<td><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  {% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #1f428d">{% endif %}
+  <form method=post enctype="multipart/form-data" style="margin:0;display:flex;align-items:center;gap:7px">
+    <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
+    <label class=filebtn>{% if b.portrait_pfad %}Anderes Bild …{% else %}Bild wählen …{% endif %}
+      <input type=file name=portrait accept="image/*" style="display:none"
+             onchange="var f=this.files[0];this.form.querySelector('.fn').textContent=f?f.name:'';this.form.querySelector('.up').disabled=!f"></label>
+    <span class=fn style="font-size:12px;color:#5a6472;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button class=up style="padding:6px 12px" disabled>Hochladen</button>
+  </form>
+  {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
+</div></td>
 <td>{{b.buchungs_url}}</td></tr>{% endfor %}</table>
 <form method=post><input type=hidden name=formular value=stelle_save>
 <input name=name placeholder="Name der Beratungsstelle" required>
