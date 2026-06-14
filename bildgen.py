@@ -189,9 +189,12 @@ def _draw_circles(base, slogan):
     dr = ImageDraw.Draw(base)
     R = 102; ccy = 946
     def shadow(cx, cy):
+        # weicher, etwas groesserer Schlagschatten mit Versatz nach unten-rechts -
+        # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass
+        # beide Kreise schweben (kleiner Versatz wurde sonst vom Kreis verdeckt)
         sh = Image.new("RGBA", base.size, (0,0,0,0))
-        ImageDraw.Draw(sh).ellipse([cx-R+5, cy-R+13, cx+R+5, cy+R+13], fill=(0,0,0,100))
-        blr = sh.filter(ImageFilter.GaussianBlur(15)); base.paste(blr, (0,0), blr)
+        ImageDraw.Draw(sh).ellipse([cx-R-6, cy-R+2, cx+R+16, cy+R+22], fill=(0,0,0,165))
+        blr = sh.filter(ImageFilter.GaussianBlur(22)); base.paste(blr, (0,0), blr)
     lx = R + 22; shadow(lx, ccy)
     dr.ellipse([lx-R, ccy-R, lx+R, ccy+R], fill=WHITE)
     if os.path.exists(LOGO_PATH):
@@ -217,32 +220,40 @@ def _draw_pager(base, idx, total):
         else:
             dr.ellipse([cx-r, y-r, cx+r, y+r], outline=WHITE, width=2)
 
+def _fit_photo(cut, max_h, max_w):
+    """Skaliert ein freigestelltes Motiv auf max. Hoehe/Breite (Seitenverhaeltnis erhalten)."""
+    if cut is None:
+        return None
+    sc = max_h / cut.height
+    if cut.width * sc > max_w:
+        sc = max_w / cut.width
+    return cut.resize((max(1, int(cut.width*sc)), max(1, int(cut.height*sc))), Image.LANCZOS)
+
 def _slide_title(fields, photo_path, slogan, idx, total):
     cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
-    grad = _gradient()
-    TOPB, BOTB = 192, 905
-    mt = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mt).polygon([(0,0),(W,0)]+[(x, TOPB+22*math.sin((x/W)*2*math.pi)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mt)
-    if cut is not None:
-        pw = 625; sc = pw / cut.width; chh = int(cut.height * sc)
-        cut2 = cut.resize((pw, chh), Image.LANCZOS)
-        base.paste(cut2, (W - 16 - pw, 205), cut2)
-    mb = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mb)
+    TOPB, BOTB = _draw_bands(base)
     dr = ImageDraw.Draw(base); margin = 54
-    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, W - 2*margin, 2)
-    yy = 72 if len(HL) == 2 else 96
+    # Ueberschrift gross, fett, zentriert im oberen Band
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 56, 36, W - 2*margin, 2)
+    yy = 64 if len(HL) == 2 else 92
     for ln in HL:
         dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
-    LCOL = 430 if cut is not None else (W - margin)
-    fsb = _font(_REG, 33); SL = _wrap(dr, fields.get("subline", ""), fsb, LCOL - margin)
-    bh = len(SL)*(fsb.size+10)
-    y = TOPB + (BOTB - TOPB - bh)//2 + fsb.size//2
+    # Eyecatcher (zentriert) + subline (fett, gross, zentriert) als vertikal+horizontal
+    # zentrierte Gruppe im weissen Feld
+    fsb = _font(_BOLD, 42); SL = _wrap(dr, fields.get("subline", ""), fsb, W - 2*margin)
+    sub_h = len(SL)*(fsb.size + 12)
+    cut2 = _fit_photo(cut, 440, W - 2*margin)
+    ph = cut2.height if cut2 is not None else 0
+    gap = 30 if cut2 is not None else 0
+    group_h = ph + gap + sub_h
+    gy = TOPB + (BOTB - TOPB - group_h)//2
+    if cut2 is not None:
+        base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
+        gy += ph + gap
+    sy = gy + fsb.size//2
     for ln in SL:
-        dr.text((margin, y), ln, font=fsb, fill=NAVY, anchor="lm"); y += fsb.size + 10
+        dr.text((W//2, sy), ln, font=fsb, fill=NAVY, anchor="mm"); sy += fsb.size + 12
     fc = _font(_BOLD, 30)
     dr.text((W//2, (BOTB + H)//2 + 12), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
     _draw_circles(base, slogan)
@@ -266,16 +277,25 @@ def _slide_bullet(text, slogan, idx, total, nummer):
     _draw_pager(base, idx, total)
     return base
 
-def _slide_cta(fields, slogan, idx, total):
+def _slide_cta(fields, photo_path, slogan, idx, total):
+    cut = _load_cut(photo_path)
     base = Image.new("RGB", (W, H), LIGHT)
     TOPB, BOTB = _draw_bands(base)
     dr = ImageDraw.Draw(base); margin = 78
-    head = _font(_BOLD, 34)
-    dr.text((W//2, TOPB + 86), "Jetzt aktiv werden", font=head, fill=GREEN2, anchor="mm")
-    fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 5)
-    top = TOPB + 150
-    th = len(CL)*(fc.size+12)
-    y = top + (BOTB - top - th)//2 + fc.size//2
+    head = _font(_BOLD, 40)
+    dr.text((W//2, TOPB + 70), "Jetzt aktiv werden", font=head, fill=GREEN2, anchor="mm")
+    fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 4)
+    sub_h = len(CL)*(fc.size + 12)
+    cut2 = _fit_photo(cut, 360, W - 2*margin)
+    ph = cut2.height if cut2 is not None else 0
+    gap = 28 if cut2 is not None else 0
+    top = TOPB + 128
+    group_h = ph + gap + sub_h
+    gy = top + (BOTB - top - group_h)//2
+    if cut2 is not None:
+        base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
+        gy += ph + gap
+    y = gy + fc.size//2
     for ln in CL:
         dr.text((W//2, y), ln, font=fc, fill=NAVY, anchor="mm"); y += fc.size + 12
     _draw_circles(base, slogan)
@@ -292,7 +312,7 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6):
     slides = [_slide_title(fields, photo_path, slogan, 0, total)]
     for i, b in enumerate(bullets):
         slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1))
-    slides.append(_slide_cta(fields, slogan, total - 1, total))
+    slides.append(_slide_cta(fields, photo_path, slogan, total - 1, total))
     paths = []
     for i, img in enumerate(slides):
         p = os.path.join(out_dir, "%s_%02d.png" % (prefix, i + 1))
