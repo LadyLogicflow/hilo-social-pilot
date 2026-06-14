@@ -49,7 +49,28 @@ def main():
     p.add_argument("--list-pages", action="store_true", help="Verbundene Facebook-Seiten + IG-Konten anzeigen")
     p.add_argument("--publish", type=int, metavar="ENTWURF_ID", help="Freigegebenen Entwurf veroeffentlichen")
     p.add_argument("--page", metavar="PAGE_ID", help="Ziel-Facebook-Seite fuer --publish")
+    p.add_argument("--test-upload", action="store_true",
+                   help="Test: ein Bild per SFTP hochladen und die oeffentliche URL anzeigen (fuer Instagram)")
     args = p.parse_args()
+
+    if args.test_upload:
+        import uploader, tempfile
+        if not uploader.configured():
+            log.error("Upload nicht konfiguriert. Bitte zuerst setzen (verdeckt): "
+                      "--set-secret ionos_sftp_host / ionos_sftp_user / ionos_sftp_password / "
+                      "ionos_public_base_url (optional ionos_sftp_dir, ionos_sftp_port).")
+            return
+        testfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "hilo_logo.png")
+        if not os.path.exists(testfile):
+            from PIL import Image
+            testfile = os.path.join(tempfile.gettempdir(), "hisome_upload_test.png")
+            Image.new("RGB", (16, 16), (31, 66, 141)).save(testfile)
+        try:
+            url = uploader.upload(testfile, remote_name="hisome_upload_test.png")
+            log.info("Upload OK. Oeffentliche URL (bitte im Browser oeffnen zum Pruefen): %s", url)
+        except Exception as ex:
+            log.error("Upload fehlgeschlagen: %s", ex)
+        return
 
     if args.set_secret:
         import getpass, secrets_store
