@@ -33,6 +33,16 @@ app.secret_key = _flask_secret()
 # Upload-Groesse begrenzen (Pi-Speicher schuetzen)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
+def _under_portraits(path):
+    """True nur, wenn der (aufgeloeste) Pfad innerhalb von DATA_DIR/portraits liegt.
+    Schutz davor, dass ein manipulierter DB-Wert eine fremde Datei ausliefert/loescht."""
+    try:
+        base = os.path.realpath(os.path.join(DATA_DIR, "portraits"))
+        rp = os.path.realpath(path)
+        return rp == base or rp.startswith(base + os.sep)
+    except Exception:
+        return False
+
 # --- Facebook-Seiten (gecacht) ---------------------------------------------
 _pages_cache = {"ts": 0, "data": None, "err": None}
 
@@ -985,13 +995,17 @@ def verwaltung():
             elif formular == "stelle_portrait":
                 sid = request.form.get("stelle_id", "").strip()
                 file = request.files.get("portrait")
-                if sid and sid.isdigit() and file and file.filename:
+                if sid and sid.isascii() and sid.isdigit() and file and file.filename:
                     try:
                         from PIL import Image
                         pdir = os.path.join(DATA_DIR, "portraits"); os.makedirs(pdir, exist_ok=True)
                         dest = os.path.join(pdir, "stelle_%s.png" % sid)
-                        img = Image.open(file.stream).convert("RGB")
-                        w, h = img.size; s = min(w, h)          # mittig quadratisch zuschneiden
+                        img = Image.open(file.stream)
+                        w, h = img.size                          # Header-Mass, noch nicht dekodiert
+                        if w * h > 40_000_000:                   # ~40 MP Deckel - schuetzt den Pi vor Speicher-Bomben
+                            raise ValueError("Bild zu gross")
+                        img = img.convert("RGB")
+                        s = min(w, h)                            # mittig quadratisch zuschneiden
                         img = img.crop(((w-s)//2, (h-s)//2, (w-s)//2+s, (h-s)//2+s))
                         if s > 400:
                             img = img.resize((400, 400), Image.LANCZOS)
@@ -999,15 +1013,16 @@ def verwaltung():
                         conn.execute("UPDATE beratungsstellen SET portrait_pfad=? WHERE id=?", (dest, sid))
                         audit_log(conn, session["user"], "beratungsstelle_portrait_gesetzt", None, "Stelle %s" % sid)
                         flash("Porträt gespeichert.")
-                    except Exception as ex:
-                        flash("Porträt-Upload fehlgeschlagen: %s" % ex)
+                    except Exception:
+                        log.exception("Portrait-Upload fehlgeschlagen (Stelle %s)", sid)
+                        flash("Porträt-Upload fehlgeschlagen – bitte eine gültige Bilddatei (max ~40 Megapixel) wählen.")
                 else:
                     flash("Bitte eine Bilddatei wählen.")
             elif formular == "stelle_portrait_del":
                 sid = request.form.get("stelle_id", "").strip()
                 if sid:
                     row = conn.execute("SELECT portrait_pfad FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
-                    if row and row["portrait_pfad"]:
+                    if row and row["portrait_pfad"] and _under_portraits(row["portrait_pfad"]):
                         try:
                             os.remove(row["portrait_pfad"])
                         except Exception:
@@ -1078,7 +1093,8 @@ def logo():
 def portrait(sid):
     with get_conn() as conn:
         row = conn.execute("SELECT portrait_pfad FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
-    if not row or not row["portrait_pfad"] or not os.path.exists(row["portrait_pfad"]):
+    if (not row or not row["portrait_pfad"] or not _under_portraits(row["portrait_pfad"])
+            or not os.path.exists(row["portrait_pfad"])):
         abort(404)
     return send_file(row["portrait_pfad"], mimetype="image/png")
 
