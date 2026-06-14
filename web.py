@@ -700,7 +700,10 @@ def veroeffentlichen(eid):
             photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
             slogan = bildgen.pick_slogan(f.get("slogan"))
             bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
-        # gewaehltes Format am Entwurf festhalten
+        # Sicherstellen, dass tatsaechlich Bilder vorliegen (symmetrisch zum Einzelbild-Check)
+        if not [b for b in bilder if b and os.path.exists(b)]:
+            flash("Kein Bild vorhanden - Ver&ouml;ffentlichung abgebrochen."); return redirect(url_for("einplanung"))
+        # gewaehltes Format am Entwurf festhalten (Format ist Entwurfs-Eigenschaft, unabhaengig vom Publish-Erfolg)
         conn.execute("UPDATE entwuerfe SET format=? WHERE id=?", (fmt, eid))
         try:
             import publish
