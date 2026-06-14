@@ -443,12 +443,16 @@ def _de_datum(iso):
         return iso or "-"
 
 def _naechster_freier_werktag(conn, ausser_id=None):
-    """Naechster Werktag (Mo-Fr) ab morgen, der noch keinen eingeplanten Beitrag hat."""
+    """Naechster freier Tag fuer einen Beitrag: HEUTE zuerst (auch am Wochenende, damit man
+    sofort einplanen/posten kann), danach nur freie Werktage (Mo-Fr). Max 1 Beitrag pro Tag."""
     import datetime
     belegt = {r[0] for r in conn.execute(
         "SELECT geplant_fuer FROM entwuerfe WHERE status='freigegeben' "
         "AND geplant_fuer IS NOT NULL AND id != ?", (ausser_id or -1,))}
-    d = datetime.date.today()
+    heute = datetime.date.today()
+    if heute.isoformat() not in belegt:
+        return heute.isoformat()
+    d = heute
     for _ in range(400):
         d += datetime.timedelta(days=1)
         if d.weekday() >= 5:  # Sa/So ueberspringen
