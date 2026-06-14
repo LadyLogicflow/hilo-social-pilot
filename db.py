@@ -60,13 +60,13 @@ CREATE TABLE IF NOT EXISTS wissensthemen (
 
 # Kuratierte Anlass-Tage mit Steuer-Aufhaenger (Startliste, in der Verwaltung erweiterbar)
 ANLASS_SEED = [
-    ("01-01", "Neujahr", "Was aendert sich steuerlich im neuen Jahr fuer Arbeitnehmer, Rentner und Familien?"),
-    ("05-01", "Tag der Arbeit", "Arbeitnehmer-Pauschbetrag und Werbungskosten - was sich von der Steuer absetzen laesst."),
-    ("04-23", "Tag des Bieres", "Die Biersteuer - wie viel Steuer in einem Glas Bier steckt (humorvoll, aber serioes)."),
-    ("10-31", "Weltspartag", "Der Sparer-Pauschbetrag: bis 1.000 Euro Kapitalertraege steuerfrei (2.000 Euro bei Zusammenveranlagung)."),
-    ("12-05", "Tag des Ehrenamts", "Ehrenamts- und Uebungsleiterpauschale - steuerfreie Aufwandsentschaedigungen fuer Ehrenamtliche."),
+    ("01-01", "Neujahr", "Was ändert sich steuerlich im neuen Jahr für Arbeitnehmer, Rentner und Familien?"),
+    ("05-01", "Tag der Arbeit", "Arbeitnehmer-Pauschbetrag und Werbungskosten - was sich von der Steuer absetzen lässt."),
+    ("04-23", "Tag des Bieres", "Die Biersteuer - wie viel Steuer in einem Glas Bier steckt (humorvoll, aber seriös)."),
+    ("10-31", "Weltspartag", "Der Sparer-Pauschbetrag: bis 1.000 Euro Kapitalerträge steuerfrei (2.000 Euro bei Zusammenveranlagung)."),
+    ("12-05", "Tag des Ehrenamts", "Ehrenamts- und Übungsleiterpauschale - steuerfreie Aufwandsentschädigungen für Ehrenamtliche."),
     ("06-21", "Tag des Gartens", "Haushaltsnahe Dienstleistungen und Handwerkerleistungen - Garten- und Pflegearbeiten von der Steuer absetzen."),
-    ("09-21", "Weltalzheimertag", "Pflegekosten und Pflege-Pauschbetrag - steuerliche Entlastung fuer pflegende Angehoerige."),
+    ("09-21", "Weltalzheimertag", "Pflegekosten und Pflege-Pauschbetrag - steuerliche Entlastung für pflegende Angehörige."),
     ("12-24", "Heiligabend", "Frohe Weihnachten - und der Hinweis: Spenden bis 31.12. mindern noch die Steuer dieses Jahres."),
 ]
 
@@ -107,6 +107,35 @@ CONTENT_KALENDER = [
 
 # Zeitlose Wissens-Themen (Evergreen) - fuellen leere Kalendertage
 WISSEN_SEED = [
+    ("Wer muss eine Steuererklärung machen?", "Wer ist zur Abgabe verpflichtet, wer gibt freiwillig ab - und warum sich Letzteres oft lohnt."),
+    ("Typische Irrtümer in der Steuererklärung", "Häufige Missverständnisse rund um die Steuererklärung und was wirklich stimmt."),
+    ("Welche Pauschbeträge gibt es?", "Arbeitnehmer-, Sparer-, Pflege- und weitere Pauschbeträge - Überblick und Nutzen."),
+    ("Werbungskosten für Arbeitnehmer", "Was Arbeitnehmer als Werbungskosten absetzen können und wann sich Einzelnachweise lohnen."),
+    ("Homeoffice-Pauschale einfach erklärt", "Wie die Homeoffice-Pauschale funktioniert und wer sie nutzen kann."),
+    ("Steuererklärung für Rentner", "Was Rentnerinnen und Rentner bei der Steuererklärung beachten sollten."),
+    ("Kinderfreibetrag oder Kindergeld?", "Wie das Finanzamt vergleicht und was für Familien günstiger ist."),
+    ("Außergewöhnliche Belastungen", "Krankheits-, Pflege- und weitere Kosten - was als außergewöhnliche Belastung zählt."),
+    ("Haushaltsnahe Dienstleistungen absetzen", "Handwerker, Reinigung, Gartenpflege - wie man Arbeitskosten von der Steuer absetzt."),
+    ("Entfernungspauschale und Fahrtkosten", "Wie Pendler die Entfernungspauschale nutzen und was absetzbar ist."),
+]
+
+# --- Einmalige Umlaut-Korrektur fuer bereits bestehende DBs (Pi) -------------
+# Die urspruenglichen Seeds nutzten ASCII-Umschreibungen (ae/oe/ue/ss). seed_*()
+# greift nur bei leerer Tabelle - bestehende DBs behalten sonst die alten Werte.
+# fix_seed_umlaute() ersetzt sie durch echte Umlaute, matcht dabei den ALTEN Wert
+# -> idempotent (laeuft nach der Korrektur ins Leere) und ueberschreibt keine
+# spaeteren Nutzer-Aenderungen. Reihenfolge identisch zu ANLASS_SEED/WISSEN_SEED.
+_ANLASS_SEED_OLD = [
+    ("Neujahr", "Was aendert sich steuerlich im neuen Jahr fuer Arbeitnehmer, Rentner und Familien?"),
+    ("Tag der Arbeit", "Arbeitnehmer-Pauschbetrag und Werbungskosten - was sich von der Steuer absetzen laesst."),
+    ("Tag des Bieres", "Die Biersteuer - wie viel Steuer in einem Glas Bier steckt (humorvoll, aber serioes)."),
+    ("Weltspartag", "Der Sparer-Pauschbetrag: bis 1.000 Euro Kapitalertraege steuerfrei (2.000 Euro bei Zusammenveranlagung)."),
+    ("Tag des Ehrenamts", "Ehrenamts- und Uebungsleiterpauschale - steuerfreie Aufwandsentschaedigungen fuer Ehrenamtliche."),
+    ("Tag des Gartens", "Haushaltsnahe Dienstleistungen und Handwerkerleistungen - Garten- und Pflegearbeiten von der Steuer absetzen."),
+    ("Weltalzheimertag", "Pflegekosten und Pflege-Pauschbetrag - steuerliche Entlastung fuer pflegende Angehoerige."),
+    ("Heiligabend", "Frohe Weihnachten - und der Hinweis: Spenden bis 31.12. mindern noch die Steuer dieses Jahres."),
+]
+_WISSEN_SEED_OLD = [
     ("Wer muss eine Steuererklaerung machen?", "Wer ist zur Abgabe verpflichtet, wer gibt freiwillig ab - und warum sich Letzteres oft lohnt."),
     ("Typische Irrtuemer in der Steuererklaerung", "Haeufige Missverstaendnisse rund um die Steuererklaerung und was wirklich stimmt."),
     ("Welche Pauschbetraege gibt es?", "Arbeitnehmer-, Sparer-, Pflege- und weitere Pauschbetraege - ueberblick und Nutzen."),
@@ -118,6 +147,19 @@ WISSEN_SEED = [
     ("Haushaltsnahe Dienstleistungen absetzen", "Handwerker, Reinigung, Gartenpflege - wie man Arbeitskosten von der Steuer absetzt."),
     ("Entfernungspauschale und Fahrtkosten", "Wie Pendler die Entfernungspauschale nutzen und was absetzbar ist."),
 ]
+
+def fix_seed_umlaute(conn):
+    """Ersetzt in bestehenden DBs die ASCII-Umschreibungen der urspruenglichen Seeds durch
+    echte Umlaute. Matcht den ALTEN Wert -> idempotent + kein Ueberschreiben von Nutzer-Aenderungen.
+    One-Shot-Migration: kann entfernt werden, sobald alle bestehenden DBs korrigiert sind."""
+    # Positionsweise Paarung OLD<->NEU absichern (faengt versehentliches Verrutschen der Listen ab)
+    assert len(_ANLASS_SEED_OLD) == len(ANLASS_SEED) and len(_WISSEN_SEED_OLD) == len(WISSEN_SEED)
+    for (anlass, alt_hook), (_, _, neu_hook) in zip(_ANLASS_SEED_OLD, ANLASS_SEED):
+        conn.execute("UPDATE anlasstage SET steuer_hook=? WHERE anlass=? AND steuer_hook=?",
+                     (neu_hook, anlass, alt_hook))
+    for (alt_titel, alt_hook), (neu_titel, neu_hook) in zip(_WISSEN_SEED_OLD, WISSEN_SEED):
+        conn.execute("UPDATE wissensthemen SET titel=?, hook=? WHERE titel=? AND hook=?",
+                     (neu_titel, neu_hook, alt_titel, alt_hook))
 
 def get_conn():
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -167,6 +209,7 @@ def init_db():
         seed_anlasstage(conn)
         seed_wissen(conn)
         seed_contentkalender(conn)
+        fix_seed_umlaute(conn)
 
 def audit_log(conn, benutzer, aktion, entwurf_id=None, details=""):
     conn.execute("INSERT INTO audit(benutzer, aktion, entwurf_id, details) VALUES (?,?,?,?)",
