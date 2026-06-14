@@ -150,7 +150,10 @@ _WISSEN_SEED_OLD = [
 
 def fix_seed_umlaute(conn):
     """Ersetzt in bestehenden DBs die ASCII-Umschreibungen der urspruenglichen Seeds durch
-    echte Umlaute. Matcht den ALTEN Wert -> idempotent + kein Ueberschreiben von Nutzer-Aenderungen."""
+    echte Umlaute. Matcht den ALTEN Wert -> idempotent + kein Ueberschreiben von Nutzer-Aenderungen.
+    One-Shot-Migration: kann entfernt werden, sobald alle bestehenden DBs korrigiert sind."""
+    # Positionsweise Paarung OLD<->NEU absichern (faengt versehentliches Verrutschen der Listen ab)
+    assert len(_ANLASS_SEED_OLD) == len(ANLASS_SEED) and len(_WISSEN_SEED_OLD) == len(WISSEN_SEED)
     for (anlass, alt_hook), (_, _, neu_hook) in zip(_ANLASS_SEED_OLD, ANLASS_SEED):
         conn.execute("UPDATE anlasstage SET steuer_hook=? WHERE anlass=? AND steuer_hook=?",
                      (neu_hook, anlass, alt_hook))
