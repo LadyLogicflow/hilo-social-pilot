@@ -450,7 +450,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 .wa .row{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .wa a.dl,.wa button{background:#1f428d;color:#fff;border:0;border-radius:8px;padding:8px 13px;text-decoration:none;cursor:pointer;font-size:14px}
 .wa a.dl.gn{background:#25638f}</style>
-<script>function copyWA(b){navigator.clipboard.writeText(document.getElementById('watext').value).then(function(){var t=b.textContent;b.textContent='✓ Kopiert';setTimeout(function(){b.textContent=t;},1500);});}</script>
+<script>function copyId(id,b){navigator.clipboard.writeText(document.getElementById(id).value).then(function(){var t=b.textContent;b.textContent='✓ Kopiert';setTimeout(function(){b.textContent=t;},1500);});}</script>
 <div class=bar><h2 style="margin:0;color:#1f428d">Geplanter Beitrag</h2><div><a href="/kalender">&larr; Kalender</a><a href="/einplanung">Alle geplanten</a></div></div>
 <div class=box style="max-width:1000px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -470,12 +470,27 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <div class=wa>
   <h3 style="margin:.2em 0">&#x1F4F2; Für WhatsApp (Kanal / Status)</h3>
   <p class=hint>WhatsApp lässt sich nicht automatisch befüllen – hier alles zum schnellen <b>manuellen</b> Posten: Text kopieren, Bild herunterladen, fertig.</p>
+  <p style="margin:.2em 0;font-weight:bold;color:#15336e">Allgemein (ohne Beratungsstelle)</p>
   <textarea id=watext readonly>{{e.f.caption}}</textarea>
   <div class=row>
-    <button type=button onclick="copyWA(this)">Text kopieren</button>
+    <button type=button onclick="copyId('watext',this)">Text kopieren</button>
     {% if fmt=='karussell' and n_slides %}{% for i in range(n_slides) %}<a class=dl href="/beitrag-slide/{{e.id}}/{{i}}" download="hilo_{{e.id}}_slide{{i+1}}.png">Slide {{i+1}} laden</a>{% endfor %}{% else %}<a class=dl href="/bild/{{e.id}}" download="hilo_{{e.id}}.png">Bild herunterladen</a>{% endif %}
     <a class="dl gn" href="/bild-status/{{e.id}}" title="Hochkant 9:16, ideal für Status/Story">Status-Version (hochkant) laden</a>
   </div>
+  {% if wa_stellen %}
+  <p style="margin:16px 0 .2em;font-weight:bold;color:#15336e">Personalisiert je Beratungsstelle <span class=hint style="font-weight:normal">(mit Porträt-Kreis und Ort)</span></p>
+  {% for w in wa_stellen %}
+  <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:8px 0">
+    <b style="color:#1f428d">{{w.name}}{% if w.ort %} &middot; {{w.ort}}{% endif %}</b>
+    <textarea id="watext_{{w.id}}" readonly style="margin-top:6px">{{w.caption}}</textarea>
+    <div class=row>
+      <button type=button onclick="copyId('watext_{{w.id}}',this)">Text kopieren</button>
+      <a class=dl href="/bild-stelle/{{e.id}}/{{w.id}}">Bild (personalisiert)</a>
+      <a class="dl gn" href="/bild-status-stelle/{{e.id}}/{{w.id}}">Status-Version (hochkant)</a>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
 </div>
 </div>"""
 
@@ -912,7 +927,22 @@ def beitrag(eid):
         except Exception as ex:
             log.warning("Karussell-Vorschau fehlgeschlagen (Beitrag %s): %s", eid, ex)
             n_slides = 0
-    return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"], n_slides=n_slides))
+    # Personalisierte WhatsApp-Varianten je Beratungsstelle (Portraet-Kreis, Ort, Begleittext)
+    wa_stellen = []
+    try:
+        import personalisierung
+        with get_conn() as conn:
+            stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                                   "AND fb_seite!='' ORDER BY ort").fetchall()
+        for st in stellen:
+            pf = personalisierung.fuer_stelle(row["f"], st)
+            wa_stellen.append({"id": st["id"], "name": st["name"], "ort": st["ort"] or "",
+                               "caption": pf.get("caption", "")})
+    except Exception:
+        log.exception("WhatsApp-Stellen-Varianten fehlgeschlagen (Beitrag %s)", eid)
+        wa_stellen = []
+    return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"],
+                                  n_slides=n_slides, wa_stellen=wa_stellen))
 
 @app.route("/beitrag-slide/<int:eid>/<int:idx>")
 @login_required
@@ -923,32 +953,76 @@ def beitrag_slide(eid, idx):
         abort(404)
     return send_file(p, mimetype="image/png", max_age=0)
 
-@app.route("/bild-status/<int:eid>")
-@login_required
-def bild_status(eid):
-    """Hochkant-Version (9:16) des Beitragsbildes fuer WhatsApp-Status / Instagram-Story:
-    das quadratische Bild zentriert auf einem HILO-Verlauf (Blau -> Gruen). Zum manuellen Posten."""
-    with get_conn() as conn:
-        e = conn.execute("SELECT id, bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
-    if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
-        abort(404)
+def _status_hochkant(square_path, out_path):
+    """Komponiert ein quadratisches Bild zentriert auf einen HILO-Verlauf (9:16, 1080x1920) -
+    fuer WhatsApp-Status / Instagram-Story. Liefert out_path."""
     from PIL import Image
     W, H = 1080, 1920
     top, bot = (31, 66, 141), (96, 163, 60)
-    grad = Image.new("RGB", (1, H))
-    gp = grad.load()
+    grad = Image.new("RGB", (1, H)); gp = grad.load()
     for y in range(H):
         t = y / (H - 1)
         gp[0, y] = (int(top[0] + (bot[0]-top[0])*t), int(top[1] + (bot[1]-top[1])*t),
                     int(top[2] + (bot[2]-top[2])*t))
     canvas = grad.resize((W, H), Image.BILINEAR)
-    sq = Image.open(e["bild_pfad"]).convert("RGB").resize((W, W), Image.LANCZOS)
+    sq = Image.open(square_path).convert("RGB").resize((W, W), Image.LANCZOS)
     canvas.paste(sq, (0, (H - W) // 2))
-    out_dir = os.path.join(DATA_DIR, "preview"); os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, "status_%d.png" % eid)
-    canvas.save(out)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    canvas.save(out_path)
+    return out_path
+
+def _render_stelle_bild(eid, sid):
+    """Rendert das PERSONALISIERTE Einzelbild fuer (Beitrag, Beratungsstelle) - mit Portraet-Kreis,
+    Ort und personalisiertem CTA. Liefert den Pfad oder None."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        st = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+    if not e or not st:
+        return None
+    import personalisierung
+    data = json.loads(e["text"])
+    out = os.path.join(DATA_DIR, "preview", "wa_e%d_stelle_%d.png" % (eid, int(st["id"])))
+    personalisierung.render_fuer_stelle(data, st, out)
+    return out
+
+@app.route("/bild-status/<int:eid>")
+@login_required
+def bild_status(eid):
+    """Hochkant-Version (9:16) des allgemeinen Beitragsbildes fuer WhatsApp-Status / Story."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
+        abort(404)
+    out = _status_hochkant(e["bild_pfad"], os.path.join(DATA_DIR, "preview", "status_%d.png" % eid))
     return send_file(out, mimetype="image/png", max_age=0,
                      as_attachment=True, download_name="hilo_status_%d.png" % eid)
+
+@app.route("/bild-stelle/<int:eid>/<int:sid>")
+@login_required
+def bild_stelle(eid, sid):
+    """Personalisiertes Einzelbild (Portraet-Kreis + Ort) der Beratungsstelle zum Download."""
+    try:
+        p = _render_stelle_bild(eid, sid)
+    except Exception:
+        log.exception("WhatsApp-Bild (Stelle) fehlgeschlagen (Beitrag %s, Stelle %s)", eid, sid); p = None
+    if not p or not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="image/png", max_age=0,
+                     as_attachment=True, download_name="hilo_%d_stelle_%d.png" % (eid, sid))
+
+@app.route("/bild-status-stelle/<int:eid>/<int:sid>")
+@login_required
+def bild_status_stelle(eid, sid):
+    """Hochkant-Status-Version des PERSONALISIERTEN Bildes der Beratungsstelle."""
+    try:
+        p = _render_stelle_bild(eid, sid)
+    except Exception:
+        log.exception("WhatsApp-Status (Stelle) fehlgeschlagen (Beitrag %s, Stelle %s)", eid, sid); p = None
+    if not p or not os.path.exists(p):
+        abort(404)
+    out = _status_hochkant(p, os.path.join(DATA_DIR, "preview", "wa_status_e%d_stelle_%d.png" % (eid, sid)))
+    return send_file(out, mimetype="image/png", max_age=0,
+                     as_attachment=True, download_name="hilo_status_%d_stelle_%d.png" % (eid, sid))
 
 @app.route("/themen", methods=["GET", "POST"])
 @login_required
