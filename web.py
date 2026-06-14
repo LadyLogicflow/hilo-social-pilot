@@ -149,7 +149,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
 <style>""" + _TOP + """
 .info{max-width:1040px;margin:0 auto 16px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#1f428d;font-weight:bold;font-size:14px}
 .grid{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:18px;position:relative;border-top:5px solid #1f428d;min-height:150px;color:inherit}
+.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:18px;position:relative;border-top:5px solid #1f428d;min-height:150px;color:inherit;text-decoration:none}
 .tile:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14);transition:.15s}
 .tile.action{border-top-color:#4c7b2d;background:linear-gradient(180deg,#f6faf2,#fff)}
 .tile h3{color:#1f428d;margin:6px 0 4px;font-size:16px}.tile p{color:#6b7280;font-size:13px;margin:0}
@@ -283,6 +283,7 @@ a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
 .addpost{display:inline-block;margin-top:4px;color:#4c7b2d;font-size:11px;font-weight:bold;text-decoration:none}
 .addpost:hover{text-decoration:underline}</style>
 """ + _NAV + """
+<div style="max-width:1120px;margin:0 auto 10px"><a href="/" style="color:#1f428d;text-decoration:none;font-weight:bold">&larr; Startseite</a></div>
 <div class=kbar>
   <a href="/kalender?jahr={{prev.year}}&monat={{prev.month}}">&larr; {{prev_name}}</a>
   <h2 style="margin:0;color:#1f428d">{{monatname}} {{jahr}}</h2>
@@ -341,11 +342,26 @@ QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><st
 <td>{{q.status}}</td></tr>{% endfor %}</table>{% endif %}
 </div>"""
 
-VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><style>""" + _STYLE + """</style>
-<div class=box><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Verwaltung</h2><a href="/">&larr; Startseite</a></div>
+VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title>
+<style>""" + _TOP + """
+.grid{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;border-top:5px solid #1f428d;color:inherit;text-decoration:none;min-height:92px}
+.tile:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14);transition:.15s}
+.tile h3{color:#1f428d;margin:4px 0 4px;font-size:17px}.tile p{color:#6b7280;font-size:13px;margin:0}</style>
+<div class=top><h2 style="margin:0;color:#1f428d">Verwaltung</h2><a href="/" style="color:#1f428d;text-decoration:none">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=grid>
+  <a class=tile href="/verwaltung?bereich=benutzer"><h3>&#x1F465; Benutzer</h3><p>Konten anlegen, Rollen vergeben, aktivieren oder deaktivieren.</p></a>
+  <a class=tile href="/verwaltung?bereich=stellen"><h3>&#x1F3E2; Beratungsstellen</h3><p>Stellen mit Ort, Facebook-Seite und Buchungslink pflegen.</p></a>
+  <a class=tile href="/verwaltung?bereich=anlass"><h3>&#x1F4C5; Anlass-Tage</h3><p>Besondere Tage mit Steuer-Aufh&auml;nger verwalten.</p></a>
+  <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
+</div>"""
+
+VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """</style>
+<div class=box><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 
-<h3>Benutzer</h3>
+{% if bereich=='benutzer' %}
 <table><tr><th>Name</th><th>Rolle</th><th>Aktiv</th><th></th></tr>
 {% for u in users %}<tr><td>{{u.name}}</td><td>{{u.rolle}}</td><td>{{'ja' if u.aktiv else 'nein'}}</td>
 <td><form method=post style=display:inline><input type=hidden name=formular value=benutzer_toggle><input type=hidden name=name value="{{u.name}}"><button>{{'Deaktivieren' if u.aktiv else 'Aktivieren'}}</button></form></td></tr>{% endfor %}</table>
@@ -354,8 +370,9 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><sty
 <input name=passwort type=password placeholder="Passwort" required>
 <select name=rolle><option value=redakteur>Redakteur</option><option value=freigeber>Freigeber</option><option value=admin>Admin</option></select>
 <button>Benutzer anlegen</button></form>
+{% endif %}
 
-<h3 style="margin-top:26px">Beratungsstellen</h3>
+{% if bereich=='stellen' %}
 <table><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Buchung</th></tr>
 {% for b in stellen %}<tr><td>{{b.name}}</td><td>{{b.ort}}</td><td>{{b.leitung}}</td><td>{{b.fb_seite or '-'}}</td><td>{{b.buchungs_url}}</td></tr>{% endfor %}</table>
 <form method=post><input type=hidden name=formular value=stelle_save>
@@ -367,8 +384,9 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><sty
 <input name=buchungs_url placeholder="Link Buchungskalender">
 <button>Beratungsstelle speichern</button></form>
 <p class=hint>Die Facebook-Seite verknüpft die Stelle für personalisierte Beiträge und die richtige Veröffentlichung.</p>
+{% endif %}
 
-<h3 style="margin-top:26px">Anlass-Tage</h3>
+{% if bereich=='anlass' %}
 <p class=hint>Besondere Tage mit Steuer-Aufhänger. Datum als MM-TT (z.B. 04-23). Fällt der Tag aufs Wochenende, erscheint der Beitrag am Freitag davor.</p>
 <table><tr><th>Datum</th><th>Anlass</th><th>Steuer-Aufhänger</th><th>Aktiv</th><th></th></tr>
 {% for a in anlasstage %}<tr><td>{{a.datum}}</td><td>{{a.anlass}}</td><td>{{a.steuer_hook}}</td><td>{{'ja' if a.aktiv else 'nein'}}</td>
@@ -378,8 +396,9 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><sty
 <input name=anlass placeholder="Anlass (z.B. Tag des Bieres)" required>
 <input name=steuer_hook placeholder="Steuer-Aufhänger" style="width:40%">
 <button>Anlass-Tag speichern</button></form>
+{% endif %}
 
-<h3 style="margin-top:26px">Wissens-Serie (zeitlose Themen)</h3>
+{% if bereich=='wissen' %}
 <p class=hint>Diese Themen füllen leere Kalendertage, wenn sonst nichts ansteht.</p>
 <table><tr><th>Thema</th><th>Aufhänger</th><th>Aktiv</th><th></th></tr>
 {% for w in wissen %}<tr><td>{{w.titel}}</td><td>{{w.hook}}</td><td>{{'ja' if w.aktiv else 'nein'}}</td>
@@ -388,6 +407,7 @@ VERWALTUNG = """<!doctype html><meta charset=utf-8><title>Verwaltung</title><sty
 <input name=titel placeholder="Thema (z.B. Wer muss abgeben?)" required style="width:35%">
 <input name=hook placeholder="Kurzer Aufhänger" style="width:40%">
 <button>Wissens-Thema speichern</button></form>
+{% endif %}
 </div>"""
 
 # --- Hilfsfunktionen --------------------------------------------------------
@@ -820,6 +840,7 @@ def veroeffentlichen(eid):
 @app.route("/verwaltung", methods=["GET", "POST"])
 @admin_required
 def verwaltung():
+    bereich = request.args.get("bereich", "").strip()
     with get_conn() as conn:
         if request.method == "POST":
             formular = request.form.get("formular")
@@ -882,11 +903,22 @@ def verwaltung():
                 conn.execute("UPDATE wissensthemen SET aktiv=1-aktiv WHERE titel=?", (titel,))
                 flash("Wissens-Thema '%s' geändert." % titel)
             conn.commit()
+            # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
+            ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
+                    "wissen": "wissen"}.get((formular or "").split("_")[0])
+            return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
+        if not bereich:
+            return render_template_string(VERWALTUNG_HOME, **_ctx())
+        bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
+                         "anlass": "Anlass-Tage", "wissen": "Wissens-Serie"}.get(bereich)
+        if not bereich_titel:
+            return redirect(url_for("verwaltung"))
         users = conn.execute("SELECT name, rolle, aktiv FROM benutzer ORDER BY name").fetchall()
         stellen = conn.execute("SELECT * FROM beratungsstellen ORDER BY ort").fetchall()
         anlasstage = conn.execute("SELECT datum, anlass, steuer_hook, aktiv FROM anlasstage ORDER BY datum").fetchall()
         wissen = conn.execute("SELECT titel, hook, aktiv FROM wissensthemen ORDER BY titel").fetchall()
-    return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage, wissen=wissen))
+    return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
+                                                     wissen=wissen, bereich=bereich, bereich_titel=bereich_titel))
 
 @app.route("/logo.png")
 def logo():
