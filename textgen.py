@@ -111,16 +111,9 @@ def generate(thema, kanal="google"):
     raw = "".join(getattr(b, "text", "") for b in msg.content)
     return _parse_json(raw)
 
-def generate_drafts(limit=3, kanal="google"):
+def _create_drafts(rows, kanal):
+    """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf (Claude). Rueckgabe: Anzahl."""
     from db import get_conn
-    if not get_secret("anthropic_api_key"):
-        log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
-        return 0
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT id, titel, url, volltext FROM themen t WHERE status='ausgewaehlt' "
-            "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id AND e.kanal=?) "
-            "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
     created = 0
     for r in rows:
         try:
@@ -134,6 +127,36 @@ def generate_drafts(limit=3, kanal="google"):
         except Exception as ex:
             log.warning("Texterzeugung fehlgeschlagen (Thema %s): %s", r["id"], ex)
     return created
+
+def generate_drafts(limit=3, kanal="google"):
+    from db import get_conn
+    if not get_secret("anthropic_api_key"):
+        log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
+        return 0
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, titel, url, volltext FROM themen t WHERE status='ausgewaehlt' "
+            "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id AND e.kanal=?) "
+            "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
+    return _create_drafts(rows, kanal)
+
+def generate_for_ids(ids, kanal="google"):
+    """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs (status 'ausgewaehlt', noch ohne
+    Entwurf in diesem Kanal). Rueckgabe: Anzahl erzeugter Entwuerfe."""
+    from db import get_conn
+    ids = [int(i) for i in ids if str(i).strip().isdigit()]
+    if not ids:
+        return 0
+    if not get_secret("anthropic_api_key"):
+        log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
+        return 0
+    ph = ",".join("?" * len(ids))
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, titel, url, volltext FROM themen WHERE id IN (%s) AND status='ausgewaehlt' "
+            "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id AND e.kanal=?)" % ph,
+            ids + [kanal]).fetchall()
+    return _create_drafts(rows, kanal)
 
 
 def regenerate(thema, previous, feedback, kanal="google"):

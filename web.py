@@ -71,6 +71,15 @@ def _start_generation(anzahl):
         [sys.executable, os.path.join(BASE_DIR, "main.py"), "--generate", str(anzahl), "--render"],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
+def _start_generation_ids(ids):
+    """Hintergrund-Erzeugung nur fuer die ausgewaehlten Thema-IDs (+ Bilder)."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
+    _gen["proc"] = subprocess.Popen(
+        [sys.executable, os.path.join(BASE_DIR, "main.py"),
+         "--generate-ids", ",".join(str(i) for i in ids), "--render"],
+        cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+
 # --- Taeglicher Radar-Lauf (7 Uhr), als Subprozess -------------------------
 def _daily_scheduler():
     import datetime
@@ -173,18 +182,50 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
 <div class=info>&#x1F552; Themen werden täglich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
 <div class=grid>
   <a class=tile href="/themen">{% if themen_offen %}<span class=badge>{{themen_offen}}</span>{% endif %}<h3>1. Freigabe: Themen</h3><p>Themen für die Kampagne auswählen (Stufe 1).</p></a>
-  <div class="tile action"><h3>2. Texte &amp; Bilder erzeugen</h3><p>Für ausgewählte Themen Beiträge erstellen.</p>
-    {% if gen_running %}<div class=run>&#x23F3; Läuft im Hintergrund &hellip;</div>
-    {% elif bereit %}<form method=post action="/generieren">
-      <label style="font-size:13px;color:#15336e">Anzahl: <input type=number name=anzahl min=1 max="{{bereit}}" value="{{ [5, bereit]|min }}" style="width:64px;padding:6px"></label>
-      <button>Jetzt erzeugen</button></form>
-      <div class=hint>{{bereit}} Themen verfügbar – wähle, wie viele Beiträge erzeugt werden sollen.</div>
-    {% else %}<p class=hint>Keine ausgewählten Themen offen. Erst unter „1. Freigabe: Themen" auswählen.</p>{% endif %}</div>
+  <a class=tile href="/erzeugen">{% if bereit %}<span class="badge g">{{bereit}}</span>{% endif %}<h3>2. Texte &amp; Bilder erzeugen</h3><p>Themen anhaken und für die ausgewählten Themen Beiträge erstellen.{% if gen_running %} <b>(läuft gerade &hellip;)</b>{% endif %}</p></a>
   <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entwürfe prüfen, überarbeiten, freigeben (Stufe 2).</p></a>
   <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>"""
+
+ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
+.bar{max-width:920px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
+.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
+.tl label{display:flex;gap:11px;align-items:flex-start;padding:10px 8px;border-bottom:1px solid #eef1f4;cursor:pointer}
+.tl label:hover{background:#f6f8fb}
+.tl input{margin-top:3px}
+.tl .ti{font-weight:bold;color:#15336e}
+.tl .meta{font-size:12px;color:#7a8694}
+.allrow{font-weight:bold;color:#1f428d;border-bottom:2px solid #e6eaf0 !important}</style>
+<div class=bar><h2 style="margin:0">Themen auswählen &amp; erzeugen</h2><a href="/">&larr; Startseite</a></div>
+<div class=box>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if laeuft %}<div class=flash>&#x23F3; Eine Erzeugung läuft gerade im Hintergrund – bitte in ein bis zwei Minuten die Startseite neu laden.</div>{% endif %}
+{% if themen %}
+<p class=hint>Hake die Themen an, für die jetzt Texte &amp; Bilder erzeugt werden sollen. Für jedes angehakte Thema entsteht ein Entwurf, den du danach unter „3. Freigabe: Texte &amp; Bilder" prüfst.</p>
+<form method=post onsubmit="return chk(this)">
+  <div class=tl>
+    <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
+    {% for t in themen %}<label><input type=checkbox name=thema_id value="{{t.id}}">
+      <span><span class=ti>{{t.titel}}</span><br><span class=meta>{{t.quelle}}{% if t.erkannt_am %} &middot; erkannt {{t.erkannt_am[:10]}}{% endif %}</span></span></label>{% endfor %}
+  </div>
+  <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+    <span class=hint><b id=cnt>0</b> ausgewählt</span>
+    <button>Ausgewählte erzeugen</button>
+  </div>
+</form>
+<script>
+function upd(){document.getElementById('cnt').textContent=document.querySelectorAll('input[name=thema_id]:checked').length;}
+function toggleAll(c){document.querySelectorAll('input[name=thema_id]').forEach(function(b){b.checked=c.checked;});upd();}
+function chk(f){if(f.querySelectorAll('input[name=thema_id]:checked').length===0){alert('Bitte mindestens ein Thema anhaken.');return false;}return true;}
+document.addEventListener('change',function(e){if(e.target&&e.target.name==='thema_id')upd();});
+</script>
+{% else %}
+<p class=hint>Aktuell sind keine freigegebenen Themen offen. Wähle zuerst unter „1. Freigabe: Themen" Themen für die Kampagne aus – danach erscheinen sie hier zur Erzeugung.</p>
+<p><a href="/themen">&rarr; Zu „1. Freigabe: Themen"</a></p>
+{% endif %}
+</div>"""
 
 EIGENER = """<!doctype html><meta charset=utf-8><title>Eigenen Beitrag erstellen</title>
 <style>""" + _TOP + """
@@ -709,6 +750,30 @@ def generieren():
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
     return redirect(url_for("index"))
+
+@app.route("/erzeugen", methods=["GET", "POST"])
+@login_required
+def erzeugen():
+    if request.method == "POST":
+        if _generation_running():
+            flash("Erzeugung läuft bereits - einen Moment, dann die Startseite neu laden.")
+            return redirect(url_for("index"))
+        ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
+        if not ids:
+            flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
+        try:
+            _start_generation_ids(ids)
+            flash("Erzeugung für %d ausgewählte Thema/Themen gestartet - läuft im Hintergrund. "
+                  "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
+        except Exception as ex:
+            flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
+        return redirect(url_for("index"))
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, titel, quelle, erkannt_am FROM themen t WHERE status='ausgewaehlt' "
+            "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id) "
+            "ORDER BY erkannt_am DESC").fetchall()
+    return render_template_string(ERZEUGEN, **_ctx(themen=rows, laeuft=_generation_running()))
 
 @app.route("/eigener", methods=["GET", "POST"])
 @rolle_required("freigeber")
