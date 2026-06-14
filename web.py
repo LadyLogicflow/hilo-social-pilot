@@ -188,9 +188,9 @@ button{margin-top:18px;background:#4c7b2d;color:#fff;border:0;border-radius:8px;
   <p class=hint>Gib ein <b>Thema</b> und einen <b>Tag</b> an. Das Tool erstellt daraus einen Entwurf (Text&nbsp;+&nbsp;Bild) wie bei den automatischen Themen. Nach deiner Freigabe unter „3. Freigabe: Texte &amp; Bilder" wird er fest für den gewählten Tag eingeplant.</p>
   <form method=post>
     <label>Thema des Beitrags</label>
-    <textarea name=thema placeholder="z. B. Urlaub ist steuerlich nicht abzugsfähig" required></textarea>
+    <textarea name=thema placeholder="z. B. Urlaub ist steuerlich nicht abzugsfähig" required>{{ vorgabe_thema }}</textarea>
     <label>Veröffentlichen am</label>
-    <input type=date name=datum required>
+    <input type=date name=datum value="{{ vorgabe_datum }}" required>
     <button>Entwurf erstellen</button>
   </form>
 </div>"""
@@ -278,7 +278,10 @@ table.kal{max-width:1120px;margin:0 auto;border-collapse:collapse;width:100%;bac
 .anl{display:block;background:#eaf3e2;color:#3c6322;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .frist{display:block;background:#fdeaea;color:#b00020;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .post{display:block;background:#eaf0fa;color:#15336e;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.post.pub{background:#e3efe0;color:#3c6322}</style>
+.post.pub{background:#e3efe0;color:#3c6322}
+a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
+.addpost{display:inline-block;margin-top:4px;color:#4c7b2d;font-size:11px;font-weight:bold;text-decoration:none}
+.addpost:hover{text-decoration:underline}</style>
 """ + _NAV + """
 <div class=kbar>
   <a href="/kalender?jahr={{prev.year}}&monat={{prev.month}}">&larr; {{prev_name}}</a>
@@ -289,12 +292,13 @@ table.kal{max-width:1120px;margin:0 auto;border-collapse:collapse;width:100%;bac
 {% for woche in wochen %}<tr>
 {% for c in woche %}<td class="{% if not c.im_monat %}out{% elif c.we %}we{% endif %}{% if c.heute %} heute{% endif %}">
 <span class=kt>{{c.tag}}</span>
-{% for b in c.besondere %}{% if 'Fristende' in b %}<span class=frist title="{{b}}">{{b}}</span>{% else %}<span class=anl title="{{b}}">{{b}}</span>{% endif %}{% endfor %}
+{% for b in c.besondere %}{% if 'Fristende' in b %}<span class=frist title="{{b}}">{{b}}</span>{% elif c.im_monat and not c.past %}<a class=anl href="/eigener?datum={{c.iso}}&anlass={{b|urlencode}}" title="Beitrag zu „{{b}}“ erstellen">{{b}}</a>{% else %}<span class=anl title="{{b}}">{{b}}</span>{% endif %}{% endfor %}
 {% for p in c.posts %}<span class="post{% if p.status=='veroeffentlicht' %} pub{% endif %}" title="{{p.titel}}">{{p.titel}}</span>{% endfor %}
+{% if c.im_monat and not c.past %}<a class=addpost href="/eigener?datum={{c.iso}}" title="Beitrag für diesen Tag erstellen">+ Beitrag</a>{% endif %}
 </td>{% endfor %}
 </tr>{% endfor %}
 </table>
-<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)</p>"""
+<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)<br>Tipp: Auf einen Tag „+ Beitrag" klicken (oder direkt auf einen grünen Anlass-Tag) erstellt einen Beitrag für diesen Tag.</p>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
 .q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}</style>
@@ -535,8 +539,8 @@ def kalender():
         zeile = []
         for d in woche:
             iso = d.isoformat()
-            zeile.append({"tag": d.day, "im_monat": d.month == monat, "we": d.weekday() >= 5,
-                          "heute": d == heute, "posts": posts.get(iso, []),
+            zeile.append({"tag": d.day, "iso": iso, "im_monat": d.month == monat, "we": d.weekday() >= 5,
+                          "heute": d == heute, "past": d < heute, "posts": posts.get(iso, []),
                           "besondere": besondere.get(iso, [])})
         wochen.append(zeile)
     erster = datetime.date(jahr, monat, 1)
@@ -679,7 +683,18 @@ def eigener():
         flash("Beitrag-Entwurf zum Thema „%s“ für %s erstellt – jetzt unter „3. Freigabe: Texte & Bilder“ "
               "prüfen und freigeben." % (thema_txt[:60], _de_datum(datum)))
         return redirect(url_for("entwuerfe"))
-    return render_template_string(EIGENER, **_ctx())
+    # GET: Vorgaben aus dem Kalender-Klick (Datum, optional Thema aus einem Anlass-Tag)
+    vorgabe_datum = request.args.get("datum", "").strip()
+    vorgabe_thema = request.args.get("thema", "").strip()
+    anlass = request.args.get("anlass", "").strip()
+    if anlass and not vorgabe_thema:
+        with get_conn() as conn:
+            row = conn.execute("SELECT anlass, steuer_hook FROM anlasstage WHERE anlass=?", (anlass,)).fetchone()
+        if row:
+            vorgabe_thema = ("%s – %s" % (row["anlass"], row["steuer_hook"] or "")).strip(" –")
+        else:
+            vorgabe_thema = anlass
+    return render_template_string(EIGENER, **_ctx(vorgabe_datum=vorgabe_datum, vorgabe_thema=vorgabe_thema))
 
 @app.route("/bild/<int:eid>")
 @login_required
