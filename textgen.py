@@ -167,6 +167,38 @@ def generate_for_ids(ids, kanal="google"):
     return _create_drafts(rows, kanal)
 
 
+def regenerate_open_drafts(kanal="google"):
+    """Erzeugt fuer ALLE noch nicht freigegebenen Entwuerfe (status 'entwurf') den Text NEU
+    gemaess den aktuellen Vorgaben (bewusst voller KI-Lauf). Setzt danach das Bild aller offenen
+    Entwuerfe zurueck, damit sie mit dem aktuellen Layout/Motiv neu gerendert werden.
+    Nur Entwuerfe mit hinterlegtem Thema bekommen neuen Text; die uebrigen behalten ihren Text,
+    werden aber ebenfalls neu gerendert. Rueckgabe: Anzahl neu erzeugter Texte."""
+    from db import get_conn
+    if not get_secret("anthropic_api_key"):
+        log.info("Neu-Erzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
+        return 0
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT e.id AS eid, e.kanal AS kanal, t.titel AS titel, t.url AS url, t.volltext AS volltext "
+            "FROM entwuerfe e JOIN themen t ON t.id = e.thema_id WHERE e.status='entwurf'").fetchall()
+    neu = 0
+    for r in rows:
+        try:
+            data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]},
+                            r["kanal"] or kanal)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), r["eid"]))
+            neu += 1
+            log.info("Entwurf neu erzeugt: %s - %s", r["eid"], (r["titel"] or "")[:60])
+        except Exception as ex:
+            log.warning("Neu-Erzeugung fehlgeschlagen (Entwurf %s): %s", r["eid"], ex)
+    # auch Entwuerfe ohne Text-Neuerzeugung (z.B. Countdowns) neu rendern -> neues Bild-Layout
+    with get_conn() as conn:
+        conn.execute("UPDATE entwuerfe SET bild_pfad=NULL WHERE status='entwurf'")
+    return neu
+
+
 def regenerate(thema, previous, feedback, kanal="google"):
     """Erzeugt eine ueberarbeitete Version eines Beitrags gemaess Aenderungswunsch."""
     import json as _json
