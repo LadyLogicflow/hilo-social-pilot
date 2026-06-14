@@ -297,7 +297,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
          <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     {% if stellen %}
-    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.') && confirm('Diesen Beitrag personalisiert für die gewählten Beratungsstellen veröffentlichen?')">
+    <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
       <div class=checks>{% for s in stellen %}<label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>{% endfor %}</div>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
@@ -306,11 +306,12 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="facebook">Facebook</option>
         <option value="instagram">Instagram</option>
         <option value="beide">Facebook + Instagram</option></select>
-      <button>Personalisiert veröffentlichen</button>
+      <button>Vorschau ansehen</button>
+      <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
-    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst.</p>
+    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. <b>Tipp:</b> erst „Vorschau ansehen", dann veröffentlichen.</p>
     {% elif pages %}
-    <form method=post action="/veroeffentlichen/{{e.id}}" onsubmit="return need(this,'page_id','Bitte mindestens eine Facebook-Seite auswählen.') && confirm('Diesen Beitrag jetzt auf den gewählten Facebook-Seiten veröffentlichen?')">
+    <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'page_id','Bitte mindestens eine Facebook-Seite auswählen.')">
       <div class=checks>{% for p in pages %}<label><input type=checkbox name=page_id value="{{p.id}}"> {{p.name}}</label>{% endfor %}</div>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
@@ -319,12 +320,46 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="facebook">Facebook</option>
         <option value="instagram">Instagram</option>
         <option value="beide">Facebook + Instagram</option></select>
-      <button>Jetzt veröffentlichen</button>
+      <button>Vorschau ansehen</button>
+      <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
     <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
     {% else %}<p class=sub>Kein Facebook-Zugang/keine Beratungsstelle aktiv.</p>{% endif %}
   </div></div>
 {% else %}<p style="text-align:center">Keine freigegebenen Beiträge zur Einplanung.</p>{% endfor %}"""
+
+VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentlichung</title><style>""" + _STYLE + """
+.bar{max-width:1200px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
+.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
+.pv{display:flex;flex-wrap:wrap;gap:18px;justify-content:center}
+.pvc{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:12px;width:340px}
+.pvc img{width:316px;height:316px;object-fit:cover;border-radius:8px;border:1px solid #eef1f4}
+.pvh{font-weight:bold;color:#15336e;margin-bottom:8px}
+.pvc details{margin-top:8px}.pvc summary{cursor:pointer;color:#1f428d;font-size:13px}
+.pvc .cap{font-size:13px;color:#444;margin:6px 0 0}
+.foot{max-width:1200px;margin:16px auto 0;display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:12px;padding:14px}</style>
+<div class=bar><h2 style="margin:0">Vorschau vor Veröffentlichung</h2><a href="/einplanung">&larr; Einplanung</a></div>
+<div style="max-width:1200px;margin:0 auto 12px">
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<p class=hint>Prüfe für jede Beratungsstelle, ob <b>Porträt-Kreis, Name, Ort und Begleittext</b> stimmen. Erst wenn alles passt, unten auf „Jetzt veröffentlichen" klicken.{% if fmt=='karussell' %} <i>(Beim Karussell zeigt die Vorschau die personalisierte Bildvariante mit Porträt, Name und Ort – das veröffentlichte Karussell enthält zusätzlich mehrere Inhalts-Slides.)</i>{% endif %}</p>
+</div>
+<div class=pv>
+{% for it in items %}
+  <div class=pvc>
+    <div class=pvh>{{it.label}}{% if not it.ok %} <span style="color:#b00020">– Vorschau-Fehler</span>{% endif %}</div>
+    {% if it.ok %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
+    {% if it.ok %}<details><summary>Begleittext anzeigen</summary><p class=cap>{{it.caption}}</p></details>{% endif %}
+  </div>
+{% endfor %}
+</div>
+<form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an die {{ziel_count}} gültigen Ziele veröffentlichen?')">
+  {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}">{% endfor %}
+  {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}">{% endfor %}
+  <input type=hidden name=format value="{{fmt}}"><input type=hidden name=kanal value="{{kanal}}">
+  <div class=foot><a href="/einplanung">&larr; Auswahl ändern</a>
+    <span class=hint>Kanal: <b>{{kanal_de}}</b> · {{ziel_count}} Ziel(e)</span>
+    <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
+</form>"""
 
 KALENDER = """<!doctype html><meta charset=utf-8><title>Content-Kalender</title>
 <style>""" + _TOP + """
@@ -1028,6 +1063,76 @@ def veroeffentlichen(eid):
         flash("Beitrag %d (%s):  %s" % (eid, "Karussell" if fmt == "karussell" else "Einzelbild", "   •   ".join(zeilen)))
         conn.commit()
     return redirect(url_for("einplanung"))
+
+@app.route("/vorschau/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def vorschau(eid):
+    """Rendert vor dem Veroeffentlichen je gewaehlter Beratungsstelle die personalisierte
+    Bildvariante (Portraet, Name, Ort, Begleittext) zur Pruefung - postet noch nichts."""
+    stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
+    page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
+    fmt = request.form.get("format", "").strip()
+    kanal = request.form.get("kanal", "facebook").strip()
+    if kanal not in ("facebook", "instagram", "beide"):
+        kanal = "facebook"
+    if not stelle_ids and not page_ids:
+        flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
+        return redirect(url_for("einplanung"))
+    kanal_de = {"facebook": "Facebook", "instagram": "Instagram", "beide": "Facebook + Instagram"}[kanal]
+    items = []
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        if fmt not in ("einzelbild", "karussell"):
+            fmt = e["format"] or "einzelbild"
+        try:
+            f = json.loads(e["text"])
+        except Exception:
+            f = {}
+        pdir = os.path.join(DATA_DIR, "preview"); os.makedirs(pdir, exist_ok=True)
+        # alte Vorschaubilder aufraeumen (aelter als 6 Stunden) - der Ordner ist nur ein Cache
+        try:
+            grenze = time.time() - 6 * 3600
+            for fn in os.listdir(pdir):
+                fp = os.path.join(pdir, fn)
+                if os.path.isfile(fp) and os.path.getmtime(fp) < grenze:
+                    os.remove(fp)
+        except Exception:
+            pass
+        import personalisierung
+        for sid in stelle_ids:
+            stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+            if not stelle or not stelle["fb_seite"]:
+                items.append({"label": "Beratungsstelle %s" % sid, "ok": False,
+                              "caption": "Keine Facebook-Seite zugeordnet – wird beim Veröffentlichen übersprungen."})
+                continue
+            out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, int(stelle["id"])))
+            try:
+                pf, _ = personalisierung.render_fuer_stelle(f, stelle, out)
+                v = int(os.path.getmtime(out))
+                items.append({"label": "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else ""),
+                              "ok": True, "caption": pf.get("caption") or f.get("caption") or "",
+                              "url": url_for("preview_bild", eid=eid, sid=int(stelle["id"])) + "?v=%d" % v})
+            except Exception:
+                log.exception("Vorschau-Render fehlgeschlagen (Entwurf %s / Stelle %s)", eid, sid)
+                items.append({"label": stelle["name"], "ok": False,
+                              "caption": "Vorschau konnte nicht erstellt werden."})
+        for pid in page_ids:
+            items.append({"label": "Facebook-Seite %s" % pid, "ok": True,
+                          "caption": f.get("caption") or f.get("ueberschrift") or "",
+                          "url": url_for("bild", eid=eid)})
+    ziel_count = sum(1 for it in items if it.get("ok"))
+    return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt=fmt, kanal=kanal, kanal_de=kanal_de,
+                                  items=items, ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids))
+
+@app.route("/preview-bild/<int:eid>/<int:sid>")
+@rolle_required("freigeber")
+def preview_bild(eid, sid):
+    p = os.path.join(DATA_DIR, "preview", "e%d_stelle_%d.png" % (eid, sid))
+    if not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="image/png", max_age=0)
 
 @app.route("/verwaltung", methods=["GET", "POST"])
 @admin_required
