@@ -698,6 +698,9 @@ def beitrag_neu(eid):
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
+        if e["status"] not in ("freigegeben", "entwurf"):
+            flash("Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+            return redirect(url_for("einplanung"))
         thema = conn.execute("SELECT titel, url, volltext FROM themen WHERE id=?",
                              (e["thema_id"],)).fetchone() if e["thema_id"] else None
         kanal = e["kanal"] or "google"
@@ -726,11 +729,17 @@ def beitrag_neu(eid):
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(data, ensure_ascii=False), out, eid))
         else:
-            conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+            # Bild fehlgeschlagen: neuer Text wuerde nicht zum alten Bild passen -> nicht freigegeben/
+            # geplant mit Mismatch stehen lassen, sondern zurueck in die Entwurfs-Pruefung (Termin bleibt).
+            conn.execute("UPDATE entwuerfe SET text=?, status='entwurf' WHERE id=?",
                          (json.dumps(data, ensure_ascii=False), eid))
         audit_log(conn, session["user"], "beitrag_neu_erzeugt", eid)
         conn.commit()
-    flash("Beitrag %d nach den aktuellen Vorgaben neu erzeugt - bitte vor dem Veröffentlichen prüfen." % eid)
+    if out:
+        flash("Beitrag %d nach den aktuellen Vorgaben neu erzeugt - bitte vor dem Veröffentlichen prüfen." % eid)
+    else:
+        flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
+              "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
     return redirect(url_for("einplanung"))
 
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
