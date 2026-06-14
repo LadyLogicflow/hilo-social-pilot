@@ -119,7 +119,9 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     base.paste(grad, (0, 0), mb)
 
     dr = ImageDraw.Draw(base); margin = 54
-    pos = pick_circle_pos()            # Eckposition der Kreise (Abwechslung je Beitrag)
+    # Mit Portraet: feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2').
+    # Nur ohne Portraet wechselt die Eckposition je Beitrag.
+    pos = "diagonal2" if portrait else pick_circle_pos()
     ct, cb = _content_bounds(pos)
     head_w = (W - 2*margin) if pos == "unten" else (W - 2*246)
     fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, head_w, 2)
@@ -134,19 +136,23 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     bullets = [b for b in (fields.get("bullets") or [])[:3] if b]
     blocks = [_wrap(dr, b, fb, bw) for b in bullets]
     lh = fb.size + 6
-    bh = len(SL)*(fsb.size+8) + 30 + sum(len(bl)*lh + 16 for bl in blocks)
+    # Gleichmaessiger Abstand: jeder Bullet bekommt denselben vertikalen Schritt (Hoehe des
+    # groessten Bullets + fester Abstand), unabhaengig davon ob er ein- oder zweizeilig ist.
+    maxlines = max((len(bl) for bl in blocks), default=1)
+    step = maxlines * lh + 22
+    bh = len(SL)*(fsb.size+8) + 30 + len(blocks)*step
     y = ct + (cb - ct - bh)//2 + fsb.size//2   # Inhalt bleibt frei von den Kreisen
     for ln in SL:
         dr.text((margin, y), ln, font=fsb, fill=GREEN2, anchor="lm"); y += fsb.size + 8
     y += 30
-    for bl in blocks:
+    for i, bl in enumerate(blocks):
+        cy = y + i*step + step//2          # Mitte des gleich grossen Slots -> konstanter Abstand
         r = 17; bx = margin + r
-        dr.ellipse([bx-r, y-r, bx+r, y+r], fill=GREEN)
-        dr.line([(bx-8, y), (bx-1, y+8), (bx+9, y-9)], fill=WHITE, width=5, joint="curve")
-        ty = y - (len(bl)-1)*lh//2
+        dr.ellipse([bx-r, cy-r, bx+r, cy+r], fill=GREEN)
+        dr.line([(bx-8, cy), (bx-1, cy+8), (bx+9, cy-9)], fill=WHITE, width=5, joint="curve")
+        ty = cy - (len(bl)-1)*lh//2
         for ln in bl:
             dr.text((tx0, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh
-        y += len(bl)*lh + 16
 
     fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 28, 20, W - 2*255, 2)
     cyy = (BOTB + H)//2 + 12; ty = cyy - (len(CL)-1)*(fc.size+4)//2
@@ -375,7 +381,8 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, por
     bullets = [b for b in (fields.get("bullets") or []) if b]
     bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
     total = 1 + len(bullets) + 1
-    pos = pick_circle_pos()   # Eckposition der Kreise einmal je Beitrag (alle Slides gleich)
+    # Mit Portraet feste Position (Logo unten-links, Portraet oben-rechts); sonst Abwechslung
+    pos = "diagonal2" if portrait else pick_circle_pos()
     slides = [_slide_title(fields, photo_path, slogan, 0, total, pos, portrait)]
     for i, b in enumerate(bullets):
         slides.append(_slide_bullet(b, slogan, 1 + i, total, i + 1, pos, portrait))
