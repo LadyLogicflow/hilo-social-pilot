@@ -8,6 +8,9 @@ from config import BASE_DIR, DATA_DIR
 
 log = logging.getLogger("hilo.bildgen")
 W = H = 1080
+# Text-Unterkante: Schriften enden oberhalb der schwebenden Kreise (Kreis-Oberkante 844,
+# inkl. weichem Schatten-Halo) - so wird kein Text vom Kreis oder Schatten verdeckt.
+CBOT = 788
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
@@ -117,7 +120,7 @@ def render(fields, photo_path, slogan, out_path):
     blocks = [_wrap(dr, b, fb, bw) for b in bullets]
     lh = fb.size + 6
     bh = len(SL)*(fsb.size+8) + 30 + sum(len(bl)*lh + 16 for bl in blocks)
-    y = TOPB + (BOTB - TOPB - bh)//2 + fsb.size//2
+    y = TOPB + (CBOT - TOPB - bh)//2 + fsb.size//2   # Inhalt endet oberhalb der Kreise
     for ln in SL:
         dr.text((margin, y), ln, font=fsb, fill=GREEN2, anchor="lm"); y += fsb.size + 8
     y += 30
@@ -135,22 +138,7 @@ def render(fields, photo_path, slogan, out_path):
     for ln in CL:
         dr.text((W//2, ty), ln, font=fc, fill=WHITE, anchor="mm"); ty += fc.size + 4
 
-    R = 102; ccy = 946
-    def shadow(cx, cy):
-        sh = Image.new("RGBA", base.size, (0,0,0,0))
-        ImageDraw.Draw(sh).ellipse([cx-R+5, cy-R+13, cx+R+5, cy+R+13], fill=(0,0,0,100))
-        blr = sh.filter(ImageFilter.GaussianBlur(15)); base.paste(blr, (0,0), blr)
-    lx = R + 22; shadow(lx, ccy)
-    dr.ellipse([lx-R, ccy-R, lx+R, ccy+R], fill=WHITE)
-    if os.path.exists(LOGO_PATH):
-        logo = Image.open(LOGO_PATH).convert("RGBA"); lw = 170; lh2 = int(logo.height*lw/logo.width)
-        logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(ccy-lh2/2)), logo)
-    rx = W - R - 22; shadow(rx, ccy)
-    dr.ellipse([rx-R, ccy-R, rx+R, ccy+R], fill=BLUE)
-    fsl = _font(_BOLD, 33); lines = _slogan_lines(dr, slogan, fsl, 2*R - 36)
-    sy = ccy - (len(lines)-1)*(fsl.size+4)//2
-    for ln in lines:
-        dr.text((rx, sy), ln, font=fsl, fill=WHITE, anchor="mm"); sy += fsl.size + 4
+    _draw_circles(base, slogan)   # schwebende Logo-/Slogan-Kreise (identisch zum Karussell)
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     base.save(out_path)
@@ -243,13 +231,13 @@ def _slide_title(fields, photo_path, slogan, idx, total):
     # zentrierte Gruppe im weissen Feld
     fsb = _font(_BOLD, 42); SL = _wrap(dr, fields.get("subline", ""), fsb, W - 2*margin)
     sub_h = len(SL)*(fsb.size + 12)
-    # Foto-Hoehe adaptiv: passt sich dem Restplatz an, damit Gruppe nie ueberlaeuft
-    photo_max = max(140, (BOTB - TOPB) - sub_h - 30 - 36)
+    # Foto-Hoehe adaptiv aus Restplatz; Gruppe endet oberhalb der Kreise (CBOT)
+    photo_max = max(140, (CBOT - TOPB) - sub_h - 30 - 36)
     cut2 = _fit_photo(cut, min(440, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 30 if cut2 is not None else 0
     group_h = ph + gap + sub_h
-    gy = TOPB + (BOTB - TOPB - group_h)//2
+    gy = TOPB + (CBOT - TOPB - group_h)//2
     if cut2 is not None:
         base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
         gy += ph + gap
@@ -272,7 +260,7 @@ def _slide_bullet(text, slogan, idx, total, nummer):
     f, L = _fit(dr, text, _BOLD, 58, 32, W - 2*margin, 6)
     top = ncy + nr + 40
     th = len(L)*(f.size+12)
-    y = top + (BOTB - top - th)//2 + f.size//2
+    y = top + (CBOT - top - th)//2 + f.size//2   # Text endet oberhalb der Kreise
     for ln in L:
         dr.text((W//2, y), ln, font=f, fill=NAVY, anchor="mm"); y += f.size + 12
     _draw_circles(base, slogan)
@@ -285,17 +273,17 @@ def _slide_cta(fields, photo_path, slogan, idx, total):
     TOPB, BOTB = _draw_bands(base)
     dr = ImageDraw.Draw(base); margin = 78
     head = _font(_BOLD, 40)
-    dr.text((W//2, TOPB + 70), "Jetzt aktiv werden", font=head, fill=GREEN2, anchor="mm")
+    dr.text((W//2, TOPB + 70), "Aktiv werden!", font=head, fill=GREEN2, anchor="mm")
     fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 4)
     sub_h = len(CL)*(fc.size + 12)
     top = TOPB + 128
-    # Foto-Hoehe adaptiv: passt sich dem Restplatz an, damit Gruppe nie ueberlaeuft
-    photo_max = max(140, (BOTB - top) - sub_h - 28 - 30)
+    # Foto-Hoehe adaptiv aus Restplatz; Gruppe endet oberhalb der Kreise (CBOT)
+    photo_max = max(140, (CBOT - top) - sub_h - 28 - 30)
     cut2 = _fit_photo(cut, min(360, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 28 if cut2 is not None else 0
     group_h = ph + gap + sub_h
-    gy = top + (BOTB - top - group_h)//2
+    gy = top + (CBOT - top - group_h)//2
     if cut2 is not None:
         base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
         gy += ph + gap
