@@ -6,18 +6,25 @@ import os
 
 
 def fuer_stelle(fields, stelle):
-    """Gibt eine personalisierte Kopie der Beitrags-Felder fuer eine Beratungsstelle zurueck."""
+    """Gibt eine personalisierte Kopie der Beitrags-Felder fuer eine Beratungsstelle zurueck.
+    Deterministisch: nutzt ausschliesslich echte Stammdaten (Ort, Leitung, Buchungslink) und
+    erfindet nichts. Der Begleittext bekommt einen persoenlichen, lokalen Bezug."""
     f = dict(fields)
     ort = (stelle["ort"] or "").strip() if _has(stelle, "ort") else ""
+    leitung = (stelle["leitung"] or "").strip() if _has(stelle, "leitung") else ""
     buchung = (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
     if ort:
         f["cta"] = "Jetzt Termin bei Ihrer HILO-Beratungsstelle %s vereinbaren" % ort
+        # Persoenlicher Begleittext: nennt die Leitung, falls hinterlegt, sonst die Stelle.
+        if leitung:
+            satz = ("%s von Ihrer HILO-Beratungsstelle in %s bespricht Ihre steuerliche "
+                    "Situation gerne persönlich mit Ihnen." % (leitung, ort))
+        else:
+            satz = "Ihre HILO-Beratungsstelle in %s berät Sie gerne persönlich." % ort
         if buchung:
             # ohne abschliessenden Punkt, damit der Link nicht bricht
-            zusatz = " Vereinbaren Sie Ihren Termin bei Ihrer HILO-Beratungsstelle in %s: %s" % (ort, buchung)
-        else:
-            zusatz = " Vereinbaren Sie Ihren Termin bei Ihrer HILO-Beratungsstelle in %s." % ort
-        f["caption"] = ((fields.get("caption") or "").strip() + zusatz).strip()
+            satz += " Termin vereinbaren: %s" % buchung
+        f["caption"] = ((fields.get("caption") or "").strip() + " " + satz).strip()
     return f
 
 
