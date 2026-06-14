@@ -14,7 +14,8 @@ CBOT = 788
 CTOPTEXT = H - CBOT        # = 292: Text-Oberkante, wenn die Kreise oben stehen (gespiegelt)
 TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender
 # Eckpositionen der beiden CI-Kreise (Erkennungszeichen) - sorgen fuer Abwechslung je Beitrag
-CIRCLE_POSITIONS = ["unten", "oben", "diagonal"]
+# diagonal  = Logo oben-links + Slogan unten-rechts; diagonal2 = Logo unten-links + Slogan oben-rechts
+CIRCLE_POSITIONS = ["unten", "oben", "diagonal", "diagonal2"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
@@ -111,7 +112,10 @@ def render(fields, photo_path, slogan, out_path):
     base.paste(grad, (0, 0), mb)
 
     dr = ImageDraw.Draw(base); margin = 54
-    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, W - 2*margin, 2)
+    pos = pick_circle_pos()            # Eckposition der Kreise (Abwechslung je Beitrag)
+    ct, cb = _content_bounds(pos)
+    head_w = (W - 2*margin) if pos == "unten" else (W - 2*246)
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, head_w, 2)
     yy = 72 if len(HL) == 2 else 96
     for ln in HL:
         dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
@@ -124,7 +128,7 @@ def render(fields, photo_path, slogan, out_path):
     blocks = [_wrap(dr, b, fb, bw) for b in bullets]
     lh = fb.size + 6
     bh = len(SL)*(fsb.size+8) + 30 + sum(len(bl)*lh + 16 for bl in blocks)
-    y = TOPB + (CBOT - TOPB - bh)//2 + fsb.size//2   # Inhalt endet oberhalb der Kreise
+    y = ct + (cb - ct - bh)//2 + fsb.size//2   # Inhalt bleibt frei von den Kreisen
     for ln in SL:
         dr.text((margin, y), ln, font=fsb, fill=GREEN2, anchor="lm"); y += fsb.size + 8
     y += 30
@@ -142,7 +146,7 @@ def render(fields, photo_path, slogan, out_path):
     for ln in CL:
         dr.text((W//2, ty), ln, font=fc, fill=WHITE, anchor="mm"); ty += fc.size + 4
 
-    _draw_circles(base, slogan)   # schwebende Logo-/Slogan-Kreise (identisch zum Karussell)
+    _draw_circles(base, slogan, pos)   # schwebende Kreise, Eckposition variiert je Beitrag
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     base.save(out_path)
@@ -199,19 +203,21 @@ def pick_circle_pos():
 
 def _content_bounds(pos):
     """Vertikale Textgrenzen je nach Kreisposition, damit kein Text einen Kreis beruehrt:
-    bei Kreisen oben startet der Text tiefer, bei Kreisen unten endet er hoeher."""
-    ct = CTOPTEXT if pos in ("oben", "diagonal") else TOPB_BAND
-    cb = CBOT if pos in ("unten", "diagonal") else BOTB_BAND
+    sobald oben ein Kreis steht, startet der Text tiefer; sobald unten ein Kreis steht,
+    endet er hoeher (bei diagonal/diagonal2 also beidseitig begrenzt)."""
+    ct = TOPB_BAND if pos == "unten" else CTOPTEXT   # nur bei 'unten' kein oberer Kreis
+    cb = BOTB_BAND if pos == "oben" else CBOT         # nur bei 'oben' kein unterer Kreis
     return ct, cb
 
 def _draw_circles(base, slogan, pos="unten"):
     """Logo-Kreis (links) und Slogan-Kreis (rechts) als schwebende Erkennungszeichen in den
-    Ecken. pos = 'unten' (beide unten), 'oben' (beide oben) oder 'diagonal'
-    (Logo oben-links + Slogan unten-rechts) - sorgt fuer Abwechslung je Beitrag."""
+    Ecken. pos = 'unten' (beide unten), 'oben' (beide oben),
+    'diagonal' (Logo oben-links + Slogan unten-rechts) oder
+    'diagonal2' (Logo unten-links + Slogan oben-rechts) - Abwechslung je Beitrag."""
     dr = ImageDraw.Draw(base)
     R = 102; CCY_TOP, CCY_BOT = 134, 946
     logo_y = CCY_TOP if pos in ("oben", "diagonal") else CCY_BOT
-    slogan_y = CCY_TOP if pos == "oben" else CCY_BOT
+    slogan_y = CCY_TOP if pos in ("oben", "diagonal2") else CCY_BOT
     def shadow(cx, cy):
         # weicher, etwas groesserer Schlagschatten mit Versatz nach unten-rechts -
         # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass
@@ -259,9 +265,9 @@ def _slide_title(fields, photo_path, slogan, idx, total, pos="unten"):
     TOPB, BOTB = _draw_bands(base)
     ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 54
-    # Ueberschrift gross, fett, zentriert im oberen Band; bei Kreisen oben schmaler,
-    # damit sie die Eck-Kreise nicht beruehrt
-    head_w = (W - 2*246) if pos in ("oben", "diagonal") else (W - 2*margin)
+    # Ueberschrift gross, fett, zentriert im oberen Band; sobald oben ein Kreis steht
+    # schmaler, damit sie die Eck-Kreise nicht beruehrt
+    head_w = (W - 2*margin) if pos == "unten" else (W - 2*246)
     fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 56, 36, head_w, 2)
     yy = 64 if len(HL) == 2 else 92
     for ln in HL:
