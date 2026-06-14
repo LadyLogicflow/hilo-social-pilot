@@ -422,8 +422,12 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
 VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
 .filebtn{display:inline-block;background:#eef2f8;border:1px solid #cfd8e6;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:13px;color:#1f428d;white-space:nowrap}
 .filebtn:hover{background:#e2e9f4}
-button:disabled{opacity:.45;cursor:not-allowed}</style>
-<div class=box><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
+button:disabled{opacity:.45;cursor:not-allowed}
+.wide{max-width:1480px}
+.scrollx{overflow-x:auto}
+.vtab td,.vtab th{padding:11px 13px}
+.nw{white-space:nowrap}</style>
+<div class="box{% if bereich=='stellen' %} wide{% endif %}"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 
 {% if bereich=='benutzer' %}
@@ -439,8 +443,8 @@ button:disabled{opacity:.45;cursor:not-allowed}</style>
 
 {% if bereich=='stellen' %}
 {% if pages_err %}<p class=hint style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}} – du kannst die Seiten-ID solange manuell eintragen.</p>{% endif %}
-<table><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th></tr>
-{% for b in stellen %}<tr><td>{{b.name}}</td><td>{{b.ort}}</td><td>{{b.leitung}}</td>
+<div class=scrollx><table class=vtab><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th></tr>
+{% for b in stellen %}<tr><td class=nw>{{b.name}}</td><td class=nw>{{b.ort}}</td><td class=nw>{{b.leitung}}</td>
 <td>{% if pages %}<form method=post style="margin:0">
   <input type=hidden name=formular value=stelle_fb><input type=hidden name=stelle_id value="{{b.id}}">
   <select name=fb_seite onchange="this.form.submit()">
@@ -460,7 +464,7 @@ button:disabled{opacity:.45;cursor:not-allowed}</style>
   </form>
   {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
 </div></td>
-<td>{{b.buchungs_url}}</td></tr>{% endfor %}</table>
+<td>{{b.buchungs_url}}</td></tr>{% endfor %}</table></div>
 <form method=post><input type=hidden name=formular value=stelle_save>
 <input name=name placeholder="Name der Beratungsstelle" required>
 <input name=ort placeholder="Ort (z.B. Neuss)" required>
