@@ -243,7 +243,9 @@ def _slide_title(fields, photo_path, slogan, idx, total):
     # zentrierte Gruppe im weissen Feld
     fsb = _font(_BOLD, 42); SL = _wrap(dr, fields.get("subline", ""), fsb, W - 2*margin)
     sub_h = len(SL)*(fsb.size + 12)
-    cut2 = _fit_photo(cut, 440, W - 2*margin)
+    # Foto-Hoehe adaptiv: passt sich dem Restplatz an, damit Gruppe nie ueberlaeuft
+    photo_max = max(140, (BOTB - TOPB) - sub_h - 30 - 36)
+    cut2 = _fit_photo(cut, min(440, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 30 if cut2 is not None else 0
     group_h = ph + gap + sub_h
@@ -286,10 +288,12 @@ def _slide_cta(fields, photo_path, slogan, idx, total):
     dr.text((W//2, TOPB + 70), "Jetzt aktiv werden", font=head, fill=GREEN2, anchor="mm")
     fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 4)
     sub_h = len(CL)*(fc.size + 12)
-    cut2 = _fit_photo(cut, 360, W - 2*margin)
+    top = TOPB + 128
+    # Foto-Hoehe adaptiv: passt sich dem Restplatz an, damit Gruppe nie ueberlaeuft
+    photo_max = max(140, (BOTB - top) - sub_h - 28 - 30)
+    cut2 = _fit_photo(cut, min(360, photo_max), W - 2*margin)
     ph = cut2.height if cut2 is not None else 0
     gap = 28 if cut2 is not None else 0
-    top = TOPB + 128
     group_h = ph + gap + sub_h
     gy = top + (BOTB - top - group_h)//2
     if cut2 is not None:
