@@ -7,3 +7,4 @@ feedparser>=6.0
 pypdf>=4.0
 beautifulsoup4>=4.12
 python-dotenv>=1.0
+paramiko>=3.0
