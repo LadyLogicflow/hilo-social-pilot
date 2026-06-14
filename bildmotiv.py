@@ -9,10 +9,13 @@ log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
 def _prompt(motiv):
-    return ("Freigestellt vor transparentem Hintergrund: %s, Halbkoerper, freundlich und sympathisch, "
-            "Arme und Schultern vollstaendig im Bild mit deutlichem Abstand zum linken und rechten Rand, "
-            "unten auf Brusthoehe endend, hochwertige Werbefotografie, sauber freigestellt. "
-            "KEIN Hintergrund, KEINE Texte, KEINE Logos." % motiv)
+    return ("Freigestellt vor transparentem Hintergrund: %s. Warme, hochwertige Werbefotografie einer "
+            "positiven Steuerberatungs-Szene; freundliche, laechelnde Menschen in zugewandter Interaktion "
+            "(kein nachdenklicher oder sorgenvoller Ausdruck, kein einzelnes Portraitfoto). Passende "
+            "Requisiten wie Laptop, Unterlagen und eine schlichte Kaffeetasse duerfen vorkommen und werden "
+            "sauber mitfreigestellt. Die gesamte Gruppe als Halbkoerper bis etwa Tischhoehe, vollstaendig "
+            "im Bild mit deutlichem Abstand zum linken und rechten Rand. Sauber freigestellt, KEIN "
+            "Hintergrund, KEIN Tisch-Hintergrund, KEINE Texte, KEINE Logos, KEINE Markennamen." % motiv)
 
 def ensure_photo(motiv):
     motiv = (motiv or "").strip()
