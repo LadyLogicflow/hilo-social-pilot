@@ -172,7 +172,28 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
   <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entwürfe prüfen, überarbeiten, freigeben (Stufe 2).</p></a>
   <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>"""
+
+EIGENER = """<!doctype html><meta charset=utf-8><title>Eigenen Beitrag erstellen</title>
+<style>""" + _TOP + """
+.card{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:22px}
+label{display:block;font-weight:bold;color:#15336e;margin:16px 0 4px}
+textarea,input[type=date]{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccd3df;border-radius:8px;font-size:15px}
+textarea{min-height:84px;resize:vertical}
+button{margin-top:18px;background:#4c7b2d;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:bold}</style>
+<div class=top><h2 style="margin:0;color:#1f428d">Eigenen Beitrag erstellen</h2><a href="/">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=card>
+  <p class=hint>Gib ein <b>Thema</b> und einen <b>Tag</b> an. Das Tool erstellt daraus einen Entwurf (Text&nbsp;+&nbsp;Bild) wie bei den automatischen Themen. Nach deiner Freigabe unter „3. Freigabe: Texte &amp; Bilder" wird er fest für den gewählten Tag eingeplant.</p>
+  <form method=post>
+    <label>Thema des Beitrags</label>
+    <textarea name=thema placeholder="z. B. Urlaub ist steuerlich nicht abzugsfähig" required></textarea>
+    <label>Veröffentlichen am</label>
+    <input type=date name=datum required>
+    <button>Entwurf erstellen</button>
+  </form>
+</div>"""
 
 ENTWUERFE = """<!doctype html><meta charset=utf-8><title>Freigabe: Texte & Bilder</title>
 <style>""" + _TOP + """
@@ -615,6 +636,50 @@ def generieren():
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
     return redirect(url_for("index"))
+
+@app.route("/eigener", methods=["GET", "POST"])
+@rolle_required("freigeber")
+def eigener():
+    if request.method == "POST":
+        import datetime, hashlib
+        thema_txt = request.form.get("thema", "").strip()
+        datum = request.form.get("datum", "").strip()
+        if not thema_txt or not datum:
+            flash("Bitte Thema und Tag angeben."); return redirect(url_for("eigener"))
+        try:
+            d = datetime.date.fromisoformat(datum)
+        except ValueError:
+            flash("Ungültiges Datum."); return redirect(url_for("eigener"))
+        if d < datetime.date.today():
+            flash("Der Tag liegt in der Vergangenheit – bitte einen Tag ab heute wählen.")
+            return redirect(url_for("eigener"))
+        # Zuerst den Beitrag erzeugen (Claude) - noch KEIN DB-Schreiben, falls es fehlschlaegt
+        try:
+            data = textgen.generate({"titel": thema_txt, "volltext": thema_txt, "url": None}, "google")
+        except Exception as ex:
+            flash("Erstellung fehlgeschlagen (Texterzeugung): %s" % ex)
+            return redirect(url_for("eigener"))
+        # Thema + Entwurf in EINER Transaktion (kein verwaistes Thema, kein Race mit /generieren,
+        # das ein 'ausgewaehlt'-Thema ohne Entwurf doppelt aufgreifen koennte)
+        h = hashlib.sha256(("eigen:%s:%s:%s" % (thema_txt, datum,
+                            datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
+        with get_conn() as conn:
+            cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
+                               "VALUES ('eigen', ?, 'ausgewaehlt', ?, ?)", (thema_txt[:300], thema_txt, h))
+            thema_id = cur.lastrowid
+            conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
+                         "VALUES (?, 'google', ?, 'entwurf', ?)",
+                         (thema_id, json.dumps(data, ensure_ascii=False), datum))
+            audit_log(conn, session["user"], "eigener_beitrag", None, "Thema '%s' fuer %s" % (thema_txt[:60], datum))
+            conn.commit()
+        try:
+            bildgen.render_drafts()
+        except Exception:
+            pass   # Bild wird sonst beim naechsten Lauf nachgerendert; Entwurf existiert bereits
+        flash("Beitrag-Entwurf zum Thema „%s“ für %s erstellt – jetzt unter „3. Freigabe: Texte & Bilder“ "
+              "prüfen und freigeben." % (thema_txt[:60], _de_datum(datum)))
+        return redirect(url_for("entwuerfe"))
+    return render_template_string(EIGENER, **_ctx())
 
 @app.route("/bild/<int:eid>")
 @login_required
