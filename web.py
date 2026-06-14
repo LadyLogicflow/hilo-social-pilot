@@ -174,7 +174,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
 .tile:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14);transition:.15s}
 .tile.action{border-top-color:#4c7b2d;background:linear-gradient(180deg,#f6faf2,#fff)}
 .tile h3{color:#1f428d;margin:6px 0 4px;font-size:16px}.tile p{color:#6b7280;font-size:13px;margin:0}
-.badge{position:absolute;top:16px;right:16px;background:#1f428d;color:#fff;border-radius:18px;padding:2px 11px;font-weight:bold;font-size:14px}
+.badge{position:absolute;bottom:14px;right:16px;background:#1f428d;color:#fff;border-radius:18px;padding:2px 11px;font-weight:bold;font-size:14px}
 .badge.g{background:#4c7b2d}
 .tile form{margin:10px 0 0}.tile button{background:#4c7b2d;color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
 .run{color:#4c7b2d;font-weight:bold;font-size:13px;margin-top:8px}</style>
@@ -198,7 +198,8 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 .tl input{margin-top:3px}
 .tl .ti{font-weight:bold;color:#15336e}
 .tl .meta{font-size:12px;color:#7a8694}
-.allrow{font-weight:bold;color:#1f428d;border-bottom:2px solid #e6eaf0 !important}</style>
+.allrow{font-weight:bold;color:#1f428d;border-bottom:2px solid #e6eaf0 !important}
+.tl .delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:auto;align-self:center}</style>
 <div class=bar><h2 style="margin:0">Themen auswählen &amp; erzeugen</h2><a href="/">&larr; Startseite</a></div>
 <div class=box>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -209,7 +210,8 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
   <div class=tl>
     <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
     {% for t in themen %}<label><input type=checkbox name=thema_id value="{{t.id}}">
-      <span><span class=ti>{{t.titel}}</span><br><span class=meta>{{t.quelle}}{% if t.erkannt_am %} &middot; erkannt {{t.erkannt_am[:10]}}{% endif %}</span></span></label>{% endfor %}
+      <span><span class=ti>{{t.titel}}</span><br><span class=meta>{{t.quelle}}{% if t.erkannt_am %} &middot; erkannt {{t.erkannt_am[:10]}}{% endif %}</span></span>
+      <button type=button class=delbtn onclick="event.preventDefault();event.stopPropagation();loeschThema({{t.id}},'erzeugen')">Löschen</button></label>{% endfor %}
   </div>
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
@@ -220,6 +222,7 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 function upd(){document.getElementById('cnt').textContent=document.querySelectorAll('input[name=thema_id]:checked').length;}
 function toggleAll(c){document.querySelectorAll('input[name=thema_id]').forEach(function(b){b.checked=c.checked;});upd();}
 function chk(f){if(f.querySelectorAll('input[name=thema_id]:checked').length===0){alert('Bitte mindestens ein Thema anhaken.');return false;}return true;}
+function loeschThema(id,z){if(!confirm('Dieses Thema wirklich löschen?'))return;var f=document.createElement('form');f.method='post';f.action='/thema-loeschen/'+id;var i=document.createElement('input');i.type='hidden';i.name='zurueck';i.value=z;f.appendChild(i);document.body.appendChild(f);f.submit();}
 document.addEventListener('change',function(e){if(e.target&&e.target.name==='thema_id')upd();});
 </script>
 {% else %}
@@ -256,7 +259,7 @@ ENTWUERFE = """<!doctype html><meta charset=utf-8><title>Freigabe: Texte & Bilde
 .cta{display:inline-block;background:#1f428d;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
 textarea{width:100%;min-height:54px;margin:8px 0;border:1px solid #ccd;border-radius:8px;padding:8px}
 button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6px;color:#fff}
-.ok{background:#2e7d32}.no{background:#9aa0a6}.re{background:#1f428d}</style>
+.ok{background:#2e7d32}.no{background:#9aa0a6}.re{background:#1f428d}.del{background:#b00020}</style>
 <div class=top><h2 style="margin:0;color:#1f428d">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 {% for e in entwuerfe %}
@@ -270,6 +273,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button class=ok name=aktion value=freigeben>Freigeben</button>
       <button class=re name=aktion value=ueberarbeiten>Überarbeiten</button>
       <button class=no name=aktion value=verwerfen>Verwerfen</button>
+      <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
@@ -399,7 +403,9 @@ a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
 <p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)<br>Tipp: Auf einen Tag „+ Beitrag" klicken (oder direkt auf einen grünen Anlass-Tag) erstellt einen Beitrag für diesen Tag.</p>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
-.q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}</style>
+.q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
+.delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px}</style>
+<script>function loeschThema(id,z){if(!confirm('Dieses Thema wirklich löschen?'))return;var f=document.createElement('form');f.method='post';f.action='/thema-loeschen/'+id;var i=document.createElement('input');i.type='hidden';i.name='zurueck';i.value=z;f.appendChild(i);document.body.appendChild(f);f.submit();}</script>
 <div class=box style="max-width:980px">
 <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Freigabe: Themen (Stufe 1)</h2><a href="/">&larr; Startseite</a></div>
 <p class=hint>Wähle die Themen aus, die in die Kampagne sollen. Erst für <b>ausgewählte</b> Themen werden danach Text und Bild erzeugt (spart Token).</p>
@@ -409,10 +415,11 @@ THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><s
 <p><label><input type=checkbox onclick="for(var c of document.querySelectorAll('input[name=thema_ids]'))c.checked=this.checked"> <b>Alle markieren</b></label>
 &nbsp;&nbsp;<button name=aktion value=auswaehlen>Markierte freigeben &rarr; Stufe 2</button>
 <button name=aktion value=verwerfen style="background:#9aa0a6">Markierte verwerfen</button></p>
-<table><tr><th></th><th>Quelle</th><th>Titel</th></tr>
+<table><tr><th></th><th>Quelle</th><th>Titel</th><th></th></tr>
 {% for t in themen %}<tr><td><input type=checkbox name=thema_ids value="{{t.id}}"></td>
 <td><span class=q>{{t.quelle}}</span></td>
-<td>{% if t.url %}<a href="{{t.url}}" target=_blank rel=noopener>{{t.titel}}</a>{% else %}{{t.titel}}{% endif %}</td></tr>{% endfor %}
+<td>{% if t.url %}<a href="{{t.url}}" target=_blank rel=noopener>{{t.titel}}</a>{% else %}{{t.titel}}{% endif %}</td>
+<td><button type=button class=delbtn onclick="loeschThema({{t.id}},'themen')">Löschen</button></td></tr>{% endfor %}
 </table>
 <p><button name=aktion value=auswaehlen>Markierte freigeben &rarr; Stufe 2</button></p>
 </form>
@@ -723,6 +730,18 @@ def themen():
                             "ORDER BY quelle, id DESC").fetchall()
     return render_template_string(THEMEN, **_ctx(themen=rows))
 
+@app.route("/thema-loeschen/<int:tid>", methods=["POST"])
+@login_required
+def thema_loeschen(tid):
+    """Loescht ein einzelnes Thema endgueltig (aus Themen-Liste oder Erzeugen-Uebersicht)."""
+    zurueck = request.form.get("zurueck", "themen")
+    with get_conn() as conn:
+        conn.execute("DELETE FROM themen WHERE id=?", (tid,))
+        audit_log(conn, session["user"], "thema_geloescht", None, "Thema %d" % tid)
+        conn.commit()
+    flash("Thema gelöscht.")
+    return redirect(url_for("erzeugen") if zurueck == "erzeugen" else url_for("themen"))
+
 @app.route("/quellen", methods=["GET", "POST"])
 @login_required
 def quellen():
@@ -901,6 +920,14 @@ def aktion(eid):
         elif aktion == "verwerfen":
             conn.execute("UPDATE entwuerfe SET status='verworfen' WHERE id=?", (eid,))
             audit_log(conn, user, "verworfen", eid); flash("Entwurf %d verworfen." % eid)
+        elif aktion == "loeschen":
+            if e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
+                try:
+                    os.remove(e["bild_pfad"])
+                except Exception:
+                    pass
+            conn.execute("DELETE FROM entwuerfe WHERE id=?", (eid,))
+            audit_log(conn, user, "entwurf_geloescht", eid); flash("Entwurf %d gelöscht." % eid)
         elif aktion == "ueberarbeiten":
             if not feedback:
                 flash("Bitte einen Änderungswunsch angeben."); return redirect(url_for("entwuerfe"))
