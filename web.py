@@ -332,7 +332,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
-    {% if e.format=='karussell' %}<p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen &rarr;</a></p>{% endif %}
+    <p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
       <div class=checks>{% for s in stellen %}<span class=stelle><label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>
@@ -444,7 +444,13 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 .slides figure{margin:0}
 .slides img,.single img{width:300px;height:300px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
 .slides figcaption{text-align:center;font-size:12px;color:#7a8694;margin-top:3px}
-.single{text-align:center;margin:6px 0}.meta{color:#4c7b2d;font-weight:bold}</style>
+.single{text-align:center;margin:6px 0}.meta{color:#4c7b2d;font-weight:bold}
+.wa{margin-top:18px;border-top:1px solid #eef1f4;padding-top:14px}
+.wa textarea{width:100%;box-sizing:border-box;min-height:90px;border:1px solid #ccd3df;border-radius:8px;padding:8px;font:inherit}
+.wa .row{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wa a.dl,.wa button{background:#1f428d;color:#fff;border:0;border-radius:8px;padding:8px 13px;text-decoration:none;cursor:pointer;font-size:14px}
+.wa a.dl.gn{background:#25638f}</style>
+<script>function copyWA(b){navigator.clipboard.writeText(document.getElementById('watext').value).then(function(){var t=b.textContent;b.textContent='✓ Kopiert';setTimeout(function(){b.textContent=t;},1500);});}</script>
 <div class=bar><h2 style="margin:0;color:#1f428d">Geplanter Beitrag</h2><div><a href="/kalender">&larr; Kalender</a><a href="/einplanung">Alle geplanten</a></div></div>
 <div class=box style="max-width:1000px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -461,6 +467,16 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 <details open><summary>Begleittext</summary><p>{{e.f.caption}}</p></details>
+<div class=wa>
+  <h3 style="margin:.2em 0">&#x1F4F2; Für WhatsApp (Kanal / Status)</h3>
+  <p class=hint>WhatsApp lässt sich nicht automatisch befüllen – hier alles zum schnellen <b>manuellen</b> Posten: Text kopieren, Bild herunterladen, fertig.</p>
+  <textarea id=watext readonly>{{e.f.caption}}</textarea>
+  <div class=row>
+    <button type=button onclick="copyWA(this)">Text kopieren</button>
+    {% if fmt=='karussell' and n_slides %}{% for i in range(n_slides) %}<a class=dl href="/beitrag-slide/{{e.id}}/{{i}}" download="hilo_{{e.id}}_slide{{i+1}}.png">Slide {{i+1}} laden</a>{% endfor %}{% else %}<a class=dl href="/bild/{{e.id}}" download="hilo_{{e.id}}.png">Bild herunterladen</a>{% endif %}
+    <a class="dl gn" href="/bild-status/{{e.id}}" title="Hochkant 9:16, ideal für Status/Story">Status-Version (hochkant) laden</a>
+  </div>
+</div>
 </div>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
@@ -906,6 +922,33 @@ def beitrag_slide(eid, idx):
     if not (p == base or p.startswith(base + os.sep)) or not os.path.exists(p):
         abort(404)
     return send_file(p, mimetype="image/png", max_age=0)
+
+@app.route("/bild-status/<int:eid>")
+@login_required
+def bild_status(eid):
+    """Hochkant-Version (9:16) des Beitragsbildes fuer WhatsApp-Status / Instagram-Story:
+    das quadratische Bild zentriert auf einem HILO-Verlauf (Blau -> Gruen). Zum manuellen Posten."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
+        abort(404)
+    from PIL import Image
+    W, H = 1080, 1920
+    top, bot = (31, 66, 141), (96, 163, 60)
+    grad = Image.new("RGB", (1, H))
+    gp = grad.load()
+    for y in range(H):
+        t = y / (H - 1)
+        gp[0, y] = (int(top[0] + (bot[0]-top[0])*t), int(top[1] + (bot[1]-top[1])*t),
+                    int(top[2] + (bot[2]-top[2])*t))
+    canvas = grad.resize((W, H), Image.BILINEAR)
+    sq = Image.open(e["bild_pfad"]).convert("RGB").resize((W, W), Image.LANCZOS)
+    canvas.paste(sq, (0, (H - W) // 2))
+    out_dir = os.path.join(DATA_DIR, "preview"); os.makedirs(out_dir, exist_ok=True)
+    out = os.path.join(out_dir, "status_%d.png" % eid)
+    canvas.save(out)
+    return send_file(out, mimetype="image/png", max_age=0,
+                     as_attachment=True, download_name="hilo_status_%d.png" % eid)
 
 @app.route("/themen", methods=["GET", "POST"])
 @login_required
