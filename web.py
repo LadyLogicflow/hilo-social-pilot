@@ -653,23 +653,20 @@ def eigener():
         if d < datetime.date.today():
             flash("Der Tag liegt in der Vergangenheit – bitte einen Tag ab heute wählen.")
             return redirect(url_for("eigener"))
-        # Eigenes Thema anlegen (umgeht Stufe 1, direkt 'ausgewaehlt')
+        # Zuerst den Beitrag erzeugen (Claude) - noch KEIN DB-Schreiben, falls es fehlschlaegt
+        try:
+            data = textgen.generate({"titel": thema_txt, "volltext": thema_txt, "url": None}, "google")
+        except Exception as ex:
+            flash("Erstellung fehlgeschlagen (Texterzeugung): %s" % ex)
+            return redirect(url_for("eigener"))
+        # Thema + Entwurf in EINER Transaktion (kein verwaistes Thema, kein Race mit /generieren,
+        # das ein 'ausgewaehlt'-Thema ohne Entwurf doppelt aufgreifen koennte)
         h = hashlib.sha256(("eigen:%s:%s:%s" % (thema_txt, datum,
                             datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
         with get_conn() as conn:
             cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                                "VALUES ('eigen', ?, 'ausgewaehlt', ?, ?)", (thema_txt[:300], thema_txt, h))
             thema_id = cur.lastrowid
-            conn.commit()
-        # Beitrag erzeugen (Claude); bei Fehler das Thema wieder entfernen, damit nichts liegen bleibt
-        try:
-            data = textgen.generate({"titel": thema_txt, "volltext": thema_txt, "url": None}, "google")
-        except Exception as ex:
-            with get_conn() as conn:
-                conn.execute("DELETE FROM themen WHERE id=?", (thema_id,)); conn.commit()
-            flash("Erstellung fehlgeschlagen (Texterzeugung): %s" % ex)
-            return redirect(url_for("eigener"))
-        with get_conn() as conn:
             conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
                          "VALUES (?, 'google', ?, 'entwurf', ?)",
                          (thema_id, json.dumps(data, ensure_ascii=False), datum))
