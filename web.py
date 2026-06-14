@@ -81,6 +81,14 @@ def _start_generation_ids(ids):
          "--generate-ids", ",".join(str(i) for i in ids), "--render"],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
+def _start_regenerate():
+    """Hintergrund: alle offenen Entwuerfe nach aktuellen Vorgaben neu erzeugen (+ Bilder neu)."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
+    _gen["proc"] = subprocess.Popen(
+        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--regenerate-drafts", "--render"],
+        cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+
 # --- Taeglicher Radar-Lauf (7 Uhr), als Subprozess -------------------------
 def _daily_scheduler():
     import datetime
@@ -262,6 +270,11 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
 .ok{background:#2e7d32}.no{background:#9aa0a6}.re{background:#1f428d}.del{background:#b00020}</style>
 <div class=top><h2 style="margin:0;color:#1f428d">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if entwuerfe %}<div style="max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center">
+  <span style="color:#6b7280;font-size:13px">Tipp: Nach geänderten Vorgaben (Bildstil, keine Abkürzungen …) kannst du alle offenen Entwürfe neu erzeugen lassen.</span>
+  <form method=post action="/entwuerfe-neu" onsubmit="return confirm('Alle offenen Entwürfe nach den neuen Vorgaben NEU erzeugen? Das ersetzt die aktuellen Text- und Bildvorschläge und kostet KI-Tokens.')">
+    <button class=re{% if gen_running %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>&#x21BB; Alle nach neuen Vorgaben neu erzeugen</button>
+  </form></div>{% endif %}
 {% for e in entwuerfe %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
@@ -630,7 +643,23 @@ def entwuerfe():
     with get_conn() as conn:
         for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' ORDER BY id DESC"):
             rows.append(_parse(e))
-    return render_template_string(ENTWUERFE, **_ctx(entwuerfe=rows))
+    return render_template_string(ENTWUERFE, **_ctx(entwuerfe=rows, gen_running=_generation_running()))
+
+@app.route("/entwuerfe-neu", methods=["POST"])
+@rolle_required("freigeber")
+def entwuerfe_neu():
+    """Erzeugt alle noch nicht freigegebenen Entwuerfe nach aktuellen Vorgaben neu (Hintergrund)."""
+    with _gen_lock:
+        if _generation_running():
+            flash("Es läuft bereits eine Erzeugung - einen Moment, dann die Seite neu laden.")
+        else:
+            try:
+                _start_regenerate()
+                flash("Alle offenen Entwürfe werden nach den neuen Vorgaben neu erzeugt - läuft im "
+                      "Hintergrund. In ein bis zwei Minuten die Seite neu laden.")
+            except Exception as ex:
+                flash("Neu-Erzeugung konnte nicht gestartet werden: %s" % ex)
+    return redirect(url_for("entwuerfe"))
 
 @app.route("/einplanung")
 @login_required
