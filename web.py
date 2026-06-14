@@ -321,6 +321,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
+    {% if e.format=='karussell' %}<p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen &rarr;</a></p>{% endif %}
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
       <div class=checks>{% for s in stellen %}<label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>{% endfor %}</div>
@@ -402,6 +403,7 @@ table.kal{max-width:1120px;margin:0 auto;border-collapse:collapse;width:100%;bac
 .post{display:block;background:#eaf0fa;color:#15336e;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .post.pub{background:#e3efe0;color:#3c6322}
 a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
+a.post{text-decoration:none;cursor:pointer}a.post:hover{filter:brightness(.94)}
 .addpost{display:inline-block;margin-top:4px;color:#4c7b2d;font-size:11px;font-weight:bold;text-decoration:none}
 .addpost:hover{text-decoration:underline}</style>
 """ + _NAV + """
@@ -416,12 +418,38 @@ a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
 {% for c in woche %}<td class="{% if not c.im_monat %}out{% elif c.we %}we{% endif %}{% if c.heute %} heute{% endif %}">
 <span class=kt>{{c.tag}}</span>
 {% for b in c.besondere %}{% if 'Fristende' in b %}<span class=frist title="{{b}}">{{b}}</span>{% elif c.im_monat and not c.past %}<a class=anl href="/eigener?datum={{c.iso}}&anlass={{b|urlencode}}" title="Beitrag zu „{{b}}“ erstellen">{{b}}</a>{% else %}<span class=anl title="{{b}}">{{b}}</span>{% endif %}{% endfor %}
-{% for p in c.posts %}<span class="post{% if p.status=='veroeffentlicht' %} pub{% endif %}" title="{{p.titel}}">{{p.titel}}</span>{% endfor %}
+{% for p in c.posts %}<a class="post{% if p.status=='veroeffentlicht' %} pub{% endif %}" href="/beitrag/{{p.id}}" title="{{p.titel}}{% if p.format=='karussell' %} – Karussell ansehen{% else %} – Beitrag ansehen{% endif %}">{% if p.format=='karussell' %}&#x1F5BC;&#xFE0F; {% endif %}{{p.titel}}</a>{% endfor %}
 {% if c.im_monat and not c.past %}<a class=addpost href="/eigener?datum={{c.iso}}" title="Beitrag für diesen Tag erstellen">+ Beitrag</a>{% endif %}
 </td>{% endfor %}
 </tr>{% endfor %}
 </table>
-<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)<br>Tipp: Auf einen Tag „+ Beitrag" klicken (oder direkt auf einen grünen Anlass-Tag) erstellt einen Beitrag für diesen Tag.</p>"""
+<p class=hint style="max-width:1120px;margin:10px auto;text-align:center">Grün = besonderer Tag &middot; Rot = Fristende &middot; Blau = geplanter Beitrag (grün = bereits veröffentlicht)<br>Tipp: Auf einen Tag „+ Beitrag" klicken (oder direkt auf einen grünen Anlass-Tag) erstellt einen Beitrag für diesen Tag. Auf einen <b>blauen Beitrag</b> klicken zeigt ihn komplett (bei Karussells alle Slides).</p>"""
+
+BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><style>""" + _STYLE + """
+.bar{max-width:1000px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
+.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px;margin-left:6px}
+.slides{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:6px 0}
+.slides figure{margin:0}
+.slides img,.single img{width:300px;height:300px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.slides figcaption{text-align:center;font-size:12px;color:#7a8694;margin-top:3px}
+.single{text-align:center;margin:6px 0}.meta{color:#4c7b2d;font-weight:bold}</style>
+<div class=bar><h2 style="margin:0;color:#1f428d">Geplanter Beitrag</h2><div><a href="/kalender">&larr; Kalender</a><a href="/einplanung">Alle geplanten</a></div></div>
+<div class=box style="max-width:1000px">
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<h3 style="margin-top:0">{{e.f.ueberschrift}}</h3>
+<p class=meta>{{e.f.subline}}</p>
+<p><b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>{% if fmt=='karussell' %}Karussell ({{n_slides}} Slides){% else %}Einzelbild{% endif %} &middot; Status: {{status}}</span></p>
+{% if fmt=='karussell' and n_slides %}
+<div class=slides>{% for i in range(n_slides) %}<figure><img src="/beitrag-slide/{{e.id}}/{{i}}" alt="Slide {{i+1}}"><figcaption>Slide {{i+1}} von {{n_slides}}</figcaption></figure>{% endfor %}</div>
+{% elif fmt=='karussell' %}
+<p class=hint>Die Karussell-Slides konnten gerade nicht erzeugt werden – bitte später erneut öffnen.</p>
+{% else %}
+<div class=single><img src="/bild/{{e.id}}" alt="Beitragsbild"></div>
+{% endif %}
+<ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+<p><b>Aufruf:</b> {{e.f.cta}}</p>
+<details open><summary>Begleittext</summary><p>{{e.f.caption}}</p></details>
+</div>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
 .q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
@@ -794,13 +822,14 @@ def kalender():
     praefix = "%04d-%02d-" % (jahr, monat)
     posts, besondere = {}, {}
     with get_conn() as conn:
-        for e in conn.execute("SELECT text, geplant_fuer, status FROM entwuerfe "
+        for e in conn.execute("SELECT id, text, geplant_fuer, status, format FROM entwuerfe "
                              "WHERE geplant_fuer LIKE ?", (praefix + "%",)):
             try:
                 titel = (json.loads(e["text"]).get("ueberschrift") or "Beitrag")
             except Exception:
                 titel = "Beitrag"
-            posts.setdefault(e["geplant_fuer"], []).append({"titel": titel, "status": e["status"]})
+            posts.setdefault(e["geplant_fuer"], []).append(
+                {"id": e["id"], "titel": titel, "status": e["status"], "format": e["format"] or "einzelbild"})
         anlass_rows = conn.execute("SELECT datum, anlass FROM anlasstage WHERE aktiv=1").fetchall()
     import anlass as _anl, fristen
     for a in anlass_rows:
@@ -826,6 +855,40 @@ def kalender():
     return render_template_string(KALENDER, **_ctx(
         wochen=wochen, jahr=jahr, monat=monat, monatname=MONATE[monat],
         prev=prev, nxt=nxt, prev_name=MONATE[prev.month], nxt_name=MONATE[nxt.month]))
+
+@app.route("/beitrag/<int:eid>")
+@login_required
+def beitrag(eid):
+    """Detailansicht eines Beitrags - bei Karussell werden ALLE Slides gezeigt (kein Blackbox)."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, geplant_fuer, status, format FROM entwuerfe WHERE id=?",
+                         (eid,)).fetchone()
+    if not e:
+        abort(404)
+    row = _parse(e)
+    fmt = row.get("format", "einzelbild")
+    n_slides = 0
+    if fmt == "karussell":
+        try:
+            import bildmotiv
+            data = row["f"]
+            photo = bildmotiv.ensure_photo(data.get("bild_motiv"))   # Cache -> kein neuer KI-Aufruf
+            slogan = bildgen.pick_slogan(data.get("slogan"))
+            out_dir = os.path.join(DATA_DIR, "preview", "karussell_%d" % eid)
+            n_slides = len(bildgen.render_slides(data, photo, slogan, out_dir, "slide"))
+        except Exception as ex:
+            log.warning("Karussell-Vorschau fehlgeschlagen (Beitrag %s): %s", eid, ex)
+            n_slides = 0
+    return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"], n_slides=n_slides))
+
+@app.route("/beitrag-slide/<int:eid>/<int:idx>")
+@login_required
+def beitrag_slide(eid, idx):
+    base = os.path.realpath(os.path.join(DATA_DIR, "preview", "karussell_%d" % eid))
+    p = os.path.realpath(os.path.join(base, "slide_%02d.png" % (idx + 1)))
+    if not (p == base or p.startswith(base + os.sep)) or not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="image/png", max_age=0)
 
 @app.route("/themen", methods=["GET", "POST"])
 @login_required
