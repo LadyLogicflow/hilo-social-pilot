@@ -821,27 +821,32 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, pu
     ODER eine reine Facebook-Seite. Rendert das/die Bild(er), postet auf den gewuenschten Kanal,
     schreibt posts + Audit. Rueckgabe: (ziel_name, erfolg_bool, [(kanal, ok, info), ...])."""
     stelle_id = str(stelle["id"]) if stelle else ""
+    ziel_name = (stelle["name"] if stelle else page_id)
     caption = f.get("caption") or f.get("ueberschrift") or ""
-    if stelle:
-        import personalisierung
-        if fmt == "karussell":
-            out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d_stelle_%d" % (eid, int(stelle["id"])))
-            pf, bilder = personalisierung.render_slides_fuer_stelle(f, stelle, out_dir, "slide")
+    # Rendern abgesichert: ein Render-Fehler bei EINEM Ziel darf die Schleife (und damit die
+    # bereits veroeffentlichten + verbuchten anderen Ziele) niemals abbrechen.
+    try:
+        if stelle:
+            import personalisierung
+            if fmt == "karussell":
+                out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d_stelle_%d" % (eid, int(stelle["id"])))
+                pf, bilder = personalisierung.render_slides_fuer_stelle(f, stelle, out_dir, "slide")
+            else:
+                out = os.path.join(DATA_DIR, "bilder", "post_%d_stelle_%d.png" % (eid, int(stelle["id"])))
+                pf, pfad = personalisierung.render_fuer_stelle(f, stelle, out); bilder = [pfad]
+            ziel_seite, caption = stelle["fb_seite"], (pf.get("caption") or caption)
         else:
-            out = os.path.join(DATA_DIR, "bilder", "post_%d_stelle_%d.png" % (eid, int(stelle["id"])))
-            pf, pfad = personalisierung.render_fuer_stelle(f, stelle, out); bilder = [pfad]
-        ziel_seite, caption = stelle["fb_seite"], (pf.get("caption") or caption)
-        ziel_name = stelle["name"]
-    else:
-        ziel_seite, ziel_name = page_id, page_id
-        if fmt == "karussell":
-            import bildgen, bildmotiv
-            out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d" % eid)
-            photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
-            slogan = bildgen.pick_slogan(f.get("slogan"))
-            bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
-        else:
-            bilder = [e["bild_pfad"]]
+            ziel_seite = page_id
+            if fmt == "karussell":
+                import bildgen, bildmotiv
+                out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d" % eid)
+                photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
+                slogan = bildgen.pick_slogan(f.get("slogan"))
+                bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
+            else:
+                bilder = [e["bild_pfad"]]
+    except Exception as ex:
+        return ziel_name, False, [("bild", False, "Bild konnte nicht erstellt werden: %s" % ex)]
     if not [b for b in bilder if b and os.path.exists(b)]:
         return ziel_name, False, [("bild", False, "Kein Bild vorhanden")]
     ergebnisse = []   # (kanal, ok, info)
@@ -872,6 +877,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, pu
             conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
                          (eid, k, "fehler", info))
             audit_log(conn, user, "veroeffentlichung_fehler_%s" % k, eid, info)
+    # Pro Ziel sofort verbuchen: ein extern veroeffentlichter Post darf nie ohne DB-Eintrag bleiben,
+    # auch wenn ein spaeteres Ziel scheitert.
+    conn.commit()
     return ziel_name, erfolg, ergebnisse
 
 
