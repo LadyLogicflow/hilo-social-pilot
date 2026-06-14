@@ -57,6 +57,14 @@ def _pages(force=False):
         _pages_cache.update(ts=time.time(), data=[], err=str(ex))
     return _pages_cache["data"], _pages_cache["err"]
 
+_KANAL_DE = {"facebook": "Facebook", "instagram": "Instagram", "beide": "Facebook + Instagram"}
+
+def _kanal_fuer(prefix, tid):
+    """Liest den je Ziel gewaehlten Kanal aus dem Formular (kanal_s<id> bzw. kanal_p<id>).
+    Default: facebook. So kann jede Beratungsstelle/Seite einen eigenen Kanal haben."""
+    k = (request.form.get("kanal_%s%s" % (prefix, tid)) or "facebook").strip()
+    return k if k in ("facebook", "instagram", "beide") else "facebook"
+
 # --- Hintergrund-Erzeugung als eigener Prozess -----------------------------
 _gen = {"proc": None}
 _gen_lock = threading.Lock()   # schuetzt Pruefen+Starten gegen Doppelklick/parallele Tabs
@@ -301,8 +309,11 @@ EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentl
 .t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
 select,button{padding:9px;border-radius:8px;margin:4px 6px 4px 0}
 button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
-.checks{margin:6px 0;display:flex;flex-wrap:wrap;gap:6px 14px}
-.checks label{font-size:14px;background:#eef2f8;padding:4px 10px;border-radius:7px;cursor:pointer}</style>
+.checks{margin:6px 0;display:flex;flex-wrap:wrap;gap:8px 14px}
+.checks label{font-size:14px;background:#eef2f8;padding:4px 10px;border-radius:7px;cursor:pointer}
+.checks .stelle{display:flex;align-items:center;gap:6px;background:#eef2f8;padding:4px 8px;border-radius:7px}
+.checks .stelle label{background:none;padding:0}
+.checks .stelle select{padding:4px 6px;margin:0;font-size:13px;border-radius:6px}</style>
 <script>function need(f,n,m){return f.querySelectorAll('input[name='+n+']:checked').length>0||(alert(m),false);}</script>
 <div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -324,28 +335,28 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
     {% if e.format=='karussell' %}<p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen &rarr;</a></p>{% endif %}
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
-      <div class=checks>{% for s in stellen %}<label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>{% endfor %}</div>
+      <div class=checks>{% for s in stellen %}<span class=stelle><label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>
+        <select name="kanal_s{{s.id}}" title="Kanal für diese Beratungsstelle">
+          <option value="facebook"{% if (s.fb_seite|string) not in ig_seiten %} selected{% endif %}>Facebook</option>
+          <option value="instagram">Instagram</option>
+          <option value="beide"{% if (s.fb_seite|string) in ig_seiten %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
-      <select name=kanal title="Kanal">
-        <option value="facebook">Facebook</option>
-        <option value="instagram">Instagram</option>
-        <option value="beide">Facebook + Instagram</option></select>
       <button>Vorschau ansehen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
-    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. <b>Tipp:</b> erst „Vorschau ansehen", dann veröffentlichen.</p>
+    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. Der <b>Kanal ist je Beratungsstelle wählbar</b> (ohne Instagram-Konto automatisch nur Facebook). <b>Tipp:</b> erst „Vorschau ansehen", dann veröffentlichen.</p>
     {% elif pages %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'page_id','Bitte mindestens eine Facebook-Seite auswählen.')">
-      <div class=checks>{% for p in pages %}<label><input type=checkbox name=page_id value="{{p.id}}"> {{p.name}}</label>{% endfor %}</div>
+      <div class=checks>{% for p in pages %}<span class=stelle><label><input type=checkbox name=page_id value="{{p.id}}"> {{p.name}}</label>
+        <select name="kanal_p{{p.id}}" title="Kanal für diese Seite">
+          <option value="facebook"{% if not p.ig_username %} selected{% endif %}>Facebook</option>
+          <option value="instagram">Instagram</option>
+          <option value="beide"{% if p.ig_username %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
       <select name=format title="Format des Beitrags">
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
-      <select name=kanal title="Kanal">
-        <option value="facebook">Facebook</option>
-        <option value="instagram">Instagram</option>
-        <option value="beide">Facebook + Instagram</option></select>
       <button>Vorschau ansehen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
@@ -373,17 +384,18 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 {% for it in items %}
   <div class=pvc>
     <div class=pvh>{{it.label}}{% if not it.ok %} <span style="color:#b00020">– Vorschau-Fehler</span>{% endif %}</div>
+    <div style="font-size:12px;color:#4c7b2d;font-weight:bold;margin-bottom:6px">Kanal: {{it.kanal_de}}</div>
     {% if it.ok %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
     {% if it.ok %}<details><summary>Begleittext anzeigen</summary><p class=cap>{{it.caption}}</p></details>{% endif %}
   </div>
 {% endfor %}
 </div>
 <form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an die {{ziel_count}} gültigen Ziele veröffentlichen?')">
-  {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}">{% endfor %}
-  {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}">{% endfor %}
-  <input type=hidden name=format value="{{fmt}}"><input type=hidden name=kanal value="{{kanal}}">
+  {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}"><input type=hidden name="kanal_s{{s}}" value="{{kanal_map.get('s'+s,'facebook')}}">{% endfor %}
+  {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}"><input type=hidden name="kanal_p{{p}}" value="{{kanal_map.get('p'+p,'facebook')}}">{% endfor %}
+  <input type=hidden name=format value="{{fmt}}">
   <div class=foot><a href="/einplanung">&larr; Auswahl ändern</a>
-    <span class=hint>Kanal: <b>{{kanal_de}}</b> · {{ziel_count}} Ziel(e)</span>
+    <span class=hint>{{ziel_count}} Ziel(e) – Kanal je Beratungsstelle wie oben angezeigt</span>
     <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
 </form>"""
 
@@ -708,8 +720,13 @@ def einplanung():
         stellen = conn.execute("SELECT id, name, ort, fb_seite, buchungs_url FROM beratungsstellen "
                               "WHERE aktiv=1 AND fb_seite IS NOT NULL AND fb_seite!='' ORDER BY ort").fetchall()
     pages, pages_err = (_pages() if rows and not stellen else ([], None))
+    # IG-Verknuepfung je Facebook-Seite -> Kanal-Vorauswahl: mit IG 'beide', ohne IG nur 'Facebook'
+    ig_seiten = set()
+    if rows and stellen:
+        pg, _ = _pages()
+        ig_seiten = {str(p["id"]) for p in (pg or []) if p.get("ig_id")}
     return render_template_string(EINPLANUNG, **_ctx(freigegeben=rows, stellen=stellen,
-                                  pages=pages, pages_err=pages_err))
+                                  pages=pages, pages_err=pages_err, ig_seiten=ig_seiten))
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
@@ -1240,9 +1257,6 @@ def veroeffentlichen(eid):
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen."); return redirect(url_for("einplanung"))
     fmt = request.form.get("format", "").strip()
-    kanal = request.form.get("kanal", "facebook").strip()
-    if kanal not in ("facebook", "instagram", "beide"):
-        kanal = "facebook"
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
@@ -1253,15 +1267,16 @@ def veroeffentlichen(eid):
             f = json.loads(e["text"])
         except Exception:
             f = {}
-        # Ziele zusammenstellen: gewaehlte Beratungsstellen (personalisiert) + gewaehlte Facebook-Seiten.
-        ziele = []   # (stelle_row | None, page_id | None)
+        # Ziele zusammenstellen: gewaehlte Beratungsstellen (personalisiert) + gewaehlte Facebook-Seiten;
+        # jeder Eintrag traegt seinen eigenen Kanal (pro Beratungsstelle waehlbar).
+        ziele = []   # (stelle_row | None, page_id | None, kanal)
         for sid in stelle_ids:
             stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
             if not stelle or not stelle["fb_seite"]:
                 flash("Beratungsstelle (ID %s) hat keine Facebook-Seite – übersprungen." % sid); continue
-            ziele.append((stelle, None))
+            ziele.append((stelle, None, _kanal_fuer("s", sid)))
         for pid in page_ids:
-            ziele.append((None, pid))
+            ziele.append((None, pid, _kanal_fuer("p", pid)))
         if not ziele:
             flash("Kein gültiges Ziel gewählt (Beratungsstelle ohne Facebook-Seite?)."); return redirect(url_for("einplanung"))
         # gewaehltes Format am Entwurf festhalten (unabhaengig vom Publish-Erfolg)
@@ -1269,7 +1284,7 @@ def veroeffentlichen(eid):
         import publish
         gesamt_erfolg = False
         zeilen = []
-        for stelle, pid in ziele:
+        for stelle, pid, kanal in ziele:
             ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, pid, user, publish)
             gesamt_erfolg = gesamt_erfolg or erfolg
             teile = ["%s: %s" % (k.capitalize(), ("OK" if ok else "Fehler – %s" % info)) for k, ok, info in ergebnisse]
@@ -1288,13 +1303,10 @@ def vorschau(eid):
     stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
     page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
     fmt = request.form.get("format", "").strip()
-    kanal = request.form.get("kanal", "facebook").strip()
-    if kanal not in ("facebook", "instagram", "beide"):
-        kanal = "facebook"
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
         return redirect(url_for("einplanung"))
-    kanal_de = {"facebook": "Facebook", "instagram": "Instagram", "beide": "Facebook + Instagram"}[kanal]
+    kanal_map = {}   # "s<sid>" / "p<pid>" -> Kanal (zum Weiterreichen an /veroeffentlichen)
     items = []
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -1318,9 +1330,10 @@ def vorschau(eid):
             pass
         import personalisierung
         for sid in stelle_ids:
+            kanal = _kanal_fuer("s", sid); kanal_map["s" + sid] = kanal
             stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
             if not stelle or not stelle["fb_seite"]:
-                items.append({"label": "Beratungsstelle %s" % sid, "ok": False,
+                items.append({"label": "Beratungsstelle %s" % sid, "ok": False, "kanal_de": _KANAL_DE[kanal],
                               "caption": "Keine Facebook-Seite zugeordnet – wird beim Veröffentlichen übersprungen."})
                 continue
             out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, int(stelle["id"])))
@@ -1328,19 +1341,21 @@ def vorschau(eid):
                 pf, _ = personalisierung.render_fuer_stelle(f, stelle, out)
                 v = int(os.path.getmtime(out))
                 items.append({"label": "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else ""),
-                              "ok": True, "caption": pf.get("caption") or f.get("caption") or "",
+                              "ok": True, "kanal_de": _KANAL_DE[kanal],
+                              "caption": pf.get("caption") or f.get("caption") or "",
                               "url": url_for("preview_bild", eid=eid, sid=int(stelle["id"])) + "?v=%d" % v})
             except Exception:
                 log.exception("Vorschau-Render fehlgeschlagen (Entwurf %s / Stelle %s)", eid, sid)
-                items.append({"label": stelle["name"], "ok": False,
+                items.append({"label": stelle["name"], "ok": False, "kanal_de": _KANAL_DE[kanal],
                               "caption": "Vorschau konnte nicht erstellt werden."})
         for pid in page_ids:
-            items.append({"label": "Facebook-Seite %s" % pid, "ok": True,
+            kanal = _kanal_fuer("p", pid); kanal_map["p" + pid] = kanal
+            items.append({"label": "Facebook-Seite %s" % pid, "ok": True, "kanal_de": _KANAL_DE[kanal],
                           "caption": f.get("caption") or f.get("ueberschrift") or "",
                           "url": url_for("bild", eid=eid)})
     ziel_count = sum(1 for it in items if it.get("ok"))
-    return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt=fmt, kanal=kanal, kanal_de=kanal_de,
-                                  items=items, ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids))
+    return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt=fmt, items=items, ziel_count=ziel_count,
+                                  stelle_ids=stelle_ids, page_ids=page_ids, kanal_map=kanal_map))
 
 @app.route("/preview-bild/<int:eid>/<int:sid>")
 @rolle_required("freigeber")
