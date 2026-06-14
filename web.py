@@ -59,6 +59,7 @@ def _pages(force=False):
 
 # --- Hintergrund-Erzeugung als eigener Prozess -----------------------------
 _gen = {"proc": None}
+_gen_lock = threading.Lock()   # schuetzt Pruefen+Starten gegen Doppelklick/parallele Tabs
 
 def _generation_running():
     p = _gen["proc"]
@@ -212,7 +213,7 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
   </div>
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
-    <button>Ausgewählte erzeugen</button>
+    <button{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
   </div>
 </form>
 <script>
@@ -729,44 +730,46 @@ def radar_starten():
 @app.route("/generieren", methods=["POST"])
 @login_required
 def generieren():
-    if _generation_running():
-        flash("Erzeugung läuft bereits - einen Moment, dann Seite neu laden.")
-    else:
-        with get_conn() as conn:
-            offen = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
-                                 "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
-        if not offen:
-            flash("Keine ausgewählten Themen offen. Erst unter 'Freigabe: Themen' Themen freigeben.")
+    with _gen_lock:   # gleicher Lock wie /erzeugen - kein paralleler Start ueber beide Wege
+        if _generation_running():
+            flash("Erzeugung läuft bereits - einen Moment, dann Seite neu laden.")
         else:
-            try:
-                anzahl = int(request.form.get("anzahl", offen))
-            except (TypeError, ValueError):
-                anzahl = offen
-            anzahl = max(1, min(anzahl, offen))   # auf die verfügbaren Themen begrenzen
-            try:
-                _start_generation(anzahl)
-                flash("Erzeugung für %d von %d Themen gestartet - läuft im Hintergrund. "
-                      "In ein bis zwei Minuten die Seite neu laden." % (anzahl, offen))
-            except Exception as ex:
-                flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
+            with get_conn() as conn:
+                offen = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
+                                     "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
+            if not offen:
+                flash("Keine ausgewählten Themen offen. Erst unter 'Freigabe: Themen' Themen freigeben.")
+            else:
+                try:
+                    anzahl = int(request.form.get("anzahl", offen))
+                except (TypeError, ValueError):
+                    anzahl = offen
+                anzahl = max(1, min(anzahl, offen))   # auf die verfügbaren Themen begrenzen
+                try:
+                    _start_generation(anzahl)
+                    flash("Erzeugung für %d von %d Themen gestartet - läuft im Hintergrund. "
+                          "In ein bis zwei Minuten die Seite neu laden." % (anzahl, offen))
+                except Exception as ex:
+                    flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
     return redirect(url_for("index"))
 
 @app.route("/erzeugen", methods=["GET", "POST"])
 @login_required
 def erzeugen():
     if request.method == "POST":
-        if _generation_running():
-            flash("Erzeugung läuft bereits - einen Moment, dann die Startseite neu laden.")
-            return redirect(url_for("index"))
         ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
         if not ids:
             flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
-        try:
-            _start_generation_ids(ids)
-            flash("Erzeugung für %d ausgewählte Thema/Themen gestartet - läuft im Hintergrund. "
-                  "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
-        except Exception as ex:
-            flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
+        with _gen_lock:   # Pruefen+Starten atomar, sonst koennten zwei Klicks zwei Prozesse starten
+            if _generation_running():
+                flash("Erzeugung läuft bereits - einen Moment, dann die Startseite neu laden.")
+                return redirect(url_for("index"))
+            try:
+                _start_generation_ids(ids)
+                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet - läuft im Hintergrund. "
+                      "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
+            except Exception as ex:
+                flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
         return redirect(url_for("index"))
     with get_conn() as conn:
         rows = conn.execute(
