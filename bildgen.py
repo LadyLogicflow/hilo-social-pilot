@@ -131,7 +131,7 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     for ln in HL:
         dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
 
-    LCOL = 560 if cut is not None else (W - margin)
+    LCOL = 372 if cut is not None else (W - margin)   # Text bleibt im linken Drittel (Bullets duerfen umbrechen)
     tx0 = margin + 18 + 18 + 16
     fsb = _font(_REG, 31); SL = _wrap(dr, fields.get("subline", ""), fsb, LCOL - margin)
     fb = _font(_BOLD, 30); bw = LCOL - tx0
