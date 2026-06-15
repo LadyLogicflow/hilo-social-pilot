@@ -12,12 +12,14 @@ def _prompt(motiv):
     return ("Freigestellt vor transparentem Hintergrund: %s. Warme, hochwertige Werbefotografie einer "
             "positiven Steuerberatungs-Szene; freundliche, laechelnde Menschen in zugewandter Interaktion "
             "(kein nachdenklicher oder sorgenvoller Ausdruck, kein einzelnes Portraitfoto). Passende "
-            "Requisiten wie Laptop, Unterlagen und eine weisse Kaffeetasse mit dem schlichten, gut "
-            "lesbaren Schriftzug 'HILO' duerfen vorkommen und werden sauber mitfreigestellt. Die gesamte "
-            "Gruppe als Halbkoerper bis etwa Tischhoehe, vollstaendig im Bild mit deutlichem Abstand zum "
-            "linken und rechten Rand. Sauber freigestellt, KEIN Hintergrund, KEIN Tisch-Hintergrund. "
-            "Ausser dem Schriftzug 'HILO' auf der Kaffeetasse KEINE weiteren Texte, Logos oder "
-            "Markennamen im Bild." % motiv)
+            "Requisiten wie Laptop, Unterlagen und eine Kaffeetasse, die deutlich den Schriftzug 'HILO' "
+            "traegt, sollen vorkommen und werden sauber mitfreigestellt. Aus der Gruppe ist IMMER eine "
+            "Person deutlich als HILO-Beraterin oder HILO-Berater erkennbar - durch ein gut sichtbares "
+            "HILO-Logo am Kragen oder auf der Blusentasche. Die gesamte Gruppe als Halbkoerper bis etwa "
+            "Tischhoehe, vollstaendig im Bild - sie wird NICHT an den Raendern abgeschnitten, mit "
+            "deutlichem Abstand zum linken, rechten und oberen Rand. Sauber freigestellt, KEIN "
+            "Hintergrund, KEIN Tisch-Hintergrund. Ausser dem Schriftzug 'HILO' auf der Kaffeetasse und "
+            "dem HILO-Logo an der Kleidung KEINE weiteren Texte, Logos oder Markennamen im Bild." % motiv)
 
 def ensure_photo(motiv):
     motiv = (motiv or "").strip()
