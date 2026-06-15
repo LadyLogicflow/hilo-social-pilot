@@ -110,16 +110,13 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     base.paste(grad, (0, 0), mt)
 
     if cut is not None:
-        # Foto in eine Box rechts einpassen und UNTEN ans Verlaufsband andocken (Personen "stehen"
-        # darauf) - so bleibt nicht so viel Leerraum oben/unten. Text liegt links und wird danach
-        # gezeichnet. Breite ~rechte Haelfte, Hoehe fuellt bis fast zum unteren Band.
-        box_w, box_h = 648, 720
-        sc = min(box_w / cut.width, box_h / cut.height)
-        nw, nh = max(1, int(cut.width * sc)), max(1, int(cut.height * sc))
-        cut2 = cut.resize((nw, nh), Image.LANCZOS)
-        px = W - 12 - nw
-        py = max(206, BOTB - nh + 36)   # unten ans Band andocken (leichte Ueberlappung), nicht in den Titel
-        base.paste(cut2, (px, py), cut2)
+        # Feste Breite ~63% (Schwerpunkt rechts), Hoehe folgt dem Seitenverhaeltnis. Foto UNTEN ans
+        # Verlaufsband andocken (Personen "stehen" darauf); bei hohem Foto deckt das untere Band die
+        # Unterkante ab. Konsistente Breite (nicht von der Hoehe abhaengig).
+        pw = 680; sc = pw / cut.width; chh = int(cut.height * sc)
+        cut2 = cut.resize((pw, chh), Image.LANCZOS)
+        py = max(200, BOTB - chh + 50)   # unten ans Band; bei sehr hohem Foto Oberkante bei ~200 (unter dem Titel)
+        base.paste(cut2, (W - 8 - pw, py), cut2)
 
     mb = Image.new("L", (W, H), 0)
     ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
