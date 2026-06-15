@@ -43,11 +43,16 @@ def ensure_photo(motiv):
         return None
     try:
         import requests
+        # Bildqualitaet steuert die OpenAI-Kosten stark: low (~1-2ct) < medium (~4-6ct) < high (~20-25ct)
+        # je 1024x1536-Bild. Default 'medium' (guter Kompromiss); per Umgebungsvariable aenderbar.
+        quality = (os.environ.get("HILO_IMAGE_QUALITY") or "medium").strip().lower()
+        if quality not in ("low", "medium", "high", "auto"):
+            quality = "medium"
         r = requests.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
             json={"model": "gpt-image-1", "prompt": _prompt(motiv), "size": "1024x1536",
-                  "background": "transparent", "output_format": "png", "n": 1},
+                  "quality": quality, "background": "transparent", "output_format": "png", "n": 1},
             timeout=120)
         r.raise_for_status()
         b64 = r.json()["data"][0]["b64_json"]
