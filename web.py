@@ -144,10 +144,22 @@ def _publiziere_geplant(gpid):
             return  # bereits von einem anderen Durchlauf uebernommen
         gp = conn.execute("SELECT * FROM geplante_posts WHERE id=?", (gpid,)).fetchone()
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (gp["entwurf_id"],)).fetchone()
-    if not e or e["status"] not in ("freigegeben", "entwurf"):
+    # Nur FREIGEGEBENE Beitraege automatisch posten (zurueckgezogene/geloeschte NICHT).
+    if not e or e["status"] != "freigegeben":
         with get_conn() as conn:
             conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
-                         ("Entwurf nicht mehr freigegeben/vorhanden", gpid)); conn.commit()
+                         ("Beitrag nicht mehr freigegeben/vorhanden", gpid)); conn.commit()
+        return
+    # Verpasst-Schutz: war der Pi laenger aus, NICHT zur falschen Tageszeit nachposten.
+    try:
+        geplant_dt = datetime.datetime.strptime((gp["geplant_am"] or "")[:16], "%Y-%m-%dT%H:%M")
+    except Exception:
+        geplant_dt = None
+    if geplant_dt and (datetime.datetime.now() - geplant_dt).total_seconds() > 60 * 60:
+        with get_conn() as conn:
+            conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
+                         ("Zeitpunkt verpasst (>60 Min) – Pi war evtl. aus; bitte neu einplanen", gpid))
+            conn.commit()
         return
     try:
         f = json.loads(e["text"])
@@ -178,6 +190,15 @@ def _publiziere_geplant(gpid):
 def _publish_scheduler():
     """Prueft minuetlich faellige geplante Veroeffentlichungen (geplant_am <= jetzt) und postet sie."""
     import datetime
+    # Beim Start: haengende 'laeuft'-Eintraege (aus einem abgebrochenen Lauf) als Fehler markieren -
+    # bewusst NICHT erneut posten (sonst Doppel-Post-Risiko), sondern sichtbar machen.
+    try:
+        with get_conn() as conn:
+            conn.execute("UPDATE geplante_posts SET status='fehler', "
+                         "info='unterbrochen (Neustart) – bitte pruefen' WHERE status='laeuft'")
+            conn.commit()
+    except Exception:
+        log.exception("Auto-Veroeffentlichung: Aufraeumen beim Start fehlgeschlagen")
     while True:
         try:
             now_iso = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
