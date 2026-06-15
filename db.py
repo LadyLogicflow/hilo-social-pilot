@@ -56,6 +56,18 @@ CREATE TABLE IF NOT EXISTS wissensthemen (
     titel TEXT UNIQUE NOT NULL, hook TEXT,
     aktiv INTEGER NOT NULL DEFAULT 1, zuletzt TEXT
 );
+CREATE TABLE IF NOT EXISTS geplante_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entwurf_id INTEGER NOT NULL,
+    stelle_id INTEGER,                 -- Beratungsstelle (NULL bei reiner Facebook-Seite)
+    page_id TEXT,                      -- Facebook-Seiten-ID (NULL bei Beratungsstelle)
+    kanal TEXT NOT NULL DEFAULT 'facebook',
+    format TEXT NOT NULL DEFAULT 'einzelbild',
+    geplant_am TEXT NOT NULL,          -- lokale deutsche Zeit "YYYY-MM-DDTHH:MM"
+    status TEXT NOT NULL DEFAULT 'geplant',   -- geplant | laeuft | veroeffentlicht | fehler
+    info TEXT,
+    erstellt_am TEXT DEFAULT (datetime('now'))
+);
 """
 
 # Kuratierte Anlass-Tage mit Steuer-Aufhaenger (Startliste, in der Verwaltung erweiterbar)

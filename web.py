@@ -65,6 +65,23 @@ def _kanal_fuer(prefix, tid):
     k = (request.form.get("kanal_%s%s" % (prefix, tid)) or "facebook").strip()
     return k if k in ("facebook", "instagram", "beide") else "facebook"
 
+def _vorschlag_zeit(belegt=(), min_m=7 * 60):
+    """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
+    nicht mit bereits vergebenen kollidiert - damit die Beitraege individuell gepostet wirken.
+    min_m = fruehest moegliche Minute (fuer 'heute' = jetzt + Puffer, damit die Zeit in der Zukunft liegt)."""
+    import random
+    lo = min(max(7 * 60, min_m), 19 * 60)
+    hi = 19 * 60
+    if lo > hi:
+        lo = hi
+    m = lo
+    for _ in range(40):
+        m = random.randint(lo, hi)
+        hhmm = "%02d:%02d" % (m // 60, m % 60)
+        if all(abs(m - (int(b[:2]) * 60 + int(b[3:5]))) >= 7 for b in belegt):  # >= 7 Min Abstand
+            return hhmm
+    return "%02d:%02d" % (m // 60, m % 60)
+
 # --- Hintergrund-Erzeugung als eigener Prozess -----------------------------
 _gen = {"proc": None}
 _gen_lock = threading.Lock()   # schuetzt Pruefen+Starten gegen Doppelklick/parallele Tabs
@@ -115,6 +132,63 @@ def _daily_scheduler():
         except Exception:
             pass
         time.sleep(120)
+
+# --- Automatische Veroeffentlichung zur geplanten Uhrzeit (deutsche Pi-Zeit) ----
+def _publiziere_geplant(gpid):
+    """Veroeffentlicht EINEN faelligen geplanten Post. Claim per status='laeuft' (kein Doppel-Post)."""
+    import publish, datetime
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE geplante_posts SET status='laeuft' WHERE id=? AND status='geplant'", (gpid,))
+        conn.commit()
+        if cur.rowcount == 0:
+            return  # bereits von einem anderen Durchlauf uebernommen
+        gp = conn.execute("SELECT * FROM geplante_posts WHERE id=?", (gpid,)).fetchone()
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (gp["entwurf_id"],)).fetchone()
+    if not e or e["status"] not in ("freigegeben", "entwurf"):
+        with get_conn() as conn:
+            conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
+                         ("Entwurf nicht mehr freigegeben/vorhanden", gpid)); conn.commit()
+        return
+    try:
+        f = json.loads(e["text"])
+    except Exception:
+        f = {}
+    fmt = gp["format"] or e["format"] or "einzelbild"
+    kanal = gp["kanal"] or "facebook"
+    ziel_name = "?"
+    with get_conn() as conn:
+        stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (gp["stelle_id"],)).fetchone() \
+            if gp["stelle_id"] else None
+        try:
+            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(
+                conn, e, gp["entwurf_id"], f, fmt, kanal, stelle, gp["page_id"], "scheduler", publish)
+        except Exception as ex:
+            erfolg, ergebnisse = False, [("-", False, str(ex))]
+        info = " | ".join("%s: %s" % (k, ("OK" if ok else "Fehler – %s" % i)) for k, ok, i in ergebnisse)
+        conn.execute("UPDATE geplante_posts SET status=?, info=? WHERE id=?",
+                     ("veroeffentlicht" if erfolg else "fehler", info[:500], gpid))
+        offen = conn.execute("SELECT COUNT(*) FROM geplante_posts WHERE entwurf_id=? AND status IN "
+                             "('geplant','laeuft')", (gp["entwurf_id"],)).fetchone()[0]
+        if erfolg and offen == 0:
+            conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=? AND status='freigegeben'",
+                         (gp["entwurf_id"],))
+        conn.commit()
+    log.info("Auto-Veroeffentlichung Beitrag %s (%s): %s", gp["entwurf_id"], ziel_name, info)
+
+def _publish_scheduler():
+    """Prueft minuetlich faellige geplante Veroeffentlichungen (geplant_am <= jetzt) und postet sie."""
+    import datetime
+    while True:
+        try:
+            now_iso = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
+            with get_conn() as conn:
+                due = conn.execute("SELECT id FROM geplante_posts WHERE status='geplant' AND geplant_am <= ? "
+                                   "ORDER BY geplant_am", (now_iso,)).fetchall()
+            for row in due:
+                _publiziere_geplant(row["id"])
+        except Exception:
+            log.exception("Auto-Veroeffentlichung: Scheduler-Fehler")
+        time.sleep(45)
 
 # --- Zugriffsschutz ---------------------------------------------------------
 def login_required(f):
@@ -315,7 +389,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
 .checks .stelle label{background:none;padding:0}
 .checks .stelle select{padding:4px 6px;margin:0;font-size:13px;border-radius:6px}</style>
 <script>function need(f,n,m){return f.querySelectorAll('input[name='+n+']:checked').length>0||(alert(m),false);}</script>
-<div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><a href="/">&larr; Startseite</a></div>
+<div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><div><a href="/geplant">&#x23F0; Geplante Veröffentlichungen</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <p class=hint style="max-width:1040px;margin:0 auto 12px">Freigegebene Beiträge werden automatisch auf die nächsten freien <b>Werktage</b> verteilt (max. 1 pro Tag, Sa+So frei). Termin unten anpassbar. Sondertage &amp; Fristen-Countdown folgen.</p>
 {% if pages_err %}<div class=flash style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}}</div>{% endif %}
@@ -344,9 +418,10 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
       <button>Vorschau ansehen</button>
+      <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
-    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. Der <b>Kanal ist je Beratungsstelle wählbar</b> (ohne Instagram-Konto automatisch nur Facebook). <b>Tipp:</b> erst „Vorschau ansehen", dann veröffentlichen.</p>
+    <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. Der <b>Kanal ist je Beratungsstelle wählbar</b> (ohne Instagram-Konto automatisch nur Facebook). <b>„Automatisch einplanen"</b> postet zur vorgeschlagenen Uhrzeit (gestreut 07–19 Uhr, anpassbar unter <a href="/geplant">Geplante Veröffentlichungen</a>).</p>
     {% elif pages %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'page_id','Bitte mindestens eine Facebook-Seite auswählen.')">
       <div class=checks>{% for p in pages %}<span class=stelle><label><input type=checkbox name=page_id value="{{p.id}}"> {{p.name}}</label>
@@ -358,6 +433,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
         <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
       <button>Vorschau ansehen</button>
+      <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
     <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
@@ -398,6 +474,33 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
     <span class=hint>{{ziel_count}} Ziel(e) – Kanal je Beratungsstelle wie oben angezeigt</span>
     <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
 </form>"""
+
+GEPLANT = """<!doctype html><meta charset=utf-8><title>Geplante Veröffentlichungen</title><style>""" + _STYLE + """
+.bar{max-width:1120px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
+.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
+table.gp{max-width:1120px;margin:0 auto;width:100%}
+.gp td,.gp th{font-size:13px;vertical-align:middle}
+.st{font-weight:bold;font-size:12px;border-radius:6px;padding:2px 8px}
+.st.geplant{background:#eaf0fa;color:#1f428d}.st.veroeffentlicht{background:#e3efe0;color:#3c6322}
+.st.fehler{background:#fdeaea;color:#b00020}.st.laeuft{background:#fff3e0;color:#9a6a00}
+.gp input{padding:4px 6px;margin:0}.gp form button{padding:5px 9px;margin:0}</style>
+<div class=bar><h2 style="margin:0;color:#1f428d">Geplante Veröffentlichungen</h2><a href="/einplanung">&larr; Einplanung</a></div>
+<div class=box style="max-width:1120px">
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if posts %}
+<p class=hint>Diese Beiträge werden <b>automatisch zur angegebenen Uhrzeit</b> (deutsche Zeit) veröffentlicht – der Pi muss dafür laufen. Uhrzeit/Datum unten anpassbar; Eintrag entfernbar.</p>
+<table class=gp><tr><th>Beitrag</th><th>Ziel</th><th>Kanal</th><th>Format</th><th>Wann (deutsche Zeit)</th><th>Status</th><th></th></tr>
+{% for p in posts %}<tr>
+  <td><a href="/beitrag/{{p.eid}}">{{p.titel}}</a></td>
+  <td>{{p.ziel}}</td><td>{{p.kanal}}</td><td>{{p.format}}</td>
+  <td>{% if p.status in ['geplant','laeuft'] %}<form method=post action="/geplant-aendern/{{p.id}}" style="margin:0;display:flex;gap:5px;align-items:center">
+        <input type=date name=datum value="{{p.datum}}"><input type=time name=zeit value="{{p.zeit}}"><button>OK</button></form>
+      {% else %}{{p.geplant_de}}, {{p.zeit}} Uhr{% endif %}</td>
+  <td><span class="st {{p.status}}">{{p.status}}</span>{% if p.info %} <span class=hint title="{{p.info}}">&#9432;</span>{% endif %}</td>
+  <td>{% if p.status in ['geplant','laeuft'] %}<form method=post action="/geplant-loeschen/{{p.id}}" style="margin:0" onsubmit="return confirm('Diese geplante Veröffentlichung entfernen?')"><button style="background:#b00020">&times;</button></form>{% endif %}</td>
+</tr>{% endfor %}</table>
+{% else %}<p style="text-align:center">Keine geplanten Veröffentlichungen. Auf der Einplanungs-Seite „<b>Automatisch einplanen</b>" wählen.</p>{% endif %}
+</div>"""
 
 KALENDER = """<!doctype html><meta charset=utf-8><title>Content-Kalender</title>
 <style>""" + _TOP + """
@@ -1412,6 +1515,107 @@ def veroeffentlichen(eid):
         conn.commit()
     return redirect(url_for("einplanung"))
 
+@app.route("/auto-einplanen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def auto_einplanen(eid):
+    """Plant den Beitrag je gewaehlter Beratungsstelle/Seite zu einer vorgeschlagenen, gestreuten
+    Uhrzeit (07-19 Uhr) auf dem geplanten Datum ein. Der Dienst veroeffentlicht dann automatisch."""
+    import datetime
+    stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
+    page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
+    fmt = request.form.get("format", "").strip()
+    if not stelle_ids and not page_ids:
+        flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
+        return redirect(url_for("einplanung"))
+    now = datetime.datetime.now()
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        if fmt not in ("einzelbild", "karussell"):
+            fmt = e["format"] or "einzelbild"
+        datum = e["geplant_fuer"] or now.date().isoformat()
+        # heute: Zeit muss in der Zukunft liegen; spaeteres Datum: ab 07:00
+        min_m = (now.hour * 60 + now.minute + 2) if datum == now.date().isoformat() else 7 * 60
+        belegt = [r[0][11:16] for r in conn.execute(
+            "SELECT geplant_am FROM geplante_posts WHERE geplant_am LIKE ? AND status='geplant'", (datum + "T%",))]
+        n = 0
+        for sid in stelle_ids:
+            stelle = conn.execute("SELECT id, fb_seite FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+            if not stelle or not stelle["fb_seite"]:
+                flash("Beratungsstelle (ID %s) ohne Facebook-Seite – übersprungen." % sid); continue
+            z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, geplant_am, status) "
+                         "VALUES (?,?,?,?,?, 'geplant')",
+                         (eid, int(stelle["id"]), _kanal_fuer("s", sid), fmt, "%sT%s" % (datum, z)))
+            n += 1
+        for pid in page_ids:
+            z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, page_id, kanal, format, geplant_am, status) "
+                         "VALUES (?,?,?,?,?, 'geplant')",
+                         (eid, pid, _kanal_fuer("p", pid), fmt, "%sT%s" % (datum, z)))
+            n += 1
+        if n:
+            audit_log(conn, session["user"], "auto_eingeplant", eid, "%d Ziel(e) am %s" % (n, datum))
+        conn.commit()
+    if n:
+        flash("%d Beitrag/Beiträge automatisch für %s eingeplant – die Uhrzeiten kannst du unter "
+              "„Geplante Veröffentlichungen“ anpassen." % (n, _de_datum(datum)))
+    return redirect(url_for("geplant"))
+
+@app.route("/geplant")
+@login_required
+def geplant():
+    rows = []
+    with get_conn() as conn:
+        for gp in conn.execute(
+            "SELECT g.id, g.entwurf_id, g.page_id, g.kanal, g.format, g.geplant_am, g.status, g.info, "
+            "e.text AS etext, b.name AS sname, b.ort AS sort "
+            "FROM geplante_posts g LEFT JOIN entwuerfe e ON e.id=g.entwurf_id "
+            "LEFT JOIN beratungsstellen b ON b.id=g.stelle_id "
+            "ORDER BY (g.status NOT IN ('geplant','laeuft')), g.geplant_am").fetchall():
+            try:
+                titel = json.loads(gp["etext"]).get("ueberschrift") or "Beitrag"
+            except Exception:
+                titel = "Beitrag"
+            ziel = (gp["sname"] + ((" · " + gp["sort"]) if gp["sort"] else "")) if gp["sname"] \
+                else ("Facebook-Seite %s" % gp["page_id"])
+            parts = (gp["geplant_am"] or "").split("T")
+            d = parts[0] if parts else ""
+            t = parts[1][:5] if len(parts) > 1 else ""
+            rows.append({"id": gp["id"], "eid": gp["entwurf_id"], "titel": titel, "ziel": ziel,
+                         "kanal": _KANAL_DE.get(gp["kanal"], gp["kanal"]),
+                         "format": "Karussell" if gp["format"] == "karussell" else "Einzelbild",
+                         "datum": d, "zeit": t, "geplant_de": _de_datum(d),
+                         "status": gp["status"], "info": gp["info"]})
+    return render_template_string(GEPLANT, **_ctx(posts=rows))
+
+@app.route("/geplant-aendern/<int:gpid>", methods=["POST"])
+@rolle_required("freigeber")
+def geplant_aendern(gpid):
+    import re
+    datum = request.form.get("datum", "").strip(); zeit = request.form.get("zeit", "").strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", datum) and re.match(r"^\d{2}:\d{2}$", zeit):
+        with get_conn() as conn:
+            conn.execute("UPDATE geplante_posts SET geplant_am=? WHERE id=? AND status='geplant'",
+                         ("%sT%s" % (datum, zeit), gpid))
+            audit_log(conn, session["user"], "geplant_aendern", None, "gp %d -> %sT%s" % (gpid, datum, zeit))
+            conn.commit()
+        flash("Termin angepasst.")
+    else:
+        flash("Bitte gültiges Datum und Uhrzeit angeben.")
+    return redirect(url_for("geplant"))
+
+@app.route("/geplant-loeschen/<int:gpid>", methods=["POST"])
+@rolle_required("freigeber")
+def geplant_loeschen(gpid):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM geplante_posts WHERE id=? AND status IN ('geplant','laeuft')", (gpid,))
+        audit_log(conn, session["user"], "geplant_loeschen", None, "gp %d" % gpid)
+        conn.commit()
+    flash("Geplante Veröffentlichung entfernt.")
+    return redirect(url_for("geplant"))
+
 @app.route("/vorschau/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def vorschau(eid):
@@ -1644,5 +1848,6 @@ def serve(host="0.0.0.0", port=None):
     except Exception as ex:
         log.info("Token-Verlaengerung beim Start uebersprungen: %s", ex)
     threading.Thread(target=_daily_scheduler, daemon=True).start()
+    threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))
     app.run(host=host, port=port, threaded=True)
