@@ -70,6 +70,16 @@ def _format(name, default="einzelbild"):
     v = (request.form.get(name) or "").strip()
     return v if v in ("einzelbild", "karussell") else default
 
+_QUELLE_LABELS = {
+    "bvl_pm": "BVL-Pressemitteilungen", "bvl_dpa": "BVL / dpa-Themen", "hilo": "HILO-Meldungen",
+    "pdf": "Eigenes PDF", "link": "Eigener Link", "eigen": "Eigener Beitrag",
+    "anlass": "Anlass-Tage", "wissen": "Wissens-Serie", "frist": "Fristen-Countdown",
+}
+
+def _quelle_label(q):
+    """Freundlicher Anzeigename fuer einen Quelle-Code (Fallback: Code lesbar gemacht)."""
+    return _QUELLE_LABELS.get(q, (q or "Sonstige").replace("_", " ").title())
+
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
     """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
     nicht mit bereits vergebenen kollidiert - damit die Beitraege individuell gepostet wirken.
@@ -310,13 +320,14 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
 ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
 .bar{max-width:920px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
 .bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
-.tl label{display:flex;gap:11px;align-items:flex-start;padding:10px 8px;border-bottom:1px solid #eef1f4;cursor:pointer}
-.tl label:hover{background:#f6f8fb}
-.tl input{margin-top:3px}
-.tl .ti{font-weight:bold;color:#15336e}
-.tl .meta{font-size:12px;color:#7a8694}
-.allrow{font-weight:bold;color:#1f428d;border-bottom:2px solid #e6eaf0 !important}
-.tl .delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:auto;align-self:center}</style>
+.allrow{display:flex;align-items:center;gap:8px;background:#dfe7f3;color:#1f428d;padding:9px 11px;border-radius:8px;font-weight:bold;cursor:pointer}
+.qgroup{border:1px solid #e3e7ee;border-radius:10px;margin:10px 0;overflow:hidden}
+.qhead{display:flex;align-items:center;gap:8px;background:#eef2f8;color:#1f428d;padding:9px 11px;cursor:pointer;margin:0}
+.qrow{display:flex;gap:11px;align-items:flex-start;padding:10px 11px;border-top:1px solid #eef1f4;cursor:pointer;margin:0}
+.qrow:hover{background:#f6f8fb}
+.qhead input{margin:0}.qrow input{margin:3px 0 0}
+.ti{font-weight:bold;color:#15336e}.meta{font-size:12px;color:#7a8694}
+.delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:auto;align-self:center}</style>
 <div class=bar><h2 style="margin:0">Themen auswählen &amp; erzeugen</h2><a href="/">&larr; Startseite</a></div>
 <div class=box>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -324,12 +335,15 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 {% if themen %}
 <p class=hint>Hake die Themen an, für die jetzt Texte &amp; Bilder erzeugt werden sollen. Für jedes angehakte Thema entsteht ein Entwurf, den du danach unter „3. Freigabe: Texte &amp; Bilder" prüfst.</p>
 <form method=post onsubmit="return chk(this)">
-  <div class=tl>
-    <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
-    {% for t in themen %}<label><input type=checkbox name=thema_id value="{{t.id}}">
-      <span><span class=ti>{{t.titel}}</span><br><span class=meta>{{t.quelle}}{% if t.erkannt_am %} &middot; erkannt {{t.erkannt_am[:10]}}{% endif %}</span></span>
+  <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
+  {% for g in gruppen %}{% set gi = loop.index %}
+  <div class=qgroup>
+    <label class=qhead><input type=checkbox onclick="toggleGroup(this,{{gi}})"> <b>{{g.label}}</b>&nbsp;<span class=meta>({{g.themen|length}})</span></label>
+    {% for t in g.themen %}<label class=qrow><input type=checkbox name=thema_id value="{{t.id}}" data-grp="{{gi}}">
+      <span><span class=ti>{{t.titel}}</span>{% if t.erkannt_am %}<br><span class=meta>erkannt {{t.erkannt_am[:10]}}</span>{% endif %}</span>
       <button type=button class=delbtn onclick="event.preventDefault();event.stopPropagation();loeschThema({{t.id}},'erzeugen')">Löschen</button></label>{% endfor %}
   </div>
+  {% endfor %}
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
     <button{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
@@ -338,6 +352,7 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 <script>
 function upd(){document.getElementById('cnt').textContent=document.querySelectorAll('input[name=thema_id]:checked').length;}
 function toggleAll(c){document.querySelectorAll('input[name=thema_id]').forEach(function(b){b.checked=c.checked;});upd();}
+function toggleGroup(c,gi){document.querySelectorAll('input[name=thema_id][data-grp="'+gi+'"]').forEach(function(b){b.checked=c.checked;});upd();}
 function chk(f){if(f.querySelectorAll('input[name=thema_id]:checked').length===0){alert('Bitte mindestens ein Thema anhaken.');return false;}return true;}
 function loeschThema(id,z){if(!confirm('Dieses Thema wirklich löschen?'))return;var f=document.createElement('form');f.method='post';f.action='/thema-loeschen/'+id;var i=document.createElement('input');i.type='hidden';i.name='zurueck';i.value=z;f.appendChild(i);document.body.appendChild(f);f.submit();}
 document.addEventListener('change',function(e){if(e.target&&e.target.name==='thema_id')upd();});
@@ -1294,7 +1309,13 @@ def erzeugen():
             "SELECT id, titel, quelle, erkannt_am FROM themen t WHERE status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id) "
             "ORDER BY erkannt_am DESC").fetchall()
-    return render_template_string(ERZEUGEN, **_ctx(themen=rows, laeuft=_generation_running()))
+    # nach Quelle gruppieren (Unterkacheln) - uebersichtlicher als eine flache Liste
+    gruppen_map = {}
+    for r in rows:
+        gruppen_map.setdefault(r["quelle"] or "", []).append(r)
+    gruppen = [{"quelle": q, "label": _quelle_label(q), "themen": ts}
+               for q, ts in sorted(gruppen_map.items(), key=lambda kv: _quelle_label(kv[0]).lower())]
+    return render_template_string(ERZEUGEN, **_ctx(themen=rows, gruppen=gruppen, laeuft=_generation_running()))
 
 @app.route("/eigener", methods=["GET", "POST"])
 @rolle_required("freigeber")
