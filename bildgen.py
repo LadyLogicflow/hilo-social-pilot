@@ -110,9 +110,11 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     base.paste(grad, (0, 0), mt)
 
     if cut is not None:
-        pw = 625; sc = pw / cut.width; chh = int(cut.height * sc)
+        # Foto gross (ca. 2/3 der Breite), Schwerpunkt rechts; Text liegt darueber (wird danach
+        # gezeichnet) und ueberschneidet nur die linke, meist transparente Foto-Haelfte.
+        pw = 720; sc = pw / cut.width; chh = int(cut.height * sc)
         cut2 = cut.resize((pw, chh), Image.LANCZOS)
-        base.paste(cut2, (W - 16 - pw, 205), cut2)
+        base.paste(cut2, (W - 8 - pw, 205), cut2)
 
     mb = Image.new("L", (W, H), 0)
     ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
@@ -129,7 +131,7 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     for ln in HL:
         dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
 
-    LCOL = 430 if cut is not None else (W - margin)
+    LCOL = 560 if cut is not None else (W - margin)
     tx0 = margin + 18 + 18 + 16
     fsb = _font(_REG, 31); SL = _wrap(dr, fields.get("subline", ""), fsb, LCOL - margin)
     fb = _font(_BOLD, 30); bw = LCOL - tx0
