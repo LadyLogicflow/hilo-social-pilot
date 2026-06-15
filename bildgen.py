@@ -110,11 +110,11 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     base.paste(grad, (0, 0), mt)
 
     if cut is not None:
-        # Foto gross (ca. 2/3 der Breite), Schwerpunkt rechts; Text liegt darueber (wird danach
-        # gezeichnet) und ueberschneidet nur die linke, meist transparente Foto-Haelfte.
-        pw = 720; sc = pw / cut.width; chh = int(cut.height * sc)
+        # Foto etwas schmaler als 2/3 (rechts), damit mehr Rand/Luft bleibt und der Text im linken
+        # Drittel klar getrennt steht. Text wird danach gezeichnet und liegt ggf. obenauf.
+        pw = 632; sc = pw / cut.width; chh = int(cut.height * sc)
         cut2 = cut.resize((pw, chh), Image.LANCZOS)
-        base.paste(cut2, (W - 8 - pw, 205), cut2)
+        base.paste(cut2, (W - 16 - pw, 205), cut2)
 
     mb = Image.new("L", (W, H), 0)
     ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
