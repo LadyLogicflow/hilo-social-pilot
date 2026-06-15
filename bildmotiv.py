@@ -18,10 +18,12 @@ def _prompt(motiv):
             "Tisch): eine Mappe oder Unterlagen und eine Kaffeetasse, die deutlich den Schriftzug 'HILO' "
             "traegt - sauber mitfreigestellt. Aus der Gruppe ist IMMER eine Person deutlich als "
             "HILO-Beraterin oder HILO-Berater erkennbar durch ein gut sichtbares HILO-Logo am Kragen oder "
-            "auf der Blusentasche. Die Personen sind NAH herangezoomt und FUELLEN das Hochformat "
-            "moeglichst aus (Kopf bis etwa Huefte, gross im Bild, wenig Leerraum) - aber mit kleinem "
-            "Sicherheitsrand, sodass NIEMAND an einer Seite abgeschnitten wird und alle vollstaendig im "
-            "Bild sind. Ausser dem 'HILO' auf der Tasse und dem HILO-Logo an der Kleidung KEINE weiteren "
+            "auf der Blusentasche. Die Personen FUELLEN das Hochformat vertikal VOLLSTAENDIG aus: "
+            "Koepfe reichen bis knapp unter den oberen Rand, Huefte/Oberschenkel bis zum unteren Rand. "
+            "KEIN Leerraum ueber den Koepfen oder unter der Huefte. Enger Bildausschnitt wie ein "
+            "Zeitschriften-Cover-Crop. WICHTIG: Koepfe NICHT anschneiden und links und rechts etwas Rand "
+            "lassen, sodass niemand am linken oder rechten Rand abgeschnitten wird. "
+            "Ausser dem 'HILO' auf der Tasse und dem HILO-Logo an der Kleidung KEINE weiteren "
             "Texte, Logos oder Markennamen." % motiv)
 
 def ensure_photo(motiv):
