@@ -65,6 +65,11 @@ def _kanal_fuer(prefix, tid):
     k = (request.form.get("kanal_%s%s" % (prefix, tid)) or "facebook").strip()
     return k if k in ("facebook", "instagram", "beide") else "facebook"
 
+def _format(name, default="einzelbild"):
+    """Liest ein Bildformat aus dem Formular (einzelbild|karussell), Default sonst."""
+    v = (request.form.get(name) or "").strip()
+    return v if v in ("einzelbild", "karussell") else default
+
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
     """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
     nicht mit bereits vergebenen kollidiert - damit die Beitraege individuell gepostet wirken.
@@ -165,7 +170,8 @@ def _publiziere_geplant(gpid):
         f = json.loads(e["text"])
     except Exception:
         f = {}
-    fmt = gp["format"] or e["format"] or "einzelbild"
+    fmt_fb = gp["format_fb"] or gp["format"] or "einzelbild"
+    fmt_ig = gp["format_ig"] or gp["format"] or "karussell"
     kanal = gp["kanal"] or "facebook"
     ziel_name = "?"
     with get_conn() as conn:
@@ -173,7 +179,7 @@ def _publiziere_geplant(gpid):
             if gp["stelle_id"] else None
         try:
             ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(
-                conn, e, gp["entwurf_id"], f, fmt, kanal, stelle, gp["page_id"], "scheduler", publish)
+                conn, e, gp["entwurf_id"], f, fmt_fb, fmt_ig, kanal, stelle, gp["page_id"], "scheduler", publish)
         except Exception as ex:
             erfolg, ergebnisse = False, [("-", False, str(ex))]
         info = " | ".join("%s: %s" % (k, ("OK" if ok else "Fehler – %s" % i)) for k, ok, i in ergebnisse)
@@ -408,7 +414,8 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
 .checks label{font-size:14px;background:#eef2f8;padding:4px 10px;border-radius:7px;cursor:pointer}
 .checks .stelle{display:flex;align-items:center;gap:6px;background:#eef2f8;padding:4px 8px;border-radius:7px}
 .checks .stelle label{background:none;padding:0}
-.checks .stelle select{padding:4px 6px;margin:0;font-size:13px;border-radius:6px}</style>
+.checks .stelle select{padding:4px 6px;margin:0;font-size:13px;border-radius:6px}
+.fmt{font-size:13px;color:#15336e;margin-right:6px}.fmt select{font-size:13px;padding:6px}</style>
 <script>function need(f,n,m){return f.querySelectorAll('input[name='+n+']:checked').length>0||(alert(m),false);}</script>
 <div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><div><a href="/geplant">&#x23F0; Geplante Veröffentlichungen</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
@@ -435,9 +442,12 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
           <option value="facebook"{% if (s.fb_seite|string) not in ig_seiten %} selected{% endif %}>Facebook</option>
           <option value="instagram">Instagram</option>
           <option value="beide"{% if (s.fb_seite|string) in ig_seiten %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
-      <select name=format title="Format des Beitrags">
-        <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
-        <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
+      <span class=fmt>Facebook: <select name=format_fb title="Bildformat für Facebook">
+        <option value="einzelbild" selected>Einzelbild</option>
+        <option value="karussell">Karussell</option></select></span>
+      <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
+        <option value="einzelbild">Einzelbild</option>
+        <option value="karussell" selected>Karussell</option></select></span>
       <button>Vorschau ansehen</button>
       <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
@@ -450,9 +460,12 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
           <option value="facebook"{% if not p.ig_username %} selected{% endif %}>Facebook</option>
           <option value="instagram">Instagram</option>
           <option value="beide"{% if p.ig_username %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
-      <select name=format title="Format des Beitrags">
-        <option value="einzelbild"{% if e.format!='karussell' %} selected{% endif %}>Einzelbild</option>
-        <option value="karussell"{% if e.format=='karussell' %} selected{% endif %}>Karussell (mehrere Slides)</option></select>
+      <span class=fmt>Facebook: <select name=format_fb title="Bildformat für Facebook">
+        <option value="einzelbild" selected>Einzelbild</option>
+        <option value="karussell">Karussell</option></select></span>
+      <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
+        <option value="einzelbild">Einzelbild</option>
+        <option value="karussell" selected>Karussell</option></select></span>
       <button>Vorschau ansehen</button>
       <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
@@ -475,7 +488,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 <div class=bar><h2 style="margin:0">Vorschau vor Veröffentlichung</h2><a href="/einplanung">&larr; Einplanung</a></div>
 <div style="max-width:1200px;margin:0 auto 12px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-<p class=hint>Prüfe für jede Beratungsstelle, ob <b>Porträt-Kreis, Name, Ort und Begleittext</b> stimmen. Erst wenn alles passt, unten auf „Jetzt veröffentlichen" klicken.{% if fmt=='karussell' %} <i>(Beim Karussell zeigt die Vorschau die personalisierte Bildvariante mit Porträt, Name und Ort – das veröffentlichte Karussell enthält zusätzlich mehrere Inhalts-Slides.)</i>{% endif %}</p>
+<p class=hint>Prüfe für jede Beratungsstelle, ob <b>Porträt-Kreis, Name, Ort und Begleittext</b> stimmen. Erst wenn alles passt, unten auf „Jetzt veröffentlichen" klicken.<br><i>Format &ndash; Facebook: {{'Karussell' if fmt_fb=='karussell' else 'Einzelbild'}}, Instagram: {{'Karussell' if fmt_ig=='karussell' else 'Einzelbild'}}. Die Vorschau zeigt die personalisierte Bildvariante; ein Karussell enthält beim Posten zusätzlich mehrere Slides.</i></p>
 </div>
 <div class=pv>
 {% for it in items %}
@@ -490,7 +503,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 <form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an die {{ziel_count}} gültigen Ziele veröffentlichen?')">
   {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}"><input type=hidden name="kanal_s{{s}}" value="{{kanal_map.get('s'+s,'facebook')}}">{% endfor %}
   {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}"><input type=hidden name="kanal_p{{p}}" value="{{kanal_map.get('p'+p,'facebook')}}">{% endfor %}
-  <input type=hidden name=format value="{{fmt}}">
+  <input type=hidden name=format_fb value="{{fmt_fb}}"><input type=hidden name=format_ig value="{{fmt_ig}}">
   <div class=foot><a href="/einplanung">&larr; Auswahl ändern</a>
     <span class=hint>{{ziel_count}} Ziel(e) – Kanal je Beratungsstelle wie oben angezeigt</span>
     <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
@@ -1422,16 +1435,21 @@ def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id
     return publish.publish_instagram(ig_id, urls[0], caption)
 
 
-def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, publish):
-    """Veroeffentlicht den Entwurf an EIN Ziel: entweder eine Beratungsstelle (personalisiert)
-    ODER eine reine Facebook-Seite. Rendert das/die Bild(er), postet auf den gewuenschten Kanal,
-    schreibt posts + Audit. Rueckgabe: (ziel_name, erfolg_bool, [(kanal, ok, info), ...])."""
+def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_id, user, publish):
+    """Veroeffentlicht den Entwurf an EIN Ziel (Beratungsstelle personalisiert ODER Facebook-Seite).
+    Das Bildformat ist je Kanal waehlbar: fmt_fb fuer Facebook, fmt_ig fuer Instagram
+    (jeweils 'einzelbild' oder 'karussell'). Rueckgabe: (ziel_name, erfolg, [(kanal, ok, info), ...])."""
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
-    caption = f.get("caption") or f.get("ueberschrift") or ""
-    # Rendern abgesichert: ein Render-Fehler bei EINEM Ziel darf die Schleife (und damit die
-    # bereits veroeffentlichten + verbuchten anderen Ziele) niemals abbrechen.
-    try:
+    ziel_seite = (stelle["fb_seite"] if stelle else page_id)
+    base_caption = f.get("caption") or f.get("ueberschrift") or ""
+    cap = {"c": base_caption}
+    _cache = {}
+
+    def _render(fmt):
+        """Bilderliste fuer dieses Format (gecacht); setzt ggf. die personalisierte Caption."""
+        if fmt in _cache:
+            return _cache[fmt]
         if stelle:
             import personalisierung
             if fmt == "karussell":
@@ -1440,9 +1458,8 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, pu
             else:
                 out = os.path.join(DATA_DIR, "bilder", "post_%d_stelle_%d.png" % (eid, int(stelle["id"])))
                 pf, pfad = personalisierung.render_fuer_stelle(f, stelle, out); bilder = [pfad]
-            ziel_seite, caption = stelle["fb_seite"], (pf.get("caption") or caption)
+            cap["c"] = pf.get("caption") or base_caption
         else:
-            ziel_seite = page_id
             if fmt == "karussell":
                 import bildgen, bildmotiv
                 out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d" % eid)
@@ -1451,23 +1468,30 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, pu
                 bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
             else:
                 bilder = [e["bild_pfad"]]
-    except Exception as ex:
-        return ziel_name, False, [("bild", False, "Bild konnte nicht erstellt werden: %s" % ex)]
-    if not [b for b in bilder if b and os.path.exists(b)]:
-        return ziel_name, False, [("bild", False, "Kein Bild vorhanden")]
+        bilder = [b for b in bilder if b and os.path.exists(b)]
+        _cache[fmt] = bilder
+        return bilder
+
     ergebnisse = []   # (kanal, ok, info)
     if kanal in ("facebook", "beide"):
         try:
-            if fmt == "karussell":
-                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, caption)
+            bilder = _render(fmt_fb)
+            if not bilder:
+                ok, info = False, "Kein Bild vorhanden"
+            elif fmt_fb == "karussell":
+                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, cap["c"])
             else:
-                ok, info = publish.publish_facebook(ziel_seite, bilder[0], caption)
+                ok, info = publish.publish_facebook(ziel_seite, bilder[0], cap["c"])
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("facebook", ok, info))
     if kanal in ("instagram", "beide"):
         try:
-            ok, info = _publish_instagram(publish, ziel_seite, bilder, caption, fmt, eid, stelle_id)
+            bilder = _render(fmt_ig)
+            if not bilder:
+                ok, info = False, "Kein Bild vorhanden"
+            else:
+                ok, info = _publish_instagram(publish, ziel_seite, bilder, cap["c"], fmt_ig, eid, stelle_id)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("instagram", ok, info))
@@ -1478,7 +1502,7 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, page_id, user, pu
             conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, "
                          "veroeffentlicht_am, status) VALUES (?,?,?,datetime('now'),'veroeffentlicht')",
                          (eid, k, info))
-            audit_log(conn, user, "veroeffentlicht_%s" % k, eid, "Format %s / Ziel %s / Post %s" % (fmt, ziel_seite, info))
+            audit_log(conn, user, "veroeffentlicht_%s" % k, eid, "Ziel %s / Post %s" % (ziel_seite, info))
         else:
             conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
                          (eid, k, "fehler", info))
@@ -1497,13 +1521,13 @@ def veroeffentlichen(eid):
     user = session["user"]
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen."); return redirect(url_for("einplanung"))
-    fmt = request.form.get("format", "").strip()
+    fmt_fb = _format("format_fb", "einzelbild")
+    fmt_ig = _format("format_ig", "karussell")
+    haupt_fmt = "karussell" if "karussell" in (fmt_fb, fmt_ig) else "einzelbild"
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
-        if fmt not in ("einzelbild", "karussell"):
-            fmt = e["format"] or "einzelbild"
         try:
             f = json.loads(e["text"])
         except Exception:
@@ -1520,19 +1544,19 @@ def veroeffentlichen(eid):
             ziele.append((None, pid, _kanal_fuer("p", pid)))
         if not ziele:
             flash("Kein gültiges Ziel gewählt (Beratungsstelle ohne Facebook-Seite?)."); return redirect(url_for("einplanung"))
-        # gewaehltes Format am Entwurf festhalten (unabhaengig vom Publish-Erfolg)
-        conn.execute("UPDATE entwuerfe SET format=? WHERE id=?", (fmt, eid))
+        # Format am Entwurf festhalten (fuer Kalender/Detailansicht): Karussell, wenn ein Kanal Karussell ist
+        conn.execute("UPDATE entwuerfe SET format=? WHERE id=?", (haupt_fmt, eid))
         import publish
         gesamt_erfolg = False
         zeilen = []
         for stelle, pid, kanal in ziele:
-            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(conn, e, eid, f, fmt, kanal, stelle, pid, user, publish)
+            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, pid, user, publish)
             gesamt_erfolg = gesamt_erfolg or erfolg
             teile = ["%s: %s" % (k.capitalize(), ("OK" if ok else "Fehler – %s" % info)) for k, ok, info in ergebnisse]
             zeilen.append("%s → %s" % (ziel_name, " | ".join(teile)))
         if gesamt_erfolg:
             conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (eid,))
-        flash("Beitrag %d (%s):  %s" % (eid, "Karussell" if fmt == "karussell" else "Einzelbild", "   •   ".join(zeilen)))
+        flash("Beitrag %d:  %s" % (eid, "   •   ".join(zeilen)))
         conn.commit()
     return redirect(url_for("einplanung"))
 
@@ -1544,7 +1568,9 @@ def auto_einplanen(eid):
     import datetime
     stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
     page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
-    fmt = request.form.get("format", "").strip()
+    fmt_fb = _format("format_fb", "einzelbild")
+    fmt_ig = _format("format_ig", "karussell")
+    haupt_fmt = "karussell" if "karussell" in (fmt_fb, fmt_ig) else "einzelbild"
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
         return redirect(url_for("einplanung"))
@@ -1553,8 +1579,6 @@ def auto_einplanen(eid):
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
-        if fmt not in ("einzelbild", "karussell"):
-            fmt = e["format"] or "einzelbild"
         datum = e["geplant_fuer"] or now.date().isoformat()
         # heute: Zeit muss in der Zukunft liegen; spaeteres Datum: ab 07:00
         min_m = (now.hour * 60 + now.minute + 2) if datum == now.date().isoformat() else 7 * 60
@@ -1566,15 +1590,15 @@ def auto_einplanen(eid):
             if not stelle or not stelle["fb_seite"]:
                 flash("Beratungsstelle (ID %s) ohne Facebook-Seite – übersprungen." % sid); continue
             z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
-            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, geplant_am, status) "
-                         "VALUES (?,?,?,?,?, 'geplant')",
-                         (eid, int(stelle["id"]), _kanal_fuer("s", sid), fmt, "%sT%s" % (datum, z)))
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, format_ig, "
+                         "geplant_am, status) VALUES (?,?,?,?,?,?,?, 'geplant')",
+                         (eid, int(stelle["id"]), _kanal_fuer("s", sid), haupt_fmt, fmt_fb, fmt_ig, "%sT%s" % (datum, z)))
             n += 1
         for pid in page_ids:
             z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
-            conn.execute("INSERT INTO geplante_posts(entwurf_id, page_id, kanal, format, geplant_am, status) "
-                         "VALUES (?,?,?,?,?, 'geplant')",
-                         (eid, pid, _kanal_fuer("p", pid), fmt, "%sT%s" % (datum, z)))
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, page_id, kanal, format, format_fb, format_ig, "
+                         "geplant_am, status) VALUES (?,?,?,?,?,?,?, 'geplant')",
+                         (eid, pid, _kanal_fuer("p", pid), haupt_fmt, fmt_fb, fmt_ig, "%sT%s" % (datum, z)))
             n += 1
         if n:
             audit_log(conn, session["user"], "auto_eingeplant", eid, "%d Ziel(e) am %s" % (n, datum))
@@ -1644,7 +1668,8 @@ def vorschau(eid):
     Bildvariante (Portraet, Name, Ort, Begleittext) zur Pruefung - postet noch nichts."""
     stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
     page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
-    fmt = request.form.get("format", "").strip()
+    fmt_fb = _format("format_fb", "einzelbild")
+    fmt_ig = _format("format_ig", "karussell")
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
         return redirect(url_for("einplanung"))
@@ -1654,8 +1679,6 @@ def vorschau(eid):
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
-        if fmt not in ("einzelbild", "karussell"):
-            fmt = e["format"] or "einzelbild"
         try:
             f = json.loads(e["text"])
         except Exception:
@@ -1696,8 +1719,9 @@ def vorschau(eid):
                           "caption": f.get("caption") or f.get("ueberschrift") or "",
                           "url": url_for("bild", eid=eid)})
     ziel_count = sum(1 for it in items if it.get("ok"))
-    return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt=fmt, items=items, ziel_count=ziel_count,
-                                  stelle_ids=stelle_ids, page_ids=page_ids, kanal_map=kanal_map))
+    return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt_fb=fmt_fb, fmt_ig=fmt_ig, items=items,
+                                  ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids,
+                                  kanal_map=kanal_map))
 
 @app.route("/preview-bild/<int:eid>/<int:sid>")
 @rolle_required("freigeber")

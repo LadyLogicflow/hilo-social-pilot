@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS geplante_posts (
     stelle_id INTEGER,                 -- Beratungsstelle (NULL bei reiner Facebook-Seite)
     page_id TEXT,                      -- Facebook-Seiten-ID (NULL bei Beratungsstelle)
     kanal TEXT NOT NULL DEFAULT 'facebook',
-    format TEXT NOT NULL DEFAULT 'einzelbild',
+    format TEXT NOT NULL DEFAULT 'einzelbild',     -- Zusammenfassung (Karussell, wenn ein Kanal Karussell)
+    format_fb TEXT DEFAULT 'einzelbild',           -- Bildformat fuer Facebook
+    format_ig TEXT DEFAULT 'karussell',            -- Bildformat fuer Instagram
     geplant_am TEXT NOT NULL,          -- lokale deutsche Zeit "YYYY-MM-DDTHH:MM"
     status TEXT NOT NULL DEFAULT 'geplant',   -- geplant | laeuft | veroeffentlicht | fehler
     info TEXT,
@@ -194,6 +196,12 @@ def migrate(conn):
     ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
     if "format" not in ecols:
         conn.execute("ALTER TABLE entwuerfe ADD COLUMN format TEXT NOT NULL DEFAULT 'einzelbild'")
+    # Format pro Kanal bei geplanten Veroeffentlichungen
+    gcols = [r[1] for r in conn.execute("PRAGMA table_info(geplante_posts)")]
+    if gcols and "format_fb" not in gcols:
+        conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_fb TEXT DEFAULT 'einzelbild'")
+    if gcols and "format_ig" not in gcols:
+        conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_ig TEXT DEFAULT 'karussell'")
     # BVL- und HILO-Meldungen gehoeren nicht in Stufe 1 -> bestehende Eintraege heilen
     conn.execute("UPDATE themen SET status='ausgewaehlt' "
                  "WHERE status='vorgeschlagen' AND quelle IN ('bvl_pm','bvl_dpa','hilo')")
