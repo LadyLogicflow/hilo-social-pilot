@@ -9,17 +9,18 @@ log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
 def _prompt(motiv):
-    return ("Freigestellt vor transparentem Hintergrund: %s. Warme, hochwertige Werbefotografie einer "
-            "positiven Steuerberatungs-Szene; freundliche, laechelnde Menschen in zugewandter Interaktion "
-            "(kein nachdenklicher oder sorgenvoller Ausdruck, kein einzelnes Portraitfoto). Passende "
-            "Requisiten wie Laptop, Unterlagen und eine Kaffeetasse, die deutlich den Schriftzug 'HILO' "
-            "traegt, sollen vorkommen und werden sauber mitfreigestellt. Aus der Gruppe ist IMMER eine "
-            "Person deutlich als HILO-Beraterin oder HILO-Berater erkennbar - durch ein gut sichtbares "
-            "HILO-Logo am Kragen oder auf der Blusentasche. Die gesamte Gruppe als Halbkoerper bis etwa "
-            "Tischhoehe, vollstaendig im Bild - sie wird NICHT an den Raendern abgeschnitten, mit "
-            "deutlichem Abstand zum linken, rechten und oberen Rand. Sauber freigestellt, KEIN "
-            "Hintergrund, KEIN Tisch-Hintergrund. Ausser dem Schriftzug 'HILO' auf der Kaffeetasse und "
-            "dem HILO-Logo an der Kleidung KEINE weiteren Texte, Logos oder Markennamen im Bild." % motiv)
+    return ("Sauber freigestelltes Foto als PNG mit ECHTEM transparentem Hintergrund (Alphakanal). "
+            "ABSOLUT KEIN Hintergrund, KEIN Raum, KEIN Tisch, KEIN Schreibtisch, KEIN Boden, KEINE Wand, "
+            "KEINE Moebel - nur die Personen frei vor Transparenz, wie ein sauberer Scherenschnitt. "
+            "Motiv: %s. Warme, hochwertige Werbefotografie - freundliche, laechelnde Menschen (zwei bis "
+            "drei Personen) in zugewandter Interaktion (kein nachdenklicher Ausdruck, kein Einzelportrait). "
+            "Requisiten NUR in der Hand gehalten (kein Tisch): eine Mappe oder Unterlagen und eine "
+            "Kaffeetasse, die deutlich den Schriftzug 'HILO' traegt - sauber mitfreigestellt. Aus der "
+            "Gruppe ist IMMER eine Person deutlich als HILO-Beraterin oder HILO-Berater erkennbar durch "
+            "ein gut sichtbares HILO-Logo am Kragen oder auf der Blusentasche. Die Personen als "
+            "Halbkoerper (etwa bis zur Huefte), VOLLSTAENDIG im Bild und an KEINER Seite abgeschnitten, "
+            "mit deutlichem Abstand zu allen vier Bildraendern. Ausser dem 'HILO' auf der Tasse und dem "
+            "HILO-Logo an der Kleidung KEINE weiteren Texte, Logos oder Markennamen." % motiv)
 
 def ensure_photo(motiv):
     motiv = (motiv or "").strip()

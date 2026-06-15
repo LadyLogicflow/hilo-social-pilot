@@ -18,13 +18,13 @@ SYSTEM = (
     "sondern eine allgemeine Aufforderung wie 'Jetzt Beratungsstelle in Ihrer Naehe finden'. "
     "Verweise dezent auf die HILO-Mitgliedschaft bzw. persoenliche Beratung. "
     "Gib zusaetzlich: 'slogan' = sehr kurzer, einpraegsamer HILO-Slogan (max 3 Woerter, passend zum Thema; oder leer fuer Standard). "
-    "'bild_motiv' = kurze Beschreibung einer warmen, positiven Beratungsszene zum Thema. Moeglichst "
-    "eine sympathische HILO-Beraterin oder ein Berater im freundlichen Gespraech mit den Mandanten an "
-    "einem Tisch, mit Laptop und Unterlagen, gerne eine Kaffeetasse dabei - laechelnd, zugewandt und "
-    "aktiv (KEINE nachdenklichen oder sorgenvollen Gesichter, keine Einzelportraits). Passe die "
-    "Mandanten ans Thema an, z.B. 'Beraterin und junge Familie am Tisch mit Laptop und Unterlagen', "
-    "'Berater und aelteres Ehepaar im Gespraech, Kaffeetassen auf dem Tisch', "
-    "'Beraterin zeigt einem Rentnerpaar etwas am Laptop'."
+    "'bild_motiv' = kurze Beschreibung einer warmen, positiven Personengruppe zum Thema (FREIGESTELLT, "
+    "OHNE Tisch/Raum). Moeglichst eine sympathische HILO-Beraterin oder ein Berater im freundlichen "
+    "Gespraech mit den Mandanten, mit einer Mappe/Unterlagen in der Hand, gerne eine Kaffeetasse dabei - "
+    "laechelnd, zugewandt und aktiv (KEINE nachdenklichen Gesichter, keine Einzelportraits, KEIN Tisch). "
+    "Passe die Mandanten ans Thema an, z.B. 'Beraterin und junge Familie im Gespraech mit Unterlagen', "
+    "'Berater und aelteres Ehepaar, Kaffeetasse in der Hand', "
+    "'Beraterin zeigt einem Rentnerpaar etwas in einer Mappe'."
 )
 
 CHANNEL_LIMIT = {"google": 1400, "linkedin": 1300, "instagram": 1500, "facebook": 1400}
