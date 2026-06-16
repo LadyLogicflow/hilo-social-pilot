@@ -34,7 +34,14 @@ SYSTEM = (
     "Hintergrund. Mappe oder Unterlagen in der Hand, gerne eine Kaffeetasse dabei - laechelnd, zugewandt, "
     "aktiv (KEINE nachdenklichen Gesichter, keine Einzelportraits). Passe die Mandanten ans Thema an, z.B. "
     "'Beraterin und junge Familie im Gespraech mit Unterlagen', 'Berater und aelteres Ehepaar, Kaffeetasse "
-    "in der Hand', 'Beraterin zeigt einem Rentnerpaar etwas in einer Mappe'.\n\n"
+    "in der Hand', 'Beraterin zeigt einem Rentnerpaar etwas in einer Mappe'.\n"
+    "7) BILD_MOTIV_THEMA: ein zum Thema passendes, GEGENSTAENDLICHES Motiv OHNE Personen - einzelne, klar "
+    "erkennbare Gegenstaende oder eine kleine Stillleben-Szene (z.B. fuer 'Gaertner absetzen' Gartengeraete "
+    "wie Heckenschere, Rechen und ein paar Pflanzen; fuer 'Homeoffice' ein aufgeraeumter Schreibtisch mit "
+    "Laptop und Notizblock; fuer 'Handwerkerleistungen' Werkzeug). Freigestellt, OHNE Raum/Hintergrund, "
+    "KEINE Menschen, KEIN Text. Kurze Beschreibung.\n"
+    "8) BILD_TYP: empfiehl den passenden Bildtyp - 'thema' wenn das Thema ein konkretes, bildstarkes Objekt "
+    "oder eine Szene nahelegt (z.B. Gaertner, Handwerker, Homeoffice, Umzug, Pendeln), sonst 'person'.\n\n"
     "WICHTIG:\n"
     "- Erfinde KEINE Zahlen, Fristen, URLs, Adressen oder Telefonnummern - nutze nur, was im Thema steht.\n"
     "- Der HOOK entscheidet, ob jemand weiterliest - hier maximale Sorgfalt.\n"
@@ -85,7 +92,9 @@ def _build_prompt(thema, kanal=None):
         "Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
         '"bullets": ["3 sehr kurze Stichpunkte, je max 5 Woerter"], "cta": "kurze Handlungsaufforderung", '
-        '"slogan": "max 3 Woerter oder leer", "bild_motiv": "kurzes freigestelltes Fotomotiv", '
+        '"slogan": "max 3 Woerter oder leer", "bild_motiv": "kurzes freigestelltes Personen-Fotomotiv", '
+        '"bild_motiv_thema": "kurzes gegenstaendliches Motiv ohne Personen", '
+        '"bild_typ": "person oder thema", '
         '"captions": {"facebook": "Begleittext fuer Facebook inkl. Hashtags am Ende, hoechstens %d '
         'Zeichen", "instagram": "Begleittext fuer Instagram inkl. Hashtags am Ende, hoechstens %d '
         'Zeichen"}}\n'
@@ -114,6 +123,17 @@ def caption_fuer(fields, kanal):
     """Liefert den kanalspezifischen Begleittext (Fallback: gemeinsame 'caption')."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
     return (caps.get(kanal) or fields.get("caption") or "").strip()
+
+def _normalize_bild(data):
+    """Stellt bild_typ ('person'|'thema', Default 'person') und ein vorhandenes bild_motiv_thema sicher.
+    Faellt auf 'person' zurueck, wenn kein gegenstaendliches Motiv geliefert wurde."""
+    if not isinstance(data, dict):
+        return data
+    typ = (data.get("bild_typ") or "").strip().lower()
+    thema_motiv = (data.get("bild_motiv_thema") or "").strip()
+    data["bild_motiv_thema"] = thema_motiv
+    data["bild_typ"] = "thema" if (typ == "thema" and thema_motiv) else "person"
+    return data
 
 def _parse_json(raw):
     s = (raw or "").strip()
@@ -184,7 +204,7 @@ def generate(thema, kanal=None):
         messages=[{"role": "user", "content": _build_prompt(thema)}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _normalize_captions(_parse_json(raw))
+    return _normalize_bild(_normalize_captions(_parse_json(raw)))
 
 def _create_drafts(rows, kanal):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf (Claude). Rueckgabe: Anzahl."""

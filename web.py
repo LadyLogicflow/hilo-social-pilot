@@ -618,6 +618,22 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 {% endif %}
 <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
+{% if status in ('entwurf','freigegeben') %}
+<div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:10px 0;background:#f7f9fc">
+  <b style="color:#15336e">Bildtyp:</b>
+  {% if e.f.bild_typ=='thema' %}Themenbild (Gegenstände){% else %}Personenbild (Beratungsszene){% endif %}
+  {% if e.f.bild_motiv_thema %}
+    <form method=post action="/bild-typ/{{e.id}}" style="display:inline;margin-left:8px"
+          onsubmit="return confirm({% if e.f.bild_typ=='thema' %}'Zur Personenszene zurückwechseln? Das Bild wird neu zusammengesetzt.'{% else %}'Auf ein Themenbild (ohne Personen) umstellen? Beim ersten Mal wird dafür ein neues Bild erzeugt (kostet ein paar Cent bei der Bild-KI).'{% endif %})">
+      <input type=hidden name=zurueck value=beitrag>
+      <input type=hidden name=typ value="{% if e.f.bild_typ=='thema' %}person{% else %}thema{% endif %}">
+      <button>{% if e.f.bild_typ=='thema' %}&#x21BA; Personenbild verwenden{% else %}&#x1F33F; Themenbild verwenden{% endif %}</button>
+    </form>
+  {% else %}
+    <span class=hint style="margin-left:8px">Kein Themenbild hinterlegt &ndash; über „Neu erzeugen" wird eines miterstellt.</span>
+  {% endif %}
+</div>
+{% endif %}
 <details open><summary>Begleittext Facebook</summary><p style="white-space:pre-wrap">{{ e.f.captions.facebook if e.f.captions else e.f.caption }}</p></details>
 <details><summary>Begleittext Instagram</summary><p style="white-space:pre-wrap">{{ e.f.captions.instagram if e.f.captions else e.f.caption }}</p></details>
 <div class=wa>
@@ -952,7 +968,7 @@ def beitrag_neu(eid):
     out = None
     try:
         import bildmotiv
-        photo = bildmotiv.ensure_photo(data.get("bild_motiv"))
+        photo = bildmotiv.ensure_photo_fuer(data)
         slogan = bildgen.pick_slogan(data.get("slogan"))
         out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
         bildgen.render(data, photo, slogan, out)
@@ -994,7 +1010,7 @@ def bild_neu(eid):
     try:
         import bildmotiv
         data = json.loads(e["text"])
-        photo = bildmotiv.ensure_photo(data.get("bild_motiv"))   # Cache -> kein neuer KI-Aufruf
+        photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
         slogan = bildgen.pick_slogan(data.get("slogan"))
         out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
         bildgen.render(data, photo, slogan, out)
@@ -1005,6 +1021,46 @@ def bild_neu(eid):
         flash("Bild von Beitrag %d neu erzeugt (Text unverändert)." % eid)
     except Exception as ex:
         flash("Bild konnte nicht neu erzeugt werden: %s" % ex)
+    return redirect(ziel)
+
+@app.route("/bild-typ/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def bild_typ(eid):
+    """Stellt den Bildtyp eines Beitrags um: 'person' (Beratungsszene) <-> 'thema' (gegenstaendliches
+    Themenbild) und rendert das Bild entsprechend neu. Beim Wechsel auf 'thema' wird ggf. ein neues
+    Themenbild bei der Bild-KI erzeugt (Kosten); 'person' nutzt i.d.R. das gecachte Motiv."""
+    zurueck = request.form.get("zurueck", "beitrag")
+    ziel = (url_for("entwuerfe") if zurueck == "entwuerfe"
+            else url_for("einplanung") if zurueck == "einplanung"
+            else url_for("beitrag", eid=eid))
+    neuer_typ = "thema" if request.form.get("typ") == "thema" else "person"
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bildtyp von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+    try:
+        import bildmotiv
+        data = json.loads(e["text"])
+        if neuer_typ == "thema" and not (data.get("bild_motiv_thema") or "").strip():
+            flash("Für Beitrag %d gibt es kein Themenbild-Motiv. Bitte den Beitrag einmal neu erzeugen, "
+                  "dann steht das Themenbild zur Verfügung." % eid)
+            return redirect(ziel)
+        data["bild_typ"] = neuer_typ
+        photo = bildmotiv.ensure_photo_fuer(data)
+        slogan = bildgen.pick_slogan(data.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(data, photo, slogan, out)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), out, eid))
+            audit_log(conn, session["user"], "bild_typ_%s" % neuer_typ, eid)
+            conn.commit()
+        flash("Beitrag %d nutzt jetzt das %s." % (eid, "Themenbild" if neuer_typ == "thema" else "Personenbild"))
+    except Exception as ex:
+        flash("Bildtyp konnte nicht umgestellt werden: %s" % ex)
     return redirect(ziel)
 
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
@@ -1073,7 +1129,7 @@ def beitrag(eid):
         try:
             import bildmotiv
             data = row["f"]
-            photo = bildmotiv.ensure_photo(data.get("bild_motiv"))   # Cache -> kein neuer KI-Aufruf
+            photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
             slogan = bildgen.pick_slogan(data.get("slogan"))
             out_dir = os.path.join(DATA_DIR, "preview", "karussell_%d" % eid)
             n_slides = len(bildgen.render_slides(data, photo, slogan, out_dir, "slide"))
@@ -1421,9 +1477,11 @@ def aktion(eid):
                 prev = {}
             try:
                 neu = textgen.regenerate(thema, prev, feedback, e["kanal"])
-                # Slogan und Bild-Motiv aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
+                # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
                 neu.setdefault("slogan", prev.get("slogan", ""))
                 neu.setdefault("bild_motiv", prev.get("bild_motiv", ""))
+                neu.setdefault("bild_motiv_thema", prev.get("bild_motiv_thema", ""))
+                neu.setdefault("bild_typ", prev.get("bild_typ", "person"))
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?", (json.dumps(neu, ensure_ascii=False), eid))
                 conn.commit(); bildgen.render_drafts()
                 audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
@@ -1490,7 +1548,7 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
             if fmt == "karussell":
                 import bildgen, bildmotiv
                 out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d" % eid)
-                photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
+                photo = bildmotiv.ensure_photo_fuer(f)
                 slogan = bildgen.pick_slogan(f.get("slogan"))
                 bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
             else:
