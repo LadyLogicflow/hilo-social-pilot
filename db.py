@@ -202,6 +202,17 @@ def migrate(conn):
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_fb TEXT DEFAULT 'einzelbild'")
     if gcols and "format_ig" not in gcols:
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_ig TEXT DEFAULT 'karussell'")
+    # Insights/Auswertung: Reichweite + Interaktionen je veroeffentlichtem Post, plus die
+    # Facebook-Seiten-ID (fuer den Insights-Abruf ueber das Seiten-Token noetig).
+    pcols = [r[1] for r in conn.execute("PRAGMA table_info(posts)")]
+    if "seite" not in pcols:
+        conn.execute("ALTER TABLE posts ADD COLUMN seite TEXT")
+    if "reichweite" not in pcols:
+        conn.execute("ALTER TABLE posts ADD COLUMN reichweite INTEGER")
+    if "interaktionen" not in pcols:
+        conn.execute("ALTER TABLE posts ADD COLUMN interaktionen INTEGER")
+    if "insights_am" not in pcols:
+        conn.execute("ALTER TABLE posts ADD COLUMN insights_am TEXT")
     # BVL- und HILO-Meldungen gehoeren nicht in Stufe 1 -> bestehende Eintraege heilen
     conn.execute("UPDATE themen SET status='ausgewaehlt' "
                  "WHERE status='vorgeschlagen' AND quelle IN ('bvl_pm','bvl_dpa','hilo')")

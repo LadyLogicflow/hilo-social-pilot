@@ -236,3 +236,53 @@ def _err(resp):
         return "HTTP %s: %s" % (resp.status_code, e.get("message") or resp.text[:200])
     except Exception:
         return "HTTP %s: %s" % (resp.status_code, resp.text[:200])
+
+
+# ---------------------------------------------------------------------------
+# Insights / Auswertung - Reichweite und Interaktionen je veroeffentlichtem Beitrag
+# ---------------------------------------------------------------------------
+def _insight_value(node, metric):
+    """Liest einen Insights-Wert aus einem Graph-Node (insights.data[i].values[0].value)."""
+    for d in (((node.get("insights") or {}).get("data")) or []):
+        if d.get("name") == metric:
+            vals = d.get("values") or []
+            if vals:
+                try:
+                    return int(vals[0].get("value") or 0)
+                except (TypeError, ValueError):
+                    return 0
+    return 0
+
+
+def post_insights(kanal, plattform_post_id, page_id):
+    """Ruft Reichweite + Interaktionen eines veroeffentlichten Beitrags ab.
+    Reichweite ist die Zahl der erreichten Personen (eindeutig). Rueckgabe: (reichweite, interaktionen).
+    Wirft bei fehlender ID oder API-Fehler eine RuntimeError-Ausnahme."""
+    if not plattform_post_id:
+        raise RuntimeError("Keine Plattform-Post-ID hinterlegt.")
+    token = _page_token(page_id) if page_id else _user_token()
+    if kanal == "instagram":
+        # Instagram-Media: Reichweite + Speichern (Insights) sowie Likes/Kommentare (Felder)
+        r = requests.get(GRAPH + "/%s" % plattform_post_id, timeout=30, params={
+            "fields": "like_count,comments_count,insights.metric(reach,saved)",
+            "access_token": token})
+        if r.status_code != 200:
+            raise RuntimeError(_err(r))
+        j = r.json()
+        reichweite = _insight_value(j, "reach")
+        interaktionen = (int(j.get("like_count") or 0) + int(j.get("comments_count") or 0)
+                         + _insight_value(j, "saved"))
+        return reichweite, interaktionen
+    # Facebook-Seitenbeitrag: eindeutige Reichweite (Insight) + Reaktionen/Kommentare/Teilen
+    r = requests.get(GRAPH + "/%s" % plattform_post_id, timeout=30, params={
+        "fields": "insights.metric(post_impressions_unique),reactions.summary(true),"
+                  "comments.summary(true),shares",
+        "access_token": token})
+    if r.status_code != 200:
+        raise RuntimeError(_err(r))
+    j = r.json()
+    reichweite = _insight_value(j, "post_impressions_unique")
+    reaktionen = ((j.get("reactions") or {}).get("summary") or {}).get("total_count") or 0
+    kommentare = ((j.get("comments") or {}).get("summary") or {}).get("total_count") or 0
+    teilen = (j.get("shares") or {}).get("count") or 0
+    return reichweite, int(reaktionen) + int(kommentare) + int(teilen)
