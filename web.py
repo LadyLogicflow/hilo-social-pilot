@@ -96,12 +96,23 @@ def _stream(quelle):
         return "Eigene Beiträge"
     return "Sonstige"
 
-def _zeitfenster(wann):
-    """Grobes Tagesfenster aus 'YYYY-MM-DD HH:MM:SS' (gespeichert in UTC - nur Tendenz)."""
+def _lokal(wann):
+    """Wandelt den gespeicherten UTC-Zeitstempel ('YYYY-MM-DD HH:MM:SS') in deutsche Lokalzeit
+    (Europe/Berlin, mit Sommerzeit) um, damit Uhrzeit-/Wochentag-Auswertung stimmt. None bei Fehler."""
     try:
-        h = int(str(wann)[11:13])
-    except (ValueError, TypeError):
+        from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
+        dt = datetime.strptime(str(wann)[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        return dt.astimezone(ZoneInfo("Europe/Berlin"))
+    except Exception:
         return None
+
+def _zeitfenster(wann):
+    """Grobes Tagesfenster in deutscher Lokalzeit."""
+    dt = _lokal(wann)
+    if dt is None:
+        return None
+    h = dt.hour
     if h < 9:
         return "Früh (bis 9 Uhr)"
     if h < 12:
@@ -113,12 +124,8 @@ def _zeitfenster(wann):
     return "Abend (ab 18 Uhr)"
 
 def _wochentag(wann):
-    try:
-        from datetime import date
-        s = str(wann)
-        return _WOCHENTAGE[date(int(s[0:4]), int(s[5:7]), int(s[8:10])).weekday()]
-    except (ValueError, TypeError, IndexError):
-        return None
+    dt = _lokal(wann)
+    return _WOCHENTAGE[dt.weekday()] if dt is not None else None
 
 def _rang(items, keyfn):
     """Gruppiert Posts nach keyfn und liefert je Gruppe die durchschnittliche Reichweite,
@@ -138,9 +145,11 @@ def _insights_aktualisieren():
     speichert Reichweite + Interaktionen. Rueckgabe: (aktualisiert, fehlgeschlagen)."""
     import publish
     with get_conn() as conn:
+        # seite IS NOT NULL: nur Posts mit hinterlegter Seiten-ID - das Seiten-Token kann die
+        # Insights lesen. Alte Posts ohne Seiten-ID werden uebersprungen (kein Fehl-Call).
         rows = conn.execute("SELECT id, kanal, plattform_post_id, seite FROM posts "
                             "WHERE status='veroeffentlicht' AND plattform_post_id IS NOT NULL "
-                            "AND plattform_post_id!=''").fetchall()
+                            "AND plattform_post_id!='' AND seite IS NOT NULL AND seite!=''").fetchall()
     ok, fehler = 0, 0
     for r in rows:
         try:
@@ -1204,7 +1213,7 @@ def auswertung():
             "ORDER BY p.reichweite DESC").fetchall()
         offen = conn.execute("SELECT COUNT(*) FROM posts WHERE status='veroeffentlicht' "
                              "AND plattform_post_id IS NOT NULL AND plattform_post_id!='' "
-                             "AND reichweite IS NULL").fetchone()[0]
+                             "AND seite IS NOT NULL AND seite!='' AND reichweite IS NULL").fetchone()[0]
     items = []
     for r in rows:
         bildtyp, titel = "Personenbild", ""
