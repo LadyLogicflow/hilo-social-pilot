@@ -72,6 +72,7 @@ def _format(name, default="einzelbild"):
 
 _QUELLE_LABELS = {
     "bvl_pm": "BVL-Pressemitteilungen", "bvl_dpa": "BVL / dpa-Themen", "hilo": "HILO-Meldungen",
+    "bmf": "BMF (Steuern)", "bfh": "Bundesfinanzhof", "bfh_news": "Bundesfinanzhof News", "haufe": "Haufe",
     "pdf": "Eigenes PDF", "link": "Eigener Link", "eigen": "Eigener Beitrag",
     "anlass": "Anlass-Tage", "wissen": "Wissens-Serie", "frist": "Fristen-Countdown",
 }
