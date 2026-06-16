@@ -184,6 +184,8 @@ def publish_instagram_story(ig_user_id, image_url):
     if c.status_code != 200:
         return False, _err(c)
     creation_id = c.json().get("id")
+    if not creation_id:
+        return False, "Instagram lieferte keine Story-Container-ID."
     ok, err = _wait_ig_container(creation_id, token)
     if not ok:
         return False, err

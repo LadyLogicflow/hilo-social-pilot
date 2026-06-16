@@ -1703,8 +1703,11 @@ def _publish_story(publish, fb_page_id, square_image, eid, stelle_id):
     if not ig_id:
         return False, "Keine Instagram-Verknuepfung fuer diese Facebook-Seite."
     out = os.path.join(DATA_DIR, "bilder", "story_%d_%s.png" % (eid, stelle_id or "p"))
-    _status_hochkant(square_image, out)
-    url = uploader.upload(out, remote_name="story_e%d_%s_%d.png" % (eid, stelle_id or "p", int(time.time())))
+    try:
+        _status_hochkant(square_image, out)
+        url = uploader.upload(out, remote_name="story_e%d_%s_%d.png" % (eid, stelle_id or "p", int(time.time())))
+    except Exception as ex:
+        return False, "Story-Bild konnte nicht vorbereitet werden: %s" % ex
     return publish.publish_instagram_story(ig_id, url)
 
 
