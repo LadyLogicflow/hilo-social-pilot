@@ -174,6 +174,26 @@ def publish_instagram(ig_user_id, image_url, caption):
     return False, _err(pub)
 
 
+def publish_instagram_story(ig_user_id, image_url):
+    """Veroeffentlicht ein Bild als Instagram-Story (verschwindet nach 24 Stunden).
+    image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ideal im Hochformat 9:16.
+    Rueckgabe: (ok, info)."""
+    token = _user_token()
+    c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60,
+                      data={"image_url": image_url, "media_type": "STORIES", "access_token": token})
+    if c.status_code != 200:
+        return False, _err(c)
+    creation_id = c.json().get("id")
+    ok, err = _wait_ig_container(creation_id, token)
+    if not ok:
+        return False, err
+    pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
+                        data={"creation_id": creation_id, "access_token": token})
+    if pub.status_code == 200:
+        return True, pub.json().get("id", "")
+    return False, _err(pub)
+
+
 def _wait_ig_container(container_id, token, attempts=12, delay=2):
     """Pollt einen Instagram-Container, bis er fertig verarbeitet ist (status_code=FINISHED).
     Meta laedt das Bild von der image_url asynchron herunter - vor dem Publish muss der
