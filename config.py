@@ -22,7 +22,8 @@ SOURCES = {
     "bfh":      os.environ.get("HILO_SOURCES_BFH", "https://www.bundesfinanzhof.de/de/precedent.rss"),
     "bfh_news": os.environ.get("HILO_SOURCES_BFH_NEWS", "https://www.bundesfinanzhof.de/de/news.rss"),
     "haufe":    os.environ.get("HILO_SOURCES_HAUFE", "https://www.haufe.de/xml/rss_129148.xml"),
-    "bmf":      os.environ.get("HILO_SOURCES_BMF", ""),
+    "bmf":      os.environ.get("HILO_SOURCES_BMF",
+                "https://www.bundesfinanzministerium.de/SiteGlobals/Functions/RSSFeed/DE/Steuern/RSSSteuern.xml"),
 }
 
 # HTML-Quellen ohne RSS (werden gescrapt)
