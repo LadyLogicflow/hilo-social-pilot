@@ -71,24 +71,49 @@ CHANNEL_GUIDE = {
 def _model():
     return os.environ.get("HILO_CLAUDE_MODEL", "claude-sonnet-4-6")
 
-def _build_prompt(thema, kanal):
-    limit = CHANNEL_LIMIT.get(kanal, 1400)
-    guide = CHANNEL_GUIDE.get(kanal, "")
-    guide_block = (guide + "\n\n") if guide else ""
+def _build_prompt(thema, kanal=None):
+    """Ein Auftrag erzeugt den Beitrag fuer Facebook UND Instagram in einem Rutsch: Bild, Ueberschrift
+    und Stichpunkte sind fuer beide Kanaele gleich; NUR der Begleittext (caption) unterscheidet sich je
+    Kanal nach den plattformspezifischen Vorgaben. So bleibt es bei einem einzigen KI-Aufruf."""
     return (
         "Thema: %s\n"
-        "Zusammenfassung/Inhalt: %s\n"
-        "Kanal: %s\n\n"
-        "%s"
-        "Erzeuge daraus einen HILO-Beitrag. Antworte AUSSCHLIESSLICH als JSON-Objekt "
-        "(keine Erklaerung, kein Markdown) mit genau diesen Feldern:\n"
+        "Zusammenfassung/Inhalt: %s\n\n"
+        "Erzeuge daraus einen HILO-Beitrag fuer FACEBOOK UND INSTAGRAM. Bild, Ueberschrift und "
+        "Stichpunkte sind fuer beide Kanaele identisch; NUR der Begleittext (caption) unterscheidet sich "
+        "je Kanal nach diesen Vorgaben:\n\n%s\n\n%s\n\n"
+        "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown) mit genau diesen "
+        "Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
         '"bullets": ["3 sehr kurze Stichpunkte, je max 5 Woerter"], "cta": "kurze Handlungsaufforderung", '
         '"slogan": "max 3 Woerter oder leer", "bild_motiv": "kurzes freigestelltes Fotomotiv", '
-        '"caption": "Fliesstext fuer den Kanal inkl. passender Hashtags am Ende, hoechstens %d Zeichen"}\n'
+        '"captions": {"facebook": "Begleittext fuer Facebook inkl. Hashtags am Ende, hoechstens %d '
+        'Zeichen", "instagram": "Begleittext fuer Instagram inkl. Hashtags am Ende, hoechstens %d '
+        'Zeichen"}}\n'
         "Sprache: Deutsch, Sie-Form."
-        % (thema.get("titel", ""), (thema.get("volltext") or "")[:1500], kanal, guide_block, limit)
+        % (thema.get("titel", ""), (thema.get("volltext") or "")[:1500],
+           CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"],
+           CHANNEL_LIMIT["facebook"], CHANNEL_LIMIT["instagram"])
     )
+
+def _normalize_captions(data):
+    """Stellt sicher, dass data['captions'] beide Kanaele (facebook, instagram) enthaelt und setzt
+    data['caption'] als Rueckwaerts-Fallback (= Facebook). Faengt aeltere Antworten mit nur 'caption' ab."""
+    if not isinstance(data, dict):
+        return data
+    caps = data.get("captions") if isinstance(data.get("captions"), dict) else {}
+    single = (data.get("caption") or "").strip()
+    fb = (caps.get("facebook") or "").strip() or single
+    ig = (caps.get("instagram") or "").strip() or single
+    fb = fb or ig
+    ig = ig or fb
+    data["captions"] = {"facebook": fb, "instagram": ig}
+    data["caption"] = fb
+    return data
+
+def caption_fuer(fields, kanal):
+    """Liefert den kanalspezifischen Begleittext (Fallback: gemeinsame 'caption')."""
+    caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
+    return (caps.get(kanal) or fields.get("caption") or "").strip()
 
 def _parse_json(raw):
     s = (raw or "").strip()
@@ -150,16 +175,16 @@ def extract_topics(volltext, quelle_titel=""):
             out.append({"titel": str(t["titel"])[:300], "inhalt": str(t.get("inhalt", ""))})
     return out
 
-def generate(thema, kanal="google"):
+def generate(thema, kanal=None):
     key = get_secret("anthropic_api_key", required=True)
     import anthropic  # lazy
     client = anthropic.Anthropic(api_key=key)
     msg = client.messages.create(
-        model=_model(), max_tokens=900, system=SYSTEM,
-        messages=[{"role": "user", "content": _build_prompt(thema, kanal)}],
+        model=_model(), max_tokens=1600, system=SYSTEM,
+        messages=[{"role": "user", "content": _build_prompt(thema)}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _parse_json(raw)
+    return _normalize_captions(_parse_json(raw))
 
 def _create_drafts(rows, kanal):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf (Claude). Rueckgabe: Anzahl."""
@@ -247,20 +272,20 @@ def regenerate(thema, previous, feedback, kanal="google"):
     key = get_secret("anthropic_api_key", required=True)
     import anthropic
     client = anthropic.Anthropic(api_key=key)
-    guide = CHANNEL_GUIDE.get(kanal, "")
-    guide_block = (guide + "\n\n") if guide else ""
     prompt = (
         "Bisheriger Beitrag (JSON):\n%s\n\n"
-        "Thema: %s\nInhalt: %s\nKanal: %s\n\n"
-        "%s"
+        "Thema: %s\nInhalt: %s\n\n"
+        "Begleittext-Vorgaben je Kanal:\n%s\n\n%s\n\n"
         "Aenderungswunsch des Nutzers: %s\n\n"
-        "Erzeuge eine UEBERARBEITETE Version, die den Aenderungswunsch umsetzt. "
+        "Erzeuge eine UEBERARBEITETE Version, die den Aenderungswunsch umsetzt. Bild, Ueberschrift und "
+        "Stichpunkte sind fuer beide Kanaele gleich; NUR der Begleittext unterscheidet sich je Kanal. "
         "Antworte AUSSCHLIESSLICH als JSON mit denselben Feldern (ueberschrift, subline, "
-        "bullets [3 sehr kurze Stichpunkte], cta, caption)."
+        "bullets [3 sehr kurze Stichpunkte], cta, captions {facebook, instagram})."
         % (_json.dumps(previous, ensure_ascii=False), thema.get("titel", ""),
-           (thema.get("volltext") or "")[:1500], kanal, guide_block, feedback)
+           (thema.get("volltext") or "")[:1500],
+           CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"], feedback)
     )
-    msg = client.messages.create(model=_model(), max_tokens=900, system=SYSTEM,
+    msg = client.messages.create(model=_model(), max_tokens=1600, system=SYSTEM,
                                  messages=[{"role": "user", "content": prompt}])
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _parse_json(raw)
+    return _normalize_captions(_parse_json(raw))
