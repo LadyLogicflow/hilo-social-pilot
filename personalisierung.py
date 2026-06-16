@@ -90,7 +90,7 @@ def render_fuer_stelle(fields, stelle, out_path):
     Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
-    photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
+    photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     bildgen.render(f, photo, slogan, out_path, portrait=_portrait(stelle))
@@ -102,7 +102,7 @@ def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     Liefert (felder, [pfade]). Kreisportraet der Stelle ersetzt ggf. den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
-    photo = bildmotiv.ensure_photo(f.get("bild_motiv"))
+    photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))
     paths = bildgen.render_slides(f, photo, slogan, out_dir, prefix, portrait=_portrait(stelle))
     return f, paths

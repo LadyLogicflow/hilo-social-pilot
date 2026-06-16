@@ -438,7 +438,7 @@ def render_drafts():
             fields = json.loads(r["text"])
         except Exception:
             continue
-        photo = bildmotiv.ensure_photo(fields.get("bild_motiv"))
+        photo = bildmotiv.ensure_photo_fuer(fields)
         slogan = pick_slogan(fields.get("slogan"))
         out = os.path.join(out_dir, "entwurf_%d.png" % r["id"])
         try:
