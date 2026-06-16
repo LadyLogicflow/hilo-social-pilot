@@ -44,23 +44,50 @@ SYSTEM = (
 
 CHANNEL_LIMIT = {"google": 1400, "linkedin": 1300, "instagram": 1500, "facebook": 1400}
 
+# Plattformspezifische Vorgaben fuer die Caption (Ton, Laenge, Hashtags) - werden in den
+# Auftrags-Prompt eingesetzt, damit jeder Kanal seinen passenden Stil bekommt.
+CHANNEL_GUIDE = {
+    "facebook": (
+        "PLATTFORM FACEBOOK: Schreibe die Caption freundlich, persoenlich und etwas ausfuehrlicher - "
+        "die Zielgruppe ist hier am staerksten vertreten (vor allem Rentner und Familien). Ideale "
+        "Laenge: 80 bis 100 Woerter. Die ersten rund 400 Zeichen sind ohne Klick auf 'mehr lesen' "
+        "sichtbar - das Wichtigste und den Hook daher nach vorne. Beende die Caption dezent mit 2 bis "
+        "5 thematisch passenden Hashtags."
+    ),
+    "instagram": (
+        "PLATTFORM INSTAGRAM: Etwas modernerer, visuell gedachter Ton - das Bild traegt die Hauptlast. "
+        "Nur die ersten 125 Zeichen der Caption sind ohne Klick auf 'mehr' sichtbar, daher MUSS der "
+        "Hook in diese ersten 125 Zeichen passen und sofort neugierig machen. Beende die Caption mit "
+        "5 bis 15 thematisch gebuendelten Hashtags."
+    ),
+    "linkedin": (
+        "PLATTFORM LINKEDIN: Sachlich-informativer Ton, Fachsprache erlaubt, KEIN Werbeton."
+    ),
+    "google": (
+        "PLATTFORM GOOGLE BUSINESS: Kurz, lokal und suchrelevant - Ort und Leistung prominent."
+    ),
+}
+
 def _model():
     return os.environ.get("HILO_CLAUDE_MODEL", "claude-sonnet-4-6")
 
 def _build_prompt(thema, kanal):
     limit = CHANNEL_LIMIT.get(kanal, 1400)
+    guide = CHANNEL_GUIDE.get(kanal, "")
+    guide_block = (guide + "\n\n") if guide else ""
     return (
         "Thema: %s\n"
         "Zusammenfassung/Inhalt: %s\n"
         "Kanal: %s\n\n"
+        "%s"
         "Erzeuge daraus einen HILO-Beitrag. Antworte AUSSCHLIESSLICH als JSON-Objekt "
         "(keine Erklaerung, kein Markdown) mit genau diesen Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
         '"bullets": ["3 sehr kurze Stichpunkte, je max 5 Woerter"], "cta": "kurze Handlungsaufforderung", '
         '"slogan": "max 3 Woerter oder leer", "bild_motiv": "kurzes freigestelltes Fotomotiv", '
-        '"caption": "Fliesstext fuer den Kanal, hoechstens %d Zeichen"}\n'
+        '"caption": "Fliesstext fuer den Kanal inkl. passender Hashtags am Ende, hoechstens %d Zeichen"}\n'
         "Sprache: Deutsch, Sie-Form."
-        % (thema.get("titel", ""), (thema.get("volltext") or "")[:1500], kanal, limit)
+        % (thema.get("titel", ""), (thema.get("volltext") or "")[:1500], kanal, guide_block, limit)
     )
 
 def _parse_json(raw):
@@ -220,15 +247,18 @@ def regenerate(thema, previous, feedback, kanal="google"):
     key = get_secret("anthropic_api_key", required=True)
     import anthropic
     client = anthropic.Anthropic(api_key=key)
+    guide = CHANNEL_GUIDE.get(kanal, "")
+    guide_block = (guide + "\n\n") if guide else ""
     prompt = (
         "Bisheriger Beitrag (JSON):\n%s\n\n"
         "Thema: %s\nInhalt: %s\nKanal: %s\n\n"
+        "%s"
         "Aenderungswunsch des Nutzers: %s\n\n"
         "Erzeuge eine UEBERARBEITETE Version, die den Aenderungswunsch umsetzt. "
         "Antworte AUSSCHLIESSLICH als JSON mit denselben Feldern (ueberschrift, subline, "
         "bullets [3 sehr kurze Stichpunkte], cta, caption)."
         % (_json.dumps(previous, ensure_ascii=False), thema.get("titel", ""),
-           (thema.get("volltext") or "")[:1500], kanal, feedback)
+           (thema.get("volltext") or "")[:1500], kanal, guide_block, feedback)
     )
     msg = client.messages.create(model=_model(), max_tokens=900, system=SYSTEM,
                                  messages=[{"role": "user", "content": prompt}])
