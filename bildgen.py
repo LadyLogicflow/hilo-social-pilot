@@ -2,7 +2,7 @@
 """M4 - Bild im HILO-Design v10 (1080x1080): zwei Verlaufsbaender, weisse Ueberschrift,
 grosses freigestelltes Foto rechts (hinter unterem Verlauf), Text links vertikal zentriert,
 CTA im unteren Band, zwei schwebende Kreise (Logo links, Slogan rechts)."""
-import math, os, json, logging, random
+import math, os, json, logging, random, re
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from config import BASE_DIR, DATA_DIR
 
@@ -101,10 +101,11 @@ def _safe(s):
     for ch in str(s):
         o = ord(ch)
         if (0x1F000 <= o or 0x2600 <= o <= 0x27BF or 0x2B00 <= o <= 0x2BFF
-                or 0x2300 <= o <= 0x23FF or 0xFE00 <= o <= 0xFE0F or o in (0x200D, 0x20E3)):
-            continue   # Emoji / Symbol / Variantenselektor -> weglassen
+                or 0x2300 <= o <= 0x23FF or 0x2190 <= o <= 0x21FF
+                or 0xFE00 <= o <= 0xFE0F or o in (0x200D, 0x20E3)):
+            continue   # Emoji / Symbol / Pfeil / Variantenselektor -> weglassen
         out.append(ch)
-    return "".join(out).replace("  ", " ").strip()
+    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 def _safe_fields(fields):
     """Liefert eine Kopie der Felder, in der die auf das Bild gezeichneten Texte emoji-bereinigt sind."""
