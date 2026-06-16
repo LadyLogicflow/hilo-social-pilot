@@ -26,12 +26,18 @@ def _local_satz(stelle):
 
 def _split_hashtags(text):
     """Trennt einen abschliessenden Hashtag-Block (#... am Ende) vom Haupttext ab.
-    Rueckgabe: (haupttext, hashtag_block) - hashtag_block ist '' wenn keiner vorhanden."""
+    Nur wenn der Block klar abgesetzt ist: durch einen Zeilenumbruch ODER mit mindestens zwei
+    Hashtags. So wird ein einzelnes Hashtag mitten im Satz (z.B. '... unter dem Tag #steuern')
+    NICHT zerrissen. Rueckgabe: (haupttext, hashtag_block) - hashtag_block '' wenn keiner."""
     text = (text or "").strip()
-    m = re.search(r"((?:#\S+\s*)+)$", text)
-    if m and m.start() > 0:
-        return text[:m.start()].rstrip(), m.group(1).strip()
-    return text, ""
+    m = re.search(r"(\s*)((?:#\S+\s*)+)$", text)
+    if not m or m.start(2) == 0:
+        return text, ""
+    block = m.group(2).strip()
+    abgesetzt = "\n" in m.group(1) or len(re.findall(r"#\S+", block)) >= 2
+    if not abgesetzt:
+        return text, ""
+    return text[:m.start()].rstrip(), block
 
 
 def personalisiere_caption(base, stelle):
