@@ -511,7 +511,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
     <div class=pvh>{{it.label}}{% if not it.ok %} <span style="color:#b00020">– Vorschau-Fehler</span>{% endif %}</div>
     <div style="font-size:12px;color:#4c7b2d;font-weight:bold;margin-bottom:6px">Kanal: {{it.kanal_de}}</div>
     {% if it.ok %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
-    {% if it.ok %}<details><summary>Begleittext anzeigen</summary><p class=cap>{{it.caption}}</p></details>{% endif %}
+    {% if it.ok %}{% for kn, cap in it.caps %}<details{% if loop.first %} open{% endif %}><summary>Begleittext {{kn}}</summary><p class=cap style="white-space:pre-wrap">{{cap}}</p></details>{% endfor %}{% endif %}
   </div>
 {% endfor %}
 </div>
@@ -618,7 +618,8 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 {% endif %}
 <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
-<details open><summary>Begleittext</summary><p>{{e.f.caption}}</p></details>
+<details open><summary>Begleittext Facebook</summary><p style="white-space:pre-wrap">{{ e.f.captions.facebook if e.f.captions else e.f.caption }}</p></details>
+<details><summary>Begleittext Instagram</summary><p style="white-space:pre-wrap">{{ e.f.captions.instagram if e.f.captions else e.f.caption }}</p></details>
 <div class=wa>
   <h3 style="margin:.2em 0">&#x1F4F2; Für WhatsApp (Kanal / Status)</h3>
   <p class=hint>WhatsApp lässt sich nicht automatisch befüllen – hier alles zum schnellen <b>manuellen</b> Posten: Text kopieren, Bild herunterladen, fertig.</p>
@@ -1463,23 +1464,28 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
-    base_caption = f.get("caption") or f.get("ueberschrift") or ""
-    cap = {"c": base_caption}
     _cache = {}
 
+    def _caption(k):
+        """Kanalspezifischer Begleittext, fuer eine Beratungsstelle zusaetzlich personalisiert."""
+        if stelle:
+            import personalisierung
+            return personalisierung.caption_fuer_stelle(f, stelle, k)
+        return textgen.caption_fuer(f, k) or f.get("ueberschrift") or ""
+
     def _render(fmt):
-        """Bilderliste fuer dieses Format (gecacht); setzt ggf. die personalisierte Caption."""
+        """Bilderliste fuer dieses Format (gecacht). Das Bild ist kanalunabhaengig -
+        nur der Begleittext (siehe _caption) unterscheidet sich je Kanal."""
         if fmt in _cache:
             return _cache[fmt]
         if stelle:
             import personalisierung
             if fmt == "karussell":
                 out_dir = os.path.join(DATA_DIR, "bilder", "karussell_%d_stelle_%d" % (eid, int(stelle["id"])))
-                pf, bilder = personalisierung.render_slides_fuer_stelle(f, stelle, out_dir, "slide")
+                _pf, bilder = personalisierung.render_slides_fuer_stelle(f, stelle, out_dir, "slide")
             else:
                 out = os.path.join(DATA_DIR, "bilder", "post_%d_stelle_%d.png" % (eid, int(stelle["id"])))
-                pf, pfad = personalisierung.render_fuer_stelle(f, stelle, out); bilder = [pfad]
-            cap["c"] = pf.get("caption") or base_caption
+                _pf, pfad = personalisierung.render_fuer_stelle(f, stelle, out); bilder = [pfad]
         else:
             if fmt == "karussell":
                 import bildgen, bildmotiv
@@ -1500,9 +1506,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
             if not bilder:
                 ok, info = False, "Kein Bild vorhanden"
             elif fmt_fb == "karussell":
-                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, cap["c"])
+                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, _caption("facebook"))
             else:
-                ok, info = publish.publish_facebook(ziel_seite, bilder[0], cap["c"])
+                ok, info = publish.publish_facebook(ziel_seite, bilder[0], _caption("facebook"))
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("facebook", ok, info))
@@ -1512,7 +1518,7 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
             if not bilder:
                 ok, info = False, "Kein Bild vorhanden"
             else:
-                ok, info = _publish_instagram(publish, ziel_seite, bilder, cap["c"], fmt_ig, eid, stelle_id)
+                ok, info = _publish_instagram(publish, ziel_seite, bilder, _caption("instagram"), fmt_ig, eid, stelle_id)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("instagram", ok, info))
@@ -1715,6 +1721,14 @@ def vorschau(eid):
         except Exception:
             pass
         import personalisierung
+        def _caps_fuer(kanal, base_fn):
+            """Liste (Kanal-Label, Begleittext) fuer die je Ziel gewaehlten Kanaele."""
+            out = []
+            if kanal in ("facebook", "beide"):
+                out.append((_KANAL_DE["facebook"], base_fn("facebook")))
+            if kanal in ("instagram", "beide"):
+                out.append((_KANAL_DE["instagram"], base_fn("instagram")))
+            return out
         for sid in stelle_ids:
             kanal = _kanal_fuer("s", sid); kanal_map["s" + sid] = kanal
             stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
@@ -1724,11 +1738,11 @@ def vorschau(eid):
                 continue
             out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, int(stelle["id"])))
             try:
-                pf, _ = personalisierung.render_fuer_stelle(f, stelle, out)
+                personalisierung.render_fuer_stelle(f, stelle, out)
                 v = int(os.path.getmtime(out))
+                caps = _caps_fuer(kanal, lambda k, st=stelle: personalisierung.caption_fuer_stelle(f, st, k))
                 items.append({"label": "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else ""),
-                              "ok": True, "kanal_de": _KANAL_DE[kanal],
-                              "caption": pf.get("caption") or f.get("caption") or "",
+                              "ok": True, "kanal_de": _KANAL_DE[kanal], "caps": caps,
                               "url": url_for("preview_bild", eid=eid, sid=int(stelle["id"])) + "?v=%d" % v})
             except Exception:
                 log.exception("Vorschau-Render fehlgeschlagen (Entwurf %s / Stelle %s)", eid, sid)
@@ -1736,9 +1750,9 @@ def vorschau(eid):
                               "caption": "Vorschau konnte nicht erstellt werden."})
         for pid in page_ids:
             kanal = _kanal_fuer("p", pid); kanal_map["p" + pid] = kanal
+            caps = _caps_fuer(kanal, lambda k: textgen.caption_fuer(f, k) or f.get("ueberschrift") or "")
             items.append({"label": "Facebook-Seite %s" % pid, "ok": True, "kanal_de": _KANAL_DE[kanal],
-                          "caption": f.get("caption") or f.get("ueberschrift") or "",
-                          "url": url_for("bild", eid=eid)})
+                          "caps": caps, "url": url_for("bild", eid=eid)})
     ziel_count = sum(1 for it in items if it.get("ok"))
     return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt_fb=fmt_fb, fmt_ig=fmt_ig, items=items,
                                   ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids,
