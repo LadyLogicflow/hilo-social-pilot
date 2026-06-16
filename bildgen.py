@@ -91,7 +91,33 @@ def _slogan_lines(dr, slogan, font, max_w):
         lines.append(last[-1])
     return lines
 
+def _safe(s):
+    """Entfernt Zeichen, die die Standard-Bildschrift nicht darstellen kann (v.a. Emojis),
+    damit auf dem Bild keine leeren Kaestchen erscheinen. Emojis gehoeren in die Caption
+    (Social-Media-Text), nicht in die auf das Bild gezeichnete Ueberschrift/Bullets/CTA."""
+    if not s:
+        return s
+    out = []
+    for ch in str(s):
+        o = ord(ch)
+        if (0x1F000 <= o or 0x2600 <= o <= 0x27BF or 0x2B00 <= o <= 0x2BFF
+                or 0x2300 <= o <= 0x23FF or 0xFE00 <= o <= 0xFE0F or o in (0x200D, 0x20E3)):
+            continue   # Emoji / Symbol / Variantenselektor -> weglassen
+        out.append(ch)
+    return "".join(out).replace("  ", " ").strip()
+
+def _safe_fields(fields):
+    """Liefert eine Kopie der Felder, in der die auf das Bild gezeichneten Texte emoji-bereinigt sind."""
+    f = dict(fields or {})
+    for k in ("ueberschrift", "subline", "cta"):
+        if k in f:
+            f[k] = _safe(f.get(k))
+    if "bullets" in f:
+        f["bullets"] = [_safe(b) for b in (f.get("bullets") or [])]
+    return f
+
 def render(fields, photo_path, slogan, out_path, portrait=None):
+    fields = _safe_fields(fields); slogan = _safe(slogan)
     cut = None
     if photo_path and os.path.exists(photo_path):
         try:
@@ -382,6 +408,7 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, por
     """Rendert ein Karussell: Title-Slide + je Bullet eine Slide + CTA-Slide.
     Liefert die Liste der Slide-Pfade in Reihenfolge. max_slides begrenzt die Gesamtzahl."""
     os.makedirs(out_dir, exist_ok=True)
+    fields = _safe_fields(fields); slogan = _safe(slogan)
     bullets = [b for b in (fields.get("bullets") or []) if b]
     bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
     total = 1 + len(bullets) + 1
