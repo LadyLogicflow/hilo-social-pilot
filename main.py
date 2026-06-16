@@ -129,9 +129,9 @@ def main():
                 log.error("Kein Bild fuer Entwurf %s vorhanden.", args.publish); return
             ok, info = publish.publish_facebook(args.page, e["bild_pfad"], caption)
             if ok:
-                conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, "
-                             "veroeffentlicht_am, status) VALUES (?,?,?,datetime('now'),'veroeffentlicht')",
-                             (args.publish, "facebook", info))
+                conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, seite, "
+                             "veroeffentlicht_am, status) VALUES (?,?,?,?,datetime('now'),'veroeffentlicht')",
+                             (args.publish, "facebook", info, args.page))
                 conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (args.publish,))
                 audit_log(conn, "cli", "veroeffentlicht_facebook", args.publish, str(info))
                 conn.commit()

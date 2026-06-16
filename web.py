@@ -81,6 +81,89 @@ def _quelle_label(q):
     """Freundlicher Anzeigename fuer einen Quelle-Code (Fallback: Code lesbar gemacht)."""
     return _QUELLE_LABELS.get(q, (q or "Sonstige").replace("_", " ").title())
 
+# --- Auswertung "Was funktioniert" (Insights) -------------------------------
+_STREAM_NEWS = {"bvl_pm", "bvl_dpa", "hilo", "bmf", "bfh", "bfh_news", "haufe"}
+_WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+def _stream(quelle):
+    """Ordnet eine Themen-Quelle einem der Content-Streams zu."""
+    m = {"frist": "Fristen-Countdown", "anlass": "Anlass-Tage", "wissen": "Wissens-Serie"}
+    if quelle in m:
+        return m[quelle]
+    if quelle in _STREAM_NEWS:
+        return "Radar (News)"
+    if quelle in ("pdf", "link", "eigen"):
+        return "Eigene Beiträge"
+    return "Sonstige"
+
+def _lokal(wann):
+    """Wandelt den gespeicherten UTC-Zeitstempel ('YYYY-MM-DD HH:MM:SS') in deutsche Lokalzeit
+    (Europe/Berlin, mit Sommerzeit) um, damit Uhrzeit-/Wochentag-Auswertung stimmt. None bei Fehler."""
+    try:
+        from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
+        dt = datetime.strptime(str(wann)[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        return dt.astimezone(ZoneInfo("Europe/Berlin"))
+    except Exception:
+        return None
+
+def _zeitfenster(wann):
+    """Grobes Tagesfenster in deutscher Lokalzeit."""
+    dt = _lokal(wann)
+    if dt is None:
+        return None
+    h = dt.hour
+    if h < 9:
+        return "Früh (bis 9 Uhr)"
+    if h < 12:
+        return "Vormittag (9-12 Uhr)"
+    if h < 15:
+        return "Mittag (12-15 Uhr)"
+    if h < 18:
+        return "Nachmittag (15-18 Uhr)"
+    return "Abend (ab 18 Uhr)"
+
+def _wochentag(wann):
+    dt = _lokal(wann)
+    return _WOCHENTAGE[dt.weekday()] if dt is not None else None
+
+def _rang(items, keyfn):
+    """Gruppiert Posts nach keyfn und liefert je Gruppe die durchschnittliche Reichweite,
+    absteigend sortiert. Leere/None-Schluessel werden uebersprungen."""
+    from collections import defaultdict
+    g = defaultdict(list)
+    for it in items:
+        k = keyfn(it)
+        if k:
+            g[k].append(it["reichweite"])
+    rows = [{"label": k, "schnitt": round(sum(v) / len(v)), "anzahl": len(v)}
+            for k, v in g.items() if v]
+    return sorted(rows, key=lambda x: (-x["schnitt"], x["label"]))
+
+def _insights_aktualisieren():
+    """Ruft fuer alle veroeffentlichten Posts mit Plattform-ID die aktuellen Insights ab und
+    speichert Reichweite + Interaktionen. Rueckgabe: (aktualisiert, fehlgeschlagen)."""
+    import publish
+    with get_conn() as conn:
+        # seite IS NOT NULL: nur Posts mit hinterlegter Seiten-ID - das Seiten-Token kann die
+        # Insights lesen. Alte Posts ohne Seiten-ID werden uebersprungen (kein Fehl-Call).
+        rows = conn.execute("SELECT id, kanal, plattform_post_id, seite FROM posts "
+                            "WHERE status='veroeffentlicht' AND plattform_post_id IS NOT NULL "
+                            "AND plattform_post_id!='' AND seite IS NOT NULL AND seite!=''").fetchall()
+    ok, fehler = 0, 0
+    for r in rows:
+        try:
+            reichweite, interakt = publish.post_insights(r["kanal"], r["plattform_post_id"], r["seite"])
+            with get_conn() as conn:
+                conn.execute("UPDATE posts SET reichweite=?, interaktionen=?, "
+                             "insights_am=datetime('now') WHERE id=?", (reichweite, interakt, r["id"]))
+                conn.commit()
+            ok += 1
+        except Exception as ex:
+            log.warning("Insights-Abruf fehlgeschlagen (Post %s): %s", r["id"], ex)
+            fehler += 1
+    return ok, fehler
+
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
     """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
     nicht mit bereits vergebenen kollidiert - damit die Beitraege individuell gepostet wirken.
@@ -316,7 +399,8 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
   <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>"""
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>"""
 
 ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
 .bar{max-width:920px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
@@ -1064,6 +1148,93 @@ def bild_typ(eid):
         flash("Bildtyp konnte nicht umgestellt werden: %s" % ex)
     return redirect(ziel)
 
+AUSWERTUNG = """<!doctype html><meta charset=utf-8><title>Was funktioniert</title><style>""" + _STYLE + """
+.awbox{max-width:780px;margin:0 auto 14px}
+table.aw{width:100%;border-collapse:collapse}
+table.aw td{padding:4px 0;vertical-align:middle}
+.bar{background:#e7edf6;border-radius:6px;overflow:hidden}
+.bar>div{background:#1f428d;height:18px;border-radius:6px}
+</style>
+<div style="max-width:780px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#1f428d">&#x1F4CA; Was funktioniert</h2><a href="/" style="color:#1f428d;text-decoration:none;font-weight:bold">&larr; Startseite</a></div></div>
+{% with m=get_flashed_messages() %}{% if m %}<div style="max-width:780px;margin:0 auto"><div class=flash>{{m[0]}}</div></div>{% endif %}{% endwith %}
+<div class=awbox>
+<p class=hint>Ausgewertet nach <b>Reichweite</b> – wie viele Personen den Beitrag gesehen haben. {% if stand %}Letzter Abruf: {{stand}} (UTC).{% endif %}</p>
+<form method=post action="/insights-abrufen"><button>Zahlen jetzt aktualisieren</button>{% if offen %} <span class=hint>&nbsp;{{offen}} Beitrag(e) noch ohne Zahlen</span>{% endif %}</form>
+</div>
+{% if not gesamt %}
+<div class="box awbox"><p>Noch keine ausgewerteten Beiträge. Sobald Beiträge veröffentlicht sind, hier auf <b>„Zahlen jetzt aktualisieren"</b> klicken – dann holt das Tool die Reichweite von Facebook und Instagram.</p>
+<p class=hint>Aussagekräftig wird die Auswertung erst nach einigen Wochen mit genügend Beiträgen – am Anfang sind es nur Tendenzen.</p></div>
+{% else %}
+<div class=awbox><p class=hint>{{gesamt}} ausgewertete Veröffentlichung(en). Längerer Balken = höhere durchschnittliche Reichweite.</p></div>
+{% macro rang(titel, rows) %}
+<div class="box awbox"><h3 style="margin:.1em 0 .4em">{{titel}}</h3>
+{% if not rows %}<p class=hint>Noch keine Daten.</p>{% else %}{% set maxv = rows[0].schnitt or 1 %}
+<table class=aw>{% for r in rows %}<tr>
+<td style="white-space:nowrap;padding-right:10px">{{r.label}}</td>
+<td style="width:100%"><div class=bar><div style="width:{{ (r.schnitt*100//maxv) if maxv else 0 }}%"></div></div></td>
+<td style="white-space:nowrap;padding-left:10px"><b>{{r.schnitt}}</b> <span class=hint>(Schnitt aus {{r.anzahl}})</span></td>
+</tr>{% endfor %}</table>{% endif %}</div>
+{% endmacro %}
+{{ rang("Nach Content-Stream", nach_stream) }}
+{{ rang("Nach Uhrzeit", nach_zeit) }}
+{{ rang("Nach Bildtyp", nach_bildtyp) }}
+{{ rang("Nach Kanal", nach_kanal) }}
+{{ rang("Nach Wochentag", nach_wochentag) }}
+<div class="box awbox"><h3 style="margin:.1em 0 .4em">Top-Beiträge nach Reichweite</h3>
+<table class=aw><tr><th style="text-align:left">Titel</th><th>Kanal</th><th>Reichweite</th><th>Interaktionen</th></tr>
+{% for t in top %}<tr><td>{{t.titel or '(ohne Titel)'}}</td><td style="text-align:center">{{t.kanal}}</td><td style="text-align:center"><b>{{t.reichweite}}</b></td><td style="text-align:center">{{t.interaktionen}}</td></tr>{% endfor %}</table></div>
+{% endif %}"""
+
+@app.route("/insights-abrufen", methods=["POST"])
+@rolle_required("freigeber")
+def insights_abrufen():
+    """Holt die aktuellen Reichweiten-/Interaktionszahlen aller veroeffentlichten Beitraege."""
+    try:
+        ok, fehler = _insights_aktualisieren()
+        if ok or fehler:
+            flash("Zahlen aktualisiert: %d Beitrag/Beitraege abgerufen%s."
+                  % (ok, (", %d fehlgeschlagen" % fehler) if fehler else ""))
+        else:
+            flash("Keine veröffentlichten Beiträge mit Plattform-ID zum Abrufen gefunden.")
+    except Exception as ex:
+        flash("Abruf fehlgeschlagen: %s" % ex)
+    return redirect(url_for("auswertung"))
+
+@app.route("/auswertung")
+@login_required
+def auswertung():
+    """Dashboard 'Was funktioniert' - Reichweiten-Auswertung der veroeffentlichten Beitraege."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT p.reichweite AS reichweite, p.interaktionen AS interaktionen, p.kanal AS kanal, "
+            "p.veroeffentlicht_am AS wann, p.insights_am AS insights_am, e.text AS etext, t.quelle AS quelle "
+            "FROM posts p LEFT JOIN entwuerfe e ON e.id=p.entwurf_id LEFT JOIN themen t ON t.id=e.thema_id "
+            "WHERE p.status='veroeffentlicht' AND p.reichweite IS NOT NULL "
+            "ORDER BY p.reichweite DESC").fetchall()
+        offen = conn.execute("SELECT COUNT(*) FROM posts WHERE status='veroeffentlicht' "
+                             "AND plattform_post_id IS NOT NULL AND plattform_post_id!='' "
+                             "AND seite IS NOT NULL AND seite!='' AND reichweite IS NULL").fetchone()[0]
+    items = []
+    for r in rows:
+        bildtyp, titel = "Personenbild", ""
+        try:
+            f = json.loads(r["etext"]) if r["etext"] else {}
+            bildtyp = "Themenbild" if f.get("bild_typ") == "thema" else "Personenbild"
+            titel = f.get("ueberschrift") or ""
+        except Exception:
+            pass
+        items.append({"reichweite": r["reichweite"] or 0, "interaktionen": r["interaktionen"] or 0,
+                      "kanal": _KANAL_DE.get(r["kanal"], r["kanal"]), "wann": r["wann"],
+                      "stream": _stream(r["quelle"]), "bildtyp": bildtyp, "titel": titel})
+    stand = max([r["insights_am"] for r in rows if r["insights_am"]], default=None)
+    return render_template_string(AUSWERTUNG, **_ctx(
+        gesamt=len(items), offen=offen, stand=stand, top=items[:8],
+        nach_stream=_rang(items, lambda it: it["stream"]),
+        nach_kanal=_rang(items, lambda it: it["kanal"]),
+        nach_bildtyp=_rang(items, lambda it: it["bildtyp"]),
+        nach_zeit=_rang(items, lambda it: _zeitfenster(it["wann"])),
+        nach_wochentag=_rang(items, lambda it: _wochentag(it["wann"]))))
+
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
           "September", "Oktober", "November", "Dezember"]
 
@@ -1585,9 +1756,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     for k, ok, info in ergebnisse:
         if ok:
             erfolg = True
-            conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, "
-                         "veroeffentlicht_am, status) VALUES (?,?,?,datetime('now'),'veroeffentlicht')",
-                         (eid, k, info))
+            conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, seite, "
+                         "veroeffentlicht_am, status) VALUES (?,?,?,?,datetime('now'),'veroeffentlicht')",
+                         (eid, k, info, ziel_seite))
             audit_log(conn, user, "veroeffentlicht_%s" % k, eid, "Ziel %s / Post %s" % (ziel_seite, info))
         else:
             conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
