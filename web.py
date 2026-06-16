@@ -1688,13 +1688,15 @@ def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id
         return publish.publish_instagram_carousel(ig_id, urls, caption)
     return publish.publish_instagram(ig_id, urls[0], caption)
 
-def _publish_story(publish, fb_page_id, square_image, eid, stelle_id):
-    """Rendert aus dem Beitragsbild eine 9:16-Story, laedt sie oeffentlich hoch (IONOS) und
-    postet sie zusaetzlich als Instagram-Story. (ok, info)."""
+def _publish_story(publish, fb_page_id, bilder, eid, stelle_id):
+    """Postet die uebergebenen Bilder NACHEINANDER als Instagram-Story-Frames (9:16) - so erscheint
+    ein Karussell als mehrteilige Story. Jeder Slide wird auf 9:16 gebracht, oeffentlich hochgeladen
+    (IONOS) und als eigene Story veroeffentlicht. (ok, info) - ok, wenn mind. ein Frame gepostet wurde."""
     import uploader, time
     if not uploader.configured():
         return False, "Bild-Upload nicht konfiguriert (IONOS-Secrets fehlen)."
-    if not (square_image and os.path.exists(square_image)):
+    valid = [b for b in (bilder or []) if b and os.path.exists(b)]
+    if not valid:
         return False, "Kein Bild fuer die Story vorhanden."
     ig_id = None
     for pg in publish.list_pages():
@@ -1702,13 +1704,24 @@ def _publish_story(publish, fb_page_id, square_image, eid, stelle_id):
             ig_id = pg.get("ig_id"); break
     if not ig_id:
         return False, "Keine Instagram-Verknuepfung fuer diese Facebook-Seite."
-    out = os.path.join(DATA_DIR, "bilder", "story_%d_%s.png" % (eid, stelle_id or "p"))
-    try:
-        _status_hochkant(square_image, out)
-        url = uploader.upload(out, remote_name="story_e%d_%s_%d.png" % (eid, stelle_id or "p", int(time.time())))
-    except Exception as ex:
-        return False, "Story-Bild konnte nicht vorbereitet werden: %s" % ex
-    return publish.publish_instagram_story(ig_id, url)
+    stamp = int(time.time())
+    gemacht, fehler = 0, []
+    for i, square in enumerate(valid):
+        out = os.path.join(DATA_DIR, "bilder", "story_%d_%s_%d.png" % (eid, stelle_id or "p", i))
+        try:
+            _status_hochkant(square, out)
+            url = uploader.upload(out, remote_name="story_e%d_%s_%d_%d.png" % (eid, stelle_id or "p", stamp, i))
+        except Exception as ex:
+            fehler.append("Frame %d: %s" % (i + 1, ex)); continue
+        s_ok, s_info = publish.publish_instagram_story(ig_id, url)
+        if s_ok:
+            gemacht += 1
+        else:
+            fehler.append("Frame %d: %s" % (i + 1, s_info))
+    if gemacht:
+        msg = "%d/%d Story-Bilder gepostet" % (gemacht, len(valid))
+        return True, (msg + " (" + "; ".join(fehler) + ")") if fehler else msg
+    return False, "; ".join(fehler) or "Story fehlgeschlagen"
 
 
 def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_id, user, publish, story=True):
@@ -1779,9 +1792,12 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         ergebnisse.append(("instagram", ok, info))
         # Zusaetzlich als Instagram-Story (9:16), wenn gewuenscht und der Feed-Post geklappt hat.
         # Story-Ergebnis wird nur protokolliert, nicht als eigener Post verbucht (Stories sind fluechtig).
-        if story and ok and bilder:
+        if story and ok:
             try:
-                s_ok, s_info = _publish_story(publish, ziel_seite, bilder[0], eid, stelle_id)
+                # Story = komplettes Karussell (alle Slides als Frames), unabhaengig vom Feed-Format.
+                # _render('karussell') ist kanalunabhaengig gecacht -> kein doppeltes Rendern.
+                slides = _render("karussell")
+                s_ok, s_info = _publish_story(publish, ziel_seite, slides, eid, stelle_id)
             except Exception as ex:
                 s_ok, s_info = False, str(ex)
             audit_log(conn, user, "instagram_story_%s" % ("ok" if s_ok else "fehler"), eid,
