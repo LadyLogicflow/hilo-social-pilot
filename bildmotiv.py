@@ -1,14 +1,23 @@
 # -*- coding: utf-8 -*-
 """Erzeugt situative, freigestellte Fotomotive via OpenAI gpt-image-1 (transparenter Hintergrund).
 Caching pro Motiv. Ohne openai_api_key wird None geliefert (Bild dann ohne Foto)."""
-import base64, hashlib, logging, os
+import base64, hashlib, logging, os, re
 from secrets_store import get_secret
 from config import DATA_DIR
 
 log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
-def _prompt(motiv):
+def _prompt(motiv, geschlecht="frau"):
+    # Geschlecht der HILO-Beratungsperson deterministisch vorgeben (Abwechslung Beraterin/Berater).
+    # Einen evtl. im Motivtext genannten 'Beraterin/Berater' neutralisieren, damit kein Widerspruch
+    # zur vorgegebenen Person entsteht.
+    motiv = re.sub(r"\bBeraterin(?:nen)?\b", "Beratungsperson", motiv, flags=re.IGNORECASE)
+    motiv = re.sub(r"\bBerater(?:s|n)?\b", "Beratungsperson", motiv, flags=re.IGNORECASE)
+    if geschlecht == "mann":
+        person, kleidung = "ein Mann", "ein weisses Hemd"
+    else:
+        person, kleidung = "eine Frau", "eine weisse Bluse"
     return ("Sauber freigestelltes Foto als PNG mit ECHTEM transparentem Hintergrund (Alphakanal). "
             "ABSOLUT KEIN Hintergrund, KEIN Raum, KEIN Tisch, KEIN Schreibtisch, KEIN Boden, KEINE Wand, "
             "KEINE Moebel - nur die Personen frei vor Transparenz, wie ein sauberer Scherenschnitt. "
@@ -17,15 +26,15 @@ def _prompt(motiv):
             "nachdenklicher Ausdruck, kein Einzelportrait). Requisiten NUR in der Hand gehalten (kein "
             "Tisch): eine Mappe oder Unterlagen und eine Kaffeetasse, die deutlich den blauen Schriftzug 'HILO' "
             "traegt - sauber mitfreigestellt. Aus der Gruppe ist IMMER eine Person deutlich als "
-            "HILO-Beraterin oder HILO-Berater erkennbar: Diese Person traegt IMMER eine weisse Bluse oder "
-            "ein weisses Hemd mit gut sichtbarem BLAUEM HILO-Schriftzug am Kragen oder auf der Brusttasche. "
+            "HILO-Beratungsperson erkennbar: Diese Person ist %s und traegt IMMER %s mit gut sichtbarem "
+            "BLAUEM HILO-Schriftzug am Kragen oder auf der Brusttasche. "
             "Die Personen werden FORMATFUELLEND dargestellt und FUELLEN das Hochformat vertikal VOLLSTAENDIG aus: "
             "Koepfe reichen bis knapp unter den oberen Rand, Huefte/Oberschenkel bis zum unteren Rand. "
             "KEIN Leerraum ueber den Koepfen oder unter der Huefte. Enger Bildausschnitt wie ein "
             "Zeitschriften-Cover-Crop. WICHTIG: Koepfe NICHT anschneiden und links und rechts etwas Rand "
             "lassen, sodass niemand am linken oder rechten Rand abgeschnitten wird. "
             "Ausser dem 'HILO' auf der Tasse und dem HILO-Logo an der Kleidung KEINE weiteren "
-            "Texte, Logos oder Markennamen." % motiv)
+            "Texte, Logos oder Markennamen." % (motiv, person, kleidung))
 
 def ensure_photo(motiv):
     motiv = (motiv or "").strip()
@@ -42,6 +51,9 @@ def ensure_photo(motiv):
     path = os.path.join(MOTIV_DIR, h + ".png")
     if os.path.exists(path):
         return path
+    # Geschlecht der HILO-Beratungsperson deterministisch aus dem Motiv-Hash (Abwechslung Frau/Mann);
+    # gleiches Motiv -> gleiches Bild (cache-stabil), ueber viele Motive ~halbe/halbe.
+    geschlecht = "mann" if int(h, 16) % 2 == 0 else "frau"
     key = get_secret("openai_api_key")
     if not key:
         log.info("Bildmotiv uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
@@ -56,7 +68,7 @@ def ensure_photo(motiv):
         r = requests.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
-            json={"model": "gpt-image-1", "prompt": _prompt(motiv), "size": "1024x1536",
+            json={"model": "gpt-image-1", "prompt": _prompt(motiv, geschlecht), "size": "1024x1536",
                   "quality": quality, "background": "transparent", "output_format": "png", "n": 1},
             timeout=120)
         r.raise_for_status()
