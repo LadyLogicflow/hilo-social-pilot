@@ -32,9 +32,8 @@ def _cta_button(base, cx, cy, text, font):
     sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
     ImageDraw.Draw(sh).rounded_rectangle([x0+3, y0+9, x1+3, y1+12], radius=rad, fill=(0, 0, 0, 120))
     blur = sh.filter(ImageFilter.GaussianBlur(10)); base.paste(blur, (0, 0), blur)
-    # weisse Flaeche mit dezentem Rand + leichte Bodenschattierung fuer Tiefe
+    # weisse Flaeche mit dezentem Rand (der weiche Schatten darunter erzeugt die Tiefe)
     dr.rounded_rectangle([x0, y0, x1, y1], radius=rad, fill=WHITE, outline=(214, 224, 216), width=2)
-    dr.rounded_rectangle([x0+4, y1-pady*0.7, x1-4, y1-3], radius=rad*0.5, fill=(238, 244, 239))
     dr.text((cx, cy), text, font=font, fill=GREEN, anchor="mm")
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
