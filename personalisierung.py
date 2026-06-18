@@ -68,6 +68,7 @@ def fuer_stelle(fields, stelle, kanal=None):
     base = caption_fuer(fields, kanal)
     if ort:
         f["cta"] = "Jetzt Termin bei Ihrer HILO-Beratungsstelle %s vereinbaren" % ort
+        f["ort"] = ort   # fuer den sichtbaren Ortsbezug im Bild
     f["caption"] = personalisiere_caption(base, stelle)
     return f
 
