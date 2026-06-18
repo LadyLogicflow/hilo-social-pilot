@@ -95,14 +95,22 @@ def _page_token(page_id):
 # ---------------------------------------------------------------------------
 # Facebook: Foto-Beitrag
 # ---------------------------------------------------------------------------
-def publish_facebook(page_id, image_path, caption):
+def publish_facebook(page_id, image_path, caption, place=None):
     """Veroeffentlicht ein Foto mit Begleittext auf einer Facebook-Seite.
+    place = optionale Facebook-Orts-ID fuer die Standort-Markierung. Schlaegt der Post MIT Ort fehl
+    (z.B. ungueltige Orts-ID), wird OHNE Ort erneut versucht, damit der Beitrag trotzdem erscheint.
     Rueckgabe: (ok, info) - info ist die Post-/Foto-ID oder die Fehlermeldung."""
     token = _page_token(page_id)
-    with open(image_path, "rb") as fh:
-        r = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
-                          data={"message": caption or "", "access_token": token},
-                          files={"source": fh})
+    def _post(with_place):
+        data = {"message": caption or "", "access_token": token}
+        if with_place and place:
+            data["place"] = place
+        with open(image_path, "rb") as fh:
+            return requests.post(GRAPH + "/%s/photos" % page_id, timeout=120, data=data, files={"source": fh})
+    r = _post(True)
+    if r.status_code != 200 and place:
+        log.warning("Facebook-Foto-Post mit Ort fehlgeschlagen, erneut ohne Ort: %s", _err(r))
+        r = _post(False)
     if r.status_code == 200:
         j = r.json()
         return True, (j.get("post_id") or j.get("id") or "")
@@ -123,7 +131,7 @@ def _delete_fb_photos(media_ids, token):
             pass
 
 
-def publish_facebook_carousel(page_id, image_paths, caption):
+def publish_facebook_carousel(page_id, image_paths, caption, place=None):
     """Veroeffentlicht mehrere Bilder als Karussell-Beitrag auf einer Facebook-Seite.
     Jedes Foto wird zunaechst unveroeffentlicht (published=false) hochgeladen, danach
     werden alle Foto-IDs in einem Feed-Beitrag zusammengefuehrt (attached_media).
@@ -145,10 +153,18 @@ def publish_facebook_carousel(page_id, image_paths, caption):
             _delete_fb_photos(media_ids, token)
             return False, "Foto-Upload ohne ID-Rueckgabe."
         media_ids.append(mid)
-    data = {"message": caption or "", "access_token": token}
+    base = {"message": caption or "", "access_token": token}
     for i, mid in enumerate(media_ids):
-        data["attached_media[%d]" % i] = json.dumps({"media_fbid": mid})
-    r = requests.post(GRAPH + "/%s/feed" % page_id, timeout=120, data=data)
+        base["attached_media[%d]" % i] = json.dumps({"media_fbid": mid})
+    def _feed(with_place):
+        data = dict(base)
+        if with_place and place:
+            data["place"] = place
+        return requests.post(GRAPH + "/%s/feed" % page_id, timeout=120, data=data)
+    r = _feed(True)
+    if r.status_code != 200 and place:
+        log.warning("Facebook-Karussell mit Ort fehlgeschlagen, erneut ohne Ort: %s", _err(r))
+        r = _feed(False)
     if r.status_code == 200:
         return True, (r.json().get("id") or "")
     _delete_fb_photos(media_ids, token)   # Feed-Beitrag fehlgeschlagen -> Fotos nicht verwaisen lassen

@@ -861,9 +861,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
           {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
         </select></form>{% else %}<div class=hint>{{fb_name.get(b.fb_seite|string, b.fb_seite) or '—'}}</div>{% endif %}
     </div>
-    <div class=stfield><label>Instagram-Ort (Orts-ID für Geotag)</label>
+    <div class=stfield><label>Orts-ID (Facebook &amp; Instagram-Geotag)</label>
       <form method=post class=oidrow><input type=hidden name=formular value=stelle_ort_id><input type=hidden name=stelle_id value="{{b.id}}">
-        <input class=oid name=ort_id value="{{b.ort_id or ''}}" placeholder="z.B. 224891167" inputmode=numeric title="Instagram-/Facebook-Orts-ID (nur Ziffern)">
+        <input class=oid name=ort_id value="{{b.ort_id or ''}}" placeholder="Facebook-Orts-ID" inputmode=numeric title="Facebook-Orts-ID (nur Ziffern) - markiert Facebook- und Instagram-Beiträge mit dem Ort">
         <button style="padding:7px 13px">OK</button></form>
     </div>
     <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
@@ -1768,6 +1768,8 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
+    # Orts-ID (Geotag) der Beratungsstelle - gilt fuer Facebook (place) UND Instagram (location_id).
+    loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
     _cache = {}
 
     def _caption(k):
@@ -1810,9 +1812,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
             if not bilder:
                 ok, info = False, "Kein Bild vorhanden"
             elif fmt_fb == "karussell":
-                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, _caption("facebook"))
+                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, _caption("facebook"), place=loc_id)
             else:
-                ok, info = publish.publish_facebook(ziel_seite, bilder[0], _caption("facebook"))
+                ok, info = publish.publish_facebook(ziel_seite, bilder[0], _caption("facebook"), place=loc_id)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("facebook", ok, info))
@@ -1833,7 +1835,6 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                           "Ziel %s / %s" % (ziel_seite, k_info))
     if kanal in ("instagram", "beide"):
         bilder = []
-        loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
         try:
             bilder = _render(fmt_ig)
             if not bilder:
