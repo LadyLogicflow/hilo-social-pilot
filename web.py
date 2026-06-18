@@ -824,8 +824,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .wide{max-width:1480px}
 .scrollx{overflow-x:auto}
 .vtab td,.vtab th{padding:11px 13px}
-.nw{white-space:nowrap}</style>
-<div class="box{% if bereich=='stellen' %} wide{% endif %}"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
+.nw{white-space:nowrap}
+.stcards{max-width:840px;margin:0 auto}
+.stcard{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:14px 16px;margin:0 0 12px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.sthead{font-size:16px;color:#1f428d;margin-bottom:10px}
+.stgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.stfield>label{display:block;font-size:12px;font-weight:bold;color:#5a6472;margin-bottom:4px}
+.stfield select,.stfield .oid{width:100%;box-sizing:border-box;padding:7px;border:1px solid #ccd3df;border-radius:6px}
+.stfield form{margin:0}.oidrow{display:flex;gap:6px;align-items:center}.oidrow .oid{flex:1}</style>
+<div class=box><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">{{bereich_titel}}</h2><div><a href="/verwaltung">&larr; Verwaltung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 
 {% if bereich=='benutzer' %}
@@ -841,33 +848,43 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 {% if bereich=='stellen' %}
 {% if pages_err %}<p class=hint style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}} – du kannst die Seiten-ID solange manuell eintragen.</p>{% endif %}
-<div class=scrollx><table class=vtab><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th><th>Instagram-Ort</th></tr>
-{% for b in stellen %}<tr><td class=nw>{{b.name}}</td><td class=nw>{{b.ort}}</td><td class=nw>{{b.leitung}}</td>
-<td>{% if pages %}<form method=post style="margin:0">
-  <input type=hidden name=formular value=stelle_fb><input type=hidden name=stelle_id value="{{b.id}}">
-  <select name=fb_seite onchange="this.form.submit()">
-    <option value="">— keine —</option>
-    {% if b.fb_seite and (b.fb_seite|string) not in page_id_set %}<option value="{{b.fb_seite}}" selected>{{b.fb_seite}} (alt)</option>{% endif %}
-    {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
-  </select></form>{% else %}{{fb_name.get(b.fb_seite|string, b.fb_seite) or '-'}}{% endif %}</td>
-<td><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  {% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:44px;height:44px;border-radius:50%;object-fit:cover">{% endif %}
-  <form method=post enctype="multipart/form-data" style="margin:0;display:flex;align-items:center;gap:7px">
-    <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
-    <label class=filebtn>{% if b.portrait_pfad %}Anderes Bild …{% else %}Bild wählen …{% endif %}
-      <input type=file name=portrait accept="image/*" style="display:none"
-             onchange="var f=this.files[0];this.form.querySelector('.fn').textContent=f?f.name:'';this.form.querySelector('.up').disabled=!f"></label>
-    <span class=fn style="font-size:12px;color:#5a6472;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-    <button class=up style="padding:6px 12px" disabled>Hochladen</button>
-  </form>
-  {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
-</div></td>
-<td>{{b.buchungs_url}}</td>
-<td><form method=post style="margin:0;display:flex;gap:5px;align-items:center">
-  <input type=hidden name=formular value=stelle_ort_id><input type=hidden name=stelle_id value="{{b.id}}">
-  <input name=ort_id value="{{b.ort_id or ''}}" placeholder="Orts-ID" inputmode=numeric title="Facebook-Orts-ID (nur Ziffern) für den Instagram-Geotag" style="width:120px;padding:5px;border:1px solid #ccd3df;border-radius:6px">
-  <button style="padding:5px 10px">OK</button>
-</form></td></tr>{% endfor %}</table></div>
+<div class=stcards>
+{% for b in stellen %}
+<div class=stcard>
+  <div class=sthead><b>{{b.name}}</b>{% if b.ort %} &middot; {{b.ort}}{% endif %}{% if b.leitung %} <span class=hint style="font-weight:normal">Leitung: {{b.leitung}}</span>{% endif %}</div>
+  <div class=stgrid>
+    <div class=stfield><label>Facebook-Seite</label>
+      {% if pages %}<form method=post><input type=hidden name=formular value=stelle_fb><input type=hidden name=stelle_id value="{{b.id}}">
+        <select name=fb_seite onchange="this.form.submit()">
+          <option value="">— keine —</option>
+          {% if b.fb_seite and (b.fb_seite|string) not in page_id_set %}<option value="{{b.fb_seite}}" selected>{{b.fb_seite}} (alt)</option>{% endif %}
+          {% for p in pages %}<option value="{{p.id}}"{% if (b.fb_seite|string)==(p.id|string) %} selected{% endif %}>{{p.name}}{% if p.ig_username %} / @{{p.ig_username}}{% endif %}</option>{% endfor %}
+        </select></form>{% else %}<div class=hint>{{fb_name.get(b.fb_seite|string, b.fb_seite) or '—'}}</div>{% endif %}
+    </div>
+    <div class=stfield><label>Instagram-Ort (Orts-ID für Geotag)</label>
+      <form method=post class=oidrow><input type=hidden name=formular value=stelle_ort_id><input type=hidden name=stelle_id value="{{b.id}}">
+        <input class=oid name=ort_id value="{{b.ort_id or ''}}" placeholder="z.B. 224891167" inputmode=numeric title="Instagram-/Facebook-Orts-ID (nur Ziffern)">
+        <button style="padding:7px 13px">OK</button></form>
+    </div>
+    <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
+    <div class=stfield><label>Porträt (Kreis)</label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        {% if b.portrait_pfad %}<img src="/portrait/{{b.id}}?v={{b.id}}" alt="Porträt" style="width:44px;height:44px;border-radius:50%;object-fit:cover">{% endif %}
+        <form method=post enctype="multipart/form-data" style="margin:0;display:flex;align-items:center;gap:7px">
+          <input type=hidden name=formular value=stelle_portrait><input type=hidden name=stelle_id value="{{b.id}}">
+          <label class=filebtn>{% if b.portrait_pfad %}Anderes Bild …{% else %}Bild wählen …{% endif %}
+            <input type=file name=portrait accept="image/*" style="display:none"
+                   onchange="var f=this.files[0];this.form.querySelector('.fn').textContent=f?f.name:'';this.form.querySelector('.up').disabled=!f"></label>
+          <span class=fn style="font-size:12px;color:#5a6472;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button class=up style="padding:6px 12px" disabled>Hochladen</button>
+        </form>
+        {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
 <form method=post><input type=hidden name=formular value=stelle_save>
 <input name=name placeholder="Name der Beratungsstelle" required>
 <input name=ort placeholder="Ort (z.B. Neuss)" required>
