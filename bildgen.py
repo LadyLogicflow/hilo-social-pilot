@@ -24,14 +24,14 @@ def _cta_button(base, cx, cy, text, font):
     weicher Schlagschatten (wirkt erhaben) + weisse Flaeche + dezenter Rand + gruene, fette Schrift."""
     dr = ImageDraw.Draw(base)
     tw = dr.textlength(text, font=font)
-    padx, pady = 34, 16
+    padx, pady = 42, 19
     w, h = tw + 2*padx, font.size + 2*pady
     x0, y0, x1, y1 = cx - w/2, cy - h/2, cx + w/2, cy + h/2
     rad = h/2
-    # weicher Schlagschatten auf eigener Ebene -> plastischer, erhabener Eindruck
+    # kraeftiger, weicher Schlagschatten auf eigener Ebene -> praesenter, plastisch erhabener Eindruck
     sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle([x0+2, y0+7, x1+2, y1+9], radius=rad, fill=(0, 0, 0, 95))
-    blur = sh.filter(ImageFilter.GaussianBlur(8)); base.paste(blur, (0, 0), blur)
+    ImageDraw.Draw(sh).rounded_rectangle([x0+3, y0+9, x1+3, y1+12], radius=rad, fill=(0, 0, 0, 120))
+    blur = sh.filter(ImageFilter.GaussianBlur(10)); base.paste(blur, (0, 0), blur)
     # weisse Flaeche mit dezentem Rand + leichte Bodenschattierung fuer Tiefe
     dr.rounded_rectangle([x0, y0, x1, y1], radius=rad, fill=WHITE, outline=(214, 224, 216), width=2)
     dr.rounded_rectangle([x0+4, y1-pady*0.7, x1-4, y1-3], radius=rad*0.5, fill=(238, 244, 239))
@@ -173,7 +173,7 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     # Nur ohne Portraet wechselt die Eckposition je Beitrag.
     pos = "diagonal2" if portrait else pick_circle_pos()
     ct, cb = _content_bounds(pos)
-    head_w = (W - 2*margin) if pos == "unten" else (W - 2*(300 if portrait else 246))   # mit groesserem Beraterfoto Titel schmaler
+    head_w = (W - 2*margin) if pos == "unten" else (W - 2*(340 if portrait else 246))   # mit grossem Beraterfoto Titel schmaler
     fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, head_w, 2)
     yy = 72 if len(HL) == 2 else 96
     for ln in HL:
@@ -204,14 +204,14 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
         for ln in bl:
             dr.text((tx0, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh
 
-    # Unteres Band: gut sichtbarer Ortsbezug + farbiger Termin-Button (rein visuell, kein Link).
+    # Unteres Band: gut sichtbarer Ortsbezug + praesenter, weisser Termin-Button (rein visuell).
     ort = (fields.get("ort") or "").strip()
     cyy = (BOTB + H)//2
     if ort:
-        dr.text((W//2, cyy - 30), "Beratungsstelle %s" % ort, font=_font(_BOLD, 31), fill=WHITE, anchor="mm")
-        _cta_button(base, W//2, cyy + 26, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
+        dr.text((W//2, cyy - 36), "Beratungsstelle %s" % ort, font=_font(_BOLD, 31), fill=WHITE, anchor="mm")
+        _cta_button(base, W//2, cyy + 28, "Jetzt Termin vereinbaren", _font(_BOLD, 30))
     else:
-        _cta_button(base, W//2, cyy + 8, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
+        _cta_button(base, W//2, cyy + 6, "Jetzt Termin vereinbaren", _font(_BOLD, 30))
 
     _draw_circles(base, slogan, pos, portrait)   # schwebende Kreise, Eckposition variiert je Beitrag
 
@@ -281,7 +281,7 @@ def _circle_portrait(base, cx, cy, R, portrait):
     ersetzt den blauen Slogan-Kreis. Liefert True bei Erfolg, sonst False (dann blauer Punkt)."""
     try:
         ImageDraw.Draw(base).ellipse([cx-R, cy-R, cx+R, cy+R], fill=WHITE)  # weisser Rand
-        ring = 7; d = 2*(R-ring)
+        ring = 10; d = 2*(R-ring)
         pim = Image.open(portrait).convert("RGB")
         pw, ph = pim.size; s = min(pw, ph)
         pim = pim.crop(((pw-s)//2, (ph-s)//2, (pw-s)//2+s, (ph-s)//2+s)).resize((d, d), Image.LANCZOS)
@@ -301,11 +301,14 @@ def _draw_circles(base, slogan, pos="unten", portrait=None):
     Slogan-Kreis (z.B. das Foto/Logo der Beratungsstelle)."""
     dr = ImageDraw.Draw(base)
     R = 102; CCY_TOP, CCY_BOT = 134, 946
-    # Mit hinterlegtem Beraterfoto wird der Portraet-Kreis deutlich groesser (~23 % der Bildbreite).
+    # Mit hinterlegtem Beraterfoto wird der Portraet-Kreis deutlich groesser und prominenter
+    # (~26 % der Bildbreite) - bewusste Abweichung von der einheitlichen Kreisgroesse.
     has_portrait = bool(portrait and os.path.exists(portrait))
-    RP = 124 if has_portrait else R
+    RP = 142 if has_portrait else R
     logo_y = CCY_TOP if pos in ("oben", "diagonal") else CCY_BOT
     slogan_y = CCY_TOP if pos in ("oben", "diagonal2") else CCY_BOT
+    if has_portrait and slogan_y == CCY_TOP:
+        slogan_y = RP + 18   # groesseres Portraet oben etwas tiefer setzen, damit es nicht anschneidet
     def shadow(cx, cy, rad):
         # weicher, etwas groesserer Schlagschatten mit Versatz nach unten-rechts -
         # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass die Kreise schweben
