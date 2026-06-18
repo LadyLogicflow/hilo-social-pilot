@@ -52,9 +52,9 @@ def personalisiere_caption(base, stelle, kanal=None):
     link = buchungslink(stelle)
     if link:
         if kanal == "facebook":
-            satz += " Den Link zum Termin findest du im ersten Kommentar."
+            satz += " Den Link zum Termin finden Sie im ersten Kommentar."
         elif kanal == "instagram":
-            satz += " Den Termin-Link findest du in unserer Bio."
+            satz += " Den Termin-Link finden Sie in unserer Bio."
         else:
             satz += " Termin vereinbaren: %s" % link
     haupt, tags = _split_hashtags(base)
