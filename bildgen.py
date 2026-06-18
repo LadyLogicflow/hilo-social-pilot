@@ -19,13 +19,23 @@ CIRCLE_POSITIONS = ["unten", "oben", "diagonal", "diagonal2"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
 ACCENT=(243,146,0)   # warmes Orange fuer den CTA-Button (hoher Kontrast auf dem Blau-Gruen-Band)
 
-def _cta_button(dr, cx, cy, text, font):
-    """Zeichnet einen farbigen, abgerundeten Termin-Button (rein visuell, kein Link)."""
+def _cta_button(base, cx, cy, text, font):
+    """Weisser, plastisch wirkender CTA-Button mit gruener Schrift (CI-konform, rein visuell):
+    weicher Schlagschatten (wirkt erhaben) + weisse Flaeche + dezenter Rand + gruene, fette Schrift."""
+    dr = ImageDraw.Draw(base)
     tw = dr.textlength(text, font=font)
-    padx, pady = 30, 15
+    padx, pady = 34, 16
     w, h = tw + 2*padx, font.size + 2*pady
-    dr.rounded_rectangle([cx - w/2, cy - h/2, cx + w/2, cy + h/2], radius=h/2, fill=ACCENT)
-    dr.text((cx, cy), text, font=font, fill=WHITE, anchor="mm")
+    x0, y0, x1, y1 = cx - w/2, cy - h/2, cx + w/2, cy + h/2
+    rad = h/2
+    # weicher Schlagschatten auf eigener Ebene -> plastischer, erhabener Eindruck
+    sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle([x0+2, y0+7, x1+2, y1+9], radius=rad, fill=(0, 0, 0, 95))
+    blur = sh.filter(ImageFilter.GaussianBlur(8)); base.paste(blur, (0, 0), blur)
+    # weisse Flaeche mit dezentem Rand + leichte Bodenschattierung fuer Tiefe
+    dr.rounded_rectangle([x0, y0, x1, y1], radius=rad, fill=WHITE, outline=(214, 224, 216), width=2)
+    dr.rounded_rectangle([x0+4, y1-pady*0.7, x1-4, y1-3], radius=rad*0.5, fill=(238, 244, 239))
+    dr.text((cx, cy), text, font=font, fill=GREEN, anchor="mm")
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 _REG  = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
@@ -199,9 +209,9 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     cyy = (BOTB + H)//2
     if ort:
         dr.text((W//2, cyy - 30), "Beratungsstelle %s" % ort, font=_font(_BOLD, 31), fill=WHITE, anchor="mm")
-        _cta_button(dr, W//2, cyy + 26, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
+        _cta_button(base, W//2, cyy + 26, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
     else:
-        _cta_button(dr, W//2, cyy + 8, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
+        _cta_button(base, W//2, cyy + 8, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
 
     _draw_circles(base, slogan, pos, portrait)   # schwebende Kreise, Eckposition variiert je Beitrag
 
