@@ -1779,6 +1779,21 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("facebook", ok, info))
+        # Erster Kommentar mit dem Termin-Link (FB-Caption verweist auf "Link in den Kommentaren").
+        # Nur fuer Beratungsstellen mit hinterlegtem Buchungslink; rein protokolliert.
+        if ok and stelle:
+            import personalisierung
+            link = personalisierung.buchungslink(stelle)
+            if link:
+                ort = (stelle["ort"] or "").strip()
+                ktext = ("Termin vereinbaren bei Ihrer HILO-Beratungsstelle %s: %s" % (ort, link)) if ort \
+                    else ("Termin vereinbaren: %s" % link)
+                try:
+                    k_ok, k_info = publish.comment_facebook(info, ziel_seite, ktext)
+                except Exception as ex:
+                    k_ok, k_info = False, str(ex)
+                audit_log(conn, user, "fb_kommentar_%s" % ("ok" if k_ok else "fehler"), eid,
+                          "Ziel %s / %s" % (ziel_seite, k_info))
     if kanal in ("instagram", "beide"):
         bilder = []
         try:

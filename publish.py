@@ -174,6 +174,17 @@ def publish_instagram(ig_user_id, image_url, caption):
     return False, _err(pub)
 
 
+def comment_facebook(post_id, page_id, message):
+    """Postet einen ersten Kommentar unter einen Facebook-Seitenbeitrag (z.B. mit dem Termin-Link).
+    Rueckgabe: (ok, info) - info ist die Kommentar-ID oder die Fehlermeldung."""
+    token = _page_token(page_id)
+    r = requests.post(GRAPH + "/%s/comments" % post_id, timeout=30,
+                      data={"message": message or "", "access_token": token})
+    if r.status_code == 200:
+        return True, r.json().get("id", "")
+    return False, _err(r)
+
+
 def publish_instagram_story(ig_user_id, image_url):
     """Veroeffentlicht ein Bild als Instagram-Story (verschwindet nach 24 Stunden).
     image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ideal im Hochformat 9:16.

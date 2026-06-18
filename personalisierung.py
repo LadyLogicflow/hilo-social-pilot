@@ -6,21 +6,27 @@ import os
 import re
 
 
-def _local_satz(stelle):
+def buchungslink(stelle):
+    """Buchungs-URL der Beratungsstelle (oder '')."""
+    return (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
+
+
+def _local_satz(stelle, mit_link=True):
     """Persoenlicher, lokaler Satz fuer den Begleittext (oder '' ohne Ort). Deterministisch,
-    nutzt nur echte Stammdaten (Ort, Leitung, Buchungslink) und erfindet nichts."""
+    nutzt nur echte Stammdaten (Ort, Leitung, Buchungslink) und erfindet nichts.
+    mit_link=False laesst den rohen Buchungslink weg (z.B. fuer Facebook -> Link in den ersten
+    Kommentar, fuer Instagram -> 'Link in Bio')."""
     ort = (stelle["ort"] or "").strip() if _has(stelle, "ort") else ""
     if not ort:
         return ""
     leitung = (stelle["leitung"] or "").strip() if _has(stelle, "leitung") else ""
-    buchung = (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
     if leitung:
         satz = ("%s von Ihrer HILO-Beratungsstelle in %s bespricht Ihre steuerliche "
                 "Situation gerne persönlich mit Ihnen." % (leitung, ort))
     else:
         satz = "Ihre HILO-Beratungsstelle in %s berät Sie gerne persönlich." % ort
-    if buchung:
-        satz += " Termin vereinbaren: %s" % buchung   # ohne Punkt, damit der Link nicht bricht
+    if mit_link and buchungslink(stelle):
+        satz += " Termin vereinbaren: %s" % buchungslink(stelle)   # ohne Punkt, damit der Link nicht bricht
     return satz
 
 
@@ -40,10 +46,12 @@ def _split_hashtags(text):
     return text[:m.start()].rstrip(), block
 
 
-def personalisiere_caption(base, stelle):
+def personalisiere_caption(base, stelle, kanal=None):
     """Haengt den lokalen Satz an den Begleittext an - aber VOR einen evtl. vorhandenen
-    Hashtag-Block, damit die Hashtags am Ende stehen bleiben."""
-    satz = _local_satz(stelle)
+    Hashtag-Block, damit die Hashtags am Ende stehen bleiben. Auf Facebook/Instagram wird KEIN
+    roher Buchungslink in die Caption gesetzt (FB: Link im ersten Kommentar, IG: 'Link in Bio')."""
+    mit_link = kanal not in ("facebook", "instagram")
+    satz = _local_satz(stelle, mit_link=mit_link)
     if not satz:
         return (base or "").strip()
     haupt, tags = _split_hashtags(base)
@@ -55,7 +63,7 @@ def caption_fuer_stelle(fields, stelle, kanal):
     """Kanalspezifischer, fuer die Beratungsstelle personalisierter Begleittext."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
     base = caps.get(kanal) or fields.get("caption") or ""
-    return personalisiere_caption(base, stelle)
+    return personalisiere_caption(base, stelle, kanal)
 
 
 def fuer_stelle(fields, stelle, kanal=None):
