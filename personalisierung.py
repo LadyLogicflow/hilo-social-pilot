@@ -69,6 +69,30 @@ def caption_fuer_stelle(fields, stelle, kanal):
     return personalisiere_caption(base, stelle, kanal)
 
 
+def whatsapp_texte(fields, stelle=None, quelle_url=""):
+    """Liefert (kanal_text, story_text) fuer WhatsApp - Buchungs- und Quelllink werden hier direkt
+    eingebettet (WhatsApp erlaubt Links). stelle=None -> ohne Stellen-Personalisierung."""
+    caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
+    link = buchungslink(stelle) if stelle else ""
+    ort = (stelle["ort"] or "").strip() if (stelle and _has(stelle, "ort")) else ""
+    quelle_url = (quelle_url or "").strip()
+
+    kanal = (caps.get("whatsapp_kanal") or fields.get("caption") or "").strip()
+    zeilen = []
+    if ort:
+        zeilen.append("Ihre HILO-Beratungsstelle in %s berät Sie gerne." % ort)
+    if quelle_url:
+        zeilen.append("Mehr dazu: %s" % quelle_url)
+    if link:
+        zeilen.append("Termin vereinbaren: %s" % link)
+    kanal_text = (kanal + ("\n\n" + "\n".join(zeilen) if zeilen else "")).strip()
+
+    story = (caps.get("whatsapp_story") or "").strip()
+    if link:
+        story = (story + "\nTermin: %s" % link).strip()
+    return kanal_text, story
+
+
 def fuer_stelle(fields, stelle, kanal=None):
     """Gibt eine personalisierte Kopie der Beitrags-Felder fuer eine Beratungsstelle zurueck.
     Deterministisch: nutzt ausschliesslich echte Stammdaten (Ort, Leitung, Buchungslink) und

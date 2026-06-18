@@ -76,6 +76,14 @@ CHANNEL_GUIDE = {
     "google": (
         "PLATTFORM GOOGLE BUSINESS: Kurz, lokal und suchrelevant - Ort und Leistung prominent."
     ),
+    "whatsapp_kanal": (
+        "WHATSAPP-KANAL: HOECHSTENS 3 Saetze, sofortiger Mehrwert (praktischer Tipp), KEIN Werbeton, "
+        "KEINE Hashtags. KEINE Links im Text (Quell- und Buchungslink werden automatisch ergaenzt)."
+    ),
+    "whatsapp_story": (
+        "WHATSAPP-STATUS (Story): HOECHSTENS 2 Saetze mit einer direkten Handlungsaufforderung. "
+        "KEINE Hashtags, KEINE Links im Text (werden automatisch ergaenzt)."
+    ),
 }
 
 def _model():
@@ -88,9 +96,9 @@ def _build_prompt(thema, kanal=None):
     return (
         "Thema: %s\n"
         "Zusammenfassung/Inhalt: %s\n\n"
-        "Erzeuge daraus einen HILO-Beitrag fuer FACEBOOK UND INSTAGRAM. Bild, Ueberschrift und "
-        "Stichpunkte sind fuer beide Kanaele identisch; NUR der Begleittext (caption) unterscheidet sich "
-        "je Kanal nach diesen Vorgaben:\n\n%s\n\n%s\n\n"
+        "Erzeuge daraus einen HILO-Beitrag fuer FACEBOOK, INSTAGRAM und WHATSAPP (Kanal + Status). Bild, "
+        "Ueberschrift und Stichpunkte sind fuer alle gleich; NUR der Begleittext unterscheidet sich je "
+        "Kanal nach diesen Vorgaben:\n\n%s\n\n%s\n\n%s\n\n%s\n\n"
         "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown) mit genau diesen "
         "Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
@@ -100,10 +108,12 @@ def _build_prompt(thema, kanal=None):
         '"bild_typ": "person oder thema", '
         '"captions": {"facebook": "Begleittext fuer Facebook inkl. Hashtags am Ende, hoechstens %d '
         'Zeichen", "instagram": "Begleittext fuer Instagram inkl. Hashtags am Ende, hoechstens %d '
-        'Zeichen"}}\n'
+        'Zeichen", "whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
+        '"whatsapp_story": "max 2 Saetze mit Handlungsaufforderung, ohne Hashtags/Links"}}\n'
         "Sprache: Deutsch, Sie-Form."
         % (thema.get("titel", ""), (thema.get("volltext") or "")[:1500],
            CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"],
+           CHANNEL_GUIDE["whatsapp_kanal"], CHANNEL_GUIDE["whatsapp_story"],
            CHANNEL_LIMIT["facebook"], CHANNEL_LIMIT["instagram"])
     )
 
@@ -118,7 +128,10 @@ def _normalize_captions(data):
     ig = (caps.get("instagram") or "").strip() or single
     fb = fb or ig
     ig = ig or fb
-    data["captions"] = {"facebook": fb, "instagram": ig}
+    # WhatsApp-Varianten - Fallback auf den Facebook-Text, falls (z.B. bei aelteren Entwuerfen) nicht erzeugt.
+    wa_k = (caps.get("whatsapp_kanal") or "").strip() or fb
+    wa_s = (caps.get("whatsapp_story") or "").strip() or wa_k
+    data["captions"] = {"facebook": fb, "instagram": ig, "whatsapp_kanal": wa_k, "whatsapp_story": wa_s}
     data["caption"] = fb
     return data
 
