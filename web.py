@@ -533,6 +533,10 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
+    <form method=post action="/text-neu/{{e.id}}" style="margin:4px 0 8px" onsubmit="if(!this.feedback.value.trim()){alert('Bitte kurz angeben, was am Text geändert werden soll.');return false}return confirm('Nur den Text mit Ihrem Hinweis überarbeiten? Das nutzt die Text-KI; das Bild wird kostenlos an den neuen Text angepasst. Termin bleibt.')">
+      <input type=hidden name=zurueck value=einplanung>
+      <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
+      <button style="background:#1f428d;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     <p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
     {% if stellen %}
@@ -1109,6 +1113,51 @@ def beitrag_neu(eid):
         flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
               "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
     return redirect(url_for("einplanung"))
+
+@app.route("/text-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def text_neu(eid):
+    """Ueberarbeitet NUR den Text gemaess einem Aenderungswunsch (Text-KI) und passt das Bild an den
+    neuen Text an (Motiv aus dem Cache -> keine Bild-KI-Kosten). Status und Termin bleiben."""
+    zurueck = request.form.get("zurueck", "einplanung")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    feedback = request.form.get("feedback", "").strip()
+    if not feedback:
+        flash("Bitte kurz angeben, was am Text geändert werden soll."); return redirect(ziel)
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        if e["status"] not in ("freigegeben", "entwurf"):
+            flash("Text von Beitrag %d kann nicht überarbeitet werden (Status: %s)." % (eid, e["status"]))
+            return redirect(ziel)
+        thema = conn.execute("SELECT titel, volltext FROM themen WHERE id=?", (e["thema_id"],)).fetchone() \
+            if e["thema_id"] else None
+        kanal = e["kanal"] or "google"
+    try:
+        prev = json.loads(e["text"])
+    except Exception:
+        prev = {}
+    try:
+        th = {"titel": thema["titel"] if thema else "", "volltext": (thema["volltext"] if thema else "") or ""}
+        neu = textgen.regenerate(th, prev, feedback, kanal)
+        # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
+        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
+            neu.setdefault(k, prev.get(k, dflt))
+        import bildmotiv
+        photo = bildmotiv.ensure_photo_fuer(neu)   # Motiv aus Cache -> keine Bild-KI-Kosten
+        slogan = bildgen.pick_slogan(neu.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(neu, photo, slogan, out)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(neu, ensure_ascii=False), out, eid))
+            audit_log(conn, session["user"], "text_ueberarbeitet", eid, feedback)
+            conn.commit()
+        flash("Text von Beitrag %d überarbeitet (Bild an den neuen Text angepasst) - bitte prüfen." % eid)
+    except Exception as ex:
+        flash("Text-Überarbeitung fehlgeschlagen: %s" % ex)
+    return redirect(ziel)
 
 @app.route("/bild-neu/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
