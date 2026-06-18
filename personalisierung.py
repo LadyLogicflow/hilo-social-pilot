@@ -6,22 +6,22 @@ import os
 import re
 
 
+def buchungslink(stelle):
+    """Buchungs-URL der Beratungsstelle (oder '')."""
+    return (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
+
+
 def _local_satz(stelle):
-    """Persoenlicher, lokaler Satz fuer den Begleittext (oder '' ohne Ort). Deterministisch,
-    nutzt nur echte Stammdaten (Ort, Leitung, Buchungslink) und erfindet nichts."""
+    """Persoenlicher, lokaler Satz (Leitung/Ort) fuer den Begleittext (oder '' ohne Ort) - OHNE Link.
+    Den Link bzw. den kanalabhaengigen Termin-Hinweis ergaenzt personalisiere_caption."""
     ort = (stelle["ort"] or "").strip() if _has(stelle, "ort") else ""
     if not ort:
         return ""
     leitung = (stelle["leitung"] or "").strip() if _has(stelle, "leitung") else ""
-    buchung = (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
     if leitung:
-        satz = ("%s von Ihrer HILO-Beratungsstelle in %s bespricht Ihre steuerliche "
+        return ("%s von Ihrer HILO-Beratungsstelle in %s bespricht Ihre steuerliche "
                 "Situation gerne persönlich mit Ihnen." % (leitung, ort))
-    else:
-        satz = "Ihre HILO-Beratungsstelle in %s berät Sie gerne persönlich." % ort
-    if buchung:
-        satz += " Termin vereinbaren: %s" % buchung   # ohne Punkt, damit der Link nicht bricht
-    return satz
+    return "Ihre HILO-Beratungsstelle in %s berät Sie gerne persönlich." % ort
 
 
 def _split_hashtags(text):
@@ -40,12 +40,23 @@ def _split_hashtags(text):
     return text[:m.start()].rstrip(), block
 
 
-def personalisiere_caption(base, stelle):
-    """Haengt den lokalen Satz an den Begleittext an - aber VOR einen evtl. vorhandenen
-    Hashtag-Block, damit die Hashtags am Ende stehen bleiben."""
+def personalisiere_caption(base, stelle, kanal=None):
+    """Haengt den lokalen Satz (+ kanalabhaengigen Termin-Hinweis) an den Begleittext an - aber VOR
+    einen evtl. vorhandenen Hashtag-Block. Der Termin-Hinweis wird NUR ergaenzt, wenn ein Buchungslink
+    hinterlegt ist - so passt er immer zum tatsaechlich geposteten ersten Kommentar:
+    Facebook -> 'Link im ersten Kommentar', Instagram -> 'in unserer Bio', sonst (WhatsApp/Default)
+    der Buchungslink direkt im Text."""
     satz = _local_satz(stelle)
     if not satz:
         return (base or "").strip()
+    link = buchungslink(stelle)
+    if link:
+        if kanal == "facebook":
+            satz += " Den Link zum Termin findest du im ersten Kommentar."
+        elif kanal == "instagram":
+            satz += " Den Termin-Link findest du in unserer Bio."
+        else:
+            satz += " Termin vereinbaren: %s" % link
     haupt, tags = _split_hashtags(base)
     kombi = (haupt + " " + satz).strip() if haupt else satz
     return (kombi + "\n\n" + tags).strip() if tags else kombi
@@ -55,7 +66,7 @@ def caption_fuer_stelle(fields, stelle, kanal):
     """Kanalspezifischer, fuer die Beratungsstelle personalisierter Begleittext."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
     base = caps.get(kanal) or fields.get("caption") or ""
-    return personalisiere_caption(base, stelle)
+    return personalisiere_caption(base, stelle, kanal)
 
 
 def fuer_stelle(fields, stelle, kanal=None):
