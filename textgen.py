@@ -59,16 +59,16 @@ CHANNEL_LIMIT = {"google": 1400, "linkedin": 1300, "instagram": 1500, "facebook"
 CHANNEL_GUIDE = {
     "facebook": (
         "PLATTFORM FACEBOOK (Hauptkanal): Freundlich, persoenlich, etwas ausfuehrlicher - Zielgruppe hier "
-        "am staerksten (Rentner, Familien). HOECHSTENS 150 Woerter. HOECHSTENS 2 Emojis. KEIN Link im Text "
-        "- schreibe stattdessen den Hinweis 'Link zum Termin in den Kommentaren'. Beende mit 4 bis 5 "
-        "thematisch passenden Hashtags, #HILO als LETZTEN."
+        "am staerksten (Rentner, Familien). HOECHSTENS 150 Woerter. HOECHSTENS 2 Emojis. KEIN Link und "
+        "KEIN Verweis auf einen Link im Text (ein Termin-Hinweis wird automatisch ergaenzt). Beende mit "
+        "4 bis 5 thematisch passenden Hashtags, #HILO als LETZTEN."
     ),
     "instagram": (
         "PLATTFORM INSTAGRAM (Hauptkanal): Moderner, visuell gedacht - das Bild traegt die Hauptlast. "
         "HOECHSTENS 100 Woerter. HOECHSTENS 2 Emojis. Der Hook MUSS in die ersten 125 Zeichen passen. "
         "Gestalte den Inhalt so, dass man ihn gern weitersendet (praktischer Tipp oder Ueberraschungseffekt). "
-        "KEINE URL im Text - schreibe stattdessen 'Link in Bio'. Beende mit 3 bis 5 thematisch gebuendelten "
-        "Hashtags, #HILO als LETZTEN."
+        "KEINE URL und KEIN Verweis auf einen Link im Text (ein Bio-Hinweis wird automatisch ergaenzt). "
+        "Beende mit 3 bis 5 thematisch gebuendelten Hashtags, #HILO als LETZTEN."
     ),
     "linkedin": (
         "PLATTFORM LINKEDIN: Sachlich-informativer Ton, Fachsprache erlaubt, KEIN Werbeton."
