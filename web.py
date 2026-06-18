@@ -727,9 +727,13 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
   <h3 style="margin:.2em 0">&#x1F4F2; Für WhatsApp (Kanal / Status)</h3>
   <p class=hint>WhatsApp lässt sich nicht automatisch befüllen – hier alles zum schnellen <b>manuellen</b> Posten: Text kopieren, Bild herunterladen, fertig.</p>
   <p style="margin:.2em 0;font-weight:bold;color:#15336e">Allgemein (ohne Beratungsstelle)</p>
-  <textarea id=watext readonly>{{e.f.caption}}</textarea>
+  <div class=hint>Kanal-Text (höchstens 3 Sätze, mit Quell-/Buchungslink)</div>
+  <textarea id=watext_k readonly>{{wa_allg_kanal}}</textarea>
+  <div class=row><button type=button onclick="copyId('watext_k',this)">Kanal-Text kopieren</button></div>
+  <div class=hint style="margin-top:6px">Status-Text (höchstens 2 Sätze)</div>
+  <textarea id=watext_s readonly>{{wa_allg_story}}</textarea>
   <div class=row>
-    <button type=button onclick="copyId('watext',this)">Text kopieren</button>
+    <button type=button onclick="copyId('watext_s',this)">Status-Text kopieren</button>
     {% if fmt=='karussell' and n_slides %}{% for i in range(n_slides) %}<a class=dl href="/beitrag-slide/{{e.id}}/{{i}}" download="hilo_{{e.id}}_slide{{i+1}}.png">Slide {{i+1}} laden</a>{% endfor %}{% else %}<a class=dl href="/bild/{{e.id}}" download="hilo_{{e.id}}.png">Bild herunterladen</a>{% endif %}
     <a class="dl gn" href="/bild-status/{{e.id}}" title="Hochkant 9:16, ideal für Status/Story">Status-Version (hochkant) laden</a>
   </div>
@@ -738,9 +742,13 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
   {% for w in wa_stellen %}
   <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:8px 0">
     <b style="color:#1f428d">{{w.name}}{% if w.ort %} &middot; {{w.ort}}{% endif %}</b>
-    <textarea id="watext_{{w.id}}" readonly style="margin-top:6px">{{w.caption}}</textarea>
+    <div class=hint style="margin-top:6px">Kanal-Text</div>
+    <textarea id="watext_k_{{w.id}}" readonly>{{w.kanal}}</textarea>
+    <div class=row><button type=button onclick="copyId('watext_k_{{w.id}}',this)">Kanal-Text kopieren</button></div>
+    <div class=hint style="margin-top:6px">Status-Text</div>
+    <textarea id="watext_s_{{w.id}}" readonly>{{w.story}}</textarea>
     <div class=row>
-      <button type=button onclick="copyId('watext_{{w.id}}',this)">Text kopieren</button>
+      <button type=button onclick="copyId('watext_s_{{w.id}}',this)">Status-Text kopieren</button>
       <a class=dl href="/bild-stelle/{{e.id}}/{{w.id}}">Bild (personalisiert)</a>
       <a class="dl gn" href="/bild-status-stelle/{{e.id}}/{{w.id}}">Status-Version (hochkant)</a>
     </div>
@@ -1292,10 +1300,14 @@ def kalender():
 def beitrag(eid):
     """Detailansicht eines Beitrags - bei Karussell werden ALLE Slides gezeigt (kein Blackbox)."""
     with get_conn() as conn:
-        e = conn.execute("SELECT id, text, geplant_fuer, status, format FROM entwuerfe WHERE id=?",
+        e = conn.execute("SELECT id, text, geplant_fuer, status, format, thema_id FROM entwuerfe WHERE id=?",
                          (eid,)).fetchone()
-    if not e:
-        abort(404)
+        if not e:
+            abort(404)
+        quelle_url = ""
+        if e["thema_id"]:
+            t = conn.execute("SELECT url FROM themen WHERE id=?", (e["thema_id"],)).fetchone()
+            quelle_url = (t["url"] or "").strip() if t else ""
     row = _parse(e)
     fmt = row.get("format", "einzelbild")
     n_slides = 0
@@ -1310,22 +1322,24 @@ def beitrag(eid):
         except Exception as ex:
             log.warning("Karussell-Vorschau fehlgeschlagen (Beitrag %s): %s", eid, ex)
             n_slides = 0
-    # Personalisierte WhatsApp-Varianten je Beratungsstelle (Portraet-Kreis, Ort, Begleittext)
+    # WhatsApp-Varianten: eigener Kanal-Text (max 3 Saetze) + Status-Text (max 2 Saetze),
+    # je mit eingebettetem Quell-/Buchungslink. Allgemein + personalisiert je Beratungsstelle.
+    import personalisierung
+    wa_allg_kanal, wa_allg_story = personalisierung.whatsapp_texte(row["f"], None, quelle_url)
     wa_stellen = []
     try:
-        import personalisierung
         with get_conn() as conn:
             stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
                                    "AND fb_seite!='' ORDER BY ort").fetchall()
         for st in stellen:
-            pf = personalisierung.fuer_stelle(row["f"], st)
+            wk, ws = personalisierung.whatsapp_texte(row["f"], st, quelle_url)
             wa_stellen.append({"id": st["id"], "name": st["name"], "ort": st["ort"] or "",
-                               "caption": pf.get("caption", "")})
+                               "kanal": wk, "story": ws})
     except Exception:
         log.exception("WhatsApp-Stellen-Varianten fehlgeschlagen (Beitrag %s)", eid)
         wa_stellen = []
-    return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"],
-                                  n_slides=n_slides, wa_stellen=wa_stellen))
+    return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"], n_slides=n_slides,
+                                  wa_stellen=wa_stellen, wa_allg_kanal=wa_allg_kanal, wa_allg_story=wa_allg_story))
 
 @app.route("/beitrag-slide/<int:eid>/<int:idx>")
 @login_required
