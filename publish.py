@@ -158,12 +158,15 @@ def publish_facebook_carousel(page_id, image_paths, caption):
 # ---------------------------------------------------------------------------
 # Instagram: zweistufige Veroeffentlichung (benoetigt oeffentliche Bild-URL)
 # ---------------------------------------------------------------------------
-def publish_instagram(ig_user_id, image_url, caption):
+def publish_instagram(ig_user_id, image_url, caption, location_id=None):
     """Veroeffentlicht ein Bild auf einem Instagram-Business-Konto.
-    image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!)."""
+    image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!).
+    location_id = optionale Facebook-Orts-ID fuer den Geotag (Standort-Markierung)."""
     token = _user_token()
-    c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60,
-                      data={"image_url": image_url, "caption": caption or "", "access_token": token})
+    data = {"image_url": image_url, "caption": caption or "", "access_token": token}
+    if location_id:
+        data["location_id"] = location_id
+    c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60, data=data)
     if c.status_code != 200:
         return False, _err(c)
     creation_id = c.json().get("id")
@@ -224,7 +227,7 @@ def _wait_ig_container(container_id, token, attempts=12, delay=2):
     return False, "Instagram-Container nicht rechtzeitig bereit (Timeout)."
 
 
-def publish_instagram_carousel(ig_user_id, image_urls, caption):
+def publish_instagram_carousel(ig_user_id, image_urls, caption, location_id=None):
     """Veroeffentlicht mehrere Bilder als Karussell auf einem Instagram-Business-Konto.
     Jede image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ablauf:
     je Bild einen Kind-Container (is_carousel_item=true) -> auf FINISHED warten,
@@ -247,9 +250,11 @@ def publish_instagram_carousel(ig_user_id, image_urls, caption):
         if not ok:
             return False, err
         child_ids.append(cid)
-    cont = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120,
-                         data={"media_type": "CAROUSEL", "children": ",".join(child_ids),
-                               "caption": caption or "", "access_token": token})
+    cont_data = {"media_type": "CAROUSEL", "children": ",".join(child_ids),
+                 "caption": caption or "", "access_token": token}
+    if location_id:
+        cont_data["location_id"] = location_id   # Geotag am Eltern-Container des Karussells
+    cont = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120, data=cont_data)
     if cont.status_code != 200:
         return False, _err(cont)
     creation_id = cont.json().get("id")

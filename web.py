@@ -841,7 +841,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 {% if bereich=='stellen' %}
 {% if pages_err %}<p class=hint style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}} – du kannst die Seiten-ID solange manuell eintragen.</p>{% endif %}
-<div class=scrollx><table class=vtab><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th></tr>
+<div class=scrollx><table class=vtab><tr><th>Name</th><th>Ort</th><th>Leitung</th><th>Facebook-Seite</th><th>Porträt (Kreis)</th><th>Buchung</th><th>Instagram-Ort</th></tr>
 {% for b in stellen %}<tr><td class=nw>{{b.name}}</td><td class=nw>{{b.ort}}</td><td class=nw>{{b.leitung}}</td>
 <td>{% if pages %}<form method=post style="margin:0">
   <input type=hidden name=formular value=stelle_fb><input type=hidden name=stelle_id value="{{b.id}}">
@@ -862,7 +862,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </form>
   {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
 </div></td>
-<td>{{b.buchungs_url}}</td></tr>{% endfor %}</table></div>
+<td>{{b.buchungs_url}}</td>
+<td><form method=post style="margin:0;display:flex;gap:5px;align-items:center">
+  <input type=hidden name=formular value=stelle_ort_id><input type=hidden name=stelle_id value="{{b.id}}">
+  <input name=ort_id value="{{b.ort_id or ''}}" placeholder="Orts-ID" inputmode=numeric title="Facebook-Orts-ID (nur Ziffern) für den Instagram-Geotag" style="width:120px;padding:5px;border:1px solid #ccd3df;border-radius:6px">
+  <button style="padding:5px 10px">OK</button>
+</form></td></tr>{% endfor %}</table></div>
 <form method=post><input type=hidden name=formular value=stelle_save>
 <input name=name placeholder="Name der Beratungsstelle" required>
 <input name=ort placeholder="Ort (z.B. Neuss)" required>
@@ -1679,9 +1684,10 @@ def aktion(eid):
         conn.commit()
     return redirect(url_for("entwuerfe"))
 
-def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id):
+def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id, location_id=None):
     """Instagram-Veroeffentlichung: Bild(er) oeffentlich hochladen (IONOS) -> https-URL(s),
-    das mit der Facebook-Seite verknuepfte IG-Konto ermitteln, dann posten. (ok, info)."""
+    das mit der Facebook-Seite verknuepfte IG-Konto ermitteln, dann posten. (ok, info).
+    location_id = optionale Facebook-Orts-ID fuer den Geotag."""
     import uploader, time
     if not uploader.configured():
         return False, ("Instagram-Bild-Upload nicht konfiguriert (Secrets ionos_sftp_* + "
@@ -1699,8 +1705,8 @@ def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id
     urls = [uploader.upload(b, remote_name="e%d_%s_%d_%d.png" % (eid, stelle_id or "p", stamp, i))
             for i, b in enumerate(valid)]
     if fmt == "karussell" and len(urls) > 1:
-        return publish.publish_instagram_carousel(ig_id, urls, caption)
-    return publish.publish_instagram(ig_id, urls[0], caption)
+        return publish.publish_instagram_carousel(ig_id, urls, caption, location_id=location_id)
+    return publish.publish_instagram(ig_id, urls[0], caption, location_id=location_id)
 
 def _publish_story(publish, fb_page_id, bilder, eid, stelle_id):
     """Postet die uebergebenen Bilder NACHEINANDER als Instagram-Story-Frames (9:16) - so erscheint
@@ -1810,12 +1816,14 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                           "Ziel %s / %s" % (ziel_seite, k_info))
     if kanal in ("instagram", "beide"):
         bilder = []
+        loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
         try:
             bilder = _render(fmt_ig)
             if not bilder:
                 ok, info = False, "Kein Bild vorhanden"
             else:
-                ok, info = _publish_instagram(publish, ziel_seite, bilder, _caption("instagram"), fmt_ig, eid, stelle_id)
+                ok, info = _publish_instagram(publish, ziel_seite, bilder, _caption("instagram"),
+                                              fmt_ig, eid, stelle_id, location_id=loc_id)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("instagram", ok, info))
@@ -2122,6 +2130,16 @@ def verwaltung():
                     audit_log(conn, session["user"], "beratungsstelle_fb_gesetzt", None,
                               "Stelle %s -> %s" % (sid, fb or "(keine)"))
                     flash("Facebook-Seite aktualisiert." if fb else "Facebook-Seite entfernt.")
+            elif formular == "stelle_ort_id":
+                sid = request.form.get("stelle_id", "").strip()
+                oid = request.form.get("ort_id", "").strip()
+                if oid and not oid.isdigit():
+                    flash("Die Facebook-Orts-ID darf nur Ziffern enthalten.")
+                elif sid:
+                    conn.execute("UPDATE beratungsstellen SET ort_id=? WHERE id=?", (oid, sid))
+                    audit_log(conn, session["user"], "beratungsstelle_ort_id_gesetzt", None,
+                              "Stelle %s -> %s" % (sid, oid or "(keine)"))
+                    flash("Instagram-Orts-ID aktualisiert." if oid else "Instagram-Orts-ID entfernt.")
             elif formular == "stelle_portrait":
                 sid = request.form.get("stelle_id", "").strip()
                 file = request.files.get("portrait")

@@ -192,6 +192,9 @@ def migrate(conn):
     # blauen Slogan-Kreis ersetzt (leer = blauer Punkt).
     if "portrait_pfad" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN portrait_pfad TEXT")
+    # Facebook-Orts-ID (Place ID) je Stelle - fuer den Instagram-Geotag beim Posten
+    if "ort_id" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN ort_id TEXT")
     # R1 Karussell: Format je Beitrag (einzelbild | karussell)
     ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
     if "format" not in ecols:
