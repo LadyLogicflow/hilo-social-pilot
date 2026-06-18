@@ -17,6 +17,15 @@ TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender
 # diagonal  = Logo oben-links + Slogan unten-rechts; diagonal2 = Logo unten-links + Slogan oben-rechts
 CIRCLE_POSITIONS = ["unten", "oben", "diagonal", "diagonal2"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
+ACCENT=(243,146,0)   # warmes Orange fuer den CTA-Button (hoher Kontrast auf dem Blau-Gruen-Band)
+
+def _cta_button(dr, cx, cy, text, font):
+    """Zeichnet einen farbigen, abgerundeten Termin-Button (rein visuell, kein Link)."""
+    tw = dr.textlength(text, font=font)
+    padx, pady = 30, 15
+    w, h = tw + 2*padx, font.size + 2*pady
+    dr.rounded_rectangle([cx - w/2, cy - h/2, cx + w/2, cy + h/2], radius=h/2, fill=ACCENT)
+    dr.text((cx, cy), text, font=font, fill=WHITE, anchor="mm")
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 _REG  = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
@@ -110,7 +119,7 @@ def _safe(s):
 def _safe_fields(fields):
     """Liefert eine Kopie der Felder, in der die auf das Bild gezeichneten Texte emoji-bereinigt sind."""
     f = dict(fields or {})
-    for k in ("ueberschrift", "subline", "cta"):
+    for k in ("ueberschrift", "subline", "cta", "ort"):
         if k in f:
             f[k] = _safe(f.get(k))
     if "bullets" in f:
@@ -154,7 +163,7 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     # Nur ohne Portraet wechselt die Eckposition je Beitrag.
     pos = "diagonal2" if portrait else pick_circle_pos()
     ct, cb = _content_bounds(pos)
-    head_w = (W - 2*margin) if pos == "unten" else (W - 2*246)
+    head_w = (W - 2*margin) if pos == "unten" else (W - 2*(300 if portrait else 246))   # mit groesserem Beraterfoto Titel schmaler
     fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, head_w, 2)
     yy = 72 if len(HL) == 2 else 96
     for ln in HL:
@@ -174,7 +183,7 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     bh = len(SL)*(fsb.size+8) + 30 + len(blocks)*step
     y = ct + (cb - ct - bh)//2 + fsb.size//2   # Inhalt bleibt frei von den Kreisen
     for ln in SL:
-        dr.text((margin, y), ln, font=fsb, fill=GREEN2, anchor="lm"); y += fsb.size + 8
+        dr.text((margin, y), ln, font=fsb, fill=NAVY, anchor="lm"); y += fsb.size + 8
     y += 30
     for i, bl in enumerate(blocks):
         cy = y + i*step + step//2          # Mitte des gleich grossen Slots -> konstanter Abstand
@@ -185,10 +194,14 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
         for ln in bl:
             dr.text((tx0, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh
 
-    fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 28, 20, W - 2*255, 2)
-    cyy = (BOTB + H)//2 + 12; ty = cyy - (len(CL)-1)*(fc.size+4)//2
-    for ln in CL:
-        dr.text((W//2, ty), ln, font=fc, fill=WHITE, anchor="mm"); ty += fc.size + 4
+    # Unteres Band: gut sichtbarer Ortsbezug + farbiger Termin-Button (rein visuell, kein Link).
+    ort = (fields.get("ort") or "").strip()
+    cyy = (BOTB + H)//2
+    if ort:
+        dr.text((W//2, cyy - 30), "Beratungsstelle %s" % ort, font=_font(_BOLD, 31), fill=WHITE, anchor="mm")
+        _cta_button(dr, W//2, cyy + 26, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
+    else:
+        _cta_button(dr, W//2, cyy + 8, "Jetzt Termin vereinbaren", _font(_BOLD, 26))
 
     _draw_circles(base, slogan, pos, portrait)   # schwebende Kreise, Eckposition variiert je Beitrag
 
@@ -278,23 +291,25 @@ def _draw_circles(base, slogan, pos="unten", portrait=None):
     Slogan-Kreis (z.B. das Foto/Logo der Beratungsstelle)."""
     dr = ImageDraw.Draw(base)
     R = 102; CCY_TOP, CCY_BOT = 134, 946
+    # Mit hinterlegtem Beraterfoto wird der Portraet-Kreis deutlich groesser (~23 % der Bildbreite).
+    has_portrait = bool(portrait and os.path.exists(portrait))
+    RP = 124 if has_portrait else R
     logo_y = CCY_TOP if pos in ("oben", "diagonal") else CCY_BOT
     slogan_y = CCY_TOP if pos in ("oben", "diagonal2") else CCY_BOT
-    def shadow(cx, cy):
+    def shadow(cx, cy, rad):
         # weicher, etwas groesserer Schlagschatten mit Versatz nach unten-rechts -
-        # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass
-        # beide Kreise schweben (kleiner Versatz wurde sonst vom Kreis verdeckt)
+        # bildet einen sichtbaren Halo, der auch auf dem farbigen Band zeigt, dass die Kreise schweben
         sh = Image.new("RGBA", base.size, (0,0,0,0))
-        ImageDraw.Draw(sh).ellipse([cx-R-6, cy-R+2, cx+R+16, cy+R+22], fill=(0,0,0,165))
+        ImageDraw.Draw(sh).ellipse([cx-rad-6, cy-rad+2, cx+rad+16, cy+rad+22], fill=(0,0,0,165))
         blr = sh.filter(ImageFilter.GaussianBlur(22)); base.paste(blr, (0,0), blr)
-    lx = R + 22; shadow(lx, logo_y)
+    lx = R + 22; shadow(lx, logo_y, R)
     dr.ellipse([lx-R, logo_y-R, lx+R, logo_y+R], fill=WHITE)
     if os.path.exists(LOGO_PATH):
         logo = Image.open(LOGO_PATH).convert("RGBA"); lw = 170; lh2 = int(logo.height*lw/logo.width)
         logo = logo.resize((lw, lh2), Image.LANCZOS); base.paste(logo, (int(lx-lw/2), int(logo_y-lh2/2)), logo)
-    rx = W - R - 22; shadow(rx, slogan_y)
-    if portrait and os.path.exists(portrait) and _circle_portrait(base, rx, slogan_y, R, portrait):
-        return   # Kreis-Portraet ersetzt den blauen Slogan-Punkt
+    rx = W - RP - 22; shadow(rx, slogan_y, RP)
+    if has_portrait and _circle_portrait(base, rx, slogan_y, RP, portrait):
+        return   # Kreis-Portraet (vergroessert) ersetzt den blauen Slogan-Punkt
     dr.ellipse([rx-R, slogan_y-R, rx+R, slogan_y+R], fill=BLUE)
     fsl = _font(_BOLD, 33); lines = _slogan_lines(dr, slogan, fsl, 2*R - 36)
     sy = slogan_y - (len(lines)-1)*(fsl.size+4)//2
