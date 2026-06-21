@@ -519,15 +519,21 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
 <script>function need(f,n,m){return f.querySelectorAll('input[name='+n+']:checked').length>0||(alert(m),false);}</script>
 <div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><div><a href="/geplant">&#x23F0; Geplante Veröffentlichungen</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-<p class=hint style="max-width:1040px;margin:0 auto 12px">Freigegebene Beiträge werden automatisch auf die nächsten freien <b>Werktage</b> verteilt (max. 1 pro Tag, Sa+So frei). Termin unten anpassbar. Sondertage &amp; Fristen-Countdown folgen.</p>
+<p class=hint style="max-width:1040px;margin:0 auto 12px">Neu freigegebene Beiträge sind zunächst <b>„Noch nicht geplant"</b>. Das Tool schlägt den nächsten freien <b>Werktag nach der letzten Einplanung</b> vor (max. 1 pro Tag, Sa+So frei) – mit einem Klick bestätigen. Termin bleibt jederzeit anpassbar.</p>
 {% if pages_err %}<div class=flash style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}}</div>{% endif %}
 {% for e in freigegeben %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
-    <p><b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
+    <p>{% if e.geplant_fuer %}<b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:8px">
          <input type=date name=geplant_fuer value="{{e.geplant_fuer}}" style="padding:5px">
          <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form>
+       {% else %}<span style="display:inline-block;background:#b00020;color:#fff;font-size:16px;font-weight:bold;padding:10px 16px;border-radius:8px">&#x26A0;&#xFE0F; Noch nicht geplant</span>
+       <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:10px">
+         <span class=hint>Vorschlag: <b>{{e.vorschlag_de}}</b></span>
+         <input type=date name=geplant_fuer value="{{e.vorschlag}}" style="padding:5px;margin-left:4px">
+         <button style="background:#2e7d32;color:#fff;padding:8px 13px;border-radius:8px;font-weight:bold">Für diesen Tag einplanen</button></form>
+       {% endif %}
        <form method=post action="/beitrag-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag nach den aktuellen Vorgaben neu erzeugen (Text + Bild)? Der geplante Termin bleibt erhalten.')">
          <button style="background:#4c7b2d;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form>
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
@@ -948,24 +954,34 @@ def _de_datum(iso):
     except Exception:
         return iso or "-"
 
-def _naechster_freier_werktag(conn, ausser_id=None):
-    """Naechster freier Tag fuer einen Beitrag: HEUTE zuerst (auch am Wochenende, damit man
-    sofort einplanen/posten kann), danach nur freie Werktage (Mo-Fr). Max 1 Beitrag pro Tag."""
+def _vorschlag_termin(belegt):
+    """Terminvorschlag: ein Werktag NACH der letzten Einplanung (Sa/So uebersprungen,
+    max 1 Beitrag pro Tag). `belegt` = Menge bereits vergebener ISO-Daten. Ist (zukuenftig)
+    noch nichts geplant, faengt es beim naechsten Werktag ab heute an."""
     import datetime
+    heute = datetime.date.today()
+    zukunft = [datetime.date.fromisoformat(x) for x in belegt
+               if datetime.date.fromisoformat(x) >= heute]
+    if zukunft:
+        d = max(zukunft)  # letzte Einplanung -> ein Werktag danach
+        for _ in range(400):
+            d += datetime.timedelta(days=1)
+            if d.weekday() < 5 and d.isoformat() not in belegt:
+                return d.isoformat()
+        return d.isoformat()
+    d = heute  # nichts geplant -> erster freier Werktag ab heute
+    for _ in range(400):
+        if d.weekday() < 5 and d.isoformat() not in belegt:
+            return d.isoformat()
+        d += datetime.timedelta(days=1)
+    return d.isoformat()
+
+def _naechster_freier_werktag(conn, ausser_id=None):
+    """Terminvorschlag fuer EINEN Beitrag anhand der bereits geplanten Beitraege."""
     belegt = {r[0] for r in conn.execute(
         "SELECT geplant_fuer FROM entwuerfe WHERE status='freigegeben' "
         "AND geplant_fuer IS NOT NULL AND id != ?", (ausser_id or -1,))}
-    heute = datetime.date.today()
-    if heute.isoformat() not in belegt:
-        return heute.isoformat()
-    d = heute
-    for _ in range(400):
-        d += datetime.timedelta(days=1)
-        if d.weekday() >= 5:  # Sa/So ueberspringen
-            continue
-        if d.isoformat() not in belegt:
-            return d.isoformat()
-    return d.isoformat()
+    return _vorschlag_termin(belegt)
 
 def _ctx(**kw):
     kw.setdefault("user", session.get("user"))
@@ -1038,6 +1054,15 @@ def einplanung():
         for e in conn.execute("SELECT id, text, geplant_fuer, format FROM entwuerfe WHERE status='freigegeben' "
                               "ORDER BY geplant_fuer IS NULL, geplant_fuer, id"):
             rows.append(_parse(e))
+        # Fuer noch nicht geplante Beitraege je einen fortlaufenden Werktags-Vorschlag berechnen
+        # (jeder Vorschlag belegt den Tag fuer den naechsten ungeplanten Beitrag).
+        belegt = {r["geplant_fuer"] for r in rows if r.get("geplant_fuer")}
+        for r in rows:
+            if not r.get("geplant_fuer"):
+                v = _vorschlag_termin(belegt)
+                r["vorschlag"] = v
+                r["vorschlag_de"] = _de_datum(v)
+                belegt.add(v)
         stellen = conn.execute("SELECT id, name, ort, fb_seite, buchungs_url FROM beratungsstellen "
                               "WHERE aktiv=1 AND fb_seite IS NOT NULL AND fb_seite!='' ORDER BY ort").fetchall()
     pages, pages_err = (_pages() if rows and not stellen else ([], None))
@@ -1708,12 +1733,15 @@ def aktion(eid):
         if not e:
             abort(404)
         if aktion == "freigeben":
-            # Bereits gesetzter Termin (z.B. Fristen-Countdown) bleibt erhalten
-            vorhanden = e["geplant_fuer"] if "geplant_fuer" in e.keys() else None
-            termin = vorhanden or _naechster_freier_werktag(conn, eid)
+            # Bereits gesetzter Termin (z.B. Fristen-Countdown, eigener Beitrag) bleibt erhalten;
+            # ansonsten startet der Beitrag bewusst OHNE Termin ("Noch nicht geplant").
+            termin = e["geplant_fuer"] if "geplant_fuer" in e.keys() else None
             conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=? WHERE id=?", (termin, eid))
-            audit_log(conn, user, "freigegeben", eid, "geplant fuer %s" % termin)
-            flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
+            audit_log(conn, user, "freigegeben", eid, "geplant fuer %s" % (termin or "(noch offen)"))
+            if termin:
+                flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
+            else:
+                flash("Entwurf %d freigegeben – Termin unter „4. Einplanung\" mit einem Klick bestätigen." % eid)
         elif aktion == "verwerfen":
             conn.execute("UPDATE entwuerfe SET status='verworfen' WHERE id=?", (eid,))
             audit_log(conn, user, "verworfen", eid); flash("Entwurf %d verworfen." % eid)
