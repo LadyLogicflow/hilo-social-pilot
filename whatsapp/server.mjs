@@ -16,6 +16,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   DisconnectReason,
   Browsers,
+  jidNormalizedUser,
 } from 'baileys'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import qrcode from 'qrcode'
@@ -30,8 +31,13 @@ const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || ''
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined
 const logger = pino({ level: process.env.HILO_WHATSAPP_LOGLEVEL || 'warn' })
 
-const S = { state: 'init', qr: null, me: null, error: null }
+const S = { state: 'init', qr: null, me: null, error: null, contacts: 0 }
+const contacts = new Set()  // synchronisierte Kontakt-JIDs (moegliche Status-Empfaenger)
 let sock = null
+
+function ownJid() {
+  return sock?.user?.id ? jidNormalizedUser(sock.user.id) : null
+}
 
 function readImage(p) {
   if (!p) return null
@@ -55,6 +61,15 @@ async function start() {
   })
 
   sock.ev.on('creds.update', saveCreds)
+
+  // Kontakte sammeln (Empfaenger fuer Status-Broadcasts)
+  const addContact = (c) => {
+    const id = c?.id
+    if (id && id.endsWith('@s.whatsapp.net')) { contacts.add(jidNormalizedUser(id)); S.contacts = contacts.size }
+  }
+  sock.ev.on('contacts.upsert', (cs) => (cs || []).forEach(addContact))
+  sock.ev.on('contacts.update', (cs) => (cs || []).forEach(addContact))
+  sock.ev.on('messaging-history.set', (h) => (h?.contacts || []).forEach(addContact))
 
   sock.ev.on('connection.update', async (u) => {
     const { connection, lastDisconnect, qr } = u
@@ -83,14 +98,31 @@ async function start() {
 }
 
 // --- Posting -----------------------------------------------------------------
-async function postStatus({ imagePath, caption, statusJidList }) {
+async function postStatus({ imagePath, caption, statusJidList, toContacts }) {
   if (S.state !== 'connected') throw new Error('Nicht verbunden (Status: ' + S.state + ')')
   const img = readImage(imagePath)
-  const opts = {}
-  if (Array.isArray(statusJidList) && statusJidList.length) opts.statusJidList = statusJidList
-  const content = img ? { image: img, caption: caption || '' } : { text: caption || '' }
+  // Ein Status-Broadcast braucht eine Empfaenger-Liste, sonst geht er ins Leere.
+  //  - explizite Liste hat Vorrang
+  //  - toContacts=true: an alle synchronisierten Kontakte (Produktiv-Reichweite)
+  //  - sonst (Test): nur an die eigene Nummer -> erscheint in "Mein Status", ohne Kontakte zu spammen
+  let recipients = []
+  if (Array.isArray(statusJidList) && statusJidList.length) recipients = statusJidList.slice()
+  else if (toContacts && contacts.size) recipients = Array.from(contacts)
+  const me = ownJid()
+  if (me && !recipients.includes(me)) recipients.push(me)  // eigene Sichtbarkeit garantieren
+  if (!recipients.length) throw new Error('Keine Empfaenger fuer den Status ermittelbar.')
+
+  const opts = { statusJidList: recipients }
+  let content
+  if (img) {
+    content = { image: img, caption: caption || '' }
+  } else {
+    content = { text: caption || '' }
+    opts.backgroundColor = '#1f428d'  // HILO-Blau
+    opts.font = 3
+  }
   await sock.sendMessage('status@broadcast', content, opts)
-  return { ok: true }
+  return { ok: true, recipients: recipients.length }
 }
 
 async function resolveChannelJid({ jid, invite }) {
