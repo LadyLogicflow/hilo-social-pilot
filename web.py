@@ -2391,8 +2391,10 @@ button.g{background:#4c7b2d}button.r{background:#b00020}
     <form method=post action="/whatsapp/test-status">
       <label>Text</label><input type=text name=caption placeholder="HISOME Test-Status">
       <label class=step style="font-weight:normal;margin-top:8px"><input type=checkbox name=to_contacts value="1"> An meine Kontakte senden (sonst nur an mich &ndash; ein „nur an mich"-Status wird von WhatsApp aber nicht angezeigt)</label>
+      <label style="margin-top:8px">Oder gezielt an eine Test-Nummer (international ohne +, z. B. 49160...)</label>
+      <input type=text name=empfaenger placeholder="z. B. 49160...">
       <button class=g>Test-Status senden</button></form>
-    <p class=muted>Ein WhatsApp-Status erscheint nur, wenn er an echte Kontakte geht. Sind oben 0 Kontakte, muss die Nummer erst Kontakte gespeichert/synchronisiert haben.</p></div>
+    <p class=muted>Ein WhatsApp-Status erscheint nur, wenn er an echte Kontakte geht. Für einen sichtbaren Test trag deine eigene Nummer ein &ndash; das Handy muss die …626-Nummer als Kontakt gespeichert haben, dann erscheint der Status dort im Status-Bereich.</p></div>
   <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Kanal</h3>
     <form method=post action="/whatsapp/test-channel">
       <label>Kanal-Einladungslink</label><input type=text name=invite placeholder="https://whatsapp.com/channel/...">
@@ -2431,10 +2433,19 @@ def whatsapp_logout():
 @app.route("/whatsapp/test-status", methods=["POST"])
 @login_required
 def whatsapp_test_status():
+    import re
     caption = request.form.get("caption", "").strip() or "HISOME Test-Status"
     to_contacts = bool(request.form.get("to_contacts"))
-    res, err = _wa_call("/post-status", method="POST",
-                        payload={"caption": caption, "toContacts": to_contacts}, timeout=30)
+    payload = {"caption": caption, "toContacts": to_contacts}
+    # Optionale Test-Empfaenger-Nummer -> WhatsApp-JID (deutsche 0... -> 49...)
+    digits = re.sub(r"\D", "", request.form.get("empfaenger", ""))
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0"):
+        digits = "49" + digits[1:]
+    if digits:
+        payload["statusJidList"] = [digits + "@s.whatsapp.net"]
+    res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=30)
     if err:
         flash("Fehler: " + err)
     elif res and res.get("error"):
