@@ -89,10 +89,20 @@ async function start() {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
       const loggedOut = code === DisconnectReason.loggedOut
-      S.state = loggedOut ? 'logged_out' : 'closed'
       S.error = lastDisconnect?.error?.message || null
       logger.warn({ code, loggedOut }, 'Verbindung geschlossen')
-      if (!loggedOut) setTimeout(() => start().catch(e => { S.error = e.message }), 3000)
+      if (loggedOut) {
+        // Sitzung wurde entfernt/abgemeldet (z.B. 'device_removed') -> die gespeicherte
+        // Auth ist tot. Verwerfen, damit beim Neustart ein FRISCHER QR entsteht statt
+        // erneut sofort 401. Danach automatisch neu verbinden (zeigt dann den QR an).
+        S.state = 'logged_out'; S.me = null; S.qr = null; contacts.clear(); S.contacts = 0
+        try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }) }
+        catch (e) { logger.warn({ err: e.message }, 'Auth-Cleanup fehlgeschlagen') }
+        setTimeout(() => start().catch(e => { S.error = e.message }), 1500)
+      } else {
+        S.state = 'closed'
+        setTimeout(() => start().catch(e => { S.error = e.message }), 3000)
+      }
     }
   })
 }
