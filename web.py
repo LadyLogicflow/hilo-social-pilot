@@ -1543,12 +1543,17 @@ def themen():
 @app.route("/thema-loeschen/<int:tid>", methods=["POST"])
 @login_required
 def thema_loeschen(tid):
-    """Loescht ein einzelnes Thema endgueltig (aus Themen-Liste oder Erzeugen-Uebersicht)."""
+    """Markiert ein einzelnes Thema als geloescht (aus Themen-Liste oder Erzeugen-Uebersicht).
+
+    Soft-Delete: Die Zeile (und ihr UNIQUE-hash) bleibt erhalten, damit der Themen-Radar das
+    bereits gepruefte Thema beim naechsten Lauf nicht erneut als 'neu' einliest - sonst kaeme
+    es nach dem Loeschen wieder zurueck. Aus den Listen verschwindet es trotzdem, weil diese
+    nur 'vorgeschlagen'/'ausgewaehlt' anzeigen (analog zum 'verworfen'-Status)."""
     zurueck = request.form.get("zurueck", "themen")
     with get_conn() as conn:
-        # nur loeschen, solange das Thema KEINEN Entwurf hat (schliesst das Zeitfenster zwischen
+        # Soft-Delete nur, solange das Thema KEINEN Entwurf hat (schliesst das Zeitfenster zwischen
         # Anzeige und Klick - kein verwaister entwuerfe-Eintrag, da SQLite hier keine FK erzwingt)
-        cur = conn.execute("DELETE FROM themen WHERE id=? "
+        cur = conn.execute("UPDATE themen SET status='geloescht' WHERE id=? AND status!='geloescht' "
                            "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id)", (tid,))
         if cur.rowcount > 0:
             audit_log(conn, session["user"], "thema_geloescht", None, "Thema %d" % tid)
