@@ -559,6 +559,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="einzelbild">Einzelbild</option>
         <option value="karussell" selected>Karussell</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
+      <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
       <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
@@ -578,6 +579,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
         <option value="einzelbild">Einzelbild</option>
         <option value="karussell" selected>Karussell</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
+      <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
       <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
@@ -615,7 +617,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 <form method=post action="/veroeffentlichen/{{eid}}" onsubmit="return confirm('Jetzt an die {{ziel_count}} gültigen Ziele veröffentlichen?')">
   {% for s in stelle_ids %}<input type=hidden name=stelle_id value="{{s}}"><input type=hidden name="kanal_s{{s}}" value="{{kanal_map.get('s'+s,'facebook')}}">{% endfor %}
   {% for p in page_ids %}<input type=hidden name=page_id value="{{p}}"><input type=hidden name="kanal_p{{p}}" value="{{kanal_map.get('p'+p,'facebook')}}">{% endfor %}
-  <input type=hidden name=format_fb value="{{fmt_fb}}"><input type=hidden name=format_ig value="{{fmt_ig}}">{% if story_ig %}<input type=hidden name=story_ig value="1">{% endif %}
+  <input type=hidden name=format_fb value="{{fmt_fb}}"><input type=hidden name=format_ig value="{{fmt_ig}}">{% if story_ig %}<input type=hidden name=story_ig value="1">{% endif %}{% if story_fb %}<input type=hidden name=story_fb value="1">{% endif %}
   <div class=foot><a href="/einplanung">&larr; Auswahl ändern</a>
     <span class=hint>{{ziel_count}} Ziel(e) – Kanal je Beratungsstelle wie oben angezeigt</span>
     <button{% if not ziel_count %} disabled{% endif %}>Jetzt veröffentlichen</button></div>
@@ -1807,43 +1809,66 @@ def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id
         return publish.publish_instagram_carousel(ig_id, urls, caption, location_id=location_id)
     return publish.publish_instagram(ig_id, urls[0], caption, location_id=location_id)
 
-def _publish_story(publish, fb_page_id, bilder, eid, stelle_id):
-    """Postet die uebergebenen Bilder NACHEINANDER als Instagram-Story-Frames (9:16) - so erscheint
-    ein Karussell als mehrteilige Story. Jeder Slide wird auf 9:16 gebracht, oeffentlich hochgeladen
-    (IONOS) und als eigene Story veroeffentlicht. (ok, info) - ok, wenn mind. ein Frame gepostet wurde."""
-    import uploader, time
-    if not uploader.configured():
-        return False, "Bild-Upload nicht konfiguriert (IONOS-Secrets fehlen)."
+def _publish_story(publish, fb_page_id, bilder, eid, stelle_id, do_ig=True, do_fb=False):
+    """Postet die uebergebenen Bilder NACHEINANDER als Story-Frames (9:16) - ein Karussell
+    erscheint so als mehrteilige Story. Jeder Slide wird auf 9:16 gebracht.
+      do_ig -> Instagram-Story (braucht oeffentliche URL via IONOS-Upload + IG-Verknuepfung)
+      do_fb -> Facebook-Seiten-Story (direkter Bild-Upload, KEINE URL noetig)
+    (ok, info) - ok, wenn mind. ein Frame irgendwo gepostet wurde."""
+    import time
     valid = [b for b in (bilder or []) if b and os.path.exists(b)]
     if not valid:
         return False, "Kein Bild fuer die Story vorhanden."
     ig_id = None
-    for pg in publish.list_pages():
-        if str(pg.get("id")) == str(fb_page_id):
-            ig_id = pg.get("ig_id"); break
-    if not ig_id:
-        return False, "Keine Instagram-Verknuepfung fuer diese Facebook-Seite."
+    if do_ig:
+        import uploader
+        if not uploader.configured():
+            if not do_fb:
+                return False, "Bild-Upload nicht konfiguriert (IONOS-Secrets fehlen)."
+            do_ig = False   # Instagram-Story nicht moeglich, Facebook-Story trotzdem versuchen
+        else:
+            for pg in publish.list_pages():
+                if str(pg.get("id")) == str(fb_page_id):
+                    ig_id = pg.get("ig_id"); break
+            if not ig_id:
+                if not do_fb:
+                    return False, "Keine Instagram-Verknuepfung fuer diese Facebook-Seite."
+                do_ig = False
     stamp = int(time.time())
     gemacht, fehler = 0, []
     for i, square in enumerate(valid):
         out = os.path.join(DATA_DIR, "bilder", "story_%d_%s_%d.png" % (eid, stelle_id or "p", i))
         try:
             _status_hochkant(square, out)
-            url = uploader.upload(out, remote_name="story_e%d_%s_%d_%d.png" % (eid, stelle_id or "p", stamp, i))
         except Exception as ex:
             fehler.append("Frame %d: %s" % (i + 1, ex)); continue
-        s_ok, s_info = publish.publish_instagram_story(ig_id, url)
-        if s_ok:
-            gemacht += 1
-        else:
-            fehler.append("Frame %d: %s" % (i + 1, s_info))
+        if do_ig and ig_id:
+            try:
+                import uploader
+                url = uploader.upload(out, remote_name="story_e%d_%s_%d_%d.png" % (eid, stelle_id or "p", stamp, i))
+                s_ok, s_info = publish.publish_instagram_story(ig_id, url)
+            except Exception as ex:
+                s_ok, s_info = False, str(ex)
+            if s_ok:
+                gemacht += 1
+            else:
+                fehler.append("IG-Frame %d: %s" % (i + 1, s_info))
+        if do_fb:
+            try:
+                f_ok, f_info = publish.publish_facebook_story(fb_page_id, out)
+            except Exception as ex:
+                f_ok, f_info = False, str(ex)
+            if f_ok:
+                gemacht += 1
+            else:
+                fehler.append("FB-Frame %d: %s" % (i + 1, f_info))
     if gemacht:
-        msg = "%d/%d Story-Bilder gepostet" % (gemacht, len(valid))
+        msg = "%d Story-Frames gepostet" % gemacht
         return True, (msg + " (" + "; ".join(fehler) + ")") if fehler else msg
     return False, "; ".join(fehler) or "Story fehlgeschlagen"
 
 
-def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_id, user, publish, story=True):
+def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_id, user, publish, story=True, story_fb=False):
     """Veroeffentlicht den Entwurf an EIN Ziel (Beratungsstelle personalisiert ODER Facebook-Seite).
     Das Bildformat ist je Kanal waehlbar: fmt_fb fuer Facebook, fmt_ig fuer Instagram
     (jeweils 'einzelbild' oder 'karussell'). Rueckgabe: (ziel_name, erfolg, [(kanal, ok, info), ...])."""
@@ -1915,6 +1940,17 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                     k_ok, k_info = False, str(ex)
                 audit_log(conn, user, "fb_kommentar_%s" % ("ok" if k_ok else "fehler"), eid,
                           "Ziel %s / %s" % (ziel_seite, k_info))
+        # Zusaetzlich als Facebook-Story (9:16), wenn gewuenscht und der Feed-Post geklappt hat.
+        # Story-Ergebnis wird nur protokolliert (Stories sind fluechtig).
+        if story_fb and ok:
+            try:
+                slides = _render("karussell")
+                sf_ok, sf_info = _publish_story(publish, ziel_seite, slides, eid, stelle_id,
+                                                do_ig=False, do_fb=True)
+            except Exception as ex:
+                sf_ok, sf_info = False, str(ex)
+            audit_log(conn, user, "facebook_story_%s" % ("ok" if sf_ok else "fehler"), eid,
+                      "Ziel %s / %s" % (ziel_seite, sf_info))
     if kanal in ("instagram", "beide"):
         bilder = []
         try:
@@ -1968,6 +2004,7 @@ def veroeffentlichen(eid):
     fmt_fb = _format("format_fb", "einzelbild")
     fmt_ig = _format("format_ig", "karussell")
     story = request.form.get("story_ig") == "1"
+    story_fb = request.form.get("story_fb") == "1"
     haupt_fmt = "karussell" if "karussell" in (fmt_fb, fmt_ig) else "einzelbild"
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -1995,7 +2032,7 @@ def veroeffentlichen(eid):
         gesamt_erfolg = False
         zeilen = []
         for stelle, pid, kanal in ziele:
-            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, pid, user, publish, story)
+            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, pid, user, publish, story, story_fb)
             gesamt_erfolg = gesamt_erfolg or erfolg
             teile = ["%s: %s" % (k.capitalize(), ("OK" if ok else "Fehler – %s" % info)) for k, ok, info in ergebnisse]
             zeilen.append("%s → %s" % (ziel_name, " | ".join(teile)))
@@ -2116,6 +2153,7 @@ def vorschau(eid):
     fmt_fb = _format("format_fb", "einzelbild")
     fmt_ig = _format("format_ig", "karussell")
     story = request.form.get("story_ig") == "1"
+    story_fb = request.form.get("story_fb") == "1"
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
         return redirect(url_for("einplanung"))
@@ -2175,7 +2213,7 @@ def vorschau(eid):
     ziel_count = sum(1 for it in items if it.get("ok"))
     return render_template_string(VORSCHAU, **_ctx(eid=eid, fmt_fb=fmt_fb, fmt_ig=fmt_ig, items=items,
                                   ziel_count=ziel_count, stelle_ids=stelle_ids, page_ids=page_ids,
-                                  kanal_map=kanal_map, story_ig=story))
+                                  kanal_map=kanal_map, story_ig=story, story_fb=story_fb))
 
 @app.route("/preview-bild/<int:eid>/<int:sid>")
 @rolle_required("freigeber")

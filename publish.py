@@ -172,6 +172,34 @@ def publish_facebook_carousel(page_id, image_paths, caption, place=None):
 
 
 # ---------------------------------------------------------------------------
+# Facebook: Story (Foto, verschwindet nach 24 Stunden) - offizielle Page-Stories-API
+# ---------------------------------------------------------------------------
+def publish_facebook_story(page_id, image_path):
+    """Veroeffentlicht ein Bild als Facebook-Seiten-Story (verschwindet nach 24 Stunden).
+    Zweistufig: Foto unveroeffentlicht hochladen (POST /{page_id}/photos?published=false),
+    dann die Foto-ID an POST /{page_id}/photo_stories uebergeben. Anders als bei Instagram
+    ist KEINE oeffentliche Bild-URL noetig (direkter Binaer-Upload). Ideal im Hochformat 9:16.
+    Rueckgabe: (ok, info) - info ist die Story-/Post-ID oder die Fehlermeldung."""
+    token = _page_token(page_id)
+    with open(image_path, "rb") as fh:
+        up = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
+                           data={"published": "false", "access_token": token},
+                           files={"source": fh})
+    if up.status_code != 200:
+        return False, _err(up)
+    photo_id = up.json().get("id")
+    if not photo_id:
+        return False, "Foto-Upload ohne ID-Rueckgabe."
+    r = requests.post(GRAPH + "/%s/photo_stories" % page_id, timeout=60,
+                      data={"photo_id": photo_id, "access_token": token})
+    if r.status_code == 200:
+        j = r.json()
+        return True, (j.get("post_id") or j.get("id") or "")
+    _delete_fb_photos([photo_id], token)   # Story-Publish fehlgeschlagen -> Foto nicht verwaisen lassen
+    return False, _err(r)
+
+
+# ---------------------------------------------------------------------------
 # Instagram: zweistufige Veroeffentlichung (benoetigt oeffentliche Bild-URL)
 # ---------------------------------------------------------------------------
 def publish_instagram(ig_user_id, image_url, caption, location_id=None):
