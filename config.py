@@ -16,6 +16,9 @@ SECRETS_FILE = os.environ.get("HILO_SECRETS_FILE", os.path.join(BASE_DIR, "secre
 TIMEZONE = os.environ.get("HILO_TIMEZONE", "Europe/Berlin")
 RUN_HOUR = int(os.environ.get("HILO_RUN_HOUR", "7"))
 
+# WhatsApp-Dienst (eigener Node-/Baileys-Prozess auf demselben Host, nur localhost)
+WHATSAPP_URL = os.environ.get("HILO_WHATSAPP_URL", "http://127.0.0.1:8769")
+
 # RSS-/Atom-Quellen
 SOURCES = {
     "hilo":     os.environ.get("HILO_SOURCES_HILO", "https://www.hilo.de/steuertipps/feed/"),

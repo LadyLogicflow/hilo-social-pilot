@@ -1,0 +1,20 @@
+{
+  "name": "hisome-whatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HISOME WhatsApp-Dienst (Baileys): QR-Login + Status-/Kanal-Posting fuer den Pi",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "baileys": "^6.7.0",
+    "qrcode": "^1.5.4",
+    "pino": "^9.0.0",
+    "https-proxy-agent": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

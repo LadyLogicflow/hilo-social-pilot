@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from db import get_conn, init_db, audit_log
 from secrets_store import get_secret
-from config import BASE_DIR, DATA_DIR
+from config import BASE_DIR, DATA_DIR, WHATSAPP_URL
 import textgen, bildgen
 
 app = Flask(__name__)
@@ -353,7 +353,7 @@ button{background:#1f428d;color:#fff;border:0;padding:9px 14px;border-radius:8px
 .flash{color:#1f428d;margin:8px 0;font-weight:bold}.hint{color:#777;font-size:13px}"""
 
 _NAV = """<div class=top><div><b style="color:#1f428d;font-size:20px">HISOME</b> <span style="color:#60a33c;font-size:13px">HILO Social Media Tool</span></div>
-<div><a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
+<div><a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
 
 LOGIN = """<!doctype html><meta charset=utf-8><title>HISOME - HILO Social Media Tool</title>
 <style>
@@ -2345,6 +2345,126 @@ def portrait(sid):
             or not os.path.exists(row["portrait_pfad"])):
         abort(404)
     return send_file(row["portrait_pfad"], mimetype="image/png")
+
+# --- WhatsApp (Baileys-Dienst auf demselben Host, nur localhost) -------------
+def _wa_call(path, method="GET", payload=None, timeout=6):
+    """Ruft die lokale HTTP-API des Node-/Baileys-Dienstes auf. Gibt (daten, fehler) zurueck."""
+    import urllib.request, urllib.error
+    url = WHATSAPP_URL.rstrip("/") + path
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(url, data=data, method=method,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8") or "{}"), None
+    except urllib.error.URLError as e:
+        return None, "Dienst nicht erreichbar (%s)" % getattr(e, "reason", e)
+    except Exception as e:  # noqa: BLE001
+        return None, str(e)
+
+WHATSAPP = """<!doctype html><meta charset=utf-8><title>HISOME - WhatsApp</title>
+{% if wa and wa.state in ['qr','init','closed'] %}<meta http-equiv=refresh content=8>{% endif %}
+<style>""" + _TOP + """
+.wrap{max-width:760px;margin:0 auto}
+.card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;margin:0 auto 16px}
+.qr{text-align:center}.qr img{width:300px;height:300px;border:1px solid #e2e8f0;border-radius:10px}
+.ok{color:#2f7d32;font-weight:bold}.bad{color:#b00020;font-weight:bold}
+.step{color:#475569;font-size:14px}
+label{display:block;margin:8px 0 3px;font-weight:bold;font-size:14px}
+input[type=text]{width:100%;box-sizing:border-box;padding:9px;border:1px solid #ccd3df;border-radius:8px}
+button{background:#1f428d;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer;margin-top:8px}
+button.g{background:#4c7b2d}button.r{background:#b00020}
+.muted{color:#6b7280;font-size:13px}</style>
+""" + _NAV + """
+<div style="max-width:760px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#1f428d">WhatsApp</h2><a href="/">&larr; Startseite</a></div></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash style="max-width:760px">{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=wrap>
+{% if wa_err %}
+  <div class=card><p class=bad>WhatsApp-Dienst nicht erreichbar.</p>
+  <p class=muted>{{wa_err}}</p>
+  <p class=step>Der WhatsApp-Dienst (Node/Baileys) läuft noch nicht. Bitte einmalig auf dem Pi einrichten (siehe <code>whatsapp/README.md</code>) und den Dienst starten.</p></div>
+{% elif wa.state == 'connected' %}
+  <div class=card><p class=ok>&#x2705; Verbunden{% if wa.me %} als <code>{{wa.me}}</code>{% endif %}.</p>
+    <p class=muted>Die WhatsApp-Sitzung ist aktiv. Du kannst jetzt einen Test senden.</p>
+    <form method=post action="/whatsapp/logout" onsubmit="return confirm('Sitzung wirklich trennen? Du musst danach neu scannen.')"><button class=r>Sitzung trennen</button></form></div>
+  <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Status</h3>
+    <form method=post action="/whatsapp/test-status">
+      <label>Text</label><input type=text name=caption placeholder="HISOME Test-Status">
+      <button class=g>Test-Status senden</button></form></div>
+  <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Kanal</h3>
+    <form method=post action="/whatsapp/test-channel">
+      <label>Kanal-Einladungslink</label><input type=text name=invite placeholder="https://whatsapp.com/channel/...">
+      <label>Text</label><input type=text name=caption placeholder="HISOME Test-Kanalbeitrag">
+      <button class=g>Test-Kanalbeitrag senden</button></form>
+    <p class=muted>Den Einladungslink findest du in WhatsApp: Kanal öffnen &rarr; Name antippen &rarr; „Link teilen".</p></div>
+{% elif wa.state == 'qr' and wa.qr %}
+  <div class="card qr"><h3 style="color:#1f428d">QR-Code scannen</h3>
+    <img src="{{wa.qr}}" alt="WhatsApp QR">
+    <ol class=step style="text-align:left;max-width:420px;margin:14px auto">
+      <li>WhatsApp auf dem Handy mit der Beratungsstellen-Nummer öffnen</li>
+      <li>Einstellungen &rarr; <b>Verknüpfte Geräte</b> &rarr; <b>Gerät verknüpfen</b></li>
+      <li>Diesen QR-Code scannen</li></ol>
+    <p class=muted>Die Seite aktualisiert sich automatisch.</p></div>
+{% else %}
+  <div class=card><p class=step>Verbindung wird aufgebaut&hellip; (Status: {{wa.state if wa else '—'}})</p>
+    {% if wa and wa.error %}<p class=muted>{{wa.error}}</p>{% endif %}
+    <p class=muted>Die Seite aktualisiert sich automatisch.</p></div>
+{% endif %}
+</div>"""
+
+@app.route("/whatsapp")
+@login_required
+def whatsapp():
+    st, err = _wa_call("/status")
+    return render_template_string(WHATSAPP, **_ctx(wa=st, wa_err=err))
+
+@app.route("/whatsapp/logout", methods=["POST"])
+@login_required
+def whatsapp_logout():
+    _wa_call("/logout", method="POST", payload={})
+    audit_log_safe("whatsapp_logout")
+    flash("WhatsApp-Sitzung getrennt. Scanne den neuen QR-Code zum Neuverbinden.")
+    return redirect(url_for("whatsapp"))
+
+@app.route("/whatsapp/test-status", methods=["POST"])
+@login_required
+def whatsapp_test_status():
+    caption = request.form.get("caption", "").strip() or "HISOME Test-Status"
+    res, err = _wa_call("/post-status", method="POST", payload={"caption": caption}, timeout=30)
+    if err:
+        flash("Fehler: " + err)
+    elif res and res.get("error"):
+        flash("WhatsApp: " + res["error"])
+    else:
+        flash("Test-Status gesendet.")
+    return redirect(url_for("whatsapp"))
+
+@app.route("/whatsapp/test-channel", methods=["POST"])
+@login_required
+def whatsapp_test_channel():
+    invite = request.form.get("invite", "").strip()
+    caption = request.form.get("caption", "").strip() or "HISOME Test-Kanalbeitrag"
+    if not invite:
+        flash("Bitte den Einladungslink des Kanals angeben.")
+        return redirect(url_for("whatsapp"))
+    res, err = _wa_call("/post-channel", method="POST",
+                        payload={"invite": invite, "caption": caption}, timeout=30)
+    if err:
+        flash("Fehler: " + err)
+    elif res and res.get("error"):
+        flash("WhatsApp: " + res["error"])
+    else:
+        flash("Test-Kanalbeitrag gesendet.")
+    return redirect(url_for("whatsapp"))
+
+def audit_log_safe(aktion):
+    """Audit-Eintrag ohne harten Fehler, falls keine DB-Verbindung verfuegbar ist."""
+    try:
+        with get_conn() as conn:
+            audit_log(conn, session.get("user"), aktion, None, None)
+            conn.commit()
+    except Exception:
+        pass
 
 def serve(host="0.0.0.0", port=None):
     init_db()

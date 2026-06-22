@@ -1,0 +1,18 @@
+# Vorlage. Normalerweise wird die echte Unit-Datei von
+# deploy/install-whatsapp.sh automatisch mit deinen Pfaden erzeugt.
+# Falls du sie von Hand einrichtest: Pfade, Benutzer und node-Pfad anpassen.
+[Unit]
+Description=HISOME WhatsApp-Dienst (Baileys)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=DEIN_BENUTZER
+WorkingDirectory=/pfad/zu/hilo-social-pilot/whatsapp
+ExecStart=/usr/bin/node /pfad/zu/hilo-social-pilot/whatsapp/server.mjs
+Environment=HILO_WHATSAPP_PORT=8769
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
