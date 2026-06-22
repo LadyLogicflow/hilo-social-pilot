@@ -2385,12 +2385,14 @@ button.g{background:#4c7b2d}button.r{background:#b00020}
   <p class=step>Der WhatsApp-Dienst (Node/Baileys) läuft noch nicht. Bitte einmalig auf dem Pi einrichten (siehe <code>whatsapp/README.md</code>) und den Dienst starten.</p></div>
 {% elif wa.state == 'connected' %}
   <div class=card><p class=ok>&#x2705; Verbunden{% if wa.me %} als <code>{{wa.me}}</code>{% endif %}.</p>
-    <p class=muted>Die WhatsApp-Sitzung ist aktiv. Du kannst jetzt einen Test senden.</p>
+    <p class=muted>Die WhatsApp-Sitzung ist aktiv. Synchronisierte Kontakte: <b>{{wa.contacts if wa.contacts is not none else '?'}}</b>.</p>
     <form method=post action="/whatsapp/logout" onsubmit="return confirm('Sitzung wirklich trennen? Du musst danach neu scannen.')"><button class=r>Sitzung trennen</button></form></div>
   <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Status</h3>
     <form method=post action="/whatsapp/test-status">
       <label>Text</label><input type=text name=caption placeholder="HISOME Test-Status">
-      <button class=g>Test-Status senden</button></form></div>
+      <label class=step style="font-weight:normal;margin-top:8px"><input type=checkbox name=to_contacts value="1"> An meine Kontakte senden (sonst nur an mich &ndash; ein „nur an mich"-Status wird von WhatsApp aber nicht angezeigt)</label>
+      <button class=g>Test-Status senden</button></form>
+    <p class=muted>Ein WhatsApp-Status erscheint nur, wenn er an echte Kontakte geht. Sind oben 0 Kontakte, muss die Nummer erst Kontakte gespeichert/synchronisiert haben.</p></div>
   <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Kanal</h3>
     <form method=post action="/whatsapp/test-channel">
       <label>Kanal-Einladungslink</label><input type=text name=invite placeholder="https://whatsapp.com/channel/...">
@@ -2430,13 +2432,16 @@ def whatsapp_logout():
 @login_required
 def whatsapp_test_status():
     caption = request.form.get("caption", "").strip() or "HISOME Test-Status"
-    res, err = _wa_call("/post-status", method="POST", payload={"caption": caption}, timeout=30)
+    to_contacts = bool(request.form.get("to_contacts"))
+    res, err = _wa_call("/post-status", method="POST",
+                        payload={"caption": caption, "toContacts": to_contacts}, timeout=30)
     if err:
         flash("Fehler: " + err)
     elif res and res.get("error"):
         flash("WhatsApp: " + res["error"])
     else:
-        flash("Test-Status gesendet.")
+        n = res.get("recipients") if res else None
+        flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
     return redirect(url_for("whatsapp"))
 
 @app.route("/whatsapp/test-channel", methods=["POST"])
