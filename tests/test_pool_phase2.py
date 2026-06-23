@@ -51,6 +51,13 @@ def main():
     with db.get_conn() as conn:
         _seed(conn)
 
+    # Pool Phase 3 (#127) gatet Instagram auf Stellen, deren fb_seite ein verknuepftes IG-Konto hat.
+    # Damit der Phase-2-Fluss (FB+IG) hier unveraendert greift, geben wir die drei Seiten als
+    # IG-faehig vor (kein echter Meta-Aufruf im Test).
+    web._pages = lambda force=False: (
+        [{"id": "fbseite_%d" % i, "name": "Seite %d" % i,
+          "ig_id": "ig_%d" % i, "ig_username": "stelle%d" % i} for i in range(1, 4)], None)
+
     # --- Lauf 1: deterministischer rng ---
     with db.get_conn() as conn:
         n1 = web._pool_tagesziehung(conn, datum=heute, rng=random.Random(42))

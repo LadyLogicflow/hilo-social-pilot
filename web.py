@@ -276,8 +276,13 @@ def _publiziere_geplant(gpid):
         stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (gp["stelle_id"],)).fetchone() \
             if gp["stelle_id"] else None
         try:
-            ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(
-                conn, e, gp["entwurf_id"], f, fmt_fb, fmt_ig, kanal, stelle, gp["page_id"], "scheduler", publish)
+            if pool_post and kanal in ("whatsapp_status", "whatsapp_kanal"):
+                # Eigener WhatsApp-Veroeffentlichungspfad (#127) - FB/IG-Pfad bleibt unveraendert.
+                ziel_name, erfolg, ergebnisse = _veroeffentliche_whatsapp(
+                    conn, e, gp["entwurf_id"], f, kanal, stelle, "scheduler")
+            else:
+                ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(
+                    conn, e, gp["entwurf_id"], f, fmt_fb, fmt_ig, kanal, stelle, gp["page_id"], "scheduler", publish)
         except Exception as ex:
             erfolg, ergebnisse = False, [("-", False, str(ex))]
         info = " | ".join("%s: %s" % (k, ("OK" if ok else "Fehler – %s" % i)) for k, ok, i in ergebnisse)
@@ -318,9 +323,95 @@ def _publish_scheduler():
         time.sleep(45)
 
 # --- Taegliche Auto-Ziehung aus dem Zufalls-Pool (Pool Phase 2, Issue #126) ----
-# Schedulerfaehige Kanaele fuer die Topf-Ziehung: Facebook und Instagram laufen ueber den
-# bestehenden Veroeffentlichungs-Scheduler. WhatsApp folgt in einer spaeteren Ausbaustufe (#127).
-POOL_SCHEDULER_KANAELE = ["facebook", "instagram"]
+# Schedulerfaehige Kanaele fuer die Topf-Ziehung. facebook/instagram laufen ueber den bestehenden
+# Veroeffentlichungs-Scheduler; whatsapp_* werden in Pool Phase 3 (#127) ueber den WhatsApp-Dienst
+# (_wa_call) gepostet. WhatsApp-Status wird taeglich gezogen, der WhatsApp-Kanal nur kuratiert an
+# bestimmten Wochentagen (1-2x/Woche).
+POOL_SCHEDULER_KANAELE = ["facebook", "instagram", "whatsapp_status", "whatsapp_kanal"]
+
+# Frequenz je Kanal (Pool Phase 3, #127): "taeglich" -> jeden Tag ziehen; eine Menge von Wochentagen
+# (0=Montag .. 6=Sonntag) -> nur an diesen Tagen ziehen. So bleibt der WhatsApp-Kanal bewusst seltener
+# (1-2x/Woche, kuratiert) als der taegliche Status. Konfigurierbar ueber HILO_WA_KANAL_TAGE (z.B. "1,4").
+def _wa_kanal_tage():
+    """Wochentage (0=Mo..6=So), an denen der WhatsApp-Kanal bespielt wird. Default: Dienstag+Freitag."""
+    roh = os.environ.get("HILO_WA_KANAL_TAGE", "1,4")
+    tage = set()
+    for t in roh.split(","):
+        t = t.strip()
+        if t.isdigit() and 0 <= int(t) <= 6:
+            tage.add(int(t))
+    return tage or {1, 4}
+
+POOL_KANAL_FREQUENZ = {
+    "facebook": "taeglich",
+    "instagram": "taeglich",
+    "whatsapp_status": "taeglich",
+    "whatsapp_kanal": _wa_kanal_tage,   # Callable -> Menge von Wochentagen
+}
+
+def _kanal_heute_faellig(kanal, wochentag):
+    """True, wenn der Kanal am gegebenen Wochentag (0=Mo..6=So) bespielt werden soll."""
+    freq = POOL_KANAL_FREQUENZ.get(kanal, "taeglich")
+    if callable(freq):
+        freq = freq()
+    if freq == "taeglich":
+        return True
+    if isinstance(freq, (set, frozenset, list, tuple)):
+        return wochentag in freq
+    return True
+
+# Wochenend-Regel (#127): am Wochenende leichtere Inhalte (Wissens-Serie), keine harten Fristen-/CTA-Posts.
+# Der Topf enthaelt zeitlose Beitraege; am Wochenende ziehen wir bevorzugt aus der Wissens-Serie
+# (quelle 'wissen'). Konfigurierbar abschaltbar ueber HILO_POOL_WOCHENEND_FILTER=0.
+_POOL_WOCHENEND_QUELLEN = {"wissen"}   # "leichte" Inhalte fuers Wochenende
+
+def _wochenend_filter_aktiv():
+    return os.environ.get("HILO_POOL_WOCHENEND_FILTER", "1").strip() not in ("0", "false", "nein", "")
+
+def _ist_wochenende(wochentag):
+    return wochentag in (5, 6)   # Samstag, Sonntag
+
+def _kanal_verfuegbarkeit(stellen):
+    """Ermittelt je Pool-Kanal die Menge der Stellen-IDs, die diesen Kanal TATSAECHLICH haben (#127):
+      - facebook: jede Stelle mit hinterlegter fb_seite (Vorbedingung der Auswahl),
+      - instagram: nur Stellen, deren fb_seite ein verknuepftes Instagram-Konto hat (ig_id aus _pages()),
+      - whatsapp_status: nur Stellen mit Marker wa_status_aktiv=1,
+      - whatsapp_kanal: nur Stellen mit hinterlegtem wa_kanal_invite.
+    'stellen' sind die bereits gefilterten aktiven Stellen mit fb_seite. Rueckgabe: dict[kanal] -> set(ids).
+    Nicht vorhandene Kanaele werden so je Stelle uebersprungen (kein pool_nutzung-Verbrauch, keine Fehlpostings)."""
+    fb_ids = {int(s["id"]) for s in stellen}
+    # IG-faehige Facebook-Seiten (mit verknuepftem Instagram-Konto) aus dem Seiten-Cache.
+    pages, _err = _pages()
+    ig_seiten = {str(p["id"]) for p in (pages or []) if p.get("ig_id")}
+    ig_ids = {int(s["id"]) for s in stellen if str(s["fb_seite"]) in ig_seiten}
+    def _hat(s, key):
+        return key in s.keys()
+    wa_status_ids = {int(s["id"]) for s in stellen
+                     if _hat(s, "wa_status_aktiv") and s["wa_status_aktiv"]}
+    wa_kanal_ids = {int(s["id"]) for s in stellen
+                    if _hat(s, "wa_kanal_invite") and (s["wa_kanal_invite"] or "").strip()}
+    return {
+        "facebook": fb_ids,
+        "instagram": ig_ids,
+        "whatsapp_status": wa_status_ids,
+        "whatsapp_kanal": wa_kanal_ids,
+    }
+
+def _pool_wochenend_eids(conn):
+    """IDs der Topf-Beitraege, die am Wochenende erlaubt sind (leichte Inhalte = Wissens-Serie, #127).
+    Verknuepft pool -> entwuerfe -> themen.quelle. Rueckgabe: set(entwurf_id) oder None bei Fehler."""
+    try:
+        rows = conn.execute(
+            "SELECT p.entwurf_id FROM pool p "
+            "LEFT JOIN entwuerfe e ON e.id=p.entwurf_id "
+            "LEFT JOIN themen t ON t.id=e.thema_id "
+            "WHERE p.aktiv=1 AND t.quelle IN (%s)" %
+            ",".join("?" * len(_POOL_WOCHENEND_QUELLEN)),
+            tuple(_POOL_WOCHENEND_QUELLEN)).fetchall()
+        return {int(r[0]) for r in rows}
+    except Exception:
+        log.exception("Pool-Wochenend-Filter: Quelle der Topf-Beitraege nicht ermittelbar")
+        return None
 
 def _pool_tagesziehung(conn, datum=None, rng=None):
     """Zieht EINMAL pro Tag je aktive Beratungsstelle und je schedulerfaehigem Kanal einen noch
@@ -336,27 +427,45 @@ def _pool_tagesziehung(conn, datum=None, rng=None):
     now = datetime.datetime.now()
     datum = datum or now.date().isoformat()
     heute = (datum == now.date().isoformat())
+    try:
+        wochentag = datetime.date.fromisoformat(datum).weekday()   # 0=Montag .. 6=Sonntag
+    except Exception:
+        wochentag = now.weekday()
     # Nur postbare, aktive Stellen (Facebook-Seite hinterlegt) kommen fuer die Ziehung infrage.
-    stellen = conn.execute("SELECT id FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+    stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
                            "AND fb_seite!='' ORDER BY id").fetchall()
     stelle_ids = [int(r["id"]) for r in stellen]
     if not stelle_ids:
         return 0
+    # Kanal-Verfuegbarkeit je Stelle (#127): nur Kanaele bespielen, die die Stelle TATSAECHLICH hat.
+    verfuegbar = _kanal_verfuegbarkeit(stellen)   # dict[kanal] -> set(stelle_id)
+    # Wochenend-Regel (#127): am Wochenende nur "leichte" Pool-Beitraege (Wissens-Serie) ziehen.
+    erlaubte_eids = None
+    if _wochenend_filter_aktiv() and _ist_wochenende(wochentag):
+        erlaubte_eids = _pool_wochenend_eids(conn)
     # Bereits am 'datum' belegte Uhrzeiten (alle geplanten Posts) - fuer die Streuung der Vorschlaege.
     belegt = [r[0][11:16] for r in conn.execute(
         "SELECT geplant_am FROM geplante_posts WHERE geplant_am LIKE ? AND status='geplant'", (datum + "T%",))]
     min_m = (now.hour * 60 + now.minute + 2) if heute else 7 * 60
     n = 0
     for kanal in POOL_SCHEDULER_KANAELE:
+        # Frequenz-Regel (#127): manche Kanaele (z.B. whatsapp_kanal) nur an bestimmten Wochentagen.
+        if not _kanal_heute_faellig(kanal, wochentag):
+            continue
+        # Kanal-Verfuegbarkeit: nur Stellen, die diesen Kanal haben.
+        kanal_stellen = [sid for sid in stelle_ids if sid in verfuegbar.get(kanal, set())]
+        if not kanal_stellen:
+            continue
         # Idempotenz: Stellen, die fuer diesen Kanal am 'datum' schon einen Pool-Eintrag haben, raus.
         schon = {int(r[0]) for r in conn.execute(
             "SELECT DISTINCT stelle_id FROM geplante_posts WHERE pool=1 AND kanal=? AND stelle_id IS NOT NULL "
             "AND geplant_am LIKE ?", (kanal, datum + "T%"))}
-        offene_stellen = [sid for sid in stelle_ids if sid not in schon]
+        offene_stellen = [sid for sid in kanal_stellen if sid not in schon]
         if not offene_stellen:
             continue
         # Je Stelle ein ANDERER Beitrag am selben Tag (Phase-1-Logik uebernimmt das Verteilen).
-        auswahl = pool.ziehe_tagesauswahl(conn, offene_stellen, kanal, rng)
+        auswahl = pool.ziehe_tagesauswahl(conn, offene_stellen, kanal, rng,
+                                          erlaubte_eids=erlaubte_eids)
         for sid, eid in auswahl.items():
             z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
             conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
@@ -982,6 +1091,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div class=stfield><label>Orts-ID (Facebook &amp; Instagram-Geotag)</label>
       <form method=post class=oidrow><input type=hidden name=formular value=stelle_ort_id><input type=hidden name=stelle_id value="{{b.id}}">
         <input class=oid name=ort_id value="{{b.ort_id or ''}}" placeholder="Facebook-Orts-ID" inputmode=numeric title="Facebook-Orts-ID (nur Ziffern) - markiert Facebook- und Instagram-Beiträge mit dem Ort">
+        <button style="padding:7px 13px">OK</button></form>
+    </div>
+    <div class=stfield><label>WhatsApp (Pool)</label>
+      <form method=post class=oidrow><input type=hidden name=formular value=stelle_whatsapp><input type=hidden name=stelle_id value="{{b.id}}">
+        <label style="font-weight:normal;font-size:13px;margin:0 0 4px"><input type=checkbox name=wa_status_aktiv value="1"{% if b.wa_status_aktiv %} checked{% endif %}> Täglichen WhatsApp-Status bespielen</label>
+        <input class=oid name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="WhatsApp-Kanal-Einladungslink (optional)" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool">
         <button style="padding:7px 13px">OK</button></form>
     </div>
     <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
@@ -2161,6 +2276,99 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     return ziel_name, erfolg, ergebnisse
 
 
+def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
+    """Veroeffentlicht einen Pool-Beitrag ueber den WhatsApp-Dienst (#127) - getrennt vom FB/IG-Pfad.
+
+    kanal: 'whatsapp_status' (taeglicher 9:16-Status, moeglichst personalisiertes Bild) oder
+    'whatsapp_kanal' (kuratierter Kanalbeitrag mit Bild + Begleittext an den Kanal der Stelle).
+    Gibt (ziel_name, erfolg, [(kanal, ok, info), ...]) zurueck - selbe Form wie _veroeffentliche_ziel,
+    damit der Aufrufer (Scheduler) unveraendert weiterverbuchen kann. Ein nicht erreichbarer
+    WhatsApp-Dienst fuehrt zu erfolg=False (-> status='fehler'), niemals zu einem Crash."""
+    import personalisierung
+    ziel_name = (stelle["name"] if stelle else "WhatsApp")
+    ziel_seite = "whatsapp"
+    quelle_url = ""
+    try:
+        kanal_text, story_text = personalisierung.whatsapp_texte(f, stelle, quelle_url)
+    except Exception as ex:
+        kanal_text, story_text = (f.get("caption") or ""), ""
+        log.exception("WhatsApp-Texte fuer Beitrag %s nicht erzeugbar: %s", eid, ex)
+
+    ok, info = False, ""
+    if kanal == "whatsapp_status":
+        # Personalisiertes 9:16-Status-Bild (Portraet/Ort), Fallback: allgemeines Hochkant-Bild.
+        bild = None
+        try:
+            if stelle:
+                quad = _render_stelle_bild(eid, int(stelle["id"]))
+                if quad and os.path.exists(quad):
+                    bild = _status_hochkant(quad, os.path.join(
+                        DATA_DIR, "preview", "wa_status_e%d_stelle_%d.png" % (eid, int(stelle["id"]))))
+            if not bild and e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
+                bild = _status_hochkant(e["bild_pfad"], os.path.join(
+                    DATA_DIR, "preview", "status_%d.png" % eid))
+        except Exception as ex:
+            log.exception("WhatsApp-Status-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
+            bild = None
+        caption = story_text or kanal_text or (f.get("caption") or "")
+        payload = {"caption": caption, "toContacts": True}
+        if bild:
+            payload["imagePath"] = bild
+        res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=60)
+        ok, info = _wa_ergebnis(res, err)
+    elif kanal == "whatsapp_kanal":
+        invite = (stelle["wa_kanal_invite"] if (stelle and "wa_kanal_invite" in stelle.keys()) else "") or ""
+        invite = invite.strip()
+        if not invite:
+            ok, info = False, "Kein WhatsApp-Kanal (Einladungslink) fuer diese Stelle hinterlegt"
+        else:
+            bild = None
+            try:
+                if stelle:
+                    bild = _render_stelle_bild(eid, int(stelle["id"]))
+                if not bild and e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
+                    bild = e["bild_pfad"]
+            except Exception as ex:
+                log.exception("WhatsApp-Kanal-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
+                bild = None
+            payload = {"invite": invite, "caption": kanal_text or (f.get("caption") or "")}
+            if bild and os.path.exists(bild):
+                payload["imagePath"] = bild
+            res, err = _wa_call("/post-channel", method="POST", payload=payload, timeout=60)
+            ok, info = _wa_ergebnis(res, err)
+    else:
+        ok, info = False, "Unbekannter WhatsApp-Kanal: %s" % kanal
+
+    ergebnisse = [(kanal, ok, info)]
+    if ok:
+        conn.execute("INSERT INTO posts(entwurf_id, kanal, plattform_post_id, seite, "
+                     "veroeffentlicht_am, status) VALUES (?,?,?,?,datetime('now'),'veroeffentlicht')",
+                     (eid, kanal, info, ziel_seite))
+        audit_log(conn, user, "veroeffentlicht_%s" % kanal, eid, "Ziel %s / %s" % (ziel_name, info))
+    else:
+        conn.execute("INSERT INTO posts(entwurf_id, kanal, status, fehler) VALUES (?,?,?,?)",
+                     (eid, kanal, "fehler", info))
+        audit_log(conn, user, "veroeffentlichung_fehler_%s" % kanal, eid, info)
+    conn.commit()
+    return ziel_name, ok, ergebnisse
+
+
+def _wa_ergebnis(res, err):
+    """Normalisiert die _wa_call-Antwort des WhatsApp-Dienstes zu (ok, info)."""
+    if err:
+        return False, "WhatsApp-Dienst: %s" % err
+    if res and res.get("error"):
+        return False, "WhatsApp: %s" % res["error"]
+    if res and res.get("ok"):
+        teile = []
+        if res.get("recipients") is not None:
+            teile.append("%s Empfaenger" % res["recipients"])
+        if res.get("jid"):
+            teile.append(str(res["jid"]))
+        return True, ("OK" + ((" (%s)" % ", ".join(teile)) if teile else ""))
+    return False, "WhatsApp: unerwartete Antwort"
+
+
 @app.route("/veroeffentlichen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def veroeffentlichen(eid):
@@ -2446,6 +2654,20 @@ def verwaltung():
                     audit_log(conn, session["user"], "beratungsstelle_ort_id_gesetzt", None,
                               "Stelle %s -> %s" % (sid, oid or "(keine)"))
                     flash("Instagram-Orts-ID aktualisiert." if oid else "Instagram-Orts-ID entfernt.")
+            elif formular == "stelle_whatsapp":
+                # WhatsApp-Konfiguration je Stelle (Pool Phase 3, #127): steuert, ob die Stelle bei der
+                # taeglichen Pool-Ziehung mit WhatsApp-Status bzw. WhatsApp-Kanal bespielt wird.
+                sid = request.form.get("stelle_id", "").strip()
+                wa_status = 1 if request.form.get("wa_status_aktiv") else 0
+                wa_invite = request.form.get("wa_kanal_invite", "").strip()
+                if wa_invite and not (wa_invite.startswith("http://") or wa_invite.startswith("https://")):
+                    flash("Der WhatsApp-Kanal-Link muss mit http:// oder https:// beginnen.")
+                elif sid and sid.isdigit():
+                    conn.execute("UPDATE beratungsstellen SET wa_status_aktiv=?, wa_kanal_invite=? WHERE id=?",
+                                 (wa_status, wa_invite or None, sid))
+                    audit_log(conn, session["user"], "beratungsstelle_whatsapp_gesetzt", None,
+                              "Stelle %s -> Status=%d, Kanal=%s" % (sid, wa_status, "ja" if wa_invite else "nein"))
+                    flash("WhatsApp-Einstellungen der Beratungsstelle gespeichert.")
             elif formular == "stelle_portrait":
                 sid = request.form.get("stelle_id", "").strip()
                 file = request.files.get("portrait")
