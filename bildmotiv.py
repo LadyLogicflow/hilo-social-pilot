@@ -1,13 +1,50 @@
 # -*- coding: utf-8 -*-
-"""Erzeugt stimmungsvolle, vollflaechige Magazin-/Editorial-Fotos via OpenAI gpt-image-1
-(opakes Foto MIT Umgebung, als Hintergrund fuer das neue Bild-Layout).
-Caching pro Motiv. Ohne openai_api_key wird None geliefert (Bild dann ohne Foto -> warmer Fallback)."""
+"""Erzeugt stimmungsvolle, vollflaechige Magazin-/Editorial-Fotos (opakes Foto MIT Umgebung,
+als Hintergrund fuer das neue Bild-Layout).
+
+Das BACKEND (welche KI das Foto erzeugt) ist umschaltbar (#137), orthogonal zum Bild-STIL
+(standard/ki_tafel). Einstellung 'bild_tool':
+  - 'openai'   (Default): OpenAI images/generations, Modell aus HILO_OPENAI_IMAGE_MODEL
+                          (Default 'gpt-image-2'). Braucht 'openai_api_key'.
+  - 'ideogram': Ideogram v4 (Text-Spezialist, bessere Schrift im Bild). Braucht
+                'ideogram_api_key'. KEIN stiller Fallback auf OpenAI bei fehlendem Key.
+Der Prompt-Bau (Szene/Tafel je bild_stil) bleibt UNVERAENDERT; nur die Erzeugung wird je
+bild_tool an den passenden Anbieter geroutet (erzeuge_bild).
+
+Caching pro Motiv UND Tool: OpenAI- und Ideogram-Bilder fuer dasselbe Motiv kollidieren NICHT
+(Ideogram-Dateien tragen den Praefix 'ideogram_'). Der Modell-Bump gpt-image-1 -> gpt-image-2
+braucht KEINEN Cache-Key-Wechsel (bestehende 'openai'-Cache-Dateien bleiben gueltig).
+Ohne passenden API-Key wird None geliefert (Bild dann ohne Foto -> warmer Fallback)."""
 import base64, hashlib, logging, os
 from secrets_store import get_secret
 from config import DATA_DIR
 
 log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
+
+# Default-Bildmodell fuer den OpenAI-Pfad (#137 Ergaenzung: Bump gpt-image-1 -> gpt-image-2).
+# Per Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ohne Code-Aenderung ueberschreibbar, falls der
+# exakte images/generations-Modellname beim OpenAI-API abweicht.
+OPENAI_IMAGE_MODEL_DEFAULT = "gpt-image-2"
+# Ideogram v4 Generate-Endpoint (Text-Spezialist). Quadratisches Format per Default; per
+# Umgebungsvariable HILO_IDEOGRAM_RESOLUTION ueberschreibbar, falls der Enum-Name abweicht.
+IDEOGRAM_URL = "https://api.ideogram.ai/v1/ideogram-v4/generate"
+IDEOGRAM_RESOLUTION_DEFAULT = "1024x1024"
+IDEOGRAM_RENDERING_SPEED_DEFAULT = "DEFAULT"
+
+
+def aktives_bild_tool():
+    """Liefert das aktuell eingestellte Bild-Tool ('openai' Default | 'ideogram').
+    Liest db.get_einstellung('bild_tool'); unbekannte Werte fallen auf 'openai' zurueck.
+    Kapselt den DB-Zugriff, damit Routing und Cache-Pfade dieselbe Quelle nutzen."""
+    import db
+    tool = (db.get_einstellung("bild_tool", "openai") or "openai").strip().lower()
+    return tool if tool in ("openai", "ideogram") else "openai"
+
+
+def openai_image_model():
+    """Liefert den OpenAI-Bildmodell-Namen aus HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2')."""
+    return (os.environ.get("HILO_OPENAI_IMAGE_MODEL") or OPENAI_IMAGE_MODEL_DEFAULT).strip()
 
 def _prompt(motiv):
     """Einheitlicher Szene-Prompt fuer ein vollflaechiges, opakes Magazin-/Editorial-Foto MIT
@@ -102,17 +139,30 @@ def ensure_photo_fuer(fields):
         return ensure_photo_tafel(scene, sign_text)
     return ensure_photo(motiv)
 
-def _szene_pfad(motiv):
+def _tool_praefix(tool):
+    """Liefert den Datei-Praefix fuer ein Bild-Tool. OpenAI traegt KEINEN Praefix (bestehende
+    Cache-Dateien bleiben gueltig); Ideogram traegt 'ideogram_', damit beide Anbieter fuer
+    dasselbe Motiv getrennte Dateien bekommen (Catrin will vergleichen, #137)."""
+    return "ideogram_" if (tool or "openai") == "ideogram" else ""
+
+
+def _szene_pfad(motiv, tool=None):
     """Liefert den absoluten Cache-Pfad fuer das Standard-Szene-Foto zu 'motiv'.
     Kapselt die BESTEHENDE Schluessel-Berechnung (Praefix 'szene:', sha256[:16]) aus
     ensure_photo(), damit sie wiederverwendbar ist. Die Hash-Formel bleibt UNVERAENDERT -
     sonst wuerden bestehende Cache-Dateien nicht mehr getroffen. Liefert None fuer leere
-    Motive und fuer 'icon:'-Motive (die liefert _icon_pfad)."""
+    Motive und fuer 'icon:'-Motive (die liefert _icon_pfad).
+
+    'tool' waehlt das Bild-Backend (#137): 'openai' (Default, KEIN Praefix -> bestehende
+    Dateinamen unveraendert) oder 'ideogram' (Praefix 'ideogram_'). None -> aktuelle
+    Einstellung (aktives_bild_tool())."""
     motiv = (motiv or "").strip()
     if not motiv or motiv.startswith("icon:"):
         return None
+    if tool is None:
+        tool = aktives_bild_tool()
     h = hashlib.sha256(("szene:" + motiv).lower().encode("utf-8")).hexdigest()[:16]
-    return os.path.join(MOTIV_DIR, h + ".png")
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + h + ".png")
 
 def _icon_pfad(motiv):
     """Liefert den absoluten Cache-Pfad fuer ein gezeichnetes 'icon:'-Motiv (Praefix 'icon_'),
@@ -128,14 +178,19 @@ def tafel_cache_key(scene, sign_text):
     sign_text). Ausgelagert, damit Tests den Schluessel pruefen koennen, ohne OpenAI aufzurufen."""
     return "tafel:" + (sign_text or "").strip() + "|" + (scene or "").strip()
 
-def _tafel_pfad(scene, sign_text):
+def _tafel_pfad(scene, sign_text, tool=None):
     """Liefert den absoluten Cache-Pfad fuer ein KI-Tafel-Foto (Praefix 'tafel_', sha256[:16]).
     Kapselt die BESTEHENDE Schluessel-Berechnung aus ensure_photo_tafel(); Hash-Formel UNVERAENDERT.
-    Verwendet dieselbe scene-Default-Logik wie ensure_photo_tafel/ensure_photo_fuer."""
+    Verwendet dieselbe scene-Default-Logik wie ensure_photo_tafel/ensure_photo_fuer.
+
+    'tool' waehlt das Bild-Backend (#137): 'openai' (Default, Dateiname unveraendert 'tafel_<h>')
+    oder 'ideogram' (Praefix 'ideogram_tafel_<h>'). None -> aktuelle Einstellung."""
     scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
     sign_text = (sign_text or "").strip()
+    if tool is None:
+        tool = aktives_bild_tool()
     h = hashlib.sha256(tafel_cache_key(scene, sign_text).lower().encode("utf-8")).hexdigest()[:16]
-    return os.path.join(MOTIV_DIR, "tafel_" + h + ".png")
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "tafel_" + h + ".png")
 
 def cache_dateien_fuer_fields(fields):
     """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
@@ -159,34 +214,124 @@ def cache_dateien_fuer_fields(fields):
         if ip:
             pfade.add(ip)
         return pfade
-    # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
-    for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
-        sp = _szene_pfad(m)
-        if sp:
-            pfade.add(sp)
-    # KI-Tafel-Variante: scene = dasselbe Motiv (mit Default), sign_text = Ueberschrift.
+    # WICHTIG (#137-Retention): BEIDE Bild-Tools (openai + ideogram) werden als 'in Benutzung'
+    # aufgenommen. Da der Cache tool-abhaengige Dateinamen vergibt (ideogram_-Praefix), wuerde
+    # die Aufraeumung (#134) sonst das jeweils ANDERE Tool faelschlich loeschen, sobald Catrin
+    # umschaltet. Wir nehmen darum fuer jeden Motiv-Pfad beide Tool-Varianten auf.
+    sign_text = (fields.get("ueberschrift") or "").strip()
     scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
-    # Bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer denselben Default auf die
-    # Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None) liefert hier
-    # aber None, sodass die Default-Szene-Datei sonst NICHT als 'in Benutzung' gilt und nach
-    # der Schonfrist faelschlich geloescht wuerde, obwohl ein aktiver/Pool-Entwurf sie nutzt
-    # (ARGUS-Blocker #134). Darum den Default-Szene-Pfad mit aufnehmen - exakt derselbe
-    # Default-String -> exakt derselbe Hash/Dateiname. Normale Entwuerfe (mit Motiv) bekommen
-    # keinen zusaetzlichen Pfad, da scene dann = motiv ist und _szene_pfad(motiv) oben schon drin.
-    sp_def = _szene_pfad(scene)
-    if sp_def:
-        pfade.add(sp_def)
-    pfade.add(_tafel_pfad(scene, (fields.get("ueberschrift") or "").strip()))
+    for tool in ("openai", "ideogram"):
+        # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
+        for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
+            sp = _szene_pfad(m, tool=tool)
+            if sp:
+                pfade.add(sp)
+        # KI-Tafel-Variante: scene = dasselbe Motiv (mit Default), sign_text = Ueberschrift.
+        # Bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer denselben Default auf die
+        # Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None) liefert hier
+        # aber None, sodass die Default-Szene-Datei sonst NICHT als 'in Benutzung' gilt und nach
+        # der Schonfrist faelschlich geloescht wuerde, obwohl ein aktiver/Pool-Entwurf sie nutzt
+        # (ARGUS-Blocker #134). Darum den Default-Szene-Pfad mit aufnehmen - exakt derselbe
+        # Default-String -> exakt derselbe Hash/Dateiname. Normale Entwuerfe (mit Motiv) bekommen
+        # keinen zusaetzlichen Pfad, da scene dann = motiv ist und _szene_pfad(motiv) oben schon drin.
+        sp_def = _szene_pfad(scene, tool=tool)
+        if sp_def:
+            pfade.add(sp_def)
+        pfade.add(_tafel_pfad(scene, sign_text, tool=tool))
     return pfade
 
-def tafel_payload(scene, sign_text):
-    """Baut das OpenAI-Request-Payload fuer ein KI-Tafel-Foto (ohne Netzwerkaufruf). Ausgelagert,
-    damit Tests Prompt + Parameter (background='opaque', size '1024x1024') pruefen koennen."""
+def _openai_quality():
+    """Liefert die OpenAI-Bildqualitaet aus HILO_IMAGE_QUALITY (Default 'medium', validiert)."""
     quality = (os.environ.get("HILO_IMAGE_QUALITY") or "medium").strip().lower()
-    if quality not in ("low", "medium", "high", "auto"):
-        quality = "medium"
-    return {"model": "gpt-image-1", "prompt": _tafel_prompt(scene, sign_text), "size": "1024x1024",
-            "quality": quality, "background": "opaque", "output_format": "png", "n": 1}
+    return quality if quality in ("low", "medium", "high", "auto") else "medium"
+
+
+def openai_payload(prompt):
+    """Baut das OpenAI images/generations-Request-Payload (ohne Netzwerkaufruf). Modell aus
+    HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2'), background='opaque', size '1024x1024',
+    quality aus HILO_IMAGE_QUALITY. Ausgelagert, damit Tests Modell/Parameter ohne Netz pruefen."""
+    return {"model": openai_image_model(), "prompt": prompt, "size": "1024x1024",
+            "quality": _openai_quality(), "background": "opaque", "output_format": "png", "n": 1}
+
+
+def ideogram_payload(prompt):
+    """Baut das Ideogram-v4-Request-Payload (ohne Netzwerkaufruf). 'text_prompt' = unser Prompt,
+    quadratisches Format (resolution aus HILO_IDEOGRAM_RESOLUTION, Default '1024x1024') und
+    rendering_speed aus HILO_IDEOGRAM_RENDERING_SPEED (Default 'DEFAULT'). Beide per ENV
+    ueberschreibbar, falls der Enum-Name in der Ideogram-Doku abweicht. Ausgelagert, damit Tests
+    URL/Body-Struktur ohne Netz pruefen koennen."""
+    resolution = (os.environ.get("HILO_IDEOGRAM_RESOLUTION") or IDEOGRAM_RESOLUTION_DEFAULT).strip()
+    speed = (os.environ.get("HILO_IDEOGRAM_RENDERING_SPEED") or IDEOGRAM_RENDERING_SPEED_DEFAULT).strip()
+    return {"text_prompt": prompt, "resolution": resolution, "rendering_speed": speed}
+
+
+def erzeuge_bild_openai(prompt):
+    """Erzeugt ein Bild via OpenAI images/generations und liefert die PNG-Bytes (oder None).
+    Ohne 'openai_api_key' -> None + Log (kein Crash). Robust gegen Netz-/API-Fehler."""
+    key = get_secret("openai_api_key")
+    if not key:
+        log.info("Bild uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
+        return None
+    try:
+        import requests
+        # Bildqualitaet steuert die OpenAI-Kosten stark: low (~1-2ct) < medium (~4-6ct) < high
+        # (~20-25ct) je 1024x1024-Bild. Default 'medium'; per Umgebungsvariable aenderbar.
+        r = requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
+            json=openai_payload(prompt),
+            timeout=120)
+        r.raise_for_status()
+        b64 = r.json()["data"][0]["b64_json"]
+        return base64.b64decode(b64)
+    except Exception as ex:
+        log.warning("OpenAI-Bild fehlgeschlagen: %s", ex)
+        return None
+
+
+def erzeuge_bild_ideogram(prompt):
+    """Erzeugt ein Bild via Ideogram v4 (Text-Spezialist) und liefert die PNG-Bytes (oder None).
+    POST IDEOGRAM_URL mit Header 'Api-Key' + JSON-Body (text_prompt, quadratisches Format). Die
+    Antwort liefert eine Bild-URL (data[0].url), die hier heruntergeladen wird. Ohne
+    'ideogram_api_key' -> None + Log (KEIN stiller Fallback auf OpenAI). Robust gegen Fehler/Timeout."""
+    key = get_secret("ideogram_api_key")
+    if not key:
+        log.info("Ideogram-Bild uebersprungen: kein 'ideogram_api_key' hinterlegt (secrets.json).")
+        return None
+    try:
+        import requests
+        r = requests.post(
+            IDEOGRAM_URL,
+            headers={"Api-Key": key, "Content-Type": "application/json"},
+            json=ideogram_payload(prompt),
+            timeout=120)
+        r.raise_for_status()
+        url = r.json()["data"][0]["url"]
+        img = requests.get(url, timeout=120)
+        img.raise_for_status()
+        return img.content
+    except Exception as ex:
+        log.warning("Ideogram-Bild fehlgeschlagen: %s", ex)
+        return None
+
+
+def erzeuge_bild(prompt, tool=None):
+    """Routet die Bild-Erzeugung je Bild-Tool (#137) an den richtigen Anbieter und liefert die
+    PNG-Bytes (oder None). 'tool' None -> aktuelle Einstellung (aktives_bild_tool()):
+    'openai' (Default, gpt-image-2) oder 'ideogram' (Text-Spezialist). Der Prompt-Bau bleibt
+    unveraendert; hier wird NUR die Erzeugung umgeschaltet."""
+    if tool is None:
+        tool = aktives_bild_tool()
+    if tool == "ideogram":
+        return erzeuge_bild_ideogram(prompt)
+    return erzeuge_bild_openai(prompt)
+
+
+def tafel_payload(scene, sign_text):
+    """Baut das OpenAI images/generations-Request-Payload fuer ein KI-Tafel-Foto (ohne
+    Netzwerkaufruf). Modell aus HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2'), background='opaque',
+    size '1024x1024'. Ausgelagert, damit Tests Prompt + Parameter pruefen koennen."""
+    return openai_payload(_tafel_prompt(scene, sign_text))
 
 def ensure_photo_tafel(scene, sign_text):
     """Erzeugt (oder liefert aus dem Cache) das KI-Tafel-Foto (#132): scene = Szene-Motiv,
@@ -196,28 +341,21 @@ def ensure_photo_tafel(scene, sign_text):
     scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
     sign_text = (sign_text or "").strip()
     os.makedirs(MOTIV_DIR, exist_ok=True)
-    path = _tafel_pfad(scene, sign_text)
+    tool = aktives_bild_tool()
+    # Cache-Pfad ist tool-abhaengig (#137): OpenAI- und Ideogram-Tafel kollidieren NICHT.
+    path = _tafel_pfad(scene, sign_text, tool=tool)
     if os.path.exists(path):
         return path
-    key = get_secret("openai_api_key")
-    if not key:
-        log.info("KI-Tafel-Foto uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
+    daten = erzeuge_bild(_tafel_prompt(scene, sign_text), tool=tool)
+    if daten is None:
         return None
     try:
-        import requests
-        r = requests.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
-            json=tafel_payload(scene, sign_text),
-            timeout=120)
-        r.raise_for_status()
-        b64 = r.json()["data"][0]["b64_json"]
         with open(path, "wb") as f:
-            f.write(base64.b64decode(b64))
-        log.info("KI-Tafel-Foto erzeugt: %s", sign_text[:50])
+            f.write(daten)
+        log.info("KI-Tafel-Foto erzeugt (%s): %s", tool, sign_text[:50])
         return path
     except Exception as ex:
-        log.warning("KI-Tafel-Foto fehlgeschlagen (%s): %s", sign_text[:40], ex)
+        log.warning("KI-Tafel-Foto speichern fehlgeschlagen (%s): %s", sign_text[:40], ex)
         return None
 
 def ensure_photo(motiv, typ=None):
@@ -234,35 +372,21 @@ def ensure_photo(motiv, typ=None):
         return path if os.path.exists(path) else countdown_motive.render_icon(name, path)
     motiv = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
     os.makedirs(MOTIV_DIR, exist_ok=True)
+    tool = aktives_bild_tool()
     # Szene-Motive bekommen einen eigenen Cache-Schluessel (Praefix 'szene:'), damit alte,
     # freigestellte Personen-/Themenbilder im Cache nicht mit den neuen Szenen kollidieren.
-    path = _szene_pfad(motiv)
+    # Der Pfad ist zusaetzlich tool-abhaengig (#137): OpenAI vs. Ideogram kollidieren NICHT.
+    path = _szene_pfad(motiv, tool=tool)
     if os.path.exists(path):
         return path
-    prompt = _prompt(motiv)
-    key = get_secret("openai_api_key")
-    if not key:
-        log.info("Bildmotiv uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
+    daten = erzeuge_bild(_prompt(motiv), tool=tool)
+    if daten is None:
         return None
     try:
-        import requests
-        # Bildqualitaet steuert die OpenAI-Kosten stark: low (~1-2ct) < medium (~4-6ct) < high (~20-25ct)
-        # je 1024x1024-Bild. Default 'medium' (guter Kompromiss); per Umgebungsvariable aenderbar.
-        quality = (os.environ.get("HILO_IMAGE_QUALITY") or "medium").strip().lower()
-        if quality not in ("low", "medium", "high", "auto"):
-            quality = "medium"
-        r = requests.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
-            json={"model": "gpt-image-1", "prompt": prompt, "size": "1024x1024",
-                  "quality": quality, "background": "opaque", "output_format": "png", "n": 1},
-            timeout=120)
-        r.raise_for_status()
-        b64 = r.json()["data"][0]["b64_json"]
         with open(path, "wb") as f:
-            f.write(base64.b64decode(b64))
-        log.info("Bildmotiv erzeugt: %s", motiv[:50])
+            f.write(daten)
+        log.info("Bildmotiv erzeugt (%s): %s", tool, motiv[:50])
         return path
     except Exception as ex:
-        log.warning("Bildmotiv fehlgeschlagen (%s): %s", motiv[:40], ex)
+        log.warning("Bildmotiv speichern fehlgeschlagen (%s): %s", motiv[:40], ex)
         return None

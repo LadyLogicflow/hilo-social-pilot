@@ -1194,6 +1194,19 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
   <button>Bild-Stil speichern</button>
 </div></form>
+
+<h3 style="margin-top:26px">Bild-Tool</h3>
+<p class=hint>Legt fest, <b>welche KI</b> das Foto erzeugt (unabhängig vom Bild-Stil oben). <b>OpenAI</b> ist die bewährte Standard-Wahl. <b>Ideogram</b> ist ein Text-Spezialist – die Schrift im Bild (z.&nbsp;B. auf der KI-Tafel) wird deutlich genauer; benötigt aber einen <b>eigenen API-Schlüssel</b> (in den Secrets als <code>ideogram_api_key</code> hinterlegen). So lassen sich beide am selben Beitrag vergleichen.</p>
+<form method=post><input type=hidden name=formular value=bildtool_save>
+<div style="max-width:560px">
+  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <input type=radio name=bild_tool value="openai"{% if bild_tool=='openai' %} checked{% endif %}>
+    <span><b>OpenAI</b><br><span class=hint>Bewährtes Standard-Bildtool (GPT Image). (Empfohlen)</span></span></label>
+  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <input type=radio name=bild_tool value="ideogram"{% if bild_tool=='ideogram' %} checked{% endif %}>
+    <span><b>Ideogram</b><br><span class=hint>Bessere Schrift im Bild; braucht einen eigenen API-Schlüssel (<code>ideogram_api_key</code>).</span></span></label>
+  <button>Bild-Tool speichern</button>
+</div></form>
 {% endif %}
 
 {% if bereich=='speicher' %}
@@ -2826,6 +2839,17 @@ def verwaltung():
                 audit_log(conn, session["user"], "bild_stil_gesetzt", None, stil)
                 flash("Bild-Stil gespeichert: %s." % ("Standard (v11)" if stil == "standard"
                                                       else "KI-Tafel (Testmodus)"))
+            elif formular == "bildtool_save":
+                # Globales Bild-Tool (#137): 'openai' (Default) oder 'ideogram' (Text-Spezialist).
+                # Orthogonal zum Bild-Stil; bestimmt nur, welche KI das Foto erzeugt.
+                tool = request.form.get("bild_tool", "openai").strip().lower()
+                if tool not in ("openai", "ideogram"):
+                    tool = "openai"
+                conn.execute(
+                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_tool', ?) "
+                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (tool,))
+                audit_log(conn, session["user"], "bild_tool_gesetzt", None, tool)
+                flash("Bild-Tool gespeichert: %s." % ("OpenAI" if tool == "openai" else "Ideogram"))
             elif formular == "cache_aufraeumen":
                 # Manuelles, sicheres Aufraeumen des KI-Foto-Caches (#134): loescht nur verwaiste,
                 # alte motive/-PNGs - aktive/Pool-Fotos und icon_-Dateien bleiben.
@@ -2841,7 +2865,8 @@ def verwaltung():
             conn.commit()
             # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
-                    "wissen": "wissen", "bildstil": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
+                    "wissen": "wissen", "bildstil": "bildstil", "bildtool": "bildstil",
+                    "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
@@ -2856,6 +2881,8 @@ def verwaltung():
         wissen = conn.execute("SELECT titel, hook, aktiv FROM wissensthemen ORDER BY titel").fetchall()
         _bs = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_stil'").fetchone()
         bild_stil = (_bs["wert"] if _bs and _bs["wert"] else "standard")
+        _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
+        bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
     page_id_set = {str(p["id"]) for p in pages}
     fb_name = {str(p["id"]): p["name"] for p in pages}
@@ -2875,7 +2902,8 @@ def verwaltung():
     return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
                                                      wissen=wissen, bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
-                                                     fb_name=fb_name, bild_stil=bild_stil, **speicher))
+                                                     fb_name=fb_name, bild_stil=bild_stil,
+                                                     bild_tool=bild_tool, **speicher))
 
 @app.route("/logo.png")
 def logo():
