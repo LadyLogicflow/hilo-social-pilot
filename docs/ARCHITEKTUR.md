@@ -113,6 +113,9 @@ foto-getriebener Look, seit Issue #129):
   je Beitrag (`pick_circle_pos`). Ein Stellen-Porträt (`portrait`) ersetzt optional einen Kreis.
 - **Foto-Motiv** (`bildmotiv.py`): emotionale Magazin-/Editorial-Szene **mit Umgebung** (nicht mehr
   freigestellt) via OpenAI `gpt-image-1` (`background=opaque`, 1024×1024, gecacht); `icon:`-Motive
-  ohne Token. Das Szene-Motiv (`szene_motiv`) liefert die Text-KI je Beitrag.
+  ohne Token. Das Szene-Motiv (`szene_motiv`) liefert die Text-KI je Beitrag. Der Prompt komponiert
+  die Szene als **Rahmen** um eine ruhige Bildmitte (Negativraum), damit das Textfeld nichts
+  Bildwichtiges verdeckt; die Karte hält dazu Rand an allen vier Seiten, passt sich aber dem
+  Textumfang an (kein Überlauf unter die Karte). (#131)
 
 Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.
