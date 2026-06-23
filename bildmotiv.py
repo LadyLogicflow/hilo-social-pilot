@@ -20,7 +20,12 @@ def _prompt(motiv):
     return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie. Eine stimmungsvolle, "
             "authentische Szene, die %s vermittelt - Jahreszeit, Gefuehl und ein dezenter Bezug zum "
             "Thema, schoen und natuerlich gestylt (KEIN steifes Stockfoto, keine steifen Posen). "
-            "Warmes, weiches Tageslicht, geringe Schaerfentiefe, harmonische warme Farben. Die Szene "
+            "Natuerliche, ausgewogene, realitaetsnahe Farben bei neutralem Tageslicht; NICHT "
+            "uebertrieben warm, golden oder amber - normale, neutrale Farbtemperatur. Die abgebildeten "
+            "Menschen wirken froh, entspannt, erleichtert und positiv (laechelnd, geloest); "
+            "KEINE traurigen, gestressten, sorgenvollen oder depressiven Gesichter - auch bei "
+            "Problem-Themen wird die Erleichterung und Loesung gezeigt, nicht die Sorge. Weiches "
+            "Tageslicht, geringe Schaerfentiefe. Die Szene "
             "fuellt das ganze Bild als Hintergrund. WICHTIG fuer die Komposition: Das Bild ist wie ein "
             "RAHMEN aufgebaut - alle bildwichtigen Elemente (Personen, Gegenstaende, Deko, Glaeser usw.) "
             "liegen am OBEREN, UNTEREN und an den SEITLICHEN Raendern und UMRAHMEN die Bildmitte. Die "
@@ -34,18 +39,28 @@ def _tafel_prompt(scene, sign_text):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
     sign_text = die Ueberschrift (in Anfuehrungszeichen eingesetzt). Die Tafel traegt NUR diese
-    Ueberschrift - sie ist die einzige Schrift im Bild (CTA + CI-Kreise kommen per Code-Overlay)."""
-    return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie, quadratisch (1:1). Warme, "
-            "authentische Szene passend zu: %s. ZENTRALES, SCHARFES Hauptmotiv: eine gut lesbare "
-            "TAFEL (Kreidetafel ODER schlichtes Holzschild/Plakat), natürlich in die Szene gestellt, "
-            "FRONTAL zur Kamera, gut ausgeleuchtet. Auf der Tafel steht der folgende deutsche Text - "
-            "exakt Wort für Wort, KORREKT geschrieben mit richtigen deutschen Umlauten (ae oe ue als "
-            "ä ö ü, ß), groß, zentriert, in sauberer, gut lesbarer Schrift, OHNE Rechtschreibfehler, "
-            "OHNE zusätzliche, fehlende oder veränderte Buchstaben: '%s'. Dieser Text ist die EINZIGE "
-            "Schrift im gesamten Bild. KEINE weiteren Wörter, Buchstaben, Zahlen, Logos oder "
-            "Wasserzeichen irgendwo sonst. Warmes, weiches Tageslicht, geringe Schärfentiefe, "
-            "harmonische warme Farben. Die Tafel ist der klare Blickfang, die Szene ringsum trägt "
-            "die Stimmung." % (scene, sign_text))
+    Ueberschrift - sie ist die einzige Schrift im Bild (CTA + CI-Kreise kommen per Code-Overlay).
+
+    HINWEIS (#135): Schriftart (serifenlos/Arial-aehnlich) und Textfarbe (HILO-Dunkelblau) auf
+    dem KI-Bild sind NICHT 100% erzwingbar - die Bild-KI approximiert beides; das Ergebnis wird
+    nach dem Render geprueft. Wir formulieren den Wunsch dennoch moeglichst praezise."""
+    return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie, quadratisch (1:1). "
+            "Authentische Szene passend zu: %s. Natuerliche, ausgewogene, realitaetsnahe Farben "
+            "bei neutralem Tageslicht; NICHT uebertrieben warm, golden oder amber - normale, "
+            "neutrale Farbtemperatur. Die abgebildeten Menschen wirken froh, entspannt, erleichtert "
+            "und positiv (laechelnd, geloest); KEINE traurigen, gestressten, sorgenvollen oder "
+            "depressiven Gesichter - auch bei Problem-Themen wird die Erleichterung und Loesung "
+            "gezeigt, nicht die Sorge. ZENTRALES, SCHARFES Hauptmotiv: ein gut lesbares, eher HELLES "
+            "Schild/Plakat (helles Schild oder Plakat statt schwarzer Kreidetafel), natürlich in die "
+            "Szene gestellt, FRONTAL zur Kamera, gut ausgeleuchtet. Auf dem hellen Schild steht der "
+            "folgende deutsche Text - exakt Wort für Wort, KORREKT geschrieben mit richtigen "
+            "deutschen Umlauten (ae oe ue als ä ö ü, ß), groß, zentriert, in HILO-Dunkelblau und in "
+            "einer klaren, modernen SERIFENLOSEN Schrift (Arial-aehnlich, ohne Serifen), perfekt "
+            "lesbar, OHNE Rechtschreibfehler, OHNE zusätzliche, fehlende oder veränderte Buchstaben: "
+            "'%s'. Dieser Text ist die EINZIGE Schrift im gesamten Bild. KEINE weiteren Wörter, "
+            "Buchstaben, Zahlen, Logos oder Wasserzeichen irgendwo sonst. Weiches, neutrales "
+            "Tageslicht, geringe Schärfentiefe. Das helle Schild ist der klare Blickfang, die Szene "
+            "ringsum trägt die frohe, geloeste Stimmung." % (scene, sign_text))
 
 def ensure_photo_fuer(fields):
     """Liefert das Szene-Foto fuer den Beitrag. Bevorzugt das neue Feld 'szene_motiv'

@@ -18,14 +18,23 @@ TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender (Karu
 # diagonal  = Logo oben-links + Slogan unten-rechts; diagonal2 = Logo unten-links + Slogan oben-rechts
 CIRCLE_POSITIONS = ["unten", "oben", "diagonal", "diagonal2"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
-ACCENT=(243,146,0)   # warmes Gold/Orange fuer die CTA-Pille (hoher Kontrast, emotionaler Akzent)
+ACCENT=(96,163,60)   # HILO-CI-Gruen fuer die CTA-Pille (#135: Aktionsfarbe statt Gold/Orange), weisse Schrift
 # Abgenommene Magazin-Vorschau: warmer Creme-Verlauf (oben hell -> unten warm) als Fallback-Hintergrund,
 # weisses Textfeld (Alpha) mit dezentem Rand fuer das integrierte Textfeld.
 CREME_TOP=(255,249,239); CREME_BOT=(244,227,199); CARD_FILL=(255,255,255,243); CARD_BORDER=(232,224,210)
 
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
-_BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
-_REG  = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+# Font-Lookup (#135): echtes Arial / Arial Bold ZUERST (CI-Wunsch), dann Liberation Sans als
+# Fallback (metrisch Arial-kompatibel), zuletzt DejaVu. Erweitert die bestehende Kette additiv -
+# fehlt echtes Arial (z.B. msttcorefonts nicht installiert), greift weiterhin Liberation Sans.
+_BOLD = ["/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf",
+         "/usr/share/fonts/truetype/msttcorefonts/arialbd.ttf",
+         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+_REG  = ["/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+         "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",
+         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
 
 STANDARD_SLOGANS = ["Wir sind HILO", "HILO - wir machen's einfach", "Steuern? Machen wir.",
                     "Mehr Netto für Sie", "Ihr gutes Recht", "Einfach mehr rausholen"]
