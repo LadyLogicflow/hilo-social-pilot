@@ -225,8 +225,12 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     ct, cb = _content_bounds(pos)
 
     dr = ImageDraw.Draw(base)
-    margin = 70
-    cx0, cx1 = margin, W - margin           # Textfeld-Spalte (volle Breite mit Rand)
+    # Issue #131: Das Foto soll das Textfeld UMRAHMEN. Darum spuerbarer Rand an ALLEN vier
+    # Seiten - seitlich etwas breiter als zuvor, damit das umrahmende Motiv links/rechts
+    # sichtbar bleibt (frueher 70; das Feld war fast vollbreit).
+    margin = 104                             # seitlicher Foto-Rand (links/rechts sichtbar)
+    frame_v = 64                             # mindest. Foto-Rand oben/unten (vertikaler Rahmen)
+    cx0, cx1 = margin, W - margin           # Textfeld-Spalte (mit deutlichem Seitenrand)
     inx = cx0 + 40                           # Innenrand im Textfeld
     inw = cx1 - inx - 40
     pad_top, pad_bot = 40, 40
@@ -267,10 +271,12 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     content_h = sum(parts) + gap*(len(parts)-1)
     card_h = content_h + pad_top + pad_bot
 
-    # Textfeld vertikal in den freien Bereich zwischen den Kreisen (ct..cb) einpassen
-    avail = cb - ct
+    # Textfeld vertikal in den freien Bereich zwischen den Kreisen (ct..cb) einpassen.
+    # Issue #131: oben und unten bleibt mindestens frame_v Foto-Rand frei, damit das Feld
+    # nicht den ganzen Bereich fuellt und der umrahmende Foto-Rahmen ringsum sichtbar ist.
+    avail = (cb - ct) - 2*frame_v
     card_h = min(card_h, avail)
-    cy0 = ct + (avail - card_h)//2
+    cy0 = ct + frame_v + (avail - card_h)//2
     cy1 = cy0 + card_h
     _card(base, cx0, cy0, cx1, cy1)
 
