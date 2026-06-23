@@ -87,6 +87,9 @@ KI-Token. Die Veröffentlichung läuft auf die hinterlegte Facebook-Seite der St
 
 - **Täglich 7:00 Uhr:** Radar + fällige Countdowns + Anlass-Beiträge + Wissens-Beiträge
   (eingebauter Scheduler, startet `main.py --daily` als Subprozess).
+- **Täglich ab 7:00 Uhr (Zufalls-Pool):** zieht je Beratungsstelle und Kanal (Facebook/
+  Instagram) automatisch einen zeitlosen Beitrag aus dem Topf und plant ihn ein – siehe
+  Abschnitt „Zufalls-Pool". Läuft genau 1×/Tag, keine Doppel-Einplanung.
 - **Robustheit:** schwere Aufgaben laufen in Subprozessen (Webserver blockiert nie),
   SQLite im WAL-Modus mit Timeout (paralleler Zugriff), Sessions überleben Neustarts.
 
@@ -97,7 +100,29 @@ KI-Token. Die Veröffentlichung läuft auf die hinterlegte Facebook-Seite der St
 - Schutz gegen schädliche Links beim URL-Einwurf (keine internen Adressen), Upload-Limit.
 - Grundsatz: nur öffentliche/unkritische Inhalte – **keine Mandanten- oder Steuerdaten**.
 
-## 11. Status & Ausblick
+## 11. Zufalls-Pool (Hybrid-Strategie)
+
+Für **zeitlose Beiträge** (z.B. Wissens-Serie, allgemeine Tipps) gibt es zusätzlich zum festen
+Kalender einen **Zufalls-Pool („Topf")**:
+
+- **Einmalige Freigabe für alle Stellen:** Ein freigegebener Beitrag wird über den Knopf
+  **„In den Pool"** (Seite „4. Einplanung") in den Topf aufgenommen – danach wird er
+  vollautomatisch ausgespielt, ohne tägliches Eingreifen.
+- **Tägliche Zufalls-Ziehung:** je Beratungsstelle und Kanal (Facebook/Instagram) wird täglich
+  ein Beitrag aus dem Topf gezogen – **für jede Stelle ein anderer**.
+- **„Nie doppelt" (Variante 1):** jeder Beitrag erscheint je Stelle **genau einmal pro Kanal**
+  (zeitversetzt über mehrere Kanäle erlaubt, nie zweimal auf demselben Kanal). Das Gedächtnis
+  dafür ist dauerhaft (kein Rollover).
+- **Nachschub-Warnung:** sind bei einer Stelle weniger als **14** ungenutzte Beiträge übrig,
+  weist die Pool-Seite darauf hin.
+- **Datumsgebundenes bleibt manuell:** Anlass-Tage und Fristen-Countdown laufen weiterhin über
+  die Einplanung (nicht über den Topf).
+
+Die menschliche Endkontrolle bleibt gewahrt – sie liegt beim **einmaligen Pool-Eintrag**
+(Grundsatz „Veröffentlichung nur nach Freigabe"). WhatsApp-Status/-Kanal sind als nächste
+Ausbaustufe vorgesehen.
+
+## 12. Status & Ausblick
 
 **Funktionsfähig:** komplette Inhaltspipeline (Quellen → Text → Bild → Freigabe → Kalender →
 Facebook), 4 Content-Streams, Personalisierung, Verwaltung, Automatik.

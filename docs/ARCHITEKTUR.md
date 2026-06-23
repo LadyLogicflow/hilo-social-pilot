@@ -36,6 +36,7 @@ Wissens-Serie ───┘
 | `anlass.py` | Anlass-Tage (besondere Tage mit Steuer-Aufhänger) |
 | `wissen.py` | Wissens-Serie (zeitlose Themen, füllt leere Tage) |
 | `personalisierung.py` | Beitrag je Beratungsstelle anpassen (CTA + Begleittext) |
+| `pool.py` | Zufalls-Pool: Kanäle, „nie doppelt"-Logik je Stelle/Kanal, tägliche Ziehung, Restbestand/Warnung |
 | `publish.py` | Veröffentlichung auf Facebook (Foto-Upload) + Instagram (vorbereitet) |
 | `logging_setup.py` | Logging nach `logs/hilo.log` |
 
@@ -59,7 +60,13 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
   Status: `vorgeschlagen` (Stufe 1) · `ausgewaehlt` (zur Texterstellung) · `verworfen` ·
   `dublette` / `erledigt` (HILO/BVL-Abgleich).
 - `entwuerfe` – erzeugte Beiträge (Text als JSON, Bildpfad, Status, **geplant_fuer**).
-  Status: `entwurf` (Stufe 2) · `freigegeben` (eingeplant) · `veroeffentlicht` · `verworfen`.
+  Status: `entwurf` (Stufe 2) · `freigegeben` (eingeplant) · `veroeffentlicht` · `verworfen` ·
+  `pool` (zeitloser Beitrag im Zufalls-Pool).
+- `geplante_posts` – terminierte Veröffentlichungen (Stelle/Seite, Kanal, Zeit, Status).
+  Spalte `pool=1` markiert Einträge aus der täglichen Pool-Ziehung (Beitrag bleibt wiederverwendbar).
+- `pool` – Mitgliedschaft im Zufalls-Pool (`entwurf_id`, `aktiv`, freigegeben_am/_von).
+- `pool_nutzung` – „nie doppelt"-Gedächtnis: `UNIQUE(entwurf_id, stelle_id, kanal)` – jeder Beitrag
+  je Stelle genau einmal pro Kanal (zeitversetzt über Kanäle erlaubt).
 - `posts` – Veröffentlichungs-Protokoll (Kanal, Plattform-Post-ID, Fehler).
 - `benutzer` – Dashboard-Konten (Rolle: admin / freigeber / redakteur).
 - `audit` – Audit-Log aller relevanten Aktionen.
@@ -73,6 +80,11 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
   täglich ab 7:00 Uhr `main.py --daily` als Subprozess (datums-getaktet via `last_radar.txt`).
 - **Generierung** (`web.py._start_generation`): „Texte & Bilder erzeugen" startet
   `main.py --generate N --render` als Subprozess – der Webserver bleibt frei.
+- **Pool-Scheduler** (`web.py._pool_scheduler` → `_pool_tagesziehung`): Thread im Webserver,
+  zieht einmal täglich ab 7:00 Uhr (datums-getaktet via `last_pool_ziehung.txt`) je aktiver
+  Beratungsstelle und je Kanal (Facebook/Instagram) einen offenen Pool-Beitrag, legt einen
+  `geplante_posts`-Eintrag (`pool=1`) an und schreibt `pool_nutzung`. Idempotent (1×/Tag,
+  keine Doppel-Einplanung je Stelle/Kanal/Tag). WhatsApp folgt in einer späteren Ausbaustufe.
 
 ## Bild-Design
 

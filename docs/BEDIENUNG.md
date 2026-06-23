@@ -40,6 +40,24 @@ Die Monatsansicht zeigt auf einen Blick, was wann geplant ist:
 Mit den Pfeilen blätterst du durch die Monate. Der heutige Tag ist hervorgehoben,
 Wochenenden sind ausgegraut (an ihnen wird nicht veröffentlicht).
 
+## Zufalls-Pool (Topf)
+
+Für **zeitlose Beiträge**, die immer wieder passen (Wissens-Serie, allgemeine Tipps), gibt es
+den **Zufalls-Pool**. Statt jeden Beitrag einzeln einzuplanen, legst du ihn **einmal** in den
+Topf – das Tool spielt ihn dann automatisch aus.
+
+- **In den Pool legen:** Auf der Seite **„4. Einplanung"** hat jeder freigegebene Beitrag den
+  grünen Knopf **„♻️ In den Pool (alle Stellen, automatisch)"**. Ein Klick = der Beitrag ist
+  für alle Stellen freigegeben und liegt im Topf.
+- **Pool-Seite** (Menü **„Pool"** oder Startseiten-Kachel): zeigt alle Beiträge im Topf und bei
+  jedem, **wie oft er schon ausgespielt** wurde. Mit **„Aus dem Pool nehmen"** holst du einen
+  Beitrag wieder heraus (er landet zurück bei „4. Einplanung").
+- **Automatik:** Das Tool zieht täglich je Beratungsstelle und Kanal (Facebook/Instagram) einen
+  Beitrag aus dem Topf – **für jede Stelle einen anderen** und **jeden Beitrag je Stelle nur
+  einmal pro Kanal**. Sind bei einer Stelle weniger als **14** Beiträge übrig, warnt die Seite.
+- **Wichtig:** Nur **zeitlose** Inhalte in den Topf. Anlass-Tage und Fristen bleiben in der
+  Einplanung, weil sie an ein festes Datum gehören.
+
 ## Eigene Quellen
 
 Über das Menü **„Eigene Quellen"** wirfst du ein **PDF** oder einen **Link** ein. HISOME
