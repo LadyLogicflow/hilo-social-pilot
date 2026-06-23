@@ -79,6 +79,10 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Anlass-Tage** – besondere Tage mit Steuer-Aufhänger (Datum als MM-TT). Fällt der Tag
   aufs Wochenende, erscheint der Beitrag am Freitag davor.
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
+- **Bild-Stil** – wählt das Aussehen der Beitragsbilder: **Standard** (Foto-Hintergrund mit
+  Textfeld, Hero-Zahl/Überschrift, Symbolen) oder **KI-Tafel (Test)** (die Bild-KI schreibt die
+  Überschrift selbst auf eine Tafel in der Szene; CTA und die blau-weißen HILO-Kreise kommen
+  weiterhin vom Tool). Jederzeit umschaltbar – das Bild entsteht beim nächsten „Neu erzeugen".
 
 ## Automatik
 
