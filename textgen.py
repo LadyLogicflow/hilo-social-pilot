@@ -35,19 +35,19 @@ SYSTEM = (
     "4) CTA (erscheint auf dem Bild): kurze Handlungsaufforderung OHNE erfundene Webadresse, zum Beispiel "
     "'Jetzt Beratungsstelle in Ihrer Naehe finden'.\n"
     "5) SLOGAN: sehr kurzer, einpraegsamer HILO-Slogan, hoechstens 3 Woerter (oder leer fuer Standard).\n"
-    "6) BILD_MOTIV: warme, positive Szene - eine sympathische HILO-Beraterin oder ein Berater im "
-    "freundlichen Gespraech mit Mandanten, die zum Thema passen. FREIGESTELLT, ohne Tisch oder Raum im "
-    "Hintergrund. Mappe oder Unterlagen in der Hand, gerne eine Kaffeetasse dabei - laechelnd, zugewandt, "
-    "aktiv (KEINE nachdenklichen Gesichter, keine Einzelportraits). Passe die Mandanten ans Thema an, z.B. "
-    "'Beraterin und junge Familie im Gespraech mit Unterlagen', 'Berater und aelteres Ehepaar, Kaffeetasse "
-    "in der Hand', 'Beraterin zeigt einem Rentnerpaar etwas in einer Mappe'.\n"
-    "7) BILD_MOTIV_THEMA: ein zum Thema passendes, GEGENSTAENDLICHES Motiv OHNE Personen - einzelne, klar "
-    "erkennbare Gegenstaende oder eine kleine Stillleben-Szene (z.B. fuer 'Gaertner absetzen' Gartengeraete "
-    "wie Heckenschere, Rechen und ein paar Pflanzen; fuer 'Homeoffice' ein aufgeraeumter Schreibtisch mit "
-    "Laptop und Notizblock; fuer 'Handwerkerleistungen' Werkzeug). Freigestellt, OHNE Raum/Hintergrund, "
-    "KEINE Menschen, KEIN Text. Kurze Beschreibung.\n"
-    "8) BILD_TYP: empfiehl den passenden Bildtyp - 'thema' wenn das Thema ein konkretes, bildstarkes Objekt "
-    "oder eine Szene nahelegt (z.B. Gaertner, Handwerker, Homeoffice, Umzug, Pendeln), sonst 'person'.\n\n"
+    "6) SZENE_MOTIV (NEU, wichtigstes Bildfeld): eine kurze Beschreibung einer emotionalen, "
+    "authentischen Szene MIT Umgebung fuer ein vollflaechiges Magazin-/Editorial-Foto (KEIN "
+    "freigestelltes Motiv). Verbinde JAHRESZEIT + GEFUEHL + einen dezenten THEMENBEZUG, z.B. "
+    "'warmer Spaetsommer-Nachmittag, eine entspannte Familie am Kuechentisch sortiert gemeinsam "
+    "Unterlagen, Erleichterung und Vertrauen' oder 'goldenes Herbstlicht, ein aelteres Paar laechelt "
+    "beim Blick auf einen Brief, Geborgenheit'. Warmes, weiches Tageslicht, natuerlich, keine steifen "
+    "Posen. KEIN Text/Logo im Bild. Kurz (ein Satz).\n"
+    "7) BILD_MOTIV: kurzes Ersatzmotiv (Fallback) im selben Stil wie szene_motiv - wird genutzt, falls "
+    "szene_motiv fehlt. Ebenfalls eine warme, authentische Szene mit Umgebung.\n"
+    "8) HERO (OPTIONAL): ein KURZER, echter Zahl-/Datums-/Betrags-Wert aus dem Inhalt, der sich als "
+    "grosser Blickfang eignet (z.B. '1.230 Euro', '31. Juli', '35 %'). NUR ausfuellen, wenn im Thema/"
+    "Inhalt eine solche Zahl TATSAECHLICH vorkommt. Gibt es keine echte Zahl: LEER lassen ('') - "
+    "NIEMALS eine Zahl, Frist oder einen Betrag erfinden.\n\n"
     "WICHTIG:\n"
     "- Erfinde NIEMALS Gerichtsurteile, Aktenzeichen, Zahlen, Fristen, Quellen, URLs, Adressen oder "
     "Telefonnummern - nutze AUSSCHLIESSLICH, was im Thema steht. Gibt das Thema keinen Fakt/kein Urteil "
@@ -110,9 +110,10 @@ def _build_prompt(thema, kanal=None):
         "Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
         '"bullets": ["3 sehr kurze Stichpunkte, je max 5 Woerter"], "cta": "kurze Handlungsaufforderung", '
-        '"slogan": "max 3 Woerter oder leer", "bild_motiv": "kurzes freigestelltes Personen-Fotomotiv", '
-        '"bild_motiv_thema": "kurzes gegenstaendliches Motiv ohne Personen", '
-        '"bild_typ": "person oder thema", '
+        '"slogan": "max 3 Woerter oder leer", '
+        '"szene_motiv": "emotionale Szene mit Umgebung (Jahreszeit+Gefuehl+Themenbezug), ein Satz", '
+        '"bild_motiv": "kurzes Ersatz-Szenenmotiv (Fallback)", '
+        '"hero": "kurze ECHTE Zahl/Datum/Betrag aus dem Inhalt oder leer", '
         '"captions": {"facebook": "Begleittext fuer Facebook inkl. Hashtags am Ende, hoechstens %d '
         'Zeichen", "instagram": "Begleittext fuer Instagram inkl. Hashtags am Ende, hoechstens %d '
         'Zeichen", "whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
@@ -148,12 +149,20 @@ def caption_fuer(fields, kanal):
     return (caps.get(kanal) or fields.get("caption") or "").strip()
 
 def _normalize_bild(data):
-    """Stellt bild_typ ('person'|'thema', Default 'person') und ein vorhandenes bild_motiv_thema sicher.
-    Faellt auf 'person' zurueck, wenn kein gegenstaendliches Motiv geliefert wurde."""
+    """Sichert die Bildfelder fuer das Magazin-Layout:
+    - szene_motiv (neues Hauptfeld): Fallback auf bild_motiv bzw. (fuer alte Entwuerfe) bild_motiv_thema.
+    - hero (optional): nur uebernehmen, wenn die KI eine echte Zahl/Frist/Betrag geliefert hat
+      (wird hier NICHT erfunden) - sonst leer, dann greift im Bild der Ueberschrift-Hingucker.
+    - bild_typ / bild_motiv_thema bleiben aus Rueckwaerts-Kompatibilitaet erhalten."""
     if not isinstance(data, dict):
         return data
-    typ = (data.get("bild_typ") or "").strip().lower()
+    szene = (data.get("szene_motiv") or "").strip()
+    bild_motiv = (data.get("bild_motiv") or "").strip()
     thema_motiv = (data.get("bild_motiv_thema") or "").strip()
+    data["szene_motiv"] = szene or bild_motiv or thema_motiv
+    data["hero"] = (data.get("hero") or "").strip()
+    # Altfelder unveraendert erhalten, damit bestehende Entwuerfe/Render-Pfade weiter funktionieren
+    typ = (data.get("bild_typ") or "").strip().lower()
     data["bild_motiv_thema"] = thema_motiv
     data["bild_typ"] = "thema" if (typ == "thema" and thema_motiv) else "person"
     return data
