@@ -240,17 +240,22 @@ def _render_ki_tafel(fields, photo_path, slogan, out_path, portrait=None):
     (2) die blau-weissen CI-Kreise (Logo + Slogan, rotierend) + optionales Portraet.
     KEINE Text-Karte, KEINE Code-Ueberschrift, KEINE Bullets. Fallback ohne Foto: Creme-Hintergrund."""
     base = _background(photo_path).convert("RGB")
-    pos = "diagonal2" if portrait else pick_circle_pos()
+    # #136-C: Im ki_tafel-Modus stehen BEIDE CI-Kreise OBEN ('oben'), damit die untere CTA-Pille
+    # frei und voll lesbar bleibt - ein unten stehender CI-Kreis hatte die CTA-Pille ueberlappt
+    # und den Text verdeckt. Die Kreis-Rotation des Standard-Modus bleibt davon unberuehrt
+    # (pick_circle_pos wird hier bewusst NICHT mehr aufgerufen). Gilt auch mit Portraet, sonst
+    # saesse der Logo-Kreis (diagonal2: unten-links) weiter unten und kollidierte mit der Pille.
+    pos = "oben"
 
     # Gold-CTA-Pille unten - selbe Quelle/Default wie der Standard-CTA (fields['cta']).
     cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
     fcta = _font(_BOLD, 34)
     h_cta = fcta.size + 2*15
-    cy_cta = H - 132                          # Pillen-Mitte: ueber den unteren CI-Kreisen
+    cy_cta = H - 132                          # Pillen-Mitte: unten, jetzt frei (Kreise oben)
     _cta_scrim(base, cy_cta - h_cta//2 - 26)  # dezenter Schatten/Scrim hinter der Pille
     _pill(base, W//2, cy_cta, cta_txt, fcta, ACCENT, WHITE, padx=36, pady=15)
 
-    _draw_circles(base, slogan, pos, portrait)   # blau-weisse CI-Kreise (Grafik, kein Text)
+    _draw_circles(base, slogan, pos, portrait)   # blau-weisse CI-Kreise OBEN (Grafik, kein Text)
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     base.save(out_path)
