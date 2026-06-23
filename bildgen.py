@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""M4 - Bild im HILO-Design v10 (1080x1080): zwei Verlaufsbaender, weisse Ueberschrift,
-grosses freigestelltes Foto rechts (hinter unterem Verlauf), Text links vertikal zentriert,
-CTA im unteren Band, zwei schwebende Kreise (Logo links, Slogan rechts)."""
+"""M4 - Bild im aufgefrischten HILO-Magazin-Stil (1080x1080): vollflaechiges Foto als Hintergrund,
+darueber ein integriertes weisses Textfeld (Saison-Pille, Ueberschrift, optionale Hero-Zahl,
+gezeichnete Symbol-Bullets, warme CTA-Pille). Die beiden CI-Kreise (Logo + Slogan 'Wir sind HILO')
+bleiben als Erkennungszeichen und rotieren je Beitrag. Ohne Foto: warmer cremefarbener Fallback."""
 import math, os, json, logging, random, re
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from config import BASE_DIR, DATA_DIR
@@ -12,29 +13,16 @@ W = H = 1080
 # inkl. weichem Schatten-Halo) - so wird kein Text vom Kreis oder Schatten verdeckt.
 CBOT = 788
 CTOPTEXT = H - CBOT        # = 292: Text-Oberkante, wenn die Kreise oben stehen (gespiegelt)
-TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender
+TOPB_BAND, BOTB_BAND = 192, 905   # Innenkanten der beiden Verlaufsbaender (Karussell-Slides)
 # Eckpositionen der beiden CI-Kreise (Erkennungszeichen) - sorgen fuer Abwechslung je Beitrag
 # diagonal  = Logo oben-links + Slogan unten-rechts; diagonal2 = Logo unten-links + Slogan oben-rechts
 CIRCLE_POSITIONS = ["unten", "oben", "diagonal", "diagonal2"]
 BLUE=(31,66,141); GREEN=(96,163,60); LIGHT=(244,247,246); NAVY=(21,51,110); GREEN2=(76,123,45); WHITE=(255,255,255)
-ACCENT=(243,146,0)   # warmes Orange fuer den CTA-Button (hoher Kontrast auf dem Blau-Gruen-Band)
+ACCENT=(243,146,0)   # warmes Gold/Orange fuer die CTA-Pille (hoher Kontrast, emotionaler Akzent)
+# Abgenommene Magazin-Vorschau: warmer Creme-Verlauf (oben hell -> unten warm) als Fallback-Hintergrund,
+# weisses Textfeld (Alpha) mit dezentem Rand fuer das integrierte Textfeld.
+CREME_TOP=(255,249,239); CREME_BOT=(244,227,199); CARD_FILL=(255,255,255,243); CARD_BORDER=(232,224,210)
 
-def _cta_button(base, cx, cy, text, font):
-    """Weisser, plastisch wirkender CTA-Button mit gruener Schrift (CI-konform, rein visuell):
-    weicher Schlagschatten (wirkt erhaben) + weisse Flaeche + dezenter Rand + gruene, fette Schrift."""
-    dr = ImageDraw.Draw(base)
-    tw = dr.textlength(text, font=font)
-    padx, pady = 42, 19
-    w, h = tw + 2*padx, font.size + 2*pady
-    x0, y0, x1, y1 = cx - w/2, cy - h/2, cx + w/2, cy + h/2
-    rad = h/2
-    # kraeftiger, weicher Schlagschatten auf eigener Ebene -> praesenter, plastisch erhabener Eindruck
-    sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle([x0+3, y0+9, x1+3, y1+12], radius=rad, fill=(0, 0, 0, 120))
-    blur = sh.filter(ImageFilter.GaussianBlur(10)); base.paste(blur, (0, 0), blur)
-    # weisse Flaeche mit dezentem Rand (der weiche Schatten darunter erzeugt die Tiefe)
-    dr.rounded_rectangle([x0, y0, x1, y1], radius=rad, fill=WHITE, outline=(214, 224, 216), width=2)
-    dr.text((cx, cy), text, font=font, fill=GREEN, anchor="mm")
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "hilo_logo.png")
 _BOLD = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 _REG  = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
@@ -69,12 +57,91 @@ def _fit(dr, text, paths, start, mn, max_w, max_lines):
         s -= 2
     return _font(paths, mn), _wrap(dr, text, _font(paths, mn), max_w)
 
-def _gradient():
-    row = Image.new("RGB", (W, 1)); px = row.load()
-    for x in range(W):
-        t = x / (W - 1)
-        px[x, 0] = (int(BLUE[0]+(GREEN[0]-BLUE[0])*t), int(BLUE[1]+(GREEN[1]-BLUE[1])*t), int(BLUE[2]+(GREEN[2]-BLUE[2])*t))
-    return row.resize((W, H))
+def _creme_bg():
+    """Warmer cremefarbener Verlaufs-Hintergrund (oben hell -> unten warm) mit einer dezenten,
+    warmen Sonne oben rechts und einer weichen gruenen Flaeche unten links - so wirkt das Bild
+    auch OHNE KI-Foto stimmungsvoll (Fallback)."""
+    col = Image.new("RGB", (1, H)); px = col.load()
+    for y in range(H):
+        t = y / (H - 1)
+        px[0, y] = (int(CREME_TOP[0]+(CREME_BOT[0]-CREME_TOP[0])*t),
+                    int(CREME_TOP[1]+(CREME_BOT[1]-CREME_TOP[1])*t),
+                    int(CREME_TOP[2]+(CREME_BOT[2]-CREME_TOP[2])*t))
+    base = col.resize((W, H))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0)); od = ImageDraw.Draw(ov)
+    od.ellipse([W-300, -160, W+160, 300], fill=(255, 214, 150, 95))   # warme Sonne oben rechts
+    od.ellipse([-260, H-360, 320, H+220], fill=(GREEN[0], GREEN[1], GREEN[2], 60))  # gruene Flaeche unten links
+    ov = ov.filter(ImageFilter.GaussianBlur(70))
+    base.paste(ov, (0, 0), ov)
+    return base
+
+def _cover_photo(photo_path):
+    """Laedt ein opakes Foto und skaliert/croppt es formatfuellend (cover) auf 1080x1080.
+    Liefert ein RGB-Image oder None (kein/ungueltiges Foto)."""
+    if not (photo_path and os.path.exists(photo_path)):
+        return None
+    try:
+        im = Image.open(photo_path).convert("RGB")
+        sc = max(W / im.width, H / im.height)
+        nw, nh = max(W, int(im.width * sc)), max(H, int(im.height * sc))
+        im = im.resize((nw, nh), Image.LANCZOS)
+        x0, y0 = (nw - W) // 2, (nh - H) // 2
+        return im.crop((x0, y0, x0 + W, y0 + H))
+    except Exception:
+        return None
+
+def _background(photo_path):
+    """Vollflaechiger Bildhintergrund: das Szene-Foto (cover) falls vorhanden, sonst warmer Creme-Fallback."""
+    bg = _cover_photo(photo_path)
+    return bg if bg is not None else _creme_bg()
+
+def _pill(base, cx, cy, text, font, fill, fg, padx=26, pady=11):
+    """Zeichnet eine abgerundete Pille (Label/CTA) mittig um (cx, cy). Liefert (x0, y0, x1, y1)."""
+    dr = ImageDraw.Draw(base)
+    tw = dr.textlength(text, font=font)
+    w, h = tw + 2*padx, font.size + 2*pady
+    x0, y0, x1, y1 = cx - w/2, cy - h/2, cx + w/2, cy + h/2
+    dr.rounded_rectangle([x0, y0, x1, y1], radius=h/2, fill=fill)
+    dr.text((cx, cy), text, font=font, fill=fg, anchor="mm")
+    return x0, y0, x1, y1
+
+def _bullet_icon(base, cx, cy, r, kind):
+    """Einfach gezeichnetes Symbol-Icon fuer einen Bullet (gruen), mittig um (cx, cy), Radius r.
+    kind: 'sonne' (Kreis + Strahlen), 'kalender' (Rechteck + Linien), 'check' (Kreis + Haken)."""
+    dr = ImageDraw.Draw(base)
+    if kind == "sonne":
+        rr = int(r*0.52)
+        dr.ellipse([cx-rr, cy-rr, cx+rr, cy+rr], fill=GREEN)
+        for a in range(8):
+            ang = math.radians(a*45)
+            x0 = cx + (rr+5)*math.cos(ang); y0 = cy + (rr+5)*math.sin(ang)
+            x1 = cx + (r+1)*math.cos(ang); y1 = cy + (r+1)*math.sin(ang)
+            dr.line([(x0, y0), (x1, y1)], fill=GREEN, width=4)
+    elif kind == "kalender":
+        x0, y0, x1, y1 = cx-r, cy-int(r*0.8), cx+r, cy+int(r*0.85)
+        dr.rounded_rectangle([x0, y0, x1, y1], radius=5, outline=GREEN, width=4)
+        dr.line([(x0+3, y0+int(r*0.5)), (x1-3, y0+int(r*0.5))], fill=GREEN, width=4)  # Kopfzeile
+        for fx in (x0+r*0.6, cx, x1-r*0.6):                                          # Aufhaenge-Ringe
+            dr.line([(fx, y0-6), (fx, y0+5)], fill=GREEN, width=4)
+        for gy in (y0+int(r*0.9), y0+int(r*1.25)):                                   # Gitterzeilen
+            dr.line([(x0+6, gy), (x1-6, gy)], fill=GREEN, width=3)
+    else:   # 'check' / 'haekchen'
+        dr.ellipse([cx-r, cy-r, cx+r, cy+r], fill=GREEN)
+        dr.line([(cx-int(r*0.45), cy), (cx-int(r*0.05), cy+int(r*0.42)),
+                 (cx+int(r*0.5), cy-int(r*0.45))], fill=WHITE, width=5, joint="curve")
+
+_BULLET_ICONS = ["check", "sonne", "kalender"]   # rotieren je Bullet (Abwechslung)
+
+def _card(base, x0, y0, x1, y1, radius=38):
+    """Integriertes weisses Textfeld (abgerundet, leicht transparent) mit weichem Schatten und
+    dezentem Rand - schwebt ueber dem Foto-Hintergrund (Magazin-Optik)."""
+    sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle([x0+4, y0+10, x1+4, y1+16], radius=radius, fill=(0, 0, 0, 95))
+    blur = sh.filter(ImageFilter.GaussianBlur(22)); base.paste(blur, (0, 0), blur)
+    card = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(card).rounded_rectangle([x0, y0, x1, y1], radius=radius,
+                                           fill=CARD_FILL, outline=CARD_BORDER, width=2)
+    base.paste(card, (0, 0), card)
 
 def _last_slogan_path():
     return os.path.join(DATA_DIR, "last_slogan.txt")
@@ -135,117 +202,125 @@ def _safe_fields(fields):
         f["bullets"] = [_safe(b) for b in (f.get("bullets") or [])]
     return f
 
+def _pille_text(fields):
+    """Kurzer Saison-/Themen-Text fuer die gruene Pille oben im Textfeld. Bevorzugt ein explizites
+    Feld ('pille'/'saison'/'thema_label'), sonst ein dezenter Standard - nie erfunden, nur Label."""
+    for k in ("pille", "saison", "thema_label"):
+        v = _safe((fields.get(k) or "")).strip()
+        if v:
+            return v[:32]
+    return "HILO Steuertipp"
+
 def render(fields, photo_path, slogan, out_path, portrait=None):
+    """Rendert das Magazin-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber das
+    weisse Textfeld (Pille, Ueberschrift, optionale Hero-Zahl ODER groessere Ueberschrift + Hook,
+    Symbol-Bullets, Gold-CTA) und die beiden CI-Kreise. Signatur unveraendert (rueckwaertskompatibel:
+    die Felder ueberschrift/subline/bullets/cta/ort werden weiter genutzt)."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
-    cut = None
-    if photo_path and os.path.exists(photo_path):
-        try:
-            cut = Image.open(photo_path).convert("RGBA")
-            bb = cut.getchannel("A").getbbox()
-            if bb:
-                cut = cut.crop(bb)
-        except Exception:
-            cut = None
+    base = _background(photo_path).convert("RGB")
 
-    grad = _gradient()
-    base = Image.new("RGB", (W, H), LIGHT)
-    TOPB, BOTB = 192, 905
-    mt = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mt).polygon([(0,0),(W,0)]+[(x, TOPB+22*math.sin((x/W)*2*math.pi)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mt)
-
-    if cut is not None:
-        # Feste Breite ~63% (Schwerpunkt rechts), Hoehe folgt dem Seitenverhaeltnis. Foto UNTEN ans
-        # Verlaufsband andocken (Personen "stehen" darauf); bei hohem Foto deckt das untere Band die
-        # Unterkante ab. Konsistente Breite (nicht von der Hoehe abhaengig).
-        pw = 680; sc = pw / cut.width; chh = int(cut.height * sc)
-        cut2 = cut.resize((pw, chh), Image.LANCZOS)
-        py = max(200, BOTB - chh + 50)   # unten ans Band; bei sehr hohem Foto Oberkante bei ~200 (unter dem Titel)
-        base.paste(cut2, (W - 8 - pw, py), cut2)
-
-    mb = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mb)
-
-    dr = ImageDraw.Draw(base); margin = 54
-    # Mit Portraet: feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2').
-    # Nur ohne Portraet wechselt die Eckposition je Beitrag.
+    # Mit Portraet feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2');
+    # nur ohne Portraet wechselt die Eckposition je Beitrag (Kreis-Rotation).
     pos = "diagonal2" if portrait else pick_circle_pos()
     ct, cb = _content_bounds(pos)
-    head_w = (W - 2*margin) if pos == "unten" else (W - 2*(340 if portrait else 246))   # mit grossem Beraterfoto Titel schmaler
-    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 46, 30, head_w, 2)
-    yy = 72 if len(HL) == 2 else 96
-    for ln in HL:
-        dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
 
-    LCOL = 372 if cut is not None else (W - margin)   # Text bleibt im linken Drittel (Bullets duerfen umbrechen)
-    tx0 = margin + 18 + 18 + 16
-    fsb = _font(_REG, 31); SL = _wrap(dr, fields.get("subline", ""), fsb, LCOL - margin)
-    fb = _font(_BOLD, 30); bw = LCOL - tx0
+    dr = ImageDraw.Draw(base)
+    margin = 70
+    cx0, cx1 = margin, W - margin           # Textfeld-Spalte (volle Breite mit Rand)
+    inx = cx0 + 40                           # Innenrand im Textfeld
+    inw = cx1 - inx - 40
+    pad_top, pad_bot = 40, 40
+
+    # --- Inhalte vorbereiten (Hoehe vorab berechnen, damit das Feld zentriert sitzt) ---
+    pille = _pille_text(fields)
+    fpill = _font(_BOLD, 26)
+    hero = _safe((fields.get("hero") or "")).strip()   # optionale, echte Zahl/Datum (nie erfunden)
+    # Hero vorhanden -> Ueberschrift normal gross; sonst Ueberschrift selbst als Hingucker (groesser)
+    head_start = 50 if hero else 64
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, head_start, 34, inw, 3)
+    lh_h = fh.size + 8
+    fhero = _font(_BOLD, 96)
+    sub_txt = fields.get("subline", "") if not hero else ""   # ohne Hero zusaetzlich eine Hook-Subline
+    fsub = _font(_REG, 30); SL = _wrap(dr, sub_txt, fsub, inw) if sub_txt else []
+    fb = _font(_BOLD, 30)
     bullets = [b for b in (fields.get("bullets") or [])[:3] if b]
-    blocks = [_wrap(dr, b, fb, bw) for b in bullets]
-    lh = fb.size + 6
-    # Gleichmaessiger Abstand: jeder Bullet bekommt denselben vertikalen Schritt (Hoehe des
-    # groessten Bullets + fester Abstand), unabhaengig davon ob er ein- oder zweizeilig ist.
-    maxlines = max((len(bl) for bl in blocks), default=1)
-    step = maxlines * lh + 22
-    bh = len(SL)*(fsb.size+8) + 30 + len(blocks)*step
-    y = ct + (cb - ct - bh)//2 + fsb.size//2   # Inhalt bleibt frei von den Kreisen
+    icon_r = 22; bx_text = inx + 2*icon_r + 22
+    bblocks = [_wrap(dr, b, fb, inw - (2*icon_r + 22)) for b in bullets]
+    lh_b = fb.size + 6
+    cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
+    fcta = _font(_BOLD, 30)
+
+    # Hoehen der einzelnen Bloecke (mit Abstaenden)
+    h_pill = fpill.size + 2*11
+    h_head = len(HL)*lh_h
+    h_hero = fhero.size if hero else 0
+    h_sub = len(SL)*(fsub.size + 6)
+    bstep = lh_b + 26
+    h_bul = len(bblocks)*bstep
+    h_cta = fcta.size + 2*13
+    gap = 22
+    parts = [h_pill, h_head]
+    if hero: parts.append(h_hero)
+    if SL: parts.append(h_sub)
+    if bblocks: parts.append(h_bul)
+    parts.append(h_cta)
+    content_h = sum(parts) + gap*(len(parts)-1)
+    card_h = content_h + pad_top + pad_bot
+
+    # Textfeld vertikal in den freien Bereich zwischen den Kreisen (ct..cb) einpassen
+    avail = cb - ct
+    card_h = min(card_h, avail)
+    cy0 = ct + (avail - card_h)//2
+    cy1 = cy0 + card_h
+    _card(base, cx0, cy0, cx1, cy1)
+
+    cxc = (cx0 + cx1)//2   # horizontale Mitte des Felds
+    y = cy0 + pad_top
+
+    # gruene Saison-/Themen-Pille
+    _pill(base, cxc, y + h_pill//2, pille, fpill, GREEN, WHITE)
+    y += h_pill + gap
+
+    # Ueberschrift (zentriert)
+    for ln in HL:
+        dr.text((cxc, y + fh.size//2), ln, font=fh, fill=NAVY, anchor="mm"); y += lh_h
+    y += gap
+
+    # Hero-Zahl als grosser gruener Blickfang (nur wenn echt vorhanden)
+    if hero:
+        dr.text((cxc, y + fhero.size//2), hero, font=fhero, fill=GREEN, anchor="mm")
+        y += h_hero + gap
+    # ohne Hero: kurze Hook-Subline unter der (groesseren) Ueberschrift
     for ln in SL:
-        dr.text((margin, y), ln, font=fsb, fill=NAVY, anchor="lm"); y += fsb.size + 8
-    y += 30
-    for i, bl in enumerate(blocks):
-        cy = y + i*step + step//2          # Mitte des gleich grossen Slots -> konstanter Abstand
-        r = 17; bx = margin + r
-        dr.ellipse([bx-r, cy-r, bx+r, cy+r], fill=GREEN)
-        dr.line([(bx-8, cy), (bx-1, cy+8), (bx+9, cy-9)], fill=WHITE, width=5, joint="curve")
-        ty = cy - (len(bl)-1)*lh//2
+        dr.text((cxc, y + fsub.size//2), ln, font=fsub, fill=NAVY, anchor="mm"); y += fsub.size + 6
+    if SL:
+        y += gap
+
+    # Symbol-Bullets (gezeichnete Icons, gruen) - linksbuendig im Feld
+    for i, bl in enumerate(bblocks):
+        cyb = y + bstep//2
+        _bullet_icon(base, inx + icon_r, cyb, icon_r, _BULLET_ICONS[i % len(_BULLET_ICONS)])
+        ty = cyb - (len(bl)-1)*lh_b//2
         for ln in bl:
-            dr.text((tx0, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh
+            dr.text((bx_text, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh_b
+        y += bstep
+    if bblocks:
+        y += gap
 
-    # Unteres Band: gut sichtbarer Ortsbezug + praesenter, weisser Termin-Button (rein visuell).
-    ort = (fields.get("ort") or "").strip()
-    cyy = (BOTB + H)//2
-    if ort:
-        dr.text((W//2, cyy - 36), "Beratungsstelle %s" % ort, font=_font(_BOLD, 31), fill=WHITE, anchor="mm")
-        _cta_button(base, W//2, cyy + 28, "Jetzt Termin vereinbaren", _font(_BOLD, 30))
-    else:
-        _cta_button(base, W//2, cyy + 6, "Jetzt Termin vereinbaren", _font(_BOLD, 30))
+    # warme CTA-Pille (Gold) - der Ortsbezug steckt bereits im personalisierten cta-Text
+    _pill(base, cxc, y + h_cta//2, cta_txt, fcta, ACCENT, WHITE, padx=34, pady=13)
 
-    _draw_circles(base, slogan, pos, portrait)   # schwebende Kreise, Eckposition variiert je Beitrag
+    _draw_circles(base, slogan, pos, portrait)   # schwebende CI-Kreise, Eckposition rotiert je Beitrag
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     base.save(out_path)
     return out_path
 
 # ---------------------------------------------------------------------------
 # R1 Karussell - mehrere Slides je Thema (Title -> je Bullet eine Slide -> CTA)
-# Gleiches HILO-Design (zwei Verlaufsbaender, Logo-/Slogan-Kreise) wie das Einzelbild.
+# Gleicher Magazin-Stil wie das Einzelbild: Foto-Hintergrund (cover) bzw. Creme-Fallback,
+# weisser Text auf dezentem Scrim, dieselben Logo-/Slogan-Kreise (Eckposition rotiert je Beitrag).
 # ---------------------------------------------------------------------------
-def _load_cut(photo_path):
-    if photo_path and os.path.exists(photo_path):
-        try:
-            cut = Image.open(photo_path).convert("RGBA")
-            bb = cut.getchannel("A").getbbox()
-            if bb:
-                cut = cut.crop(bb)
-            return cut
-        except Exception:
-            return None
-    return None
-
-def _draw_bands(base):
-    """Zeichnet die zwei Verlaufsbaender (oben/unten) und liefert deren Innenkanten."""
-    grad = _gradient()
-    TOPB, BOTB = 192, 905
-    mt = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mt).polygon([(0,0),(W,0)]+[(x, TOPB+22*math.sin((x/W)*2*math.pi)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mt)
-    mb = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mb).polygon([(0,H),(W,H)]+[(x, BOTB+22*math.sin((x/W)*2*math.pi+1.0)) for x in range(W,-1,-15)], fill=255)
-    base.paste(grad, (0, 0), mb)
-    return TOPB, BOTB
-
 def _last_circlepos_path():
     return os.path.join(DATA_DIR, "last_circlepos.txt")
 
@@ -341,54 +416,45 @@ def _draw_pager(base, idx, total):
         else:
             dr.ellipse([cx-r, y-r, cx+r, y+r], outline=WHITE, width=2)
 
-def _fit_photo(cut, max_h, max_w):
-    """Skaliert ein freigestelltes Motiv auf max. Hoehe/Breite (Seitenverhaeltnis erhalten)."""
-    if cut is None:
-        return None
-    sc = max_h / cut.height
-    if cut.width * sc > max_w:
-        sc = max_w / cut.width
-    return cut.resize((max(1, int(cut.width*sc)), max(1, int(cut.height*sc))), Image.LANCZOS)
+def _slide_bg(photo_path):
+    """Slide-Hintergrund im neuen Magazin-Stil: Szene-Foto (cover) mit dezentem dunklem Verlauf-Scrim
+    fuer Textlesbarkeit, sonst warmer Creme-Fallback. Liefert ein RGB-Image."""
+    bg = _cover_photo(photo_path)
+    if bg is None:
+        return _creme_bg()
+    # Vertikaler Scrim (oben/unten dunkler), damit der weisse Text auf dem Foto lesbar bleibt
+    scrim = Image.new("L", (1, H), 0); sp = scrim.load()
+    for yy in range(H):
+        t = abs((yy/(H-1)) - 0.5)*2     # 0 in der Mitte, 1 an den Raendern
+        sp[0, yy] = int(150 * (t**1.4))
+    scrim = scrim.resize((W, H))
+    dark = Image.new("RGB", (W, H), (12, 24, 48))
+    bg.paste(dark, (0, 0), scrim)
+    return bg
 
 def _slide_title(fields, photo_path, slogan, idx, total, pos="unten", portrait=None):
-    cut = _load_cut(photo_path)
-    base = Image.new("RGB", (W, H), LIGHT)
-    TOPB, BOTB = _draw_bands(base)
+    base = _slide_bg(photo_path)
     ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 54
-    # Ueberschrift gross, fett, zentriert im oberen Band; sobald oben ein Kreis steht
-    # schmaler, damit sie die Eck-Kreise nicht beruehrt
     head_w = (W - 2*margin) if pos == "unten" else (W - 2*246)
-    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 56, 36, head_w, 2)
-    yy = 64 if len(HL) == 2 else 92
-    for ln in HL:
-        dr.text((W//2, yy), ln, font=fh, fill=WHITE, anchor="mm"); yy += fh.size + 6
-    # Eyecatcher (zentriert) + subline (fett, gross, zentriert) als vertikal+horizontal
-    # zentrierte Gruppe im freien Feld zwischen den Kreis-Grenzen (ct..cb)
+    fh, HL = _fit(dr, fields.get("ueberschrift", ""), _BOLD, 60, 36, head_w, 3)
     fsb = _font(_BOLD, 42); SL = _wrap(dr, fields.get("subline", ""), fsb, W - 2*margin)
-    sub_h = len(SL)*(fsb.size + 12)
-    photo_max = max(140, (cb - ct) - sub_h - 30 - 36)
-    cut2 = _fit_photo(cut, min(440, photo_max), W - 2*margin)
-    ph = cut2.height if cut2 is not None else 0
-    gap = 30 if cut2 is not None else 0
-    group_h = ph + gap + sub_h
-    gy = ct + (cb - ct - group_h)//2
-    if cut2 is not None:
-        base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
-        gy += ph + gap
-    sy = gy + fsb.size//2
+    head_h = len(HL)*(fh.size + 6); sub_h = len(SL)*(fsb.size + 12)
+    group_h = head_h + (28 if SL else 0) + sub_h
+    y = ct + (cb - ct - group_h)//2 + fh.size//2
+    for ln in HL:
+        dr.text((W//2, y), ln, font=fh, fill=WHITE, anchor="mm"); y += fh.size + 6
+    y += 28 - fh.size//2 + fsb.size//2 if SL else 0
     for ln in SL:
-        dr.text((W//2, sy), ln, font=fsb, fill=NAVY, anchor="mm"); sy += fsb.size + 12
-    # "Weiterwischen"-Hinweis unten-zentriert (klart die Eck-Kreise in jeder Position)
+        dr.text((W//2, y), ln, font=fsb, fill=WHITE, anchor="mm"); y += fsb.size + 12
     fc = _font(_BOLD, 30)
-    dr.text((W//2, (BOTB + H)//2 + 12), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
+    dr.text((W//2, H - 64), u"Weiterwischen →", font=fc, fill=WHITE, anchor="mm")
     _draw_circles(base, slogan, pos, portrait)
     _draw_pager(base, idx, total)
     return base
 
 def _slide_bullet(text, slogan, idx, total, nummer, pos="unten", portrait=None):
-    base = Image.new("RGB", (W, H), LIGHT)
-    TOPB, BOTB = _draw_bands(base)
+    base = _slide_bg(None)   # Bullet-Slides bleiben auf warmem Creme-Hintergrund (klare Lesbarkeit)
     ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 78
     nr = 44; ncx = W//2; ncy = ct + 96   # Nummern-Badge unter der oberen Grenze
@@ -405,29 +471,17 @@ def _slide_bullet(text, slogan, idx, total, nummer, pos="unten", portrait=None):
     return base
 
 def _slide_cta(fields, photo_path, slogan, idx, total, pos="unten", portrait=None):
-    cut = _load_cut(photo_path)
-    base = Image.new("RGB", (W, H), LIGHT)
-    TOPB, BOTB = _draw_bands(base)
+    base = _slide_bg(photo_path)
     ct, cb = _content_bounds(pos)
     dr = ImageDraw.Draw(base); margin = 78
     head = _font(_BOLD, 40)
-    dr.text((W//2, ct + 70), "Aktiv werden!", font=head, fill=GREEN2, anchor="mm")
+    dr.text((W//2, ct + 70), "Aktiv werden!", font=head, fill=WHITE, anchor="mm")
     fc, CL = _fit(dr, fields.get("cta", ""), _BOLD, 52, 30, W - 2*margin, 4)
     sub_h = len(CL)*(fc.size + 12)
     top = ct + 128
-    # Foto-Hoehe adaptiv aus Restplatz; Gruppe bleibt frei von den Kreisen
-    photo_max = max(140, (cb - top) - sub_h - 28 - 30)
-    cut2 = _fit_photo(cut, min(360, photo_max), W - 2*margin)
-    ph = cut2.height if cut2 is not None else 0
-    gap = 28 if cut2 is not None else 0
-    group_h = ph + gap + sub_h
-    gy = top + (cb - top - group_h)//2
-    if cut2 is not None:
-        base.paste(cut2, (int(W//2 - cut2.width//2), int(gy)), cut2)
-        gy += ph + gap
-    y = gy + fc.size//2
+    y = top + (cb - top - sub_h)//2 + fc.size//2
     for ln in CL:
-        dr.text((W//2, y), ln, font=fc, fill=NAVY, anchor="mm"); y += fc.size + 12
+        dr.text((W//2, y), ln, font=fc, fill=WHITE, anchor="mm"); y += fc.size + 12
     _draw_circles(base, slogan, pos, portrait)
     _draw_pager(base, idx, total)
     return base
