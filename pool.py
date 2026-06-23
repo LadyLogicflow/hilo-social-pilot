@@ -82,7 +82,7 @@ def markiere_verbraucht(conn, entwurf_id, stelle_id, kanal):
                  (entwurf_id, stelle_id, kanal))
 
 
-def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng):
+def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None):
     """Zieht fuer EINEN Kanal je Stelle einen zufaelligen, noch offenen Topf-Beitrag - so, dass an
     EINEM Tag keine zwei Stellen denselben Beitrag bekommen ('fuer jede Stelle ein anderer').
 
@@ -90,11 +90,17 @@ def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng):
     wenigsten Ausweichmoeglichkeiten). rng ist eine random.Random-Instanz (Aufrufer steuert den Seed
     -> testbar). Rueckgabe: dict[stelle_id] -> entwurf_id (Stellen ohne offenen Beitrag fehlen).
 
+    erlaubte_eids (optional, #127): Menge von entwurf_ids, auf die die Auswahl eingeschraenkt wird
+    (z.B. nur 'leichte' Wochenend-Beitraege). None = keine Einschraenkung.
+
     Markiert NICHTS - der Aufrufer entscheidet, ob/wann er markiere_verbraucht() schreibt (z.B. erst
     nach erfolgreicher Einplanung)."""
     pool_ids = aktive_pool_ids(conn)
     verbraucht = verbrauchte_paare(conn)
     offen = {sid: offene_beitraege(conn, sid, kanal, pool_ids, verbraucht) for sid in stelle_ids}
+    if erlaubte_eids is not None:
+        erlaubt = set(erlaubte_eids)
+        offen = {sid: [eid for eid in lst if eid in erlaubt] for sid, lst in offen.items()}
     auswahl = {}
     schon_vergeben = set()
     for sid in sorted(stelle_ids, key=lambda s: len(offen[s])):

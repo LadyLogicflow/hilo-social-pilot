@@ -214,6 +214,16 @@ def migrate(conn):
     # Facebook-Orts-ID (Place ID) je Stelle - fuer den Instagram-Geotag beim Posten
     if "ort_id" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN ort_id TEXT")
+    # WhatsApp-Kanal je Stelle (Pool Phase 3, #127): Einladungslink des WhatsApp-Kanals der Stelle.
+    # Gesetzt = die Stelle hat einen WhatsApp-Kanal -> wird bei der Pool-Ziehung bespielt; leer = nicht.
+    if "wa_kanal_invite" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN wa_kanal_invite TEXT")
+    # WhatsApp-Status je Stelle (Pool Phase 3, #127): Marker, dass die Stelle WhatsApp-Status nutzt.
+    # 1 = Stelle hat eine eigene WhatsApp-Nummer/Session fuer Status -> taeglich bespielen; 0/NULL = nicht.
+    # Hinweis: Der WhatsApp-Dienst (whatsapp/server.mjs) faehrt aktuell EINE globale Baileys-Sitzung;
+    # dieser Marker steuert nur, OB fuer die Stelle gezogen wird (Single-Source-Sende-Limitierung siehe MR).
+    if "wa_status_aktiv" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN wa_status_aktiv INTEGER NOT NULL DEFAULT 0")
     # R1 Karussell: Format je Beitrag (einzelbild | karussell)
     ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
     if "format" not in ecols:
