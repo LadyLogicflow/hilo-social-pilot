@@ -211,12 +211,58 @@ def _pille_text(fields):
             return v[:32]
     return "HILO Steuertipp"
 
+def _cta_scrim(base, cy0):
+    """Dezenter dunkler Verlauf-Scrim ab cy0 bis zur Bildunterkante - hebt die Gold-CTA-Pille im
+    ki_tafel-Modus vom KI-Foto ab, ohne das Foto zu ueberdecken (Lesbarkeit)."""
+    band = H - cy0
+    if band <= 0:
+        return
+    scrim = Image.new("L", (1, band), 0); sp = scrim.load()
+    for yy in range(band):
+        sp[0, yy] = int(150 * (yy / max(1, band - 1)) ** 1.3)   # nach unten dunkler
+    scrim = scrim.resize((W, band))
+    dark = Image.new("RGB", (W, band), (10, 22, 44))
+    base.paste(dark, (0, cy0), scrim)
+
+def _render_ki_tafel(fields, photo_path, slogan, out_path, portrait=None):
+    """Bild-Stil 'ki_tafel' (#132, Testmodus): Das KI-Foto traegt die Ueberschrift selbst auf einer
+    Tafel in der Szene. Hier wird das Foto VOLLFLAECHIG (cover) gezeigt; per CODE-Overlay kommen NUR
+    (1) die Gold-CTA-Pille unten (exakter, personalisierbarer CTA-Text mit dezentem Scrim) und
+    (2) die blau-weissen CI-Kreise (Logo + Slogan, rotierend) + optionales Portraet.
+    KEINE Text-Karte, KEINE Code-Ueberschrift, KEINE Bullets. Fallback ohne Foto: Creme-Hintergrund."""
+    base = _background(photo_path).convert("RGB")
+    pos = "diagonal2" if portrait else pick_circle_pos()
+
+    # Gold-CTA-Pille unten - selbe Quelle/Default wie der Standard-CTA (fields['cta']).
+    cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
+    fcta = _font(_BOLD, 34)
+    h_cta = fcta.size + 2*15
+    cy_cta = H - 132                          # Pillen-Mitte: ueber den unteren CI-Kreisen
+    _cta_scrim(base, cy_cta - h_cta//2 - 26)  # dezenter Schatten/Scrim hinter der Pille
+    _pill(base, W//2, cy_cta, cta_txt, fcta, ACCENT, WHITE, padx=36, pady=15)
+
+    _draw_circles(base, slogan, pos, portrait)   # blau-weisse CI-Kreise (Grafik, kein Text)
+
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    base.save(out_path)
+    return out_path
+
 def render(fields, photo_path, slogan, out_path, portrait=None):
     """Rendert das Magazin-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber das
     weisse Textfeld (Pille, Ueberschrift, optionale Hero-Zahl ODER groessere Ueberschrift + Hook,
     Symbol-Bullets, Gold-CTA) und die beiden CI-Kreise. Signatur unveraendert (rueckwaertskompatibel:
-    die Felder ueberschrift/subline/bullets/cta/ort werden weiter genutzt)."""
+    die Felder ueberschrift/subline/bullets/cta/ort werden weiter genutzt).
+
+    Bild-Stil 'ki_tafel' (#132): Modus wird intern aus der Einstellung gelesen (kein neuer Pflicht-
+    Parameter). Default 'standard' -> unveraendertes v11-Layout unten."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
+    try:
+        import db
+        stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
+    except Exception:
+        stil = "standard"
+    if stil == "ki_tafel":
+        return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
     base = _background(photo_path).convert("RGB")
 
     # Mit Portraet feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2');

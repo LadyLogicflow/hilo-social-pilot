@@ -1046,6 +1046,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=stellen"><h3>&#x1F3E2; Beratungsstellen</h3><p>Stellen mit Ort, Facebook-Seite und Buchungslink pflegen.</p></a>
   <a class=tile href="/verwaltung?bereich=anlass"><h3>&#x1F4C5; Anlass-Tage</h3><p>Besondere Tage mit Steuer-Aufh&auml;nger verwalten.</p></a>
   <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
+  <a class=tile href="/verwaltung?bereich=bildstil"><h3>&#x1F5BC; Bild-Stil</h3><p>Standard (v11) oder Testmodus „KI schreibt den Text selbst auf eine Tafel".</p></a>
 </div>"""
 
 VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
@@ -1155,6 +1156,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <input name=titel placeholder="Thema (z.B. Wer muss abgeben?)" required style="width:35%">
 <input name=hook placeholder="Kurzer Aufhänger" style="width:40%">
 <button>Wissens-Thema speichern</button></form>
+{% endif %}
+
+{% if bereich=='bildstil' %}
+<p class=hint>Legt fest, wie das Beitragsbild gestaltet wird. <b>Standard</b> ist das bewährte Layout (v11): Foto-Hintergrund mit weißem Textfeld (Überschrift, Bullets, CTA). Der <b>Testmodus</b> lässt die Bild-KI die Überschrift selbst auf eine Tafel in der Szene schreiben; CTA und die HILO-Kreise kommen weiterhin exakt per Code. So lässt sich beides vergleichen.</p>
+<form method=post><input type=hidden name=formular value=bildstil_save>
+<div style="max-width:560px">
+  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <input type=radio name=bild_stil value="standard"{% if bild_stil=='standard' %} checked{% endif %}>
+    <span><b>Standard (v11)</b><br><span class=hint>Bewährtes Layout: Foto + weißes Textfeld mit Überschrift, Bullets und CTA. (Empfohlen)</span></span></label>
+  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <input type=radio name=bild_stil value="ki_tafel"{% if bild_stil=='ki_tafel' %} checked{% endif %}>
+    <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
+  <button>Bild-Stil speichern</button>
+</div></form>
 {% endif %}
 </div>"""
 
@@ -2763,28 +2778,42 @@ def verwaltung():
                 titel = request.form.get("titel", "").strip()
                 conn.execute("UPDATE wissensthemen SET aktiv=1-aktiv WHERE titel=?", (titel,))
                 flash("Wissens-Thema '%s' geändert." % titel)
+            elif formular == "bildstil_save":
+                # Globaler Bild-Stil (#132): 'standard' (v11, Default) oder 'ki_tafel' (Testmodus).
+                stil = request.form.get("bild_stil", "standard").strip()
+                if stil not in ("standard", "ki_tafel"):
+                    stil = "standard"
+                conn.execute(
+                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_stil', ?) "
+                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (stil,))
+                audit_log(conn, session["user"], "bild_stil_gesetzt", None, stil)
+                flash("Bild-Stil gespeichert: %s." % ("Standard (v11)" if stil == "standard"
+                                                      else "KI-Tafel (Testmodus)"))
             conn.commit()
             # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
-                    "wissen": "wissen"}.get((formular or "").split("_")[0])
+                    "wissen": "wissen", "bildstil": "bildstil"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
         bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
-                         "anlass": "Anlass-Tage", "wissen": "Wissens-Serie"}.get(bereich)
+                         "anlass": "Anlass-Tage", "wissen": "Wissens-Serie",
+                         "bildstil": "Bild-Stil"}.get(bereich)
         if not bereich_titel:
             return redirect(url_for("verwaltung"))
         users = conn.execute("SELECT name, rolle, aktiv FROM benutzer ORDER BY name").fetchall()
         stellen = conn.execute("SELECT * FROM beratungsstellen ORDER BY ort").fetchall()
         anlasstage = conn.execute("SELECT datum, anlass, steuer_hook, aktiv FROM anlasstage ORDER BY datum").fetchall()
         wissen = conn.execute("SELECT titel, hook, aktiv FROM wissensthemen ORDER BY titel").fetchall()
+        _bs = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_stil'").fetchone()
+        bild_stil = (_bs["wert"] if _bs and _bs["wert"] else "standard")
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
     page_id_set = {str(p["id"]) for p in pages}
     fb_name = {str(p["id"]): p["name"] for p in pages}
     return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
                                                      wissen=wissen, bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
-                                                     fb_name=fb_name))
+                                                     fb_name=fb_name, bild_stil=bild_stil))
 
 @app.route("/logo.png")
 def logo():
