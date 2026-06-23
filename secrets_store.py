@@ -9,6 +9,7 @@ log = logging.getLogger("hilo.secrets")
 _ENV_MAP = {
     "anthropic_api_key":     "HILO_ANTHROPIC_API_KEY",
     "openai_api_key":        "HILO_OPENAI_API_KEY",
+    "ideogram_api_key":      "HILO_IDEOGRAM_API_KEY",
     "linkedin_access_token": "HILO_LINKEDIN_ACCESS_TOKEN",
     "linkedin_org_id":       "HILO_LINKEDIN_ORG_ID",
 }
