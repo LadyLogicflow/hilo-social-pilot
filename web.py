@@ -498,6 +498,29 @@ def _pool_scheduler():
             log.exception("Pool-Tagesziehung: Scheduler-Fehler")
         time.sleep(120)
 
+def _cache_cleanup_scheduler():
+    """Raeumt den KI-Foto-Cache (motive/) einmal pro Tag orphan-basiert auf (#134).
+    Datums-getaktet ueber eine Marker-Datei (analog _pool_scheduler). Faengt jeden Fehler ab -
+    der Thread darf nie sterben, das Aufraeumen ist best effort und niemals kritisch."""
+    import datetime
+    import wartung
+    marker = os.path.join(DATA_DIR, "last_cache_cleanup.txt")
+    while True:
+        try:
+            now = datetime.datetime.now()
+            heute = now.strftime("%Y-%m-%d")
+            last = open(marker, encoding="utf-8").read().strip() if os.path.exists(marker) else ""
+            if now.hour >= 7 and last != heute:
+                with get_conn() as conn:
+                    n, frei = wartung.aufraeumen_motive(conn)
+                os.makedirs(DATA_DIR, exist_ok=True)
+                open(marker, "w", encoding="utf-8").write(heute)
+                log.info("Cache-Aufraeumung: %d Foto(s) geloescht, %.1f MB frei (%s)",
+                         n, frei / (1024 * 1024), heute)
+        except Exception:
+            log.exception("Cache-Aufraeumung: Scheduler-Fehler")
+        time.sleep(120)
+
 # --- Zugriffsschutz ---------------------------------------------------------
 def login_required(f):
     @functools.wraps(f)
@@ -1047,6 +1070,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=anlass"><h3>&#x1F4C5; Anlass-Tage</h3><p>Besondere Tage mit Steuer-Aufh&auml;nger verwalten.</p></a>
   <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
   <a class=tile href="/verwaltung?bereich=bildstil"><h3>&#x1F5BC; Bild-Stil</h3><p>Standard (v11) oder Testmodus „KI schreibt den Text selbst auf eine Tafel".</p></a>
+  <a class=tile href="/verwaltung?bereich=speicher"><h3>&#x1F4BE; Speicher</h3><p>Foto-Cache und freien Plattenplatz ansehen, ungenutzte KI-Fotos aufr&auml;umen.</p></a>
 </div>"""
 
 VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
@@ -1170,6 +1194,19 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
   <button>Bild-Stil speichern</button>
 </div></form>
+{% endif %}
+
+{% if bereich=='speicher' %}
+<p class=hint>Jedes „Neu erzeugen" legt ein neues KI-Foto im Cache ab; ungenutzte Fotos sammeln sich mit der Zeit an. Hier siehst du, wie viel Platz der Foto-Cache belegt und wie viel auf der Platte frei ist. Das Aufr&auml;umen l&ouml;scht <b>nur</b> Fotos, die <b>kein aktiver Beitrag mehr braucht</b> (Entw&uuml;rfe, Freigaben, Pool-Beitr&auml;ge und geplante Posts bleiben immer erhalten) und die &auml;lter als {{schonfrist_tage}} Tage sind. Es l&auml;uft zus&auml;tzlich automatisch einmal t&auml;glich.</p>
+{% if speicher_warnung %}<p class=hint style="color:#b00020"><b>Achtung:</b> Es sind nur noch {{frei_lesbar}} frei. Bitte Speicher pr&uuml;fen.</p>{% endif %}
+<table style="max-width:560px">
+  <tr><th style="text-align:left">Foto-Cache (motive/)</th><td>{{motive_lesbar}}</td></tr>
+  <tr><th style="text-align:left">Frei auf der Platte</th><td>{{frei_lesbar}} von {{gesamt_lesbar}}</td></tr>
+</table>
+<form method=post style="margin-top:14px"><input type=hidden name=formular value=cache_aufraeumen>
+  <button>Jetzt aufr&auml;umen</button>
+  <span class=hint style="margin-left:10px">L&ouml;scht ungenutzte KI-Fotos &auml;lter als {{schonfrist_tage}} Tage.</span>
+</form>
 {% endif %}
 </div>"""
 
@@ -2789,16 +2826,28 @@ def verwaltung():
                 audit_log(conn, session["user"], "bild_stil_gesetzt", None, stil)
                 flash("Bild-Stil gespeichert: %s." % ("Standard (v11)" if stil == "standard"
                                                       else "KI-Tafel (Testmodus)"))
+            elif formular == "cache_aufraeumen":
+                # Manuelles, sicheres Aufraeumen des KI-Foto-Caches (#134): loescht nur verwaiste,
+                # alte motive/-PNGs - aktive/Pool-Fotos und icon_-Dateien bleiben.
+                import wartung
+                try:
+                    n, frei = wartung.aufraeumen_motive(conn)
+                    audit_log(conn, session["user"], "cache_aufgeraeumt", None,
+                              "%d Foto(s), %d Bytes" % (n, frei))
+                    flash("%d Foto(s) geloescht, %s frei." % (n, wartung.menschlich(frei)))
+                except Exception as ex:
+                    log.exception("Cache-Aufraeumung (manuell) fehlgeschlagen")
+                    flash("Aufraeumen fehlgeschlagen: %s" % ex)
             conn.commit()
             # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
-                    "wissen": "wissen", "bildstil": "bildstil"}.get((formular or "").split("_")[0])
+                    "wissen": "wissen", "bildstil": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
         bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
                          "anlass": "Anlass-Tage", "wissen": "Wissens-Serie",
-                         "bildstil": "Bild-Stil"}.get(bereich)
+                         "bildstil": "Bild-Stil", "speicher": "Speicher"}.get(bereich)
         if not bereich_titel:
             return redirect(url_for("verwaltung"))
         users = conn.execute("SELECT name, rolle, aktiv FROM benutzer ORDER BY name").fetchall()
@@ -2810,10 +2859,23 @@ def verwaltung():
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
     page_id_set = {str(p["id"]) for p in pages}
     fb_name = {str(p["id"]): p["name"] for p in pages}
+    # Speicher-Status (#134): Foto-Cache-Groesse + freier Plattenplatz, menschenlesbar.
+    speicher = {"schonfrist_tage": 14, "motive_lesbar": "", "frei_lesbar": "",
+                "gesamt_lesbar": "", "speicher_warnung": False}
+    if bereich == "speicher":
+        import wartung
+        frei, gesamt = wartung.freier_speicher(DATA_DIR)
+        speicher = {
+            "schonfrist_tage": 14,
+            "motive_lesbar": wartung.menschlich(wartung.motive_ordner_groesse()),
+            "frei_lesbar": wartung.menschlich(frei),
+            "gesamt_lesbar": wartung.menschlich(gesamt),
+            "speicher_warnung": bool(frei and frei < 1024 * 1024 * 1024),  # < 1 GB
+        }
     return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
                                                      wissen=wissen, bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
-                                                     fb_name=fb_name, bild_stil=bild_stil))
+                                                     fb_name=fb_name, bild_stil=bild_stil, **speicher))
 
 @app.route("/logo.png")
 def logo():
@@ -2981,5 +3043,6 @@ def serve(host="0.0.0.0", port=None):
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
     threading.Thread(target=_pool_scheduler, daemon=True).start()      # Taegliche Auto-Ziehung aus dem Topf (#126)
+    threading.Thread(target=_cache_cleanup_scheduler, daemon=True).start()  # Taegliches Cache-Aufraeumen (#134)
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))
     app.run(host=host, port=port, threaded=True)
