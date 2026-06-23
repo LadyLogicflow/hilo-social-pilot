@@ -244,7 +244,11 @@ def _publiziere_geplant(gpid):
         gp = conn.execute("SELECT * FROM geplante_posts WHERE id=?", (gpid,)).fetchone()
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (gp["entwurf_id"],)).fetchone()
     # Nur FREIGEGEBENE Beitraege automatisch posten (zurueckgezogene/geloeschte NICHT).
-    if not e or e["status"] != "freigegeben":
+    # Pool-Beitraege (gp['pool']==1) tragen den Status 'pool' (einmalige Freigabe beim Topf-Eintrag)
+    # und sind ebenfalls postbar - sie bleiben aber wiederverwendbar (siehe Status-Flip unten).
+    pool_post = bool(gp["pool"])
+    erlaubte_status = ("freigegeben", "pool") if pool_post else ("freigegeben",)
+    if not e or e["status"] not in erlaubte_status:
         with get_conn() as conn:
             conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
                          ("Beitrag nicht mehr freigegeben/vorhanden", gpid)); conn.commit()
@@ -281,7 +285,9 @@ def _publiziere_geplant(gpid):
                      ("veroeffentlicht" if erfolg else "fehler", info[:500], gpid))
         offen = conn.execute("SELECT COUNT(*) FROM geplante_posts WHERE entwurf_id=? AND status IN "
                              "('geplant','laeuft')", (gp["entwurf_id"],)).fetchone()[0]
-        if erfolg and offen == 0:
+        # Pool-Beitraege NICHT auf 'veroeffentlicht' flippen - sie muessen wiederverwendbar bleiben
+        # (je Stelle/Kanal nur einmal, das regelt pool_nutzung, nicht der Entwurf-Status).
+        if erfolg and offen == 0 and not pool_post:
             conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=? AND status='freigegeben'",
                          (gp["entwurf_id"],))
         conn.commit()
@@ -310,6 +316,78 @@ def _publish_scheduler():
         except Exception:
             log.exception("Auto-Veroeffentlichung: Scheduler-Fehler")
         time.sleep(45)
+
+# --- Taegliche Auto-Ziehung aus dem Zufalls-Pool (Pool Phase 2, Issue #126) ----
+# Schedulerfaehige Kanaele fuer die Topf-Ziehung: Facebook und Instagram laufen ueber den
+# bestehenden Veroeffentlichungs-Scheduler. WhatsApp folgt in einer spaeteren Ausbaustufe (#127).
+POOL_SCHEDULER_KANAELE = ["facebook", "instagram"]
+
+def _pool_tagesziehung(conn, datum=None, rng=None):
+    """Zieht EINMAL pro Tag je aktive Beratungsstelle und je schedulerfaehigem Kanal einen noch
+    offenen Topf-Beitrag und legt dafuer einen geplante_posts-Eintrag mit pool=1 zu einer gestreuten
+    Uhrzeit an; danach wird die Ziehung in pool_nutzung verbucht (markiere_verbraucht).
+
+    Idempotent: Stellen, die fuer einen Kanal am 'datum' bereits einen pool=1-Eintrag haben, werden
+    uebersprungen - ein zweiter Lauf am selben Tag plant nichts doppelt ein. 'rng' steuert den Zufall
+    (testbar). Rueckgabe: Anzahl neu eingeplanter Beitraege."""
+    import datetime, random
+    import pool
+    rng = rng or random.Random()
+    now = datetime.datetime.now()
+    datum = datum or now.date().isoformat()
+    heute = (datum == now.date().isoformat())
+    # Nur postbare, aktive Stellen (Facebook-Seite hinterlegt) kommen fuer die Ziehung infrage.
+    stellen = conn.execute("SELECT id FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                           "AND fb_seite!='' ORDER BY id").fetchall()
+    stelle_ids = [int(r["id"]) for r in stellen]
+    if not stelle_ids:
+        return 0
+    # Bereits am 'datum' belegte Uhrzeiten (alle geplanten Posts) - fuer die Streuung der Vorschlaege.
+    belegt = [r[0][11:16] for r in conn.execute(
+        "SELECT geplant_am FROM geplante_posts WHERE geplant_am LIKE ? AND status='geplant'", (datum + "T%",))]
+    min_m = (now.hour * 60 + now.minute + 2) if heute else 7 * 60
+    n = 0
+    for kanal in POOL_SCHEDULER_KANAELE:
+        # Idempotenz: Stellen, die fuer diesen Kanal am 'datum' schon einen Pool-Eintrag haben, raus.
+        schon = {int(r[0]) for r in conn.execute(
+            "SELECT DISTINCT stelle_id FROM geplante_posts WHERE pool=1 AND kanal=? AND stelle_id IS NOT NULL "
+            "AND geplant_am LIKE ?", (kanal, datum + "T%"))}
+        offene_stellen = [sid for sid in stelle_ids if sid not in schon]
+        if not offene_stellen:
+            continue
+        # Je Stelle ein ANDERER Beitrag am selben Tag (Phase-1-Logik uebernimmt das Verteilen).
+        auswahl = pool.ziehe_tagesauswahl(conn, offene_stellen, kanal, rng)
+        for sid, eid in auswahl.items():
+            z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
+                         "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
+                         (eid, sid, kanal, "einzelbild", "einzelbild", "karussell", "%sT%s" % (datum, z)))
+            pool.markiere_verbraucht(conn, eid, sid, kanal)
+            n += 1
+    if n:
+        audit_log(conn, "system", "pool_tagesziehung", None, "%d Pool-Beitrag/-Beitraege fuer %s" % (n, datum))
+    conn.commit()
+    return n
+
+def _pool_scheduler():
+    """Klinkt sich in den Tagesablauf ein (wie der Radar-Lauf um 7 Uhr) und stoesst die taegliche
+    Topf-Ziehung genau EINMAL pro Tag an (Marker-Datei). Bricht nie den Dienst ab."""
+    import datetime
+    marker = os.path.join(DATA_DIR, "last_pool_ziehung.txt")
+    while True:
+        try:
+            now = datetime.datetime.now()
+            heute = now.strftime("%Y-%m-%d")
+            last = open(marker, encoding="utf-8").read().strip() if os.path.exists(marker) else ""
+            if now.hour >= 7 and last != heute:
+                with get_conn() as conn:
+                    n = _pool_tagesziehung(conn)
+                os.makedirs(DATA_DIR, exist_ok=True)
+                open(marker, "w", encoding="utf-8").write(heute)
+                log.info("Pool-Tagesziehung: %d Beitrag/Beitraege eingeplant (%s)", n, heute)
+        except Exception:
+            log.exception("Pool-Tagesziehung: Scheduler-Fehler")
+        time.sleep(120)
 
 # --- Zugriffsschutz ---------------------------------------------------------
 def login_required(f):
@@ -2622,5 +2700,6 @@ def serve(host="0.0.0.0", port=None):
         log.info("Token-Verlaengerung beim Start uebersprungen: %s", ex)
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
+    threading.Thread(target=_pool_scheduler, daemon=True).start()      # Taegliche Auto-Ziehung aus dem Topf (#126)
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))
     app.run(host=host, port=port, threaded=True)
