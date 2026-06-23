@@ -13,13 +13,21 @@ def _prompt(motiv):
     """Einheitlicher Szene-Prompt fuer ein vollflaechiges, opakes Magazin-/Editorial-Foto MIT
     Umgebung (kein freigestelltes Motiv mehr). Das Motiv beschreibt Jahreszeit, Gefuehl und einen
     dezenten Themenbezug; das Foto fuellt spaeter das ganze 1080x1080-Bild als Hintergrund.
-    Ein ruhiger Bereich bleibt frei fuer das spaeter daraufgesetzte weisse Textfeld."""
+    Ein ruhiger Bereich bleibt frei fuer das spaeter daraufgesetzte weisse Textfeld.
+    Die Szene ist bewusst als RAHMEN komponiert: bildwichtige Elemente liegen an den
+    Raendern und umrahmen eine ruhige, weitgehend leere BILDMITTE (zentraler Negativraum),
+    in die spaeter das Textfeld gesetzt wird - so wird kein Hauptmotiv vom Text verdeckt."""
     return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie. Eine stimmungsvolle, "
             "authentische Szene, die %s vermittelt - Jahreszeit, Gefuehl und ein dezenter Bezug zum "
             "Thema, schoen und natuerlich gestylt (KEIN steifes Stockfoto, keine steifen Posen). "
             "Warmes, weiches Tageslicht, geringe Schaerfentiefe, harmonische warme Farben. Die Szene "
-            "fuellt das ganze Bild als Hintergrund. Ein ruhiger, wenig detaillierter Bereich bleibt "
-            "frei (fuer ein spaeteres Textfeld). KEIN Text, keine Schrift, keine Logos oder "
+            "fuellt das ganze Bild als Hintergrund. WICHTIG fuer die Komposition: Das Bild ist wie ein "
+            "RAHMEN aufgebaut - alle bildwichtigen Elemente (Personen, Gegenstaende, Deko, Glaeser usw.) "
+            "liegen am OBEREN, UNTEREN und an den SEITLICHEN Raendern und UMRAHMEN die Bildmitte. Die "
+            "BILDMITTE bleibt bewusst ruhig und weitgehend LEER (grosser zentraler Negativraum, weiche "
+            "Flaeche / unscharfer Hintergrund / Tischflaeche) und enthaelt KEIN Hauptmotiv und kein "
+            "zentrales Subjekt - dieser ruhige zentrale Bereich bleibt frei fuer ein spaeteres Textfeld, "
+            "nichts Bildwichtiges darf dort verdeckt werden. KEIN Text, keine Schrift, keine Logos oder "
             "Markennamen im Bild." % motiv)
 
 def ensure_photo_fuer(fields):

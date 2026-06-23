@@ -225,8 +225,12 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     ct, cb = _content_bounds(pos)
 
     dr = ImageDraw.Draw(base)
-    margin = 70
-    cx0, cx1 = margin, W - margin           # Textfeld-Spalte (volle Breite mit Rand)
+    # Issue #131: Das Foto soll das Textfeld UMRAHMEN. Darum spuerbarer Rand an ALLEN vier
+    # Seiten - seitlich etwas breiter als zuvor, damit das umrahmende Motiv links/rechts
+    # sichtbar bleibt (frueher 70; das Feld war fast vollbreit).
+    margin = 104                             # seitlicher Foto-Rand (links/rechts sichtbar)
+    frame_v = 64                             # mindest. Foto-Rand oben/unten (vertikaler Rahmen)
+    cx0, cx1 = margin, W - margin           # Textfeld-Spalte (mit deutlichem Seitenrand)
     inx = cx0 + 40                           # Innenrand im Textfeld
     inw = cx1 - inx - 40
     pad_top, pad_bot = 40, 40
@@ -265,12 +269,21 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     if bblocks: parts.append(h_bul)
     parts.append(h_cta)
     content_h = sum(parts) + gap*(len(parts)-1)
-    card_h = content_h + pad_top + pad_bot
 
-    # Textfeld vertikal in den freien Bereich zwischen den Kreisen (ct..cb) einpassen
-    avail = cb - ct
-    card_h = min(card_h, avail)
-    cy0 = ct + (avail - card_h)//2
+    # Issue #131 (ARGUS-Blocker behoben): Die Karte muss den Inhalt VOLLSTAENDIG umschliessen,
+    # sonst laeuft der Inhalt (v.a. die Gold-CTA-Pille) unter die Kartenunterkante aufs nackte
+    # Foto. Darum wird die Karte an den Inhalt gekoppelt: card_h = Inhalt + Innenabstaende.
+    band = cb - ct                          # verfuegbares Band zwischen den Kreisen
+    card_needed = content_h + pad_top + pad_bot
+    # frame_v ist nur ein OPTIONALER Luft-Rand oben/unten: er wird so weit angewendet, wie nach
+    # dem Inhalt noch Platz im Band bleibt - nie so weit, dass der Inhalt nicht mehr passt.
+    # Reicht das Band selbst ohne Rand nicht (sehr enge diagonal-Baender + Maximal-Content),
+    # fuellt die Karte das ganze Band (frame_v effektiv 0) - lieber kein oberer/unterer
+    # Foto-Rand als CTA auf nacktem Foto. Der Inhalt bleibt so immer INNERHALB der Karte.
+    frame_eff = max(0, min(frame_v, (band - card_needed)//2))
+    avail = band - 2*frame_eff
+    card_h = max(card_needed, avail)        # Karte umschliesst den Inhalt immer vollstaendig
+    cy0 = ct + frame_eff + (avail - card_h)//2
     cy1 = cy0 + card_h
     _card(base, cx0, cy0, cx1, cy1)
 
