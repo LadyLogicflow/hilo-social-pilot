@@ -67,10 +67,82 @@ def ensure_photo_fuer(fields):
         return ensure_photo_tafel(scene, sign_text)
     return ensure_photo(motiv)
 
+def _szene_pfad(motiv):
+    """Liefert den absoluten Cache-Pfad fuer das Standard-Szene-Foto zu 'motiv'.
+    Kapselt die BESTEHENDE Schluessel-Berechnung (Praefix 'szene:', sha256[:16]) aus
+    ensure_photo(), damit sie wiederverwendbar ist. Die Hash-Formel bleibt UNVERAENDERT -
+    sonst wuerden bestehende Cache-Dateien nicht mehr getroffen. Liefert None fuer leere
+    Motive und fuer 'icon:'-Motive (die liefert _icon_pfad)."""
+    motiv = (motiv or "").strip()
+    if not motiv or motiv.startswith("icon:"):
+        return None
+    h = hashlib.sha256(("szene:" + motiv).lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, h + ".png")
+
+def _icon_pfad(motiv):
+    """Liefert den absoluten Cache-Pfad fuer ein gezeichnetes 'icon:'-Motiv (Praefix 'icon_'),
+    sonst None. Spiegelt die Pfadbildung aus ensure_photo()."""
+    motiv = (motiv or "").strip()
+    if not motiv.startswith("icon:"):
+        return None
+    name = motiv.split(":", 1)[1]
+    return os.path.join(MOTIV_DIR, "icon_%s.png" % name)
+
 def tafel_cache_key(scene, sign_text):
     """Liefert den Cache-Schluessel-String fuer ein KI-Tafel-Foto (Praefix 'tafel:', enthaelt den
     sign_text). Ausgelagert, damit Tests den Schluessel pruefen koennen, ohne OpenAI aufzurufen."""
     return "tafel:" + (sign_text or "").strip() + "|" + (scene or "").strip()
+
+def _tafel_pfad(scene, sign_text):
+    """Liefert den absoluten Cache-Pfad fuer ein KI-Tafel-Foto (Praefix 'tafel_', sha256[:16]).
+    Kapselt die BESTEHENDE Schluessel-Berechnung aus ensure_photo_tafel(); Hash-Formel UNVERAENDERT.
+    Verwendet dieselbe scene-Default-Logik wie ensure_photo_tafel/ensure_photo_fuer."""
+    scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
+    sign_text = (sign_text or "").strip()
+    h = hashlib.sha256(tafel_cache_key(scene, sign_text).lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, "tafel_" + h + ".png")
+
+def cache_dateien_fuer_fields(fields):
+    """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
+    diesen 'fields' (Entwurfs-JSON-dict) nutzen KOENNTE - ueber BEIDE Stil-Varianten hinweg
+    (Standard-Szene UND KI-Tafel). So bleiben beim Aufraeumen beide Varianten geschuetzt,
+    unabhaengig vom aktuell eingestellten Bild-Stil.
+
+    Beruecksichtigt - analog ensure_photo_fuer() - die Motiv-Fallback-Kette
+    szene_motiv -> bild_motiv -> bild_motiv_thema sowie den ki_tafel-Fall
+    (sign_text = ueberschrift). Gezeichnete 'icon:'-Motive werden mit aufgenommen, damit
+    auch deren Pfad als 'in Benutzung' gilt (geloescht werden icon_-Dateien ohnehin nie).
+
+    Robust: fehlerhafte/nicht-dict fields liefern ein leeres set, ohne zu crashen."""
+    pfade = set()
+    if not isinstance(fields, dict):
+        return pfade
+    motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
+             or fields.get("bild_motiv_thema") or "").strip()
+    if motiv.startswith("icon:"):
+        ip = _icon_pfad(motiv)
+        if ip:
+            pfade.add(ip)
+        return pfade
+    # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
+    for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
+        sp = _szene_pfad(m)
+        if sp:
+            pfade.add(sp)
+    # KI-Tafel-Variante: scene = dasselbe Motiv (mit Default), sign_text = Ueberschrift.
+    scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+    # Bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer denselben Default auf die
+    # Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None) liefert hier
+    # aber None, sodass die Default-Szene-Datei sonst NICHT als 'in Benutzung' gilt und nach
+    # der Schonfrist faelschlich geloescht wuerde, obwohl ein aktiver/Pool-Entwurf sie nutzt
+    # (ARGUS-Blocker #134). Darum den Default-Szene-Pfad mit aufnehmen - exakt derselbe
+    # Default-String -> exakt derselbe Hash/Dateiname. Normale Entwuerfe (mit Motiv) bekommen
+    # keinen zusaetzlichen Pfad, da scene dann = motiv ist und _szene_pfad(motiv) oben schon drin.
+    sp_def = _szene_pfad(scene)
+    if sp_def:
+        pfade.add(sp_def)
+    pfade.add(_tafel_pfad(scene, (fields.get("ueberschrift") or "").strip()))
+    return pfade
 
 def tafel_payload(scene, sign_text):
     """Baut das OpenAI-Request-Payload fuer ein KI-Tafel-Foto (ohne Netzwerkaufruf). Ausgelagert,
@@ -89,8 +161,7 @@ def ensure_photo_tafel(scene, sign_text):
     scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
     sign_text = (sign_text or "").strip()
     os.makedirs(MOTIV_DIR, exist_ok=True)
-    h = hashlib.sha256(tafel_cache_key(scene, sign_text).lower().encode("utf-8")).hexdigest()[:16]
-    path = os.path.join(MOTIV_DIR, "tafel_" + h + ".png")
+    path = _tafel_pfad(scene, sign_text)
     if os.path.exists(path):
         return path
     key = get_secret("openai_api_key")
@@ -124,14 +195,13 @@ def ensure_photo(motiv, typ=None):
         import countdown_motive
         os.makedirs(MOTIV_DIR, exist_ok=True)
         name = motiv.split(":", 1)[1]
-        path = os.path.join(MOTIV_DIR, "icon_%s.png" % name)
+        path = _icon_pfad(motiv)
         return path if os.path.exists(path) else countdown_motive.render_icon(name, path)
     motiv = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
     os.makedirs(MOTIV_DIR, exist_ok=True)
     # Szene-Motive bekommen einen eigenen Cache-Schluessel (Praefix 'szene:'), damit alte,
     # freigestellte Personen-/Themenbilder im Cache nicht mit den neuen Szenen kollidieren.
-    h = hashlib.sha256(("szene:" + motiv).lower().encode("utf-8")).hexdigest()[:16]
-    path = os.path.join(MOTIV_DIR, h + ".png")
+    path = _szene_pfad(motiv)
     if os.path.exists(path):
         return path
     prompt = _prompt(motiv)
