@@ -89,6 +89,12 @@ CREATE TABLE IF NOT EXISTS pool_nutzung (
     verbraucht_am TEXT DEFAULT (datetime('now')),
     UNIQUE(entwurf_id, stelle_id, kanal)
 );
+-- Globale Key-Value-Einstellungen (#132): z.B. 'bild_stil' = 'standard' | 'ki_tafel'.
+-- Bewusst minimal (Schluessel/Wert), damit weitere globale Schalter ohne Schema-Migration moeglich sind.
+CREATE TABLE IF NOT EXISTS einstellungen (
+    schluessel TEXT PRIMARY KEY,
+    wert TEXT
+);
 """
 
 # Kuratierte Anlass-Tage mit Steuer-Aufhaenger (Startliste, in der Verwaltung erweiterbar)
@@ -284,3 +290,22 @@ def init_db():
 def audit_log(conn, benutzer, aktion, entwurf_id=None, details=""):
     conn.execute("INSERT INTO audit(benutzer, aktion, entwurf_id, details) VALUES (?,?,?,?)",
                  (benutzer, aktion, entwurf_id, details))
+
+def get_einstellung(schluessel, default=None):
+    """Liest eine globale Einstellung (Key-Value). Fehlt der Schluessel, wird 'default'
+    geliefert. Oeffnet bei Bedarf eine eigene Verbindung - kein Aufruferzustand noetig."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT wert FROM einstellungen WHERE schluessel=?",
+                           (schluessel,)).fetchone()
+    if row is None or row["wert"] is None:
+        return default
+    return row["wert"]
+
+def set_einstellung(schluessel, wert):
+    """Setzt (oder ueberschreibt) eine globale Einstellung. Wert wird als Text gespeichert."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO einstellungen(schluessel, wert) VALUES (?,?) "
+            "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert",
+            (schluessel, None if wert is None else str(wert)))
+        conn.commit()

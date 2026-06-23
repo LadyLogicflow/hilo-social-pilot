@@ -30,14 +30,89 @@ def _prompt(motiv):
             "nichts Bildwichtiges darf dort verdeckt werden. KEIN Text, keine Schrift, keine Logos oder "
             "Markennamen im Bild." % motiv)
 
+def _tafel_prompt(scene, sign_text):
+    """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
+    in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
+    sign_text = die Ueberschrift (in Anfuehrungszeichen eingesetzt). Die Tafel traegt NUR diese
+    Ueberschrift - sie ist die einzige Schrift im Bild (CTA + CI-Kreise kommen per Code-Overlay)."""
+    return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie, quadratisch (1:1). Warme, "
+            "authentische Szene passend zu: %s. ZENTRALES, SCHARFES Hauptmotiv: eine gut lesbare "
+            "TAFEL (Kreidetafel ODER schlichtes Holzschild/Plakat), natürlich in die Szene gestellt, "
+            "FRONTAL zur Kamera, gut ausgeleuchtet. Auf der Tafel steht der folgende deutsche Text - "
+            "exakt Wort für Wort, KORREKT geschrieben mit richtigen deutschen Umlauten (ae oe ue als "
+            "ä ö ü, ß), groß, zentriert, in sauberer, gut lesbarer Schrift, OHNE Rechtschreibfehler, "
+            "OHNE zusätzliche, fehlende oder veränderte Buchstaben: '%s'. Dieser Text ist die EINZIGE "
+            "Schrift im gesamten Bild. KEINE weiteren Wörter, Buchstaben, Zahlen, Logos oder "
+            "Wasserzeichen irgendwo sonst. Warmes, weiches Tageslicht, geringe Schärfentiefe, "
+            "harmonische warme Farben. Die Tafel ist der klare Blickfang, die Szene ringsum trägt "
+            "die Stimmung." % (scene, sign_text))
+
 def ensure_photo_fuer(fields):
     """Liefert das Szene-Foto fuer den Beitrag. Bevorzugt das neue Feld 'szene_motiv'
     (emotionale Szene mit Umgebung); faellt fuer aeltere Entwuerfe auf 'bild_motiv' bzw.
     'bild_motiv_thema' zurueck, damit bestehende Entwuerfe weiter rendern.
-    'icon:'-Motive (gezeichnet) bleiben unveraendert."""
+    'icon:'-Motive (gezeichnet) bleiben unveraendert.
+
+    Bild-Stil 'ki_tafel' (#132, Testmodus): die KI schreibt die Ueberschrift selbst auf eine Tafel
+    in der Szene. Der Modus wird global aus der Einstellung gelesen (db.get_einstellung('bild_stil')).
+    Default 'standard' -> unveraendertes v11-Verhalten."""
+    import db
+    stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
     motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
              or fields.get("bild_motiv_thema") or "").strip()
+    # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel).
+    if stil == "ki_tafel" and not motiv.startswith("icon:"):
+        sign_text = (fields.get("ueberschrift") or "").strip()
+        scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+        return ensure_photo_tafel(scene, sign_text)
     return ensure_photo(motiv)
+
+def tafel_cache_key(scene, sign_text):
+    """Liefert den Cache-Schluessel-String fuer ein KI-Tafel-Foto (Praefix 'tafel:', enthaelt den
+    sign_text). Ausgelagert, damit Tests den Schluessel pruefen koennen, ohne OpenAI aufzurufen."""
+    return "tafel:" + (sign_text or "").strip() + "|" + (scene or "").strip()
+
+def tafel_payload(scene, sign_text):
+    """Baut das OpenAI-Request-Payload fuer ein KI-Tafel-Foto (ohne Netzwerkaufruf). Ausgelagert,
+    damit Tests Prompt + Parameter (background='opaque', size '1024x1024') pruefen koennen."""
+    quality = (os.environ.get("HILO_IMAGE_QUALITY") or "medium").strip().lower()
+    if quality not in ("low", "medium", "high", "auto"):
+        quality = "medium"
+    return {"model": "gpt-image-1", "prompt": _tafel_prompt(scene, sign_text), "size": "1024x1024",
+            "quality": quality, "background": "opaque", "output_format": "png", "n": 1}
+
+def ensure_photo_tafel(scene, sign_text):
+    """Erzeugt (oder liefert aus dem Cache) das KI-Tafel-Foto (#132): scene = Szene-Motiv,
+    sign_text = die Ueberschrift, die die KI auf die Tafel schreibt. Eigener Cache-Schluessel
+    (Praefix 'tafel:'), der den sign_text ENTHAELT - so bekommt jede Ueberschrift ihr eigenes Foto.
+    background='opaque', size '1024x1024'. Ohne openai_api_key wird None geliefert (Creme-Fallback)."""
+    scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
+    sign_text = (sign_text or "").strip()
+    os.makedirs(MOTIV_DIR, exist_ok=True)
+    h = hashlib.sha256(tafel_cache_key(scene, sign_text).lower().encode("utf-8")).hexdigest()[:16]
+    path = os.path.join(MOTIV_DIR, "tafel_" + h + ".png")
+    if os.path.exists(path):
+        return path
+    key = get_secret("openai_api_key")
+    if not key:
+        log.info("KI-Tafel-Foto uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
+        return None
+    try:
+        import requests
+        r = requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
+            json=tafel_payload(scene, sign_text),
+            timeout=120)
+        r.raise_for_status()
+        b64 = r.json()["data"][0]["b64_json"]
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(b64))
+        log.info("KI-Tafel-Foto erzeugt: %s", sign_text[:50])
+        return path
+    except Exception as ex:
+        log.warning("KI-Tafel-Foto fehlgeschlagen (%s): %s", sign_text[:40], ex)
+        return None
 
 def ensure_photo(motiv, typ=None):
     """Erzeugt (oder liefert aus dem Cache) das Szene-Foto zu 'motiv'. Der Parameter 'typ' wird
