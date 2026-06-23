@@ -163,6 +163,38 @@ if frei <= 0:
 print("B) Aufraeum-Szenarien (Pool/aktiv bleiben, alte Waisen weg, Schonfrist, icon_): OK (%d geloescht, %d Bytes)"
       % (geloescht, frei))
 
+# --- B2) ARGUS-Blocker #134: Pool-/aktiver Entwurf OHNE Motiv -> Default-Szene bleibt -------
+# Reproduktion: ein POOL-Entwurf mit LEEREM szene_motiv/bild_motiv/bild_motiv_thema nutzt zur
+# Laufzeit die Default-Szene ("ein ruhiger, vertrauensvoller Moment im Alltag"), die
+# ensure_photo bei leerem Motiv anwendet. Vor dem Fix war diese geteilte Default-Datei NICHT in
+# der In-Benutzung-Menge -> sie wurde nach 14 Tagen faelschlich geloescht. Nach dem Fix muss sie
+# erhalten bleiben, solange ein aktiver/Pool-Entwurf mit leerem Motiv existiert.
+DEFAULT_SZENE = "ein ruhiger, vertrauensvoller Moment im Alltag"
+# Default-Szene-Dateiname GENAU so bilden, wie ensure_photo sie anlegt (gleicher Hash/Dateiname).
+_h_def = hashlib.sha256(("szene:" + DEFAULT_SZENE).lower().encode("utf-8")).hexdigest()[:16]
+p_default = os.path.join(MOTIV_DIR, _h_def + ".png")
+# Regression-Sicherung: _szene_pfad(DEFAULT) muss exakt diesen Pfad liefern (Hash unveraendert).
+if bildmotiv._szene_pfad(DEFAULT_SZENE) != p_default:
+    _fail("Default-Szene-Hash weicht ab: %r != %r" % (bildmotiv._szene_pfad(DEFAULT_SZENE), p_default))
+
+with db.get_conn() as conn:
+    # Pool-Entwurf OHNE Motiv (alle Motiv-Felder leer) -> Default-Szene 'in Benutzung'.
+    f_pool_leer = {"szene_motiv": "", "bild_motiv": "", "bild_motiv_thema": "", "ueberschrift": ""}
+    # Der Fix muss die Default-Szene-Datei in die Cache-Pfade aufnehmen.
+    leer_pfade = bildmotiv.cache_dateien_fuer_fields(f_pool_leer)
+    if p_default not in leer_pfade:
+        _fail("Default-Szene-Pfad fehlt in cache_dateien_fuer_fields fuer leeres Motiv: %r" % leer_pfade)
+    _entwurf(conn, "pool", f_pool_leer)
+    conn.commit()
+    # Default-Szene-Datei ALT (40 Tage) anlegen, genau wie ensure_photo sie ablegen wuerde.
+    _touch(p_default, alter_tage=40)
+    g2, b2 = wartung.aufraeumen_motive(conn, schonfrist_tage=14)
+
+# AKZEPTANZ: Pool-Entwurf mit leerem Motiv -> Default-Szene-Foto bleibt (auch alt).
+_muss_da(p_default, "Default-Szene-Foto (Pool-Entwurf ohne Motiv)")
+print("B2) ARGUS-Blocker: Pool-Entwurf OHNE Motiv -> Default-Szene-Foto bleibt erhalten: OK "
+      "(Datei %s, %d in diesem Lauf geloescht)" % (os.path.basename(p_default), g2))
+
 # --- C) Speicher-Helfer -----------------------------------------------------
 groesse = wartung.motive_ordner_groesse()
 if groesse <= 0:

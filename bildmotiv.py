@@ -131,6 +131,16 @@ def cache_dateien_fuer_fields(fields):
             pfade.add(sp)
     # KI-Tafel-Variante: scene = dasselbe Motiv (mit Default), sign_text = Ueberschrift.
     scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+    # Bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer denselben Default auf die
+    # Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None) liefert hier
+    # aber None, sodass die Default-Szene-Datei sonst NICHT als 'in Benutzung' gilt und nach
+    # der Schonfrist faelschlich geloescht wuerde, obwohl ein aktiver/Pool-Entwurf sie nutzt
+    # (ARGUS-Blocker #134). Darum den Default-Szene-Pfad mit aufnehmen - exakt derselbe
+    # Default-String -> exakt derselbe Hash/Dateiname. Normale Entwuerfe (mit Motiv) bekommen
+    # keinen zusaetzlichen Pfad, da scene dann = motiv ist und _szene_pfad(motiv) oben schon drin.
+    sp_def = _szene_pfad(scene)
+    if sp_def:
+        pfade.add(sp_def)
     pfade.add(_tafel_pfad(scene, (fields.get("ueberschrift") or "").strip()))
     return pfade
 
