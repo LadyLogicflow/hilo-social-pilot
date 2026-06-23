@@ -108,19 +108,31 @@ Kalender einen **Zufalls-Pool („Topf")**:
 - **Einmalige Freigabe für alle Stellen:** Ein freigegebener Beitrag wird über den Knopf
   **„In den Pool"** (Seite „4. Einplanung") in den Topf aufgenommen – danach wird er
   vollautomatisch ausgespielt, ohne tägliches Eingreifen.
-- **Tägliche Zufalls-Ziehung:** je Beratungsstelle und Kanal (Facebook/Instagram) wird täglich
-  ein Beitrag aus dem Topf gezogen – **für jede Stelle ein anderer**.
+- **Tägliche Zufalls-Ziehung:** je Beratungsstelle und Kanal wird täglich ein Beitrag aus dem
+  Topf gezogen – **für jede Stelle ein anderer**.
+- **Kanal je Stelle:** bespielt wird nur, was die Stelle tatsächlich hat – **Facebook** immer
+  (wenn FB-Seite hinterlegt), **Instagram** nur bei verknüpftem IG-Konto, **WhatsApp-Status/
+  -Kanal** nur bei eingerichteter WhatsApp-Einstellung. Nicht vorhandene Kanäle werden
+  übersprungen (kein Verbrauch, keine Fehlpostings).
 - **„Nie doppelt" (Variante 1):** jeder Beitrag erscheint je Stelle **genau einmal pro Kanal**
   (zeitversetzt über mehrere Kanäle erlaubt, nie zweimal auf demselben Kanal). Das Gedächtnis
   dafür ist dauerhaft (kein Rollover).
+- **Frequenz je Kanal:** Facebook/Instagram/**WhatsApp-Status** täglich, **WhatsApp-Kanal** nur
+  an festen Wochentagen (Standard Di+Fr, per `HILO_WA_KANAL_TAGE` einstellbar).
+- **Wochenend-Regel:** am Wochenende werden nur leichtere Inhalte (Wissens-Serie) gezogen –
+  abschaltbar per `HILO_POOL_WOCHENEND_FILTER`.
 - **Nachschub-Warnung:** sind bei einer Stelle weniger als **14** ungenutzte Beiträge übrig,
   weist die Pool-Seite darauf hin.
 - **Datumsgebundenes bleibt manuell:** Anlass-Tage und Fristen-Countdown laufen weiterhin über
   die Einplanung (nicht über den Topf).
 
 Die menschliche Endkontrolle bleibt gewahrt – sie liegt beim **einmaligen Pool-Eintrag**
-(Grundsatz „Veröffentlichung nur nach Freigabe"). WhatsApp-Status/-Kanal sind als nächste
-Ausbaustufe vorgesehen.
+(Grundsatz „Veröffentlichung nur nach Freigabe").
+
+> **WhatsApp-Hinweis:** Der WhatsApp-Dienst nutzt aktuell **eine** Nummer/Session (nicht je
+> Stelle eine eigene). Das Posten läuft über diese eine Nummer; ist der Dienst nicht erreichbar,
+> wird der betroffene Beitrag als „Fehler" markiert (kein Absturz). Dedizierte Nummern pro
+> Beratungsstelle sind ein späterer Ausbau (Sperr-Restrisiko).
 
 ## 12. Status & Ausblick
 

@@ -70,7 +70,9 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
 - `posts` – Veröffentlichungs-Protokoll (Kanal, Plattform-Post-ID, Fehler).
 - `benutzer` – Dashboard-Konten (Rolle: admin / freigeber / redakteur).
 - `audit` – Audit-Log aller relevanten Aktionen.
-- `beratungsstellen` – Stellen mit Ort, Leitung, **fb_seite**, Buchungslink.
+- `beratungsstellen` – Stellen mit Ort, Leitung, **fb_seite**, Buchungslink,
+  `wa_status_aktiv` (WhatsApp-Status für diese Stelle ziehen) und `wa_kanal_invite`
+  (WhatsApp-Kanal-Einladungslink).
 - `anlasstage` – kuratierte besondere Tage (MM-TT, Anlass, Steuer-Aufhänger).
 - `wissensthemen` – zeitlose Themen (Titel, Aufhänger, zuletzt genutzt).
 
@@ -82,9 +84,20 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
   `main.py --generate N --render` als Subprozess – der Webserver bleibt frei.
 - **Pool-Scheduler** (`web.py._pool_scheduler` → `_pool_tagesziehung`): Thread im Webserver,
   zieht einmal täglich ab 7:00 Uhr (datums-getaktet via `last_pool_ziehung.txt`) je aktiver
-  Beratungsstelle und je Kanal (Facebook/Instagram) einen offenen Pool-Beitrag, legt einen
+  Beratungsstelle und je **verfügbarem** Kanal einen offenen Pool-Beitrag, legt einen
   `geplante_posts`-Eintrag (`pool=1`) an und schreibt `pool_nutzung`. Idempotent (1×/Tag,
-  keine Doppel-Einplanung je Stelle/Kanal/Tag). WhatsApp folgt in einer späteren Ausbaustufe.
+  keine Doppel-Einplanung je Stelle/Kanal/Tag).
+  - **Kanal-Verfügbarkeit** (`_kanal_verfuegbarkeit`): Facebook bei `fb_seite`, Instagram nur bei
+    `ig_id` (aus `_pages()`), WhatsApp-Status bei `wa_status_aktiv=1`, WhatsApp-Kanal bei gesetztem
+    `wa_kanal_invite`. Nicht vorhandene Kanäle werden übersprungen.
+  - **Frequenz/Wochenende:** `_kanal_heute_faellig` (Status täglich, Kanal an `HILO_WA_KANAL_TAGE`,
+    Default Di+Fr) und `_pool_wochenend_eids` (am Wochenende nur `quelle='wissen'`,
+    `HILO_POOL_WOCHENEND_FILTER`).
+  - **WhatsApp-Veröffentlichung** (`_veroeffentliche_whatsapp` in `_publiziere_geplant`, **nur** für
+    `pool=1 + whatsapp_*`): postet via `_wa_call` an `/post-status` bzw. `/post-channel` des
+    WhatsApp-Dienstes (`whatsapp/server.mjs`, eine globale Baileys-Session) mit personalisiertem
+    Text und – für Status – personalisiertem 9:16-Bild. Dienst-Fehler → `status='fehler'`, kein
+    Status-Flip. Der FB/IG-Pfad (`_veroeffentliche_ziel`) bleibt unberührt.
 
 ## Bild-Design
 

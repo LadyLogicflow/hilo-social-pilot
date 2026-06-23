@@ -52,9 +52,12 @@ Topf – das Tool spielt ihn dann automatisch aus.
 - **Pool-Seite** (Menü **„Pool"** oder Startseiten-Kachel): zeigt alle Beiträge im Topf und bei
   jedem, **wie oft er schon ausgespielt** wurde. Mit **„Aus dem Pool nehmen"** holst du einen
   Beitrag wieder heraus (er landet zurück bei „4. Einplanung").
-- **Automatik:** Das Tool zieht täglich je Beratungsstelle und Kanal (Facebook/Instagram) einen
-  Beitrag aus dem Topf – **für jede Stelle einen anderen** und **jeden Beitrag je Stelle nur
-  einmal pro Kanal**. Sind bei einer Stelle weniger als **14** Beiträge übrig, warnt die Seite.
+- **Automatik:** Das Tool zieht täglich je Beratungsstelle einen Beitrag aus dem Topf – **für
+  jede Stelle einen anderen** und **jeden Beitrag je Stelle nur einmal pro Kanal**. Bespielt wird
+  nur, was die Stelle hat: Facebook immer, Instagram wo verknüpft, WhatsApp wo eingerichtet
+  (WhatsApp-Status täglich, WhatsApp-Kanal an festen Wochentagen). Am Wochenende kommen nur
+  leichtere Inhalte (Wissens-Serie). Sind bei einer Stelle weniger als **14** Beiträge übrig,
+  warnt die Seite.
 - **Wichtig:** Nur **zeitlose** Inhalte in den Topf. Anlass-Tage und Fristen bleiben in der
   Einplanung, weil sie an ein festes Datum gehören.
 
@@ -71,7 +74,8 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Benutzer** – Redakteure und Freigeber anlegen, aktivieren/deaktivieren.
 - **Beratungsstellen** – Name, Ort, Leitung, **Facebook-Seite** und Buchungslink. Die
   Facebook-Seite verknüpft die Stelle für personalisierte Beiträge und die richtige
-  Veröffentlichung.
+  Veröffentlichung. Zusätzlich je Stelle: **WhatsApp-Status** (an/aus) und ein
+  **WhatsApp-Kanal-Link** – nur damit zieht der Pool für die Stelle auch diese Kanäle.
 - **Anlass-Tage** – besondere Tage mit Steuer-Aufhänger (Datum als MM-TT). Fällt der Tag
   aufs Wochenende, erscheint der Beitrag am Freitag davor.
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
