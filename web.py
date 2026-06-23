@@ -667,11 +667,15 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
 .ok{background:#2e7d32}.no{background:#9aa0a6}.re{background:#1f428d}.del{background:#b00020}</style>
 <div class=top><h2 style="margin:0;color:#1f428d">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-{% if entwuerfe %}<div style="max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center">
+{% if entwuerfe %}<div style="max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
   <span style="color:#6b7280;font-size:13px">Tipp: Nach geänderten Vorgaben (Bildstil, keine Abkürzungen …) kannst du alle offenen Entwürfe neu erzeugen lassen.</span>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  <form method=post action="/pool-aufnehmen-alle" onsubmit="return confirm('Alle {{entwuerfe|length}} offenen Entwürfe in den Zufalls-Pool aufnehmen?\n\nDas gilt als Freigabe. Es wird nichts sofort gepostet – die Veröffentlichung läuft erst über die tägliche Pool-Ziehung. Einzelne Beiträge kannst du auf der Pool-Seite jederzeit wieder entfernen.')">
+    <button class=ok title="Alle offenen Entwürfe auf einen Schlag in den Pool legen">&#x267B;&#xFE0F; Alle in den Pool</button>
+  </form>
   <form method=post action="/entwuerfe-neu" onsubmit="return confirm('Alle offenen Entwürfe nach den neuen Vorgaben NEU erzeugen? Das ersetzt die aktuellen Text- und Bildvorschläge und kostet KI-Tokens.')">
     <button class=re{% if gen_running %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>&#x21BB; Alle nach neuen Vorgaben neu erzeugen</button>
-  </form></div>{% endif %}
+  </form></div></div>{% endif %}
 {% for e in entwuerfe %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
@@ -1357,6 +1361,31 @@ def pool_entfernen(eid):
         audit_log(conn, user, "pool_entfernt", eid, "aus dem Zufalls-Pool genommen")
         conn.commit()
     flash("Beitrag %d ist nicht mehr im Pool. Du findest ihn wieder unter „4. Einplanung\"." % eid)
+    return redirect(url_for("pool_seite"))
+
+@app.route("/pool-aufnehmen-alle", methods=["POST"])
+@rolle_required("freigeber")
+def pool_aufnehmen_alle():
+    """Sammelaktion (Issue #128): nimmt ALLE aktuell offenen Entwuerfe (status='entwurf') auf einen
+    Schlag in den Zufalls-Pool auf. Der Pool-Eintrag gilt bewusst als Freigabe; es wird nichts sofort
+    veroeffentlicht (Posten erst ueber die taegliche Pool-Ziehung). Idempotent: bereits gepoolte/
+    freigegebene/veroeffentlichte/verworfene Beitraege werden NICHT angefasst, nur status='entwurf'."""
+    user = session["user"]
+    n = 0
+    with get_conn() as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM entwuerfe WHERE status='entwurf'")]
+        for eid in ids:
+            conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
+            conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))  # frueher entfernten reaktivieren
+            conn.execute("UPDATE entwuerfe SET status='pool' WHERE id=?", (eid,))
+            audit_log(conn, user, "pool_aufgenommen", eid, "Sammelaktion: in den Zufalls-Pool aufgenommen (alle Stellen)")
+            n += 1
+        conn.commit()
+    if n:
+        flash("%d Beiträge in den Pool aufgenommen – sie werden ab jetzt automatisch je Beratungsstelle "
+              "ausgespielt. Einzelne kannst du hier jederzeit wieder „Aus dem Pool nehmen\"." % n)
+    else:
+        flash("Es gab keine offenen Entwürfe, die in den Pool aufgenommen werden konnten.")
     return redirect(url_for("pool_seite"))
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
