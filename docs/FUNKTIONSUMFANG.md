@@ -41,9 +41,11 @@ automatisch in einzelne Themen.
 
 - **Text:** Claude erzeugt strukturierte Beiträge (Überschrift, Stichpunkte, Call-to-Action,
   Begleittext) im HILO-Stil, faktentreu (keine erfundenen Zahlen/Fristen/Adressen).
-- **Bild:** programmatisch im **HILO-Referenzdesign v10** gerendert (1080×1080, rauschfrei,
-  ohne Bild-Token) – Verlaufsbänder, Logo, rotierender Slogan, CTA. Optionales freigestelltes
-  Foto via OpenAI oder gezeichnetes Motiv-Icon.
+- **Bild:** programmatisch im **HILO-Magazin-Design v11** gerendert (1080×1080) – ein
+  emotionales **Szene-Foto als Hintergrund** (warmer Creme-Fallback ohne Foto), darüber ein
+  integriertes Textfeld mit Saison-Pille, Überschrift, **Hero-Zahl oder großer Überschrift**,
+  Symbol-Bullets und CTA; die blau-weißen **CI-Kreise** (Logo + Slogan) bleiben und rotieren.
+  Das Foto erzeugt OpenAI als emotionale Magazin-Szene (oder ein gezeichnetes Icon, ohne Token).
 - **Überarbeiten:** auf Knopfdruck mit Änderungswunsch („Bild freundlicher") neu erzeugen.
 
 ## 4. Freigabe-Workflow (Dashboard)

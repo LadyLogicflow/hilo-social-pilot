@@ -29,8 +29,8 @@ Wissens-Serie ───┘
 | `sources.py` | Aktive Quellen aus der Konfiguration |
 | `ingest.py` | Eigene Quellen: PDF/Link → Text → **Mehr-Themen-Extraktion** |
 | `textgen.py` | Texterstellung via Claude (`generate`, `regenerate`, `extract_topics`) |
-| `bildgen.py` | Bild im HILO-Referenzdesign (v10), rauschfrei gerendert |
-| `bildmotiv.py` | Foto-Motiv via OpenAI **oder** gezeichnetes Icon (`icon:…`) |
+| `bildgen.py` | Bild im HILO-Magazin-Design (v11): Foto-Hintergrund + Textkarte + CI-Kreise |
+| `bildmotiv.py` | Emotionales Szene-Foto via OpenAI **oder** gezeichnetes Icon (`icon:…`) |
 | `countdown_motive.py` | Gezeichnete Icons (Kalender, Wecker, Sanduhr) |
 | `fristen.py` | Fristen-Countdown (gestaffelte Erinnerungen) |
 | `anlass.py` | Anlass-Tage (besondere Tage mit Steuer-Aufhänger) |
@@ -101,8 +101,18 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
 
 ## Bild-Design
 
-Das Beitragsbild (1080×1080, `bildgen.py`) folgt dem **HILO-Referenzdesign v10**:
-zwei Verlaufsbänder (Blau→Grün), weiße Überschrift oben, Text links, optionales
-freigestelltes Foto bzw. gezeichnetes Motiv-Icon rechts, CTA im unteren Band, zwei
-schwebende Kreise (Logo links, rotierender Slogan rechts). Alles programmatisch und
-rauschfrei – Fotos optional via OpenAI, Icons komplett ohne Token.
+Das Beitragsbild (1080×1080, `bildgen.py`) folgt dem **HILO-Magazin-Design v11** (emotionaler,
+foto-getriebener Look, seit Issue #129):
+
+- **Foto als Vollbild-Hintergrund** (cover-Crop). Fehlt ein Foto, greift ein warmer
+  Creme-Verlauf-Fallback (`_creme_bg`) – das Bild sieht auch ohne KI-Foto gut aus.
+- **Integriertes weißes Textfeld** (`_card`, abgerundet, weicher Schatten + Scrim für Kontrast)
+  mit: grüner Saison-/Themen-Pille, Überschrift, **optionaler Hero-Zahl** (groß, grün) **oder** –
+  ohne Zahl – größerer Überschrift + Hook-Subline, gezeichneten Symbol-Bullets und Gold-CTA-Pille.
+- **CI-Kreise bleiben** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, Position rotiert
+  je Beitrag (`pick_circle_pos`). Ein Stellen-Porträt (`portrait`) ersetzt optional einen Kreis.
+- **Foto-Motiv** (`bildmotiv.py`): emotionale Magazin-/Editorial-Szene **mit Umgebung** (nicht mehr
+  freigestellt) via OpenAI `gpt-image-1` (`background=opaque`, 1024×1024, gecacht); `icon:`-Motive
+  ohne Token. Das Szene-Motiv (`szene_motiv`) liefert die Text-KI je Beitrag.
+
+Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.
