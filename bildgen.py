@@ -269,14 +269,21 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     if bblocks: parts.append(h_bul)
     parts.append(h_cta)
     content_h = sum(parts) + gap*(len(parts)-1)
-    card_h = content_h + pad_top + pad_bot
 
-    # Textfeld vertikal in den freien Bereich zwischen den Kreisen (ct..cb) einpassen.
-    # Issue #131: oben und unten bleibt mindestens frame_v Foto-Rand frei, damit das Feld
-    # nicht den ganzen Bereich fuellt und der umrahmende Foto-Rahmen ringsum sichtbar ist.
-    avail = (cb - ct) - 2*frame_v
-    card_h = min(card_h, avail)
-    cy0 = ct + frame_v + (avail - card_h)//2
+    # Issue #131 (ARGUS-Blocker behoben): Die Karte muss den Inhalt VOLLSTAENDIG umschliessen,
+    # sonst laeuft der Inhalt (v.a. die Gold-CTA-Pille) unter die Kartenunterkante aufs nackte
+    # Foto. Darum wird die Karte an den Inhalt gekoppelt: card_h = Inhalt + Innenabstaende.
+    band = cb - ct                          # verfuegbares Band zwischen den Kreisen
+    card_needed = content_h + pad_top + pad_bot
+    # frame_v ist nur ein OPTIONALER Luft-Rand oben/unten: er wird so weit angewendet, wie nach
+    # dem Inhalt noch Platz im Band bleibt - nie so weit, dass der Inhalt nicht mehr passt.
+    # Reicht das Band selbst ohne Rand nicht (sehr enge diagonal-Baender + Maximal-Content),
+    # fuellt die Karte das ganze Band (frame_v effektiv 0) - lieber kein oberer/unterer
+    # Foto-Rand als CTA auf nacktem Foto. Der Inhalt bleibt so immer INNERHALB der Karte.
+    frame_eff = max(0, min(frame_v, (band - card_needed)//2))
+    avail = band - 2*frame_eff
+    card_h = max(card_needed, avail)        # Karte umschliesst den Inhalt immer vollstaendig
+    cy0 = ct + frame_eff + (avail - card_h)//2
     cy1 = cy0 + card_h
     _card(base, cx0, cy0, cx1, cy1)
 
