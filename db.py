@@ -68,7 +68,26 @@ CREATE TABLE IF NOT EXISTS geplante_posts (
     geplant_am TEXT NOT NULL,          -- lokale deutsche Zeit "YYYY-MM-DDTHH:MM"
     status TEXT NOT NULL DEFAULT 'geplant',   -- geplant | laeuft | veroeffentlicht | fehler
     info TEXT,
+    pool INTEGER NOT NULL DEFAULT 0,   -- 1 = aus dem Zufalls-Pool (Beitrag bleibt wiederverwendbar, kein Status-Flip)
     erstellt_am TEXT DEFAULT (datetime('now'))
+);
+-- Zufalls-Pool ("Topf"): zeitlose, einmal fuer ALLE Beratungsstellen freigegebene Beitraege,
+-- aus denen taeglich je Stelle/Kanal zufaellig gezogen wird (Hybrid-Strategie Catrin 2026-06-23).
+CREATE TABLE IF NOT EXISTS pool (
+    entwurf_id INTEGER PRIMARY KEY,    -- ein freigegebener Entwurf = ein Topf-Beitrag
+    aktiv INTEGER NOT NULL DEFAULT 1,  -- 0 = aus dem Topf genommen (nicht mehr ziehbar), bleibt fuer Historie
+    freigegeben_am TEXT DEFAULT (datetime('now')),
+    freigegeben_von TEXT
+);
+-- "Nie doppelt"-Gedaechtnis (Variante 1): jeder Beitrag wird je Stelle GENAU EINMAL pro Kanal
+-- gezogen. Der UNIQUE-Schluessel verhindert die Doppel-Ausspielung dauerhaft (kein Rollover).
+CREATE TABLE IF NOT EXISTS pool_nutzung (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entwurf_id INTEGER NOT NULL,
+    stelle_id INTEGER NOT NULL,
+    kanal TEXT NOT NULL,               -- facebook | instagram | whatsapp_status | whatsapp_kanal
+    verbraucht_am TEXT DEFAULT (datetime('now')),
+    UNIQUE(entwurf_id, stelle_id, kanal)
 );
 """
 
@@ -205,6 +224,9 @@ def migrate(conn):
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_fb TEXT DEFAULT 'einzelbild'")
     if gcols and "format_ig" not in gcols:
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_ig TEXT DEFAULT 'karussell'")
+    # Zufalls-Pool: Markierung, dass ein geplanter Post aus dem Topf stammt (Beitrag bleibt wiederverwendbar)
+    if gcols and "pool" not in gcols:
+        conn.execute("ALTER TABLE geplante_posts ADD COLUMN pool INTEGER NOT NULL DEFAULT 0")
     # Insights/Auswertung: Reichweite + Interaktionen je veroeffentlichtem Post, plus die
     # Facebook-Seiten-ID (fuer den Insights-Abruf ueber das Seiten-Token noetig).
     pcols = [r[1] for r in conn.execute("PRAGMA table_info(posts)")]
