@@ -353,7 +353,7 @@ button{background:#1f428d;color:#fff;border:0;padding:9px 14px;border-radius:8px
 .flash{color:#1f428d;margin:8px 0;font-weight:bold}.hint{color:#777;font-size:13px}"""
 
 _NAV = """<div class=top><div><b style="color:#1f428d;font-size:20px">HISOME</b> <span style="color:#60a33c;font-size:13px">HILO Social Media Tool</span></div>
-<div><a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
+<div><a href="/pool">Pool</a> &middot; <a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
 
 LOGIN = """<!doctype html><meta charset=utf-8><title>HISOME - HILO Social Media Tool</title>
 <style>
@@ -398,6 +398,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
   <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entwürfe prüfen, überarbeiten, freigeben (Stufe 2).</p></a>
   <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>"""
@@ -545,6 +546,9 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
       <button style="background:#1f428d;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
     <p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
+    <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:4px 0 10px" onsubmit="return confirm('Diesen zeitlosen Beitrag in den Zufalls-Pool aufnehmen?\n\nEr wird dann automatisch ausgespielt – je Beratungsstelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal. Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
+      <button style="background:#4c7b2d" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
+      <span class=hint>für zeitlose Beiträge – statt manuell einzuplanen</span></form>
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
       <div class=checks>{% for s in stellen %}<span class=stelle><label><input type=checkbox name=stelle_id value="{{s.id}}"> {{s.name}}{% if s.ort %} ({{s.ort}}){% endif %}</label>
@@ -588,6 +592,30 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
     {% else %}<p class=sub>Kein Facebook-Zugang/keine Beratungsstelle aktiv.</p>{% endif %}
   </div></div>
 {% else %}<p style="text-align:center">Keine freigegebenen Beiträge zur Einplanung.</p>{% endfor %}"""
+
+POOL = """<!doctype html><meta charset=utf-8><title>Zufalls-Pool</title><style>""" + _TOP + """
+.card{display:flex;gap:16px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:14px;max-width:1040px;margin:0 auto 14px}
+.card img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
+.meta{font-size:13px;color:#6b7280;margin:6px 0}
+button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;border-radius:8px}
+.intro{max-width:1040px;margin:0 auto 14px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#1f428d;font-size:14px}
+.warn{max-width:1040px;margin:0 auto 14px;background:#fff3cd;border:1px solid #ffe69c;border-radius:10px;padding:11px 16px;color:#7a5b00;font-size:14px}
+.hint{color:#777;font-size:13px}</style>
+""" + _NAV + """
+<div class=top><h2 style="margin:0;color:#1f428d">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
+{% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
+{% for e in items %}
+<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
+    <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
+    <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
+      <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
+  </div></div>
+{% else %}<p style="text-align:center;max-width:1040px;margin:20px auto">Der Topf ist noch leer. Gib unter <a href="/einplanung">„4. Einplanung"</a> bei einem freigegebenen Beitrag „In den Pool" frei.</p>{% endfor %}"""
 
 VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentlichung</title><style>""" + _STYLE + """
 .bar{max-width:1200px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
@@ -1075,6 +1103,68 @@ def einplanung():
         ig_seiten = {str(p["id"]) for p in (pg or []) if p.get("ig_id")}
     return render_template_string(EINPLANUNG, **_ctx(freigegeben=rows, stellen=stellen,
                                   pages=pages, pages_err=pages_err, ig_seiten=ig_seiten))
+
+@app.route("/pool")
+@login_required
+def pool_seite():
+    """Zufalls-Pool ("Topf"): zeitlose, einmal fuer alle Stellen freigegebene Beitraege. Zeigt
+    je Beitrag, wie oft er schon ausgespielt wurde, und warnt bei knappem Vorrat je Stelle/Kanal."""
+    import pool as poolmod
+    items = []
+    with get_conn() as conn:
+        stellen = conn.execute("SELECT id, name, ort FROM beratungsstellen WHERE aktiv=1 ORDER BY ort").fetchall()
+        stelle_ids = [s["id"] for s in stellen]
+        nutzung = {r["entwurf_id"]: r["n"] for r in
+                   conn.execute("SELECT entwurf_id, COUNT(*) n FROM pool_nutzung GROUP BY entwurf_id")}
+        for e in conn.execute("SELECT p.entwurf_id id, p.freigegeben_am, e.text FROM pool p "
+                              "JOIN entwuerfe e ON e.id=p.entwurf_id WHERE p.aktiv=1 "
+                              "ORDER BY p.freigegeben_am, p.entwurf_id"):
+            row = _parse(e)
+            row["freigegeben_de"] = _de_datum((e["freigegeben_am"] or "")[:10])
+            row["bespielt"] = nutzung.get(e["id"], 0)
+            items.append(row)
+        knapp = poolmod.knappe_vorraete(conn, stelle_ids) if stelle_ids else []
+    namen = {s["id"]: s["name"] for s in stellen}
+    warn = ["%s · %s: noch %d" % (namen.get(sid, sid), poolmod.KANAL_LABEL.get(kanal, kanal), rest)
+            for sid, kanal, rest in knapp]
+    return render_template_string(POOL, **_ctx(
+        items=items, n_stellen=len(stellen), n_kanaele=len(poolmod.POOL_KANAELE),
+        slots=len(stellen) * len(poolmod.POOL_KANAELE),
+        kanaele=[poolmod.KANAL_LABEL[k] for k in poolmod.POOL_KANAELE],
+        warn=warn, schwelle=poolmod.WARNSCHWELLE))
+
+@app.route("/pool-aufnehmen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def pool_aufnehmen(eid):
+    """Nimmt einen freigegebenen Beitrag in den Topf auf (einmalige Freigabe fuer ALLE Stellen).
+    Der Status wechselt auf 'pool' -> faellt aus dem Einmal-Posten-Fluss heraus, wird stattdessen
+    automatisch je Stelle/Kanal gezogen."""
+    user = session["user"]
+    with get_conn() as conn:
+        e = conn.execute("SELECT id FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
+        conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))   # frueher entfernten reaktivieren
+        conn.execute("UPDATE entwuerfe SET status='pool' WHERE id=?", (eid,))
+        audit_log(conn, user, "pool_aufgenommen", eid, "in den Zufalls-Pool aufgenommen (alle Stellen)")
+        conn.commit()
+    flash("Beitrag %d ist im Pool – er wird ab jetzt automatisch je Beratungsstelle ausgespielt (jeder Beitrag je Stelle genau einmal pro Kanal)." % eid)
+    return redirect(url_for("pool_seite"))
+
+@app.route("/pool-entfernen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def pool_entfernen(eid):
+    """Nimmt einen Beitrag aus dem Topf (aktiv=0). Das 'nie doppelt'-Gedaechtnis (pool_nutzung)
+    bleibt erhalten. Der Beitrag geht zurueck auf 'freigegeben' -> wieder manuell einplanbar."""
+    user = session["user"]
+    with get_conn() as conn:
+        conn.execute("UPDATE pool SET aktiv=0 WHERE entwurf_id=?", (eid,))
+        conn.execute("UPDATE entwuerfe SET status='freigegeben' WHERE id=? AND status='pool'", (eid,))
+        audit_log(conn, user, "pool_entfernt", eid, "aus dem Zufalls-Pool genommen")
+        conn.commit()
+    flash("Beitrag %d ist nicht mehr im Pool. Du findest ihn wieder unter „4. Einplanung\"." % eid)
+    return redirect(url_for("pool_seite"))
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
