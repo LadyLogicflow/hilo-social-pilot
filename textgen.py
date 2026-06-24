@@ -96,6 +96,89 @@ CHANNEL_GUIDE = {
 def _model():
     return os.environ.get("HILO_CLAUDE_MODEL", "claude-sonnet-4-6")
 
+# --- #143: Art-Director-Schritt (NUR im Bild-Stil 'kreativ') -----------------------------------
+# Zweistufig: NACH der Texterzeugung erzeugt die Text-KI (Claude) ZUSAETZLICH ein konkretes
+# Szene-Motiv (fields['kreativ_motiv']) fuer ein kinoreifes Foto OHNE Text. Exakter deutscher
+# Wortlaut (echte Umlaute). Dieser Schritt laeuft AUSSCHLIESSLICH im kreativ-Modus, damit in den
+# Stilen standard/ki_tafel KEIN zusaetzlicher KI-Aufruf (kein zusaetzlicher Token-Verbrauch) anfaellt.
+ART_DIRECTOR_SYSTEM = (
+    "Du bist ein preisgekrönter Art Director und Social-Media-Marketing-Experte."
+)
+
+def _art_director_prompt(fields):
+    """Baut die Art-Director-Anweisung (#143) aus dem fertigen Beitrag (Überschrift + Caption +
+    Bullets). Exakter, deutscher Wortlaut mit echten Umlauten. Die KI liefert NUR die Bildszene
+    (1-3 Sätze) zurück - daraus wird fields['kreativ_motiv']."""
+    f = fields if isinstance(fields, dict) else {}
+    ueberschrift = (f.get("ueberschrift") or "").strip()
+    caption = (f.get("caption") or "").strip()
+    if not caption:
+        caps = f.get("captions") if isinstance(f.get("captions"), dict) else {}
+        caption = (caps.get("facebook") or caps.get("instagram") or "").strip()
+    bullets_raw = f.get("bullets")
+    bullets = ""
+    if isinstance(bullets_raw, (list, tuple)):
+        bullets = "; ".join((str(b) if b is not None else "").strip()
+                            for b in bullets_raw if b is not None and str(b).strip())
+    beitrag = ("Überschrift: %s\n\nBeitragstext: %s\n\nStichpunkte: %s"
+               % (ueberschrift or "-", caption or "-", bullets or "-"))
+    return (
+        "Du bist ein preisgekrönter Art Director und Social-Media-Marketing-Experte. Lies den "
+        "folgenden Beitragstext. Finde die EINE überraschendste, kontraintuitivste Erkenntnis. "
+        "Entwirf dann eine fotorealistische, kinoreif beleuchtete Bildszene, auf die eine "
+        "Top-Kreativagentur stolz wäre - KEINE Stockfoto-Ästhetik, KEINE Klischees (keine "
+        "Taschenrechner, keine Ordner, keine Händedrücke). Visualisiere die emotionale oder "
+        "finanzielle KONSEQUENZ über echte Objekte, echte Menschen, echte Situationen. Nutze "
+        "visuellen Kontrast, Spannung oder Ironie für Stopping Power. KEIN Text im Bild. Gib NUR "
+        "die konkrete Bildszene-Beschreibung zurück (1-3 Sätze).\n\n%s" % beitrag
+    )
+
+def art_director_motiv(fields, client=None):
+    """#143: Setzt fields['kreativ_motiv'] - das konkrete Szene-Motiv fuer ein kinoreifes Foto OHNE
+    Text - per Art-Director-Schritt (zusaetzlicher Claude-Aufruf). Eigenschaften:
+
+    - NUR im Bild-Stil 'kreativ' aktiv: bei jedem anderen Stil wird KEIN KI-Aufruf gemacht und
+      fields unveraendert zurueckgegeben (kein zusaetzlicher Token-Verbrauch).
+    - STABIL: ist fields['kreativ_motiv'] bereits gesetzt (Re-Render/Regenerate), bleibt es
+      UNVERAENDERT (kein neuer KI-Aufruf) - nur wenn leer wird es gesetzt.
+    - ROBUST: jeder Fehler (kein Key, KI-/Parse-Fehler) wird abgefangen; fields bleibt dann ohne
+      kreativ_motiv (Fallback: ensure_photo_fuer/_kreativ_scene nutzt szene_motiv/bild_motiv).
+
+    'client' kann ein bereits erzeugter anthropic-Client sein (spart einen zweiten Verbindungs-
+    aufbau im selben Erzeugungslauf); fehlt er, wird bei Bedarf einer erzeugt. Mockbar: Tests
+    koennen client durch ein Objekt mit messages.create(...) ersetzen (kein echter KI-Aufruf)."""
+    if not isinstance(fields, dict):
+        return fields
+    try:
+        import db
+        stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
+    except Exception:
+        stil = "standard"
+    if stil != "kreativ":
+        return fields
+    # Stabil: bereits gesetztes Motiv NICHT ueberschreiben (kein neuer KI-Aufruf).
+    if (fields.get("kreativ_motiv") or "").strip():
+        return fields
+    try:
+        if client is None:
+            key = get_secret("anthropic_api_key")
+            if not key:
+                log.info("Art-Director-Schritt uebersprungen: kein 'anthropic_api_key' hinterlegt.")
+                return fields
+            import anthropic  # lazy
+            client = anthropic.Anthropic(api_key=key)
+        msg = client.messages.create(
+            model=_model(), max_tokens=400, system=ART_DIRECTOR_SYSTEM,
+            messages=[{"role": "user", "content": _art_director_prompt(fields)}],
+        )
+        raw = "".join(getattr(b, "text", "") for b in msg.content).strip()
+        if raw:
+            fields["kreativ_motiv"] = raw[:600]
+            log.info("Art-Director-Motiv erzeugt (#143): %s", raw[:60])
+    except Exception as ex:
+        log.warning("Art-Director-Schritt fehlgeschlagen (#143): %s", ex)
+    return fields
+
 def _build_prompt(thema, kanal=None):
     """Ein Auftrag erzeugt den Beitrag fuer Facebook UND Instagram in einem Rutsch: Bild, Ueberschrift
     und Stichpunkte sind fuer beide Kanaele gleich; NUR der Begleittext (caption) unterscheidet sich je
@@ -245,6 +328,9 @@ def _create_drafts(rows, kanal):
     for r in rows:
         try:
             data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
+            # #143: NUR im kreativ-Modus ein zusaetzliches Art-Director-Motiv erzeugen (stabil,
+            # nur-wenn-leer). In allen anderen Stilen No-Op (kein zusaetzlicher KI-Aufruf).
+            art_director_motiv(data)
             with get_conn() as conn:
                 # #140: Schauplatz EINMAL bei der Erzeugung waehlen und in fields['schauplatz']
                 # ablegen (stabil ueber Re-Renders/Personalisierung; KI-Tafel nutzt ihn als Szene).
@@ -326,15 +412,20 @@ def regenerate_open_drafts(kanal="google"):
             # fehlt er (alte Entwuerfe), bei der Neu-Erzeugung einmal frisch waehlen.
             alt_sp = ""
             alt_tr = ""
+            alt_km = ""
             try:
                 alt = json.loads(r["alt_text"]) if r["alt_text"] else {}
                 if isinstance(alt, dict):
                     alt_sp = (alt.get("schauplatz") or "").strip()
                     # #142: bestehenden Traeger aus dem alten Entwurf uebernehmen (stabil).
                     alt_tr = (alt.get("traeger") or "").strip()
+                    # #143: bestehendes kreativ_motiv uebernehmen (stabil ueber Re-Renders) - der
+                    # Art-Director-Schritt laeuft nur, wenn noch keins existiert.
+                    alt_km = (alt.get("kreativ_motiv") or "").strip()
             except Exception:
                 alt_sp = ""
                 alt_tr = ""
+                alt_km = ""
             with get_conn() as conn:
                 if alt_sp:
                     data["schauplatz"] = alt_sp
@@ -349,6 +440,12 @@ def regenerate_open_drafts(kanal="google"):
                         _traeger.zuweisen_traeger_falls_fehlt(conn, data)
                     except Exception as ex:
                         log.warning("Traeger-Zuweisung (regenerate) uebersprungen: %s", ex)
+                # #143: bestehendes kreativ_motiv uebernehmen (stabil); sonst im kreativ-Modus
+                # einmal frisch erzeugen (art_director_motiv ist ausserhalb kreativ ein No-Op).
+                if alt_km:
+                    data["kreativ_motiv"] = alt_km
+                else:
+                    art_director_motiv(data)
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), r["eid"]))
             neu += 1

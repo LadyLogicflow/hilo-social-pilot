@@ -149,6 +149,34 @@ def _tafel_traeger(fields):
         return ""
     return (fields.get("traeger") or "").strip()
 
+def _kreativ_scene(fields):
+    """Liefert die Bildszene fuer den Bild-Stil 'kreativ' (#143): bevorzugt das vom Art-Director-
+    Schritt (textgen) erzeugte fields['kreativ_motiv'] (eine konkrete, fotorealistische Szene zur
+    ueberraschendsten Erkenntnis des Beitrags), faellt sonst auf szene_motiv -> bild_motiv ->
+    bild_motiv_thema und zuletzt auf den Default zurueck.
+
+    WICHTIG (#134-Retention, KRITISCH): Producer (ensure_photo_fuer) UND Aufraeumschutz
+    (cache_dateien_fuer_fields) MUESSEN denselben Szene-Wert nutzen, sonst zeigt _kreativ_pfad auf
+    eine ANDERE Datei -> Falsch-Loeschen der aktiven kreativ-Datei. Darum diese gemeinsame Helper-
+    Funktion (genauso konsistent wie _tafel_scene/_tafel_traeger)."""
+    if not isinstance(fields, dict):
+        return "ein ruhiger, vertrauensvoller Moment im Alltag"
+    motiv = (fields.get("kreativ_motiv") or fields.get("szene_motiv")
+             or fields.get("bild_motiv") or fields.get("bild_motiv_thema") or "").strip()
+    return motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+
+def _kreativ_prompt(scene):
+    """Kreativ-Bildprompt (#143): ein kinoreifes, fotorealistisches Editorial-/Award-Foto OHNE Text.
+    Stil-Wrapper + die konkrete Szene ({scene} = kreativ_motiv mit Fallback). Die Botschaft + HILO-CI
+    traegt spaeter der Code als Overlay (Textfeld + Kreise + CTA, Standard-Layout) - das Foto selbst
+    enthaelt KEINE Schrift. Echte deutsche Umlaute."""
+    scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
+    return ("Fotorealistisches, KINOREIF beleuchtetes Bild in Editorial-/Award-Winning-Qualitaet. "
+            "KEINE Stockfoto-Aesthetik, KEINE Klischees (keine Taschenrechner, keine Ordner, "
+            "keine Haendedruecke). Szene: %s. Nutze visuellen Kontrast, Spannung oder Ironie fuer "
+            "Stopping Power. ABSOLUT KEIN Text, keine Buchstaben, Zahlen, Logos oder Wasserzeichen "
+            "irgendwo im Bild." % scene)
+
 def _tafel_prompt(scene, sign_text, traeger=None):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
@@ -239,7 +267,12 @@ def ensure_photo_fuer(fields):
     stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
     motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
              or fields.get("bild_motiv_thema") or "").strip()
-    # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel).
+    # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel, kein kreativ-Foto).
+    if stil == "kreativ" and not motiv.startswith("icon:"):
+        # NEU (#143): kreativ-Foto OHNE Text. Szene = das vom Art-Director-Schritt (textgen)
+        # erzeugte kreativ_motiv (Fallback szene_motiv/bild_motiv/bild_motiv_thema) - _kreativ_scene
+        # haelt diesen Wert konsistent zwischen Producer und cache_dateien_fuer_fields (#134).
+        return ensure_photo_kreativ(_kreativ_scene(fields))
     if stil == "ki_tafel" and not motiv.startswith("icon:"):
         # NEU (#139): mehr Text aufs Schild - Ueberschrift + Stichpunkte (tafel_sign_text)
         # statt nur der Ueberschrift. Ohne bullets bleibt es bei der Ueberschrift (Fallback).
@@ -316,6 +349,20 @@ def _tafel_pfad(scene, sign_text, tool=None, traeger=None):
     h = hashlib.sha256(tafel_cache_key(scene, sign_text, traeger).lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "tafel_" + h + ".png")
 
+def _kreativ_pfad(scene, tool=None):
+    """Liefert den absoluten Cache-Pfad fuer ein kreativ-Foto (#143). EIGENER Cache-Praefix
+    'kreativ_' (sha256[:16] aus 'kreativ:' + scene), getrennt von szene/tafel/ideogram_ - so
+    kollidiert das kreativ-Foto NICHT mit den Standard-/Tafel-Caches.
+
+    Wie bei _szene_pfad/_tafel_pfad ist der Pfad zusaetzlich tool-abhaengig (#137): OpenAI (kein
+    zusaetzlicher Tool-Praefix vor 'kreativ_') vs. Ideogram ('ideogram_kreativ_<h>'). None ->
+    aktuelle Einstellung (aktives_bild_tool())."""
+    scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
+    if tool is None:
+        tool = aktives_bild_tool()
+    h = hashlib.sha256(("kreativ:" + scene).lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "kreativ_" + h + ".png")
+
 def cache_dateien_fuer_fields(fields):
     """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
     diesen 'fields' (Entwurfs-JSON-dict) nutzen KOENNTE - ueber BEIDE Stil-Varianten hinweg
@@ -354,6 +401,11 @@ def cache_dateien_fuer_fields(fields):
     # auf eine ANDERE Datei zeigen -> die aktive Tafel-Datei wuerde nach der Schonfrist faelschlich
     # geloescht (#134). Leer -> alter Schluessel (Bilderrahmen-Default), rueckwaertskompatibel.
     tafel_traeger = _tafel_traeger(fields)
+    # NEU (#143, KRITISCH): GENAU derselbe Szene-Wert wie der kreativ-Producer (ensure_photo_fuer ->
+    # _kreativ_scene). Da die Szene in den kreativ-Cache-Key einfliesst, wuerde ein abweichender Wert
+    # hier auf eine ANDERE Datei zeigen -> die aktive kreativ-Datei wuerde nach der Schonfrist
+    # faelschlich geloescht (#134). Konsistent wie bei _tafel_scene/_tafel_traeger.
+    kreativ_scene = _kreativ_scene(fields)
     for tool in ("openai", "ideogram"):
         # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
         for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
@@ -373,6 +425,10 @@ def cache_dateien_fuer_fields(fields):
         # traeger = das Botschafts-Device (_tafel_traeger) - exakt dieselben Werte wie im Producer
         # ensure_photo_fuer -> selber _tafel_pfad, kein Falsch-Loeschen der aktiven Tafel-Datei.
         pfade.add(_tafel_pfad(tafel_scene, sign_text, tool=tool, traeger=tafel_traeger))
+        # kreativ-Variante (#143): Szene = _kreativ_scene (kreativ_motiv mit Fallback) - exakt
+        # derselbe Wert wie im Producer ensure_photo_fuer -> selber _kreativ_pfad, kein
+        # Falsch-Loeschen der aktiven kreativ-Datei.
+        pfade.add(_kreativ_pfad(kreativ_scene, tool=tool))
     return pfade
 
 def _openai_quality():
@@ -468,6 +524,35 @@ def tafel_payload(scene, sign_text, traeger=None):
     size '1024x1024'. Ausgelagert, damit Tests Prompt + Parameter pruefen koennen.
     'traeger' (#142): das Botschafts-Device; leer -> bisheriges Bilderrahmen-Device (#140)."""
     return openai_payload(_tafel_prompt(scene, sign_text, traeger))
+
+def kreativ_payload(scene):
+    """Baut das OpenAI images/generations-Request-Payload fuer ein kreativ-Foto (#143, ohne
+    Netzwerkaufruf). background='opaque', size '1024x1024' (ueber openai_payload). Ausgelagert,
+    damit Tests Prompt + Parameter ohne Netz pruefen koennen."""
+    return openai_payload(_kreativ_prompt(scene))
+
+def ensure_photo_kreativ(scene):
+    """Erzeugt (oder liefert aus dem Cache) das kreativ-Foto (#143): ein kinoreifes, fotorealistisches
+    Bild OHNE Text zur uebergebenen Szene (scene = kreativ_motiv mit Fallback, via _kreativ_scene).
+    Eigener Cache-Praefix 'kreativ_' (getrennt von szene/tafel). background='opaque', size '1024x1024'.
+    Tool-Routing (OpenAI/Ideogram) wie bei den anderen Stilen. Ohne API-Key -> None (Creme-Fallback)."""
+    scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
+    os.makedirs(MOTIV_DIR, exist_ok=True)
+    tool = aktives_bild_tool()
+    path = _kreativ_pfad(scene, tool=tool)
+    if os.path.exists(path):
+        return path
+    daten = erzeuge_bild(_kreativ_prompt(scene), tool=tool)
+    if daten is None:
+        return None
+    try:
+        with open(path, "wb") as f:
+            f.write(daten)
+        log.info("Kreativ-Foto erzeugt (%s): %s", tool, scene[:50])
+        return path
+    except Exception as ex:
+        log.warning("Kreativ-Foto speichern fehlgeschlagen (%s): %s", scene[:40], ex)
+        return None
 
 def ensure_photo_tafel(scene, sign_text, traeger=None):
     """Erzeugt (oder liefert aus dem Cache) das KI-Tafel-Foto (#132): scene = Szene-Motiv,
