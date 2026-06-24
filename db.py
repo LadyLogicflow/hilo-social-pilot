@@ -105,6 +105,17 @@ CREATE TABLE IF NOT EXISTS schauplaetze (
     aktiv INTEGER NOT NULL DEFAULT 1,
     zuletzt_genutzt TEXT               -- NULL = noch nie genutzt (kommt in der Rotation zuerst dran)
 );
+-- Traeger-Wechsler (#142): WIE die Botschaft praesentiert wird (Tafel/Rahmen/Holzschild/...).
+-- Zweite Abwechslungs-Achse zu den Schauplaetzen; der Traeger ist das DEVICE in der Szene, auf
+-- dem der KI-Tafel-Text steht. 16 Seed, hybride Auswahl (Zufall + nie-doppelt-im-Zyklus via
+-- zuletzt_genutzt + leichte Themen-Passung), in der Verwaltung editierbar.
+CREATE TABLE IF NOT EXISTS traeger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    prompt_snippet TEXT NOT NULL,      -- die Beschreibung des Devices fuer den KI-Tafel-Prompt
+    aktiv INTEGER NOT NULL DEFAULT 1,
+    zuletzt_genutzt TEXT               -- NULL = noch nie genutzt (kommt in der Rotation zuerst dran)
+);
 """
 
 # Kuratierte Anlass-Tage mit Steuer-Aufhaenger (Startliste, in der Verwaltung erweiterbar)
@@ -225,6 +236,29 @@ SCHAUPLATZ_SEED_EXTRA = [
     ("Holzchalet mit Fellen und Blick auf schneebedeckte Gipfel", "winter"),
     ("Eislauf-Szene auf einem zugefrorenen See", "winter"),
     ("Festlich gedeckter Wintertisch mit Tannenzweigen und Lichtern", "winter"),
+]
+
+# Traeger-Wechsler (#142): 16 Botschafts-Traeger (das DEVICE in der Szene). Echte deutsche Umlaute.
+# In der Verwaltung editierbar; seed_traeger() greift nur bei leerer Tabelle (Muster wie seed_wissen).
+# prompt_snippet beschreibt das Device fuer den KI-Tafel-Prompt (steht spaeter als Schild-/Tafel-Objekt
+# in der Schauplatz-Szene, traegt den vollen sign_text).
+TRAEGER_SEED = [
+    ("Kreidetafel", "eine schwarze Kreidetafel mit sauberer, gut lesbarer heller Kreideschrift"),
+    ("Bilderrahmen/Aufsteller", "ein eleganter heller Bilderrahmen bzw. Tisch-Aufsteller, der Text in HILO-Dunkelblau, serifenlos, klar lesbar"),
+    ("Rustikales Holzschild", "ein rustikales Holzschild mit gut lesbarer, dunkler Schrift"),
+    ("Plakat an der Wand", "ein gerahmtes helles Plakat an der Wand, der Text in HILO-Dunkelblau, klar lesbar"),
+    ("Café-Aufstelltafel (A-Schild)", "eine Café-Aufstelltafel (A-Schild) mit sauberer Kreideschrift"),
+    ("Pinnwand mit Notizzettel", "eine Pinnwand mit einem großen hellen Notizzettel, der Text in HILO-Dunkelblau gut lesbar"),
+    ("Beschriftete Glastafel", "eine moderne Glastafel, mit Stift in HILO-Dunkelblau klar beschriftet"),
+    ("Aufgeschlagenes Notizbuch", "ein aufgeschlagenes Notizbuch auf dem Tisch mit sauberer, gut lesbarer Handschrift in Dunkelblau"),
+    ("Whiteboard", "ein Whiteboard mit klarer HILO-Dunkelblauer Marker-Schrift"),
+    ("Vintage-Emaille-Schild", "ein Vintage-Emaille-Schild im Retro-Stil mit klarer, gut lesbarer Schrift"),
+    ("Edle Schiefertafel", "eine edle, gerahmte Schiefertafel mit sauberer heller Kreideschrift"),
+    ("Klemmbrett", "ein Klemmbrett mit einem hellen beschrifteten Blatt, der Text in Dunkelblau gut lesbar"),
+    ("Cinema-Leuchtkasten", "ein Cinema-Leuchtkasten mit klaren Steckbuchstaben, gut lesbar"),
+    ("Festliches Stoffbanner", "ein festliches helles Stoffbanner mit gut lesbarer Schrift in HILO-Dunkelblau"),
+    ("Große Postkarte", "eine große helle Postkarte auf dem Tisch mit gut lesbarer Schrift in Dunkelblau"),
+    ("Magnettafel", "eine Magnettafel, auf der Buchstaben-Magneten die Botschaft bilden, gut lesbar"),
 ]
 
 # --- Einmalige Umlaut-Korrektur fuer bereits bestehende DBs (Pi) -------------
@@ -359,6 +393,12 @@ def seed_schauplaetze_extra(conn):
             "SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM schauplaetze WHERE beschreibung=?)",
             (beschreibung, jahreszeit, beschreibung))
 
+def seed_traeger(conn):
+    """Spielt die 16 Start-Traeger ein - NUR bei leerer Tabelle (Muster wie seed_wissen/
+    seed_schauplaetze). Bestehende/editierte Listen bleiben unangetastet."""
+    if conn.execute("SELECT COUNT(*) FROM traeger").fetchone()[0] == 0:
+        conn.executemany("INSERT INTO traeger(name, prompt_snippet) VALUES (?,?)", TRAEGER_SEED)
+
 def seed_contentkalender(conn):
     """Spielt Catrins Steuer-Contentkalender EINMALIG ein - auch in bereits bestehende DBs
     (anders als die seed_*-Startlisten, die nur bei leerer Tabelle greifen). Sentinel-Eintrag
@@ -378,6 +418,7 @@ def init_db():
         seed_wissen(conn)
         seed_schauplaetze(conn)
         seed_schauplaetze_extra(conn)
+        seed_traeger(conn)
         seed_contentkalender(conn)
         fix_seed_umlaute(conn)
 

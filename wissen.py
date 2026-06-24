@@ -42,6 +42,13 @@ def auffuellen(heute=None, min_buffer=3):
         # sofern kein saisonales Schlagwort im Thema steckt).
         import schauplatz
         schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
+        # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
+        # Robust: fehlt die Tabelle (alte DB) -> No-Op.
+        try:
+            import traeger
+            traeger.zuweisen_traeger_falls_fehlt(conn, fields, datum=heute)
+        except Exception as ex:
+            log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
         conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status) "
                      "VALUES (?, 'facebook', ?, 'entwurf')", (cur.lastrowid, json.dumps(fields, ensure_ascii=False)))
         conn.execute("UPDATE wissensthemen SET zuletzt=? WHERE id=?", (heute.isoformat(), topic["id"]))
