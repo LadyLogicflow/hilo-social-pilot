@@ -59,6 +59,15 @@ def erzeuge_anlass_posts(heute=None):
             # einen saisonalen Anlass (z.B. 12-24 Heiligabend) auf die Winter-Schauplaetze lenken.
             import schauplatz
             fields["anlass_datum"] = a["datum"]
+            # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
+            # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
+            # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
+            try:
+                import stilwahl
+                stilwahl.zuweisen_stil_falls_fehlt(conn, fields)
+                textgen.art_director_motiv(fields)
+            except Exception as ex:
+                log.warning("Stil-Zuweisung uebersprungen: %s", ex)
             schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
             # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
             # Robust: fehlt die Tabelle (alte DB) -> No-Op.

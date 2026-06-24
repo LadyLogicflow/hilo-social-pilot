@@ -712,9 +712,12 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button class=no name=aktion value=verwerfen>Verwerfen</button>
       <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
-    <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
+    <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px;display:inline" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
       <input type=hidden name=zurueck value=entwuerfe>
       <button style="background:#6b7280" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
+    <form method=post action="/anderes-bild/{{e.id}}" style="margin-top:6px;display:inline;margin-left:6px" onsubmit="return confirm('Für diesen Beitrag einen anderen Bild-Stil würfeln und das Bild neu erzeugen?\n\nDas kostet ein neues KI-Bild. Text und Termin bleiben unverändert.')">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <button style="background:#7a4fae" title="Anderen aktiven Bild-Stil würfeln und das Bild neu erzeugen (kostet ein neues KI-Bild). Text bleibt">&#x1F3B2; Anderes Bild</button></form>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
@@ -1236,19 +1239,19 @@ button:disabled{opacity:.45;cursor:not-allowed}
 {% endif %}
 
 {% if bereich=='bildstil' %}
-<p class=hint>Legt fest, wie das Beitragsbild gestaltet wird. <b>Standard</b> ist das bewährte Layout (v11): Foto-Hintergrund mit weißem Textfeld (Überschrift, Bullets, CTA). Der <b>Testmodus</b> lässt die Bild-KI die Überschrift selbst auf eine Tafel in der Szene schreiben; CTA und die HILO-Kreise kommen weiterhin exakt per Code. So lässt sich beides vergleichen.</p>
+<p class=hint>Der Bild-Stil wird jetzt <b>automatisch und zufällig pro Beitrag</b> aus den hier <b>aktivierten</b> Stilen gewählt – kein manuelles Umschalten mehr. Haken Sie die Stile an, die in den Zufalls-Topf sollen. In der Freigabe (Schritt&nbsp;3) lässt sich für einen einzelnen Beitrag mit „Anderes Bild“ ein anderer aktiver Stil würfeln. <b>Mindestens ein Stil</b> muss aktiv bleiben.</p>
 <form method=post><input type=hidden name=formular value=bildstil_save>
 <div style="max-width:560px">
   <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=radio name=bild_stil value="standard"{% if bild_stil=='standard' %} checked{% endif %}>
+    <input type=checkbox name=stil_standard value="1"{% if stil_standard %} checked{% endif %}>
     <span><b>Standard (v11)</b><br><span class=hint>Bewährtes Layout: Foto + weißes Textfeld mit Überschrift, Bullets und CTA. (Empfohlen)</span></span></label>
   <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=radio name=bild_stil value="ki_tafel"{% if bild_stil=='ki_tafel' %} checked{% endif %}>
+    <input type=checkbox name=stil_ki_tafel value="1"{% if stil_ki_tafel %} checked{% endif %}>
     <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
   <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=radio name=bild_stil value="kreativ"{% if bild_stil=='kreativ' %} checked{% endif %}>
+    <input type=checkbox name=stil_kreativ value="1"{% if stil_kreativ %} checked{% endif %}>
     <span><b>Kreativ</b><br><span class=hint>Kinoreifes Foto ohne Text – die Bild-KI entwirft (über einen Art-Director-Schritt) eine fotorealistische Szene zur überraschendsten Erkenntnis des Beitrags. Überschrift, Bullets, CTA und HILO-Kreise kommen wie im Standard-Look exakt per Code als Overlay.</span></span></label>
-  <button>Bild-Stil speichern</button>
+  <button>Auswahl speichern</button>
 </div></form>
 
 <h3 style="margin-top:26px">Bild-Tool</h3>
@@ -1647,6 +1650,51 @@ def bild_neu(eid):
         flash("Bild von Beitrag %d neu erzeugt (Text unverändert)." % eid)
     except Exception as ex:
         flash("Bild konnte nicht neu erzeugt werden: %s" % ex)
+    return redirect(ziel)
+
+@app.route("/anderes-bild/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def anderes_bild(eid):
+    """#144-C 'Anderes Bild': wuerfelt fuer DIESEN Entwurf einen ANDEREN aktiven Bild-Stil
+    (ungleich dem aktuellen fields['bild_stil']), ergaenzt ggf. fehlende Felder (kreativ_motiv,
+    falls der neue Stil 'kreativ' ist) und rendert das Bild NEU (neuer Stil/neues Foto = KI-Kosten
+    wie 'Neu erzeugen'). Status, Termin und Text des Beitrags bleiben unveraendert."""
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bild von Beitrag %d kann nicht gewechselt werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+    try:
+        import bildmotiv, stilwahl, textgen
+        data = json.loads(e["text"])
+        with get_conn() as conn:
+            neu = stilwahl.anderen_stil_waehlen(conn, data)
+        if neu is None:
+            flash("Es ist nur ein Bild-Stil aktiv – bitte erst in der Verwaltung unter „Bild-Stil“ "
+                  "weitere Stile aktivieren, dann lässt sich ein anderes Bild würfeln.")
+            return redirect(ziel)
+        # Neuer Stil 'kreativ' und noch kein kreativ_motiv -> Art-Director-Motiv erzeugen (No-Op
+        # ohne Key; dann faellt kreativ auf die bestehende Szene zurueck).
+        if neu == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
+            textgen.art_director_motiv(data)
+        photo = bildmotiv.ensure_photo_fuer(data)   # neuer Stil -> ggf. neues KI-Foto
+        slogan = bildgen.pick_slogan(data.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(data, photo, slogan, out)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), out, eid))
+            audit_log(conn, session["user"], "bild_stil_gewechselt", eid, neu)
+            conn.commit()
+        _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ"}
+        flash("Beitrag %d hat ein anderes Bild (Stil: %s, neues KI-Bild). Text und Termin bleiben."
+              % (eid, _stil_label.get(neu, neu)))
+    except Exception as ex:
+        flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
 
 @app.route("/bild-typ/<int:eid>", methods=["POST"])
@@ -2128,6 +2176,15 @@ def eigener():
             cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                                "VALUES ('eigen', ?, 'ausgewaehlt', ?, ?)", (thema_txt[:300], thema_txt, h))
             thema_id = cur.lastrowid
+            # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
+            # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
+            # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
+            try:
+                import stilwahl
+                stilwahl.zuweisen_stil_falls_fehlt(conn, data)
+                textgen.art_director_motiv(data)
+            except Exception as ex:
+                log.warning("Stil-Zuweisung uebersprungen: %s", ex)
             # #140: Schauplatz EINMAL bei der Erzeugung waehlen (Datum des eigenen Beitrags ->
             # Kalender-Jahreszeit, sofern das Thema keinen saisonalen Bezug hat).
             import schauplatz
@@ -2957,18 +3014,29 @@ def verwaltung():
                     audit_log(conn, session["user"], "traeger_geloescht", None, tid)
                     flash("Träger gelöscht.")
             elif formular == "bildstil_save":
-                # Globaler Bild-Stil (#132/#143): 'standard' (v11, Default), 'ki_tafel' (Testmodus)
-                # oder 'kreativ' (#143: kinoreifes Foto ohne Text, CI/Text per Code-Overlay).
-                stil = request.form.get("bild_stil", "standard").strip()
-                if stil not in ("standard", "ki_tafel", "kreativ"):
-                    stil = "standard"
-                conn.execute(
-                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_stil', ?) "
-                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (stil,))
-                audit_log(conn, session["user"], "bild_stil_gesetzt", None, stil)
+                # #144: Bild-Stil-Topf (Mehrfach-Aktivierung). Je Stil ein An/Aus-Flag in den
+                # Einstellungen (bild_stil_standard/_ki_tafel/_kreativ = '1'/'0'). Bei der
+                # Beitrags-Erzeugung wird zufaellig aus den AKTIVEN Stilen gewaehlt (stilwahl).
+                # Mindestens EINER muss aktiv bleiben: ist keiner angehakt, wird 'standard'
+                # erzwungen (server-seitiger Fallback, nie ein leerer Topf).
+                flags = {
+                    "standard": "1" if request.form.get("stil_standard") else "0",
+                    "ki_tafel": "1" if request.form.get("stil_ki_tafel") else "0",
+                    "kreativ": "1" if request.form.get("stil_kreativ") else "0",
+                }
+                if "1" not in flags.values():
+                    flags["standard"] = "1"   # Fallback: nie alle aus
+                for stil, wert in flags.items():
+                    conn.execute(
+                        "INSERT INTO einstellungen(schluessel, wert) VALUES (?, ?) "
+                        "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert",
+                        ("bild_stil_%s" % stil, wert))
                 _stil_label = {"standard": "Standard (v11)", "ki_tafel": "KI-Tafel (Testmodus)",
                                "kreativ": "Kreativ (kinoreifes Foto ohne Text)"}
-                flash("Bild-Stil gespeichert: %s." % _stil_label.get(stil, "Standard (v11)"))
+                aktiv_namen = [_stil_label[s] for s in ("standard", "ki_tafel", "kreativ")
+                               if flags[s] == "1"]
+                audit_log(conn, session["user"], "bild_stil_topf_gesetzt", None, ", ".join(aktiv_namen))
+                flash("Aktive Bild-Stile (Zufalls-Topf): %s." % ", ".join(aktiv_namen))
             elif formular == "bildtool_save":
                 # Globales Bild-Tool (#137): 'openai' (Default) oder 'ideogram' (Text-Spezialist).
                 # Orthogonal zum Bild-Stil; bestimmt nur, welche KI das Foto erzeugt.
@@ -3022,8 +3090,15 @@ def verwaltung():
                 "SELECT id, name, prompt_snippet, aktiv FROM traeger ORDER BY id").fetchall()
         except Exception:
             traeger = []
-        _bs = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_stil'").fetchone()
-        bild_stil = (_bs["wert"] if _bs and _bs["wert"] else "standard")
+        # #144: Drei An/Aus-Flags fuer den Bild-Stil-Topf (Default aktiv: fehlt der Schluessel oder
+        # steht nicht auf '0', ist der Stil im Topf). Steuern die Zufallswahl pro Beitrag.
+        def _stil_aktiv(stil):
+            r = conn.execute("SELECT wert FROM einstellungen WHERE schluessel=?",
+                             ("bild_stil_%s" % stil,)).fetchone()
+            return (r is None) or (str(r["wert"]).strip() != "0")
+        stil_standard = _stil_aktiv("standard")
+        stil_ki_tafel = _stil_aktiv("ki_tafel")
+        stil_kreativ = _stil_aktiv("kreativ")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
@@ -3047,7 +3122,10 @@ def verwaltung():
                                                      traeger=traeger,
                                                      bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
-                                                     fb_name=fb_name, bild_stil=bild_stil,
+                                                     fb_name=fb_name,
+                                                     stil_standard=stil_standard,
+                                                     stil_ki_tafel=stil_ki_tafel,
+                                                     stil_kreativ=stil_kreativ,
                                                      bild_tool=bild_tool, **speicher))
 
 @app.route("/logo.png")

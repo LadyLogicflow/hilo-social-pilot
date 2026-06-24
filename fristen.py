@@ -112,6 +112,15 @@ def erzeuge_countdowns(heute=None):
         # #140: Schauplatz EINMAL bei der Erzeugung waehlen (heute = Kalender-Jahreszeit, sofern
         # kein saisonaler Themenbezug im Frist-Text steckt).
         import schauplatz
+        # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
+        # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
+        # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
+        try:
+            import stilwahl, textgen
+            stilwahl.zuweisen_stil_falls_fehlt(conn, fields)
+            textgen.art_director_motiv(fields)
+        except Exception as ex:
+            log.warning("Stil-Zuweisung uebersprungen: %s", ex)
         schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
         # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
         # Robust: fehlt die Tabelle (alte DB) -> No-Op.

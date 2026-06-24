@@ -149,9 +149,13 @@ def art_director_motiv(fields, client=None):
     koennen client durch ein Objekt mit messages.create(...) ersetzen (kein echter KI-Aufruf)."""
     if not isinstance(fields, dict):
         return fields
+    # #144: kreativ-Gate PRO BEITRAG. Der Kosten-/Token-Schutz bleibt erhalten - der Art-Director-
+    # Aufruf erfolgt NUR, wenn der fuer DIESEN Beitrag gewaehlte Stil 'kreativ' ist
+    # (fields['bild_stil']), nicht mehr anhand der globalen Einstellung. Fallback (kein
+    # fields['bild_stil']): globale Einstellung/'standard' via stilwahl.aktiver_stil.
     try:
-        import db
-        stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
+        import stilwahl
+        stil = stilwahl.aktiver_stil(fields)
     except Exception:
         stil = "standard"
     if stil != "kreativ":
@@ -328,10 +332,17 @@ def _create_drafts(rows, kanal):
     for r in rows:
         try:
             data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
-            # #143: NUR im kreativ-Modus ein zusaetzliches Art-Director-Motiv erzeugen (stabil,
-            # nur-wenn-leer). In allen anderen Stilen No-Op (kein zusaetzlicher KI-Aufruf).
-            art_director_motiv(data)
             with get_conn() as conn:
+                # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen und in
+                # fields['bild_stil'] ablegen (stabil ueber Re-Renders). Robust gegen Fehler.
+                try:
+                    import stilwahl
+                    stilwahl.zuweisen_stil_falls_fehlt(conn, data)
+                except Exception as ex:
+                    log.warning("Stil-Zuweisung uebersprungen: %s", ex)
+                # #143/#144: NUR wenn der PRO-BEITRAG-Stil 'kreativ' ist, ein zusaetzliches
+                # Art-Director-Motiv erzeugen (stabil, nur-wenn-leer). Sonst No-Op (kein KI-Aufruf).
+                art_director_motiv(data)
                 # #140: Schauplatz EINMAL bei der Erzeugung waehlen und in fields['schauplatz']
                 # ablegen (stabil ueber Re-Renders/Personalisierung; KI-Tafel nutzt ihn als Szene).
                 import schauplatz
@@ -413,6 +424,7 @@ def regenerate_open_drafts(kanal="google"):
             alt_sp = ""
             alt_tr = ""
             alt_km = ""
+            alt_st = ""
             try:
                 alt = json.loads(r["alt_text"]) if r["alt_text"] else {}
                 if isinstance(alt, dict):
@@ -422,11 +434,25 @@ def regenerate_open_drafts(kanal="google"):
                     # #143: bestehendes kreativ_motiv uebernehmen (stabil ueber Re-Renders) - der
                     # Art-Director-Schritt laeuft nur, wenn noch keins existiert.
                     alt_km = (alt.get("kreativ_motiv") or "").strip()
+                    # #144: bestehenden Bild-Stil uebernehmen (stabil je Entwurf). Fehlt er (alte
+                    # Entwuerfe), wird unten einmal frisch gewuerfelt.
+                    alt_st = (alt.get("bild_stil") or "").strip()
             except Exception:
                 alt_sp = ""
                 alt_tr = ""
                 alt_km = ""
+                alt_st = ""
             with get_conn() as conn:
+                # #144: Bild-Stil ZUERST setzen (vor art_director_motiv), damit das kreativ-Gate den
+                # richtigen Pro-Beitrag-Stil sieht. Bestehenden uebernehmen, sonst frisch waehlen.
+                try:
+                    import stilwahl
+                    if alt_st:
+                        data["bild_stil"] = alt_st
+                    else:
+                        stilwahl.zuweisen_stil_falls_fehlt(conn, data)
+                except Exception as ex:
+                    log.warning("Stil-Zuweisung (regenerate) uebersprungen: %s", ex)
                 if alt_sp:
                     data["schauplatz"] = alt_sp
                 else:
