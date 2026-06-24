@@ -79,10 +79,22 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Anlass-Tage** – besondere Tage mit Steuer-Aufhänger (Datum als MM-TT). Fällt der Tag
   aufs Wochenende, erscheint der Beitrag am Freitag davor.
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
-- **Bild-Stil** – wählt das Aussehen der Beitragsbilder: **Standard** (Foto-Hintergrund mit
-  Textfeld, Hero-Zahl/Überschrift, Symbolen) oder **KI-Tafel (Test)** (die Bild-KI schreibt die
-  Überschrift selbst auf eine Tafel in der Szene; CTA und die blau-weißen HILO-Kreise kommen
-  weiterhin vom Tool). Jederzeit umschaltbar – das Bild entsteht beim nächsten „Neu erzeugen".
+- **Bild-Stil** – legt fest, welche der **drei Stile** im Zufalls-Topf sind (je an/aus):
+  **Standard** (Foto + Textfeld), **KI-Tafel** (Botschaft auf einer Tafel/einem Rahmen in einer
+  Umgebung) und **Kreativ** (kinoreifes Foto ohne Text). Das Tool **mischt automatisch pro Beitrag** –
+  du musst nicht umschalten. (Mindestens ein Stil muss aktiv bleiben.)
+- **Schauplätze** – die schönen Umgebungen (z.B. „Terrasse am Meer", „Biergarten in München"),
+  in denen Tafel/Rahmen stehen. Pflegbar wie die Anlass-Tage; je Eintrag eine Jahreszeit.
+- **Träger** – wie die Botschaft präsentiert wird (Tafel, Bilderrahmen, Holzschild, Postkarte …).
+  Einzelne Träger an/aus schalten, wenn einer zu oft daneben liegt.
+- **Bild-Tool** – welche Bild-KI das Foto macht: **OpenAI (GPT Image 2)** oder **Ideogram**
+  (bessere Schrift im Bild; braucht einen eigenen API-Schlüssel).
+- **Speicher** – Größe des Foto-Cache + freier Platz auf dem Pi, mit Knopf „Jetzt aufräumen"
+  (löscht nur Fotos, die kein aktiver Beitrag mehr braucht).
+
+> **In der Freigabe (Stufe 3)** hat jeder Beitrag den 🎲-Knopf **„Anderes Bild"** – damit
+> würfelst du für genau diesen Beitrag einen anderen Stil und erzeugst das Bild neu. **Wichtig:**
+> Bei KI-Tafeln den Text vor dem Posten kurz gegenlesen (die Bild-KI kann sich verschreiben).
 
 ## Automatik
 

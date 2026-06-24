@@ -29,8 +29,12 @@ Wissens-Serie ───┘
 | `sources.py` | Aktive Quellen aus der Konfiguration |
 | `ingest.py` | Eigene Quellen: PDF/Link → Text → **Mehr-Themen-Extraktion** |
 | `textgen.py` | Texterstellung via Claude (`generate`, `regenerate`, `extract_topics`) |
-| `bildgen.py` | Bild im HILO-Magazin-Design (v11): Foto-Hintergrund + Textkarte + CI-Kreise |
-| `bildmotiv.py` | Emotionales Szene-Foto via OpenAI **oder** gezeichnetes Icon (`icon:…`) |
+| `bildgen.py` | Bild-Layout: 3 Stile (Standard / KI-Tafel / Kreativ), Textkarte bzw. Tafel-/Träger-Device + CI-Kreise |
+| `bildmotiv.py` | Foto-Erzeugung via OpenAI (gpt-image-2) **oder** Ideogram; Szene-/Tafel-/Kreativ-Prompts + Cache, `icon:`-Motive |
+| `stilwahl.py` | Bild-Stil zufällig pro Beitrag aus den aktiven Stilen (`aktiver_stil`, „Anderes Bild") |
+| `schauplatz.py` | Schauplätze: saisonale/themen-passende Umgebung je Beitrag (Rotation, nie doppelt) |
+| `traeger.py` | Botschafts-Träger (Tafel/Rahmen/Holzschild …): Hybrid-Auswahl (Zufall + nie doppelt + Themen) |
+| `wartung.py` | Cache-Aufräumung: löscht nur ungenutzte KI-Fotos (orphan-basiert, Pool/aktiv geschützt) |
 | `countdown_motive.py` | Gezeichnete Icons (Kalender, Wecker, Sanduhr) |
 | `fristen.py` | Fristen-Countdown (gestaffelte Erinnerungen) |
 | `anlass.py` | Anlass-Tage (besondere Tage mit Steuer-Aufhänger) |
@@ -75,6 +79,14 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
   (WhatsApp-Kanal-Einladungslink).
 - `anlasstage` – kuratierte besondere Tage (MM-TT, Anlass, Steuer-Aufhänger).
 - `wissensthemen` – zeitlose Themen (Titel, Aufhänger, zuletzt genutzt).
+- `einstellungen` – globale Schlüssel-Wert-Einstellungen (z.B. `bild_tool` = openai/ideogram,
+  `bild_stil_standard`/`_ki_tafel`/`_kreativ` = welche Bild-Stile im Zufalls-Topf sind).
+- `schauplaetze` – pflegbare Liste schöner Umgebungen (Beschreibung, Jahreszeit, aktiv, zuletzt_genutzt);
+  je Beitrag wird einer gezogen (Rotation, nie doppelt im Zyklus).
+- `traeger` – pflegbare Liste der Botschafts-Träger (Name, prompt_snippet, aktiv, zuletzt_genutzt).
+
+Die `entwuerfe.text`-JSON trägt pro Beitrag u.a. `bild_stil`, `schauplatz`, `traeger`, `kreativ_motiv`,
+`szene_motiv`, `hero` – einmal bei der Erzeugung gewürfelt/erzeugt und dann stabil (Cache + Re-Render).
 
 ## Hintergrund-Abläufe
 
@@ -98,24 +110,35 @@ Alle Streams münden in dieselbe Freigabe und denselben Kalender:
     WhatsApp-Dienstes (`whatsapp/server.mjs`, eine globale Baileys-Session) mit personalisiertem
     Text und – für Status – personalisiertem 9:16-Bild. Dienst-Fehler → `status='fehler'`, kein
     Status-Flip. Der FB/IG-Pfad (`_veroeffentliche_ziel`) bleibt unberührt.
+- **Cache-Aufräumung** (`web.py._cache_cleanup_scheduler` → `wartung.aufraeumen_motive`): Thread,
+  einmal täglich (Marker `last_cache_cleanup.txt`), löscht aus `DATA_DIR/motive/` nur KI-Fotos,
+  die **kein aktiver Beitrag** mehr braucht (orphan-basiert, 14-Tage-Schonfrist; Pool-/aktive Fotos
+  und `icon_*` werden NIE gelöscht). Verwaltung zeigt Cache-Größe + freien Speicher + Knopf.
 
 ## Bild-Design
 
-Das Beitragsbild (1080×1080, `bildgen.py`) folgt dem **HILO-Magazin-Design v11** (emotionaler,
-foto-getriebener Look, seit Issue #129):
+Das Beitragsbild (1080×1080, `bildgen.py`) entsteht in **drei Stilen**, die **zufällig je Beitrag**
+gemischt werden (`stilwahl.aktiver_stil`; in der Verwaltung je Stil an/aus, „Anderes Bild" in der
+Freigabe würfelt neu):
 
-- **Foto als Vollbild-Hintergrund** (cover-Crop). Fehlt ein Foto, greift ein warmer
-  Creme-Verlauf-Fallback (`_creme_bg`) – das Bild sieht auch ohne KI-Foto gut aus.
-- **Integriertes weißes Textfeld** (`_card`, abgerundet, weicher Schatten + Scrim für Kontrast)
-  mit: grüner Saison-/Themen-Pille, Überschrift, **optionaler Hero-Zahl** (groß, grün) **oder** –
-  ohne Zahl – größerer Überschrift + Hook-Subline, gezeichneten Symbol-Bullets und Gold-CTA-Pille.
-- **CI-Kreise bleiben** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, Position rotiert
-  je Beitrag (`pick_circle_pos`). Ein Stellen-Porträt (`portrait`) ersetzt optional einen Kreis.
-- **Foto-Motiv** (`bildmotiv.py`): emotionale Magazin-/Editorial-Szene **mit Umgebung** (nicht mehr
-  freigestellt) via OpenAI `gpt-image-1` (`background=opaque`, 1024×1024, gecacht); `icon:`-Motive
-  ohne Token. Das Szene-Motiv (`szene_motiv`) liefert die Text-KI je Beitrag. Der Prompt komponiert
-  die Szene als **Rahmen** um eine ruhige Bildmitte (Negativraum), damit das Textfeld nichts
-  Bildwichtiges verdeckt; die Karte hält dazu Rand an allen vier Seiten, passt sich aber dem
-  Textumfang an (kein Überlauf unter die Karte). (#131)
+1. **Standard** – Foto-Vollbild-Hintergrund (cover-Crop; Creme-Fallback `_creme_bg` ohne Foto) +
+   integriertes weißes Textfeld (`_card`, Scrim, Rand an allen vier Seiten, wächst mit dem Text –
+   kein Überlauf, #131) mit Saison-Pille, Überschrift, **optionaler Hero-Zahl** oder größerer
+   Überschrift + Hook, Symbol-Bullets und **grüner CTA-Pille** (HILO-CI, #135).
+2. **KI-Tafel** – die Bild-KI schreibt **Überschrift + Stichpunkte** selbst auf einen **Träger**
+   (Tafel/Rahmen/Holzschild/… aus `traeger`), der in einer schönen **Umgebung** (`schauplaetze`,
+   saisonal/themen-passend) steht; CTA + CI-Kreise kommen weiter per Code-Overlay (#132/#139/#140/#142).
+3. **Kreativ** – ein **kinoreifes, fotorealistisches Foto OHNE Text** (Art-Director-Schritt:
+   `textgen.art_director_motiv` lässt Claude die Szene aus dem Beitrag entwerfen), Botschaft + CI
+   kommen wie im Standard-Stil per Code-Overlay (#143).
+
+- **CI-Kreise** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, Position rotiert je
+  Beitrag (`pick_circle_pos`); ein Stellen-Porträt (`portrait`) ersetzt optional einen Kreis.
+- **Foto-Erzeugung** (`bildmotiv.py`): je nach `bild_tool` via **OpenAI** (`gpt-image-2`,
+  env `HILO_OPENAI_IMAGE_MODEL`) **oder Ideogram** (`ideogram_api_key`, bessere Text-im-Bild-Genauigkeit);
+  `background=opaque`, 1024×1024, je Stil/Tool getrennt gecacht. Stil-Prompts: authentische/
+  dokumentarische Optik, natürliche Farben, themenpassende Stimmung (#135/#136/#138).
+- **Faktentreue:** Auf KI-Tafeln kann die Bild-KI sich verschreiben → Tafel-Texte vor dem Posten
+  in der Freigabe gegenlesen.
 
 Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.
