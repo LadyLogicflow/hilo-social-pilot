@@ -120,6 +120,23 @@ def tafel_sign_text(fields):
         return ueberschrift + "\n" + "\n".join(zeilen)
     return "\n".join(zeilen)
 
+def _tafel_scene(fields):
+    """Liefert die Szene fuer den KI-Tafel-Modus (#140): bevorzugt den gewaehlten Schauplatz
+    (fields['schauplatz'], eine schoene saisonale Umgebung), faellt sonst auf das bisherige
+    Motiv (szene_motiv -> bild_motiv -> bild_motiv_thema) und zuletzt auf den Default zurueck.
+
+    WICHTIG (#134-Retention): Producer (ensure_photo_fuer) UND Aufraeumschutz
+    (cache_dateien_fuer_fields) MUESSEN denselben scene-Wert nutzen, sonst zeigt _tafel_pfad
+    auf eine andere Datei -> Falsch-Loeschen. Darum diese gemeinsame Helper-Funktion."""
+    if not isinstance(fields, dict):
+        return "ein ruhiger, vertrauensvoller Moment im Alltag"
+    schauplatz = (fields.get("schauplatz") or "").strip()
+    if schauplatz:
+        return schauplatz
+    motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
+             or fields.get("bild_motiv_thema") or "").strip()
+    return motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+
 def _tafel_prompt(scene, sign_text):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
@@ -145,10 +162,11 @@ def _tafel_prompt(scene, sign_text):
             "aufgehoben und beraten), KEIN froehliches Grinsen oder Feiern, das dem Ernst des Themas "
             "widerspricht; bei freudigen Themen darf die Stimmung froehlich und feiernd sein. Also "
             "positiv UND zum Thema passend, nicht pauschal Party. ZENTRALES, SCHARFES Hauptmotiv: ein "
-            "gut lesbares, eher HELLES Schild/Plakat/Tafel (helles Schild oder Plakat statt schwarzer "
-            "Kreidetafel). Das Schild/die Tafel ist NATUERLICH in die Szene integriert - es steht auf "
-            "einem Tisch, lehnt an einer Wand, steht auf einer Staffelei oder ist angelehnt - und wird "
-            "NICHT von einer Person frontal in die Kamera GEHALTEN, niemand haelt es hoch. KEINE "
+            "eleganter, gut lesbarer, eher HELLES Schild in einem BILDERRAHMEN bzw. TISCH-AUFSTELLER "
+            "(helles Schild oder helle Karte im Rahmen statt schwarzer Kreidetafel). Dieser "
+            "Bilderrahmen/Tisch-Aufsteller ist NATUERLICH in die Szene integriert - er steht auf einem "
+            "TISCH im VORDERGRUND der Szene, lehnt an einer Wand oder steht auf einer Staffelei - und "
+            "wird NICHT von einer Person frontal in die Kamera GEHALTEN, niemand haelt ihn hoch. KEINE "
             "gestellten Stockfoto-Posen, niemand posiert oder blickt steif in die Kamera. Stattdessen "
             "eine spontane, ungestellte, lebendige Alltagsszene (candid), natuerliche Bewegung und "
             "Interaktion, wie ein echter, nicht gestellter Schnappschuss. "
@@ -159,9 +177,10 @@ def _tafel_prompt(scene, sign_text):
             "KEINE perfekten Model-Gesichter. UMGEBUNG: echte, gelebte, leicht unperfekte Räume mit "
             "konkreten, spezifischen Alltags-Details (kein steriles Studio/Showroom). ANMUTUNG: "
             "natürlich, ungestellt, candid, wie ein echtes Foto aus dem Alltag - leichte natürliche "
-            "Imperfektion ist erwünscht. Das Schild bleibt dabei gut "
+            "Imperfektion ist erwünscht. Der Bilderrahmen/Tisch-Aufsteller bleibt dabei gut "
             "sichtbar und lesbar (frontal genug zur Kamera, scharf, gut ausgeleuchtet) - nur eben als "
-            "Teil der Szene, nicht als gehaltenes Plakat. Auf dem hellen Schild steht der "
+            "Teil der Szene auf dem Tisch, nicht als gehaltenes Plakat. Auf dem hellen Schild im "
+            "Bilderrahmen/Aufsteller steht der "
             "folgende mehrzeilige deutsche Text - exakt Wort für Wort und Zeile für Zeile, KORREKT "
             "geschrieben mit richtigen deutschen Umlauten (ae oe ue als ä ö ü, ß), zentriert, in "
             "HILO-Dunkelblau und in einer klaren, modernen SERIFENLOSEN Schrift (Arial-aehnlich, "
@@ -171,8 +190,9 @@ def _tafel_prompt(scene, sign_text):
             "sie stehen darunter KLEINER, aber weiterhin gut und klar lesbar. Der gesamte Text "
             "lautet:\n'%s'. Dieser Text ist die EINZIGE Schrift im gesamten Bild. KEINE weiteren Wörter, "
             "Buchstaben, Zahlen, Logos oder Wasserzeichen irgendwo sonst. Weiches, neutrales "
-            "Tageslicht, geringe Schärfentiefe. Das helle Schild ist der klare Blickfang, die Szene "
-            "ringsum trägt die zum Thema passende, geloeste Stimmung." % (scene, sign_text))
+            "Tageslicht, geringe Schärfentiefe. Der helle Bilderrahmen/Tisch-Aufsteller ist der klare "
+            "Blickfang im Vordergrund, die Schauplatz-Szene ringsum traegt die zum Thema passende, "
+            "geloeste Stimmung." % (scene, sign_text))
 
 def ensure_photo_fuer(fields):
     """Liefert das Szene-Foto fuer den Beitrag. Bevorzugt das neue Feld 'szene_motiv'
@@ -192,7 +212,10 @@ def ensure_photo_fuer(fields):
         # NEU (#139): mehr Text aufs Schild - Ueberschrift + Stichpunkte (tafel_sign_text)
         # statt nur der Ueberschrift. Ohne bullets bleibt es bei der Ueberschrift (Fallback).
         sign_text = tafel_sign_text(fields)
-        scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+        # NEU (#140): scene = der gewaehlte Schauplatz (schoene saisonale Umgebung), Fallback auf
+        # das bisherige Motiv. _tafel_scene() haelt diese Fallback-Logik konsistent zwischen
+        # Producer und cache_dateien_fuer_fields (#134-Retention).
+        scene = _tafel_scene(fields)
         return ensure_photo_tafel(scene, sign_text)
     return ensure_photo(motiv)
 
@@ -279,25 +302,28 @@ def cache_dateien_fuer_fields(fields):
     # Stichpunkte), sonst zeigt _tafel_pfad hier auf eine ANDERE Datei als die tatsaechlich
     # erzeugte -> die aktive Tafel-Datei wuerde nach der Schonfrist faelschlich geloescht.
     sign_text = tafel_sign_text(fields)
-    scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+    # NEU (#140): die KI-Tafel-Szene ist der gewaehlte Schauplatz (mit Motiv-Fallback). Producer
+    # (ensure_photo_fuer) und dieser Aufraeumschutz MUESSEN denselben scene-Wert nutzen -> _tafel_scene.
+    tafel_scene = _tafel_scene(fields)
     for tool in ("openai", "ideogram"):
         # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
         for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
             sp = _szene_pfad(m, tool=tool)
             if sp:
                 pfade.add(sp)
-        # KI-Tafel-Variante: scene = dasselbe Motiv (mit Default), sign_text = Ueberschrift.
-        # Bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer denselben Default auf die
-        # Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None) liefert hier
-        # aber None, sodass die Default-Szene-Datei sonst NICHT als 'in Benutzung' gilt und nach
-        # der Schonfrist faelschlich geloescht wuerde, obwohl ein aktiver/Pool-Entwurf sie nutzt
-        # (ARGUS-Blocker #134). Darum den Default-Szene-Pfad mit aufnehmen - exakt derselbe
-        # Default-String -> exakt derselbe Hash/Dateiname. Normale Entwuerfe (mit Motiv) bekommen
-        # keinen zusaetzlichen Pfad, da scene dann = motiv ist und _szene_pfad(motiv) oben schon drin.
-        sp_def = _szene_pfad(scene, tool=tool)
+        # Standard-Szene-Default (#134): bei LEEREM Motiv wendet ensure_photo/ensure_photo_fuer den
+        # Default auf die Standard-Szene an (ensure_photo: motiv = motiv or "..."). _szene_pfad(None)
+        # liefert sonst None, sodass die Default-Szene-Datei NICHT als 'in Benutzung' gilt und nach
+        # der Schonfrist faelschlich geloescht wuerde (ARGUS-Blocker #134). Darum den Default-Szene-
+        # Pfad mit aufnehmen - exakt derselbe Default-String -> exakt derselbe Hash/Dateiname.
+        szene_default = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
+        sp_def = _szene_pfad(szene_default, tool=tool)
         if sp_def:
             pfade.add(sp_def)
-        pfade.add(_tafel_pfad(scene, sign_text, tool=tool))
+        # KI-Tafel-Variante (#140): scene = der Schauplatz (mit Motiv-Fallback, _tafel_scene),
+        # exakt derselbe scene-Wert wie im Producer ensure_photo_fuer -> selber _tafel_pfad,
+        # kein Falsch-Loeschen der aktiven Tafel-Datei.
+        pfade.add(_tafel_pfad(tafel_scene, sign_text, tool=tool))
     return pfade
 
 def _openai_quality():

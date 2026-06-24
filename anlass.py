@@ -55,6 +55,11 @@ def erzeuge_anlass_posts(heute=None):
         with get_conn() as conn:
             cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                                "VALUES('anlass', ?, 'erledigt', ?, ?)", (a["anlass"], a["steuer_hook"], h))
+            # #140: Schauplatz EINMAL waehlen. Anlass-Datum (MM-DD) mitgeben -> ziel_jahreszeit kann
+            # einen saisonalen Anlass (z.B. 12-24 Heiligabend) auf die Winter-Schauplaetze lenken.
+            import schauplatz
+            fields["anlass_datum"] = a["datum"]
+            schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
             conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
                          "VALUES (?, 'facebook', ?, 'entwurf', ?)",
                          (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat()))

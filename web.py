@@ -1069,6 +1069,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=stellen"><h3>&#x1F3E2; Beratungsstellen</h3><p>Stellen mit Ort, Facebook-Seite und Buchungslink pflegen.</p></a>
   <a class=tile href="/verwaltung?bereich=anlass"><h3>&#x1F4C5; Anlass-Tage</h3><p>Besondere Tage mit Steuer-Aufh&auml;nger verwalten.</p></a>
   <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
+  <a class=tile href="/verwaltung?bereich=schauplatz"><h3>&#x1F5BC; Schaupl&auml;tze</h3><p>Sch&ouml;ne saisonale Umgebungen f&uuml;r den KI-Tafel-Look (mit Bilderrahmen-Botschaft).</p></a>
   <a class=tile href="/verwaltung?bereich=bildstil"><h3>&#x1F5BC; Bild-Stil</h3><p>Standard (v11) oder Testmodus „KI schreibt den Text selbst auf eine Tafel".</p></a>
   <a class=tile href="/verwaltung?bereich=speicher"><h3>&#x1F4BE; Speicher</h3><p>Foto-Cache und freien Plattenplatz ansehen, ungenutzte KI-Fotos aufr&auml;umen.</p></a>
 </div>"""
@@ -1180,6 +1181,36 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <input name=titel placeholder="Thema (z.B. Wer muss abgeben?)" required style="width:35%">
 <input name=hook placeholder="Kurzer Aufhänger" style="width:40%">
 <button>Wissens-Thema speichern</button></form>
+{% endif %}
+
+{% if bereich=='schauplatz' %}
+<p class=hint>Schöne, abwechslungsreiche Umgebungen für den KI-Tafel-Look: Die Szene wird zu einem dieser Schauplätze, die Botschaft steht darin auf einem Bilderrahmen/Tisch-Aufsteller. Pro Jahreszeit fünf Schauplätze; gewählt wird passend zur Jahreszeit (oder zum Thema) und rotierend – nie zweimal hintereinander derselbe. „Aus" nimmt einen Schauplatz aus der Auswahl, ohne ihn zu löschen.</p>
+<table><tr><th>Beschreibung</th><th>Jahreszeit</th><th>Aktiv</th><th></th></tr>
+{% for s in schauplaetze %}<tr>
+<td><form method=post style="display:flex;gap:6px;align-items:center;margin:0"><input type=hidden name=formular value=schauplatz_save><input type=hidden name=id value="{{s.id}}">
+  <input name=beschreibung value="{{s.beschreibung}}" required style="flex:1;min-width:280px">
+  <select name=jahreszeit>
+    <option value=fruehling{% if s.jahreszeit=='fruehling' %} selected{% endif %}>Frühling</option>
+    <option value=sommer{% if s.jahreszeit=='sommer' %} selected{% endif %}>Sommer</option>
+    <option value=herbst{% if s.jahreszeit=='herbst' %} selected{% endif %}>Herbst</option>
+    <option value=winter{% if s.jahreszeit=='winter' %} selected{% endif %}>Winter</option>
+  </select>
+  <label style="font-weight:normal;font-size:13px;white-space:nowrap"><input type=checkbox name=aktiv value=1{% if s.aktiv %} checked{% endif %}> aktiv</label>
+  <button>Speichern</button></form></td>
+<td>{{s.jahreszeit}}</td>
+<td>{{'ja' if s.aktiv else 'nein'}}</td>
+<td class=nw>
+  <form method=post style=display:inline><input type=hidden name=formular value=schauplatz_toggle><input type=hidden name=id value="{{s.id}}"><button>{{'Aus' if s.aktiv else 'Ein'}}</button></form>
+  <form method=post style=display:inline onsubmit="return confirm('Diesen Schauplatz wirklich löschen?')"><input type=hidden name=formular value=schauplatz_delete><input type=hidden name=id value="{{s.id}}"><button style="background:#b00020">Löschen</button></form>
+</td></tr>{% endfor %}</table>
+<form method=post><input type=hidden name=formular value=schauplatz_save>
+<input name=beschreibung placeholder="Beschreibung (z.B. Sonnige Caféterrasse mit Tulpen)" required style="width:45%">
+<select name=jahreszeit>
+  <option value=fruehling>Frühling</option><option value=sommer>Sommer</option>
+  <option value=herbst>Herbst</option><option value=winter>Winter</option>
+</select>
+<label style="font-weight:normal;font-size:13px"><input type=checkbox name=aktiv value=1 checked> aktiv</label>
+<button>Schauplatz anlegen</button></form>
 {% endif %}
 
 {% if bereich=='bildstil' %}
@@ -2072,6 +2103,10 @@ def eigener():
             cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                                "VALUES ('eigen', ?, 'ausgewaehlt', ?, ?)", (thema_txt[:300], thema_txt, h))
             thema_id = cur.lastrowid
+            # #140: Schauplatz EINMAL bei der Erzeugung waehlen (Datum des eigenen Beitrags ->
+            # Kalender-Jahreszeit, sofern das Thema keinen saisonalen Bezug hat).
+            import schauplatz
+            schauplatz.zuweisen_falls_fehlt(conn, data, datum=d)
             conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
                          "VALUES (?, 'google', ?, 'entwurf', ?)",
                          (thema_id, json.dumps(data, ensure_ascii=False), datum))
@@ -2828,6 +2863,37 @@ def verwaltung():
                 titel = request.form.get("titel", "").strip()
                 conn.execute("UPDATE wissensthemen SET aktiv=1-aktiv WHERE titel=?", (titel,))
                 flash("Wissens-Thema '%s' geändert." % titel)
+            elif formular == "schauplatz_save":
+                # #140: Schauplatz neu anlegen ODER bestehenden bearbeiten (per id). Jahreszeit
+                # validiert; Beschreibung Pflicht. aktiv-Checkbox steuert die Sichtbarkeit in der Wahl.
+                import schauplatz as _sp
+                sid = request.form.get("id", "").strip()
+                beschreibung = request.form.get("beschreibung", "").strip()
+                jahreszeit = request.form.get("jahreszeit", "").strip().lower()
+                aktiv = 1 if request.form.get("aktiv") else 0
+                if beschreibung and jahreszeit in _sp.JAHRESZEITEN:
+                    if sid.isdigit():
+                        conn.execute("UPDATE schauplaetze SET beschreibung=?, jahreszeit=?, aktiv=? WHERE id=?",
+                                     (beschreibung, jahreszeit, aktiv, int(sid)))
+                        flash("Schauplatz aktualisiert.")
+                    else:
+                        conn.execute("INSERT INTO schauplaetze(beschreibung, jahreszeit, aktiv) VALUES (?,?,?)",
+                                     (beschreibung, jahreszeit, aktiv))
+                        flash("Schauplatz angelegt.")
+                    audit_log(conn, session["user"], "schauplatz_gespeichert", None, beschreibung[:60])
+                else:
+                    flash("Beschreibung und gültige Jahreszeit (fruehling/sommer/herbst/winter) nötig.")
+            elif formular == "schauplatz_toggle":
+                sid = request.form.get("id", "").strip()
+                if sid.isdigit():
+                    conn.execute("UPDATE schauplaetze SET aktiv=1-aktiv WHERE id=?", (int(sid),))
+                    flash("Schauplatz geändert.")
+            elif formular == "schauplatz_delete":
+                sid = request.form.get("id", "").strip()
+                if sid.isdigit():
+                    conn.execute("DELETE FROM schauplaetze WHERE id=?", (int(sid),))
+                    audit_log(conn, session["user"], "schauplatz_geloescht", None, sid)
+                    flash("Schauplatz gelöscht.")
             elif formular == "bildstil_save":
                 # Globaler Bild-Stil (#132): 'standard' (v11, Default) oder 'ki_tafel' (Testmodus).
                 stil = request.form.get("bild_stil", "standard").strip()
@@ -2865,13 +2931,14 @@ def verwaltung():
             conn.commit()
             # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
-                    "wissen": "wissen", "bildstil": "bildstil", "bildtool": "bildstil",
-                    "cache": "speicher"}.get((formular or "").split("_")[0])
+                    "wissen": "wissen", "schauplatz": "schauplatz", "bildstil": "bildstil",
+                    "bildtool": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
         bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
                          "anlass": "Anlass-Tage", "wissen": "Wissens-Serie",
+                         "schauplatz": "Schauplätze",
                          "bildstil": "Bild-Stil", "speicher": "Speicher"}.get(bereich)
         if not bereich_titel:
             return redirect(url_for("verwaltung"))
@@ -2879,6 +2946,11 @@ def verwaltung():
         stellen = conn.execute("SELECT * FROM beratungsstellen ORDER BY ort").fetchall()
         anlasstage = conn.execute("SELECT datum, anlass, steuer_hook, aktiv FROM anlasstage ORDER BY datum").fetchall()
         wissen = conn.execute("SELECT titel, hook, aktiv FROM wissensthemen ORDER BY titel").fetchall()
+        # #140: Schauplaetze nach Jahreszeit (Reihenfolge fruehling->sommer->herbst->winter), dann id.
+        schauplaetze = conn.execute(
+            "SELECT id, beschreibung, jahreszeit, aktiv FROM schauplaetze "
+            "ORDER BY CASE jahreszeit WHEN 'fruehling' THEN 1 WHEN 'sommer' THEN 2 "
+            "WHEN 'herbst' THEN 3 WHEN 'winter' THEN 4 ELSE 5 END, id").fetchall()
         _bs = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_stil'").fetchone()
         bild_stil = (_bs["wert"] if _bs and _bs["wert"] else "standard")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
@@ -2900,7 +2972,8 @@ def verwaltung():
             "speicher_warnung": bool(frei and frei < 1024 * 1024 * 1024),  # < 1 GB
         }
     return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
-                                                     wissen=wissen, bereich=bereich, bereich_titel=bereich_titel,
+                                                     wissen=wissen, schauplaetze=schauplaetze,
+                                                     bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
                                                      fb_name=fb_name, bild_stil=bild_stil,
                                                      bild_tool=bild_tool, **speicher))

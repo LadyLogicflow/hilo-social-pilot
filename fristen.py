@@ -109,6 +109,10 @@ def erzeuge_countdowns(heute=None):
                            "VALUES('frist', ?, 'erledigt', ?, ?)",
                            (frist["name"], "Fristen-Countdown", h))
         fields = _post_fields(frist, rest, heute)
+        # #140: Schauplatz EINMAL bei der Erzeugung waehlen (heute = Kalender-Jahreszeit, sofern
+        # kein saisonaler Themenbezug im Frist-Text steckt).
+        import schauplatz
+        schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
         conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
                      "VALUES (?, 'facebook', ?, 'entwurf', ?)",
                      (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat()))

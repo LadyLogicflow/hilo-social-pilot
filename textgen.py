@@ -246,6 +246,10 @@ def _create_drafts(rows, kanal):
         try:
             data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
             with get_conn() as conn:
+                # #140: Schauplatz EINMAL bei der Erzeugung waehlen und in fields['schauplatz']
+                # ablegen (stabil ueber Re-Renders/Personalisierung; KI-Tafel nutzt ihn als Szene).
+                import schauplatz
+                schauplatz.zuweisen_falls_fehlt(conn, data)
                 conn.execute(
                     "INSERT INTO entwuerfe(thema_id, kanal, text, status) VALUES (?,?,?, 'entwurf')",
                     (r["id"], kanal, json.dumps(data, ensure_ascii=False)))
@@ -298,14 +302,29 @@ def regenerate_open_drafts(kanal="google"):
         return 0
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT e.id AS eid, e.kanal AS kanal, t.titel AS titel, t.url AS url, t.volltext AS volltext "
-            "FROM entwuerfe e JOIN themen t ON t.id = e.thema_id WHERE e.status='entwurf'").fetchall()
+            "SELECT e.id AS eid, e.kanal AS kanal, e.text AS alt_text, t.titel AS titel, t.url AS url, "
+            "t.volltext AS volltext FROM entwuerfe e JOIN themen t ON t.id = e.thema_id "
+            "WHERE e.status='entwurf'").fetchall()
     neu = 0
+    import schauplatz
     for r in rows:
         try:
             data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]},
                             r["kanal"] or kanal)
+            # #140: bestehenden Schauplatz uebernehmen (bleibt je Entwurf STABIL, Cache passt);
+            # fehlt er (alte Entwuerfe), bei der Neu-Erzeugung einmal frisch waehlen.
+            alt_sp = ""
+            try:
+                alt = json.loads(r["alt_text"]) if r["alt_text"] else {}
+                if isinstance(alt, dict):
+                    alt_sp = (alt.get("schauplatz") or "").strip()
+            except Exception:
+                alt_sp = ""
             with get_conn() as conn:
+                if alt_sp:
+                    data["schauplatz"] = alt_sp
+                else:
+                    schauplatz.zuweisen_falls_fehlt(conn, data)
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), r["eid"]))
             neu += 1
