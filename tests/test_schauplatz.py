@@ -47,14 +47,14 @@ db.init_db()
 # --- A) Seed ----------------------------------------------------------------
 with db.get_conn() as conn:
     rows = conn.execute("SELECT beschreibung, jahreszeit FROM schauplaetze").fetchall()
-if len(rows) != 20:
-    _fail("Seed: erwartet 20 Schauplaetze, sind %d" % len(rows))
+if len(rows) != 40:
+    _fail("Seed: erwartet 40 Schauplaetze, sind %d" % len(rows))
 zaehl = {}
 for r in rows:
     zaehl[r["jahreszeit"]] = zaehl.get(r["jahreszeit"], 0) + 1
 for jz in schauplatz.JAHRESZEITEN:
-    if zaehl.get(jz) != 5:
-        _fail("Seed: Jahreszeit %s hat %s statt 5 Schauplaetze" % (jz, zaehl.get(jz)))
+    if zaehl.get(jz) != 10:
+        _fail("Seed: Jahreszeit %s hat %s statt 10 Schauplaetze" % (jz, zaehl.get(jz)))
 # echte Umlaute im Seed (z.B. Café, München, Dünen, Kürbissen, Rottönen)
 alle = " ".join(r["beschreibung"] for r in rows)
 for u in ("ä", "ö", "ü", "é"):
@@ -63,10 +63,11 @@ for u in ("ä", "ö", "ü", "é"):
 # Seed idempotent: zweiter Aufruf legt nichts dazu
 with db.get_conn() as conn:
     db.seed_schauplaetze(conn)
+    db.seed_schauplaetze_extra(conn)
     n2 = conn.execute("SELECT COUNT(*) FROM schauplaetze").fetchone()[0]
-if n2 != 20:
-    _fail("Seed nicht idempotent: nach zweitem seed_schauplaetze sind %d" % n2)
-_ok("A) Seed: 20 Schauplaetze, 5/Jahreszeit, echte Umlaute, idempotent")
+if n2 != 40:
+    _fail("Seed nicht idempotent: nach zweitem seed sind %d" % n2)
+_ok("A) Seed: 40 Schauplaetze, 10/Jahreszeit, echte Umlaute, idempotent")
 
 # --- B) aktuelle_jahreszeit -------------------------------------------------
 erwartet = {1: "winter", 2: "winter", 3: "fruehling", 4: "fruehling", 5: "fruehling",
@@ -102,32 +103,32 @@ if jz != "sommer":
 _ok("C) ziel_jahreszeit: Thema schlaegt Kalender, Anlass-Datum, Fallback auf Kalender")
 
 # --- D) waehle_schauplatz Rotation -----------------------------------------
-# Erzwinge Sommer (kein Themenbezug, Datum im Sommer); es gibt genau 5 Sommer-Schauplaetze.
+# Erzwinge Sommer (kein Themenbezug, Datum im Sommer); es gibt genau 10 Sommer-Schauplaetze.
 sommer_tag = datetime.date(2026, 7, 15)
 gewaehlt = []
 with db.get_conn() as conn:
     sommer_namen = {r["beschreibung"] for r in
                     conn.execute("SELECT beschreibung FROM schauplaetze WHERE jahreszeit='sommer'").fetchall()}
-    for _ in range(5):
+    for _ in range(10):
         sp = schauplatz.waehle_schauplatz(conn, {"ueberschrift": "Neutrales Thema"}, sommer_tag)
         gewaehlt.append(sp)
     conn.commit()
-if len(set(gewaehlt)) != 5:
-    _fail("Rotation: in 5 Zuegen NICHT alle 5 Sommer-Schauplaetze verschieden: %r" % gewaehlt)
+if len(set(gewaehlt)) != 10:
+    _fail("Rotation: in 10 Zuegen NICHT alle 10 Sommer-Schauplaetze verschieden: %r" % gewaehlt)
 if set(gewaehlt) != sommer_namen:
-    _fail("Rotation: gewaehlte Menge != die 5 Sommer-Schauplaetze")
+    _fail("Rotation: gewaehlte Menge != die 10 Sommer-Schauplaetze")
 # zuletzt_genutzt ist nun fuer alle Sommer-Schauplaetze gesetzt
 with db.get_conn() as conn:
     offen = conn.execute("SELECT COUNT(*) FROM schauplaetze WHERE jahreszeit='sommer' "
                          "AND zuletzt_genutzt IS NULL").fetchone()[0]
 if offen != 0:
     _fail("Rotation: %d Sommer-Schauplaetze ohne zuletzt_genutzt nach 5 Zuegen" % offen)
-# 6. Zug: der am laengsten nicht genutzte (= der zuerst gewaehlte) kommt wieder dran
+# Naechster Zug: der am laengsten nicht genutzte (= der zuerst gewaehlte) kommt wieder dran
 with db.get_conn() as conn:
     sp6 = schauplatz.waehle_schauplatz(conn, {"ueberschrift": "Neutral"}, sommer_tag)
     conn.commit()
 if sp6 != gewaehlt[0]:
-    _fail("Rotation: 6. Zug = %r, erwartet der laengst-ungenutzte %r" % (sp6, gewaehlt[0]))
+    _fail("Rotation: naechster Zug = %r, erwartet der laengst-ungenutzte %r" % (sp6, gewaehlt[0]))
 _ok("D) waehle_schauplatz rotiert, nie doppelt im Zyklus, setzt zuletzt_genutzt")
 
 # aktiv=0 wird uebersprungen: alle Sommer auf inaktiv -> Fallback auf andere aktive Jahreszeit

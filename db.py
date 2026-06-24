@@ -197,6 +197,36 @@ SCHAUPLATZ_SEED = [
     ("Gemütliche Stube mit Tee und Schneeblick durchs Fenster", "winter"),
 ]
 
+# Schauplaetze-Erweiterung (#141): 20 WEITERE Umgebungen, 5 pro Jahreszeit (zusammen mit
+# SCHAUPLATZ_SEED dann 40, 10/Jahreszeit). Echte deutsche Umlaute. Additiv per
+# seed_schauplaetze_extra() - auch in bereits geseedete DBs (Pi) nachgezogen, idempotent.
+SCHAUPLATZ_SEED_EXTRA = [
+    # fruehling
+    ("Bauerngarten mit Frühlingskräutern und Bienenstock", "fruehling"),
+    ("Sonniger Balkon mit Blumenkästen über der Stadt", "fruehling"),
+    ("Flussufer mit frischem Grün und kleiner Brücke", "fruehling"),
+    ("Gartenlaube mit Frühstückstisch im Grünen", "fruehling"),
+    ("Obstwiese mit blühenden Apfelbäumen", "fruehling"),
+    # sommer
+    ("Bootssteg mit Liegestühlen am Bergsee", "sommer"),
+    ("Mediterrane Innenhof-Terrasse mit Olivenbäumen", "sommer"),
+    ("Sommerwiese mit Picknickdecke und Sonnenschirm", "sommer"),
+    ("Hafenpromenade mit Segelbooten in der Abendsonne", "sommer"),
+    ("Dachterrasse zur goldenen Stunde über der Stadt", "sommer"),
+    # herbst
+    ("Weinstube mit Holzbalken und Kerzenlicht", "herbst"),
+    ("Allee mit goldenem Laub und Morgennebel", "herbst"),
+    ("Gemütliche Bibliothek mit Lesesessel und Tee", "herbst"),
+    ("Markthalle mit Herbstgemüse und warmem Licht", "herbst"),
+    ("Berghütte mit Blick auf herbstliche Wälder", "herbst"),
+    # winter
+    ("Verschneiter Garten mit beleuchtetem Pavillon", "winter"),
+    ("Café mit beschlagenen Fenstern und heißer Schokolade", "winter"),
+    ("Holzchalet mit Fellen und Blick auf schneebedeckte Gipfel", "winter"),
+    ("Eislauf-Szene auf einem zugefrorenen See", "winter"),
+    ("Festlich gedeckter Wintertisch mit Tannenzweigen und Lichtern", "winter"),
+]
+
 # --- Einmalige Umlaut-Korrektur fuer bereits bestehende DBs (Pi) -------------
 # Die urspruenglichen Seeds nutzten ASCII-Umschreibungen (ae/oe/ue/ss). seed_*()
 # greift nur bei leerer Tabelle - bestehende DBs behalten sonst die alten Werte.
@@ -313,6 +343,22 @@ def seed_schauplaetze(conn):
         conn.executemany("INSERT INTO schauplaetze(beschreibung, jahreszeit) VALUES (?,?)",
                          SCHAUPLATZ_SEED)
 
+def seed_schauplaetze_extra(conn):
+    """Spielt die 20 ZUSAETZLICHEN Schauplaetze (#141) EINMALIG ein - auch in bereits
+    bestehende DBs (Muster wie seed_contentkalender, anders als seed_schauplaetze, das nur
+    bei leerer Tabelle greift). Der Sentinel-Eintrag (erste neue Beschreibung) verhindert
+    erneutes Einspielen; manuell von Catrin geloeschte Eintraege bleiben geloescht.
+    'WHERE NOT EXISTS' je Eintrag -> idempotent (zweiter Lauf legt keine Duplikate an) und
+    bereits vorhandene gleiche Beschreibungen bleiben unveraendert."""
+    sentinel = SCHAUPLATZ_SEED_EXTRA[0][0]
+    if conn.execute("SELECT 1 FROM schauplaetze WHERE beschreibung=?", (sentinel,)).fetchone():
+        return
+    for beschreibung, jahreszeit in SCHAUPLATZ_SEED_EXTRA:
+        conn.execute(
+            "INSERT INTO schauplaetze(beschreibung, jahreszeit) "
+            "SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM schauplaetze WHERE beschreibung=?)",
+            (beschreibung, jahreszeit, beschreibung))
+
 def seed_contentkalender(conn):
     """Spielt Catrins Steuer-Contentkalender EINMALIG ein - auch in bereits bestehende DBs
     (anders als die seed_*-Startlisten, die nur bei leerer Tabelle greifen). Sentinel-Eintrag
@@ -331,6 +377,7 @@ def init_db():
         seed_anlasstage(conn)
         seed_wissen(conn)
         seed_schauplaetze(conn)
+        seed_schauplaetze_extra(conn)
         seed_contentkalender(conn)
         fix_seed_umlaute(conn)
 
