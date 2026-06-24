@@ -95,6 +95,16 @@ CREATE TABLE IF NOT EXISTS einstellungen (
     schluessel TEXT PRIMARY KEY,
     wert TEXT
 );
+-- Schauplaetze-Bibliothek (#140): schoene, saisonale Umgebungen fuer den KI-Tafel-Look.
+-- Die Botschaft steht darin auf einem Bilderrahmen/Tisch-Aufsteller. 20 Seed (5/Jahreszeit),
+-- rotierend (zuletzt_genutzt -> 'nie doppelt im Zyklus'), in der Verwaltung editierbar.
+CREATE TABLE IF NOT EXISTS schauplaetze (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    beschreibung TEXT NOT NULL,
+    jahreszeit TEXT NOT NULL,          -- 'fruehling' | 'sommer' | 'herbst' | 'winter'
+    aktiv INTEGER NOT NULL DEFAULT 1,
+    zuletzt_genutzt TEXT               -- NULL = noch nie genutzt (kommt in der Rotation zuerst dran)
+);
 """
 
 # Kuratierte Anlass-Tage mit Steuer-Aufhaenger (Startliste, in der Verwaltung erweiterbar)
@@ -156,6 +166,35 @@ WISSEN_SEED = [
     ("Außergewöhnliche Belastungen", "Krankheits-, Pflege- und weitere Kosten - was als außergewöhnliche Belastung zählt."),
     ("Haushaltsnahe Dienstleistungen absetzen", "Handwerker, Reinigung, Gartenpflege - wie man Arbeitskosten von der Steuer absetzt."),
     ("Entfernungspauschale und Fahrtkosten", "Wie Pendler die Entfernungspauschale nutzen und was absetzbar ist."),
+]
+
+# Schauplaetze-Bibliothek (#140): 20 schoene Umgebungen, 5 pro Jahreszeit. Echte deutsche Umlaute.
+# In der Verwaltung editierbar; seed_schauplaetze() greift nur bei leerer Tabelle (wie seed_wissen).
+SCHAUPLATZ_SEED = [
+    # fruehling
+    ("Blühender Kirschblütengarten mit Holztisch im Morgenlicht", "fruehling"),
+    ("Almwiese mit Bergpanorama und ersten Frühlingsblumen", "fruehling"),
+    ("Sonnige Caféterrasse mit Tulpen und frischem Grün", "fruehling"),
+    ("Park mit blühenden Magnolien und einer Holzbank", "fruehling"),
+    ("Heller Wintergarten voller Pflanzen im Sonnenlicht", "fruehling"),
+    # sommer
+    ("Terrasse mit Blick auf den Sommerstrand am Meer", "sommer"),
+    ("Biergarten in München unter schattigen Kastanien", "sommer"),
+    ("Weinberg im goldenen Spätsommerlicht", "sommer"),
+    ("Holzsteg am See im warmen Abendlicht", "sommer"),
+    ("Strandcafé an der Nordsee mit Dünen", "sommer"),
+    # herbst
+    ("Stadtpark mit buntem Herbstlaub und Holzbank", "herbst"),
+    ("Gemütliches Café am Fenster, draußen Herbstregen", "herbst"),
+    ("Weinberg in herbstlichen Rottönen", "herbst"),
+    ("Waldlichtung mit warmem Herbstlicht", "herbst"),
+    ("Hofterrasse mit Kürbissen und Abendsonne", "herbst"),
+    # winter
+    ("Weihnachtsmarkt mit Lichterglanz", "winter"),
+    ("Wohnzimmer mit knisterndem Kaminfeuer und Kerzen", "winter"),
+    ("Sonnige Skihütte mit Schnee und Bergblick", "winter"),
+    ("Verschneite Altstadtgasse mit Laternen", "winter"),
+    ("Gemütliche Stube mit Tee und Schneeblick durchs Fenster", "winter"),
 ]
 
 # --- Einmalige Umlaut-Korrektur fuer bereits bestehende DBs (Pi) -------------
@@ -267,6 +306,13 @@ def seed_wissen(conn):
     if conn.execute("SELECT COUNT(*) FROM wissensthemen").fetchone()[0] == 0:
         conn.executemany("INSERT OR IGNORE INTO wissensthemen(titel, hook) VALUES (?,?)", WISSEN_SEED)
 
+def seed_schauplaetze(conn):
+    """Spielt die 20 Start-Schauplaetze ein - NUR bei leerer Tabelle (Muster wie seed_wissen).
+    Bestehende/editierte Listen bleiben unangetastet."""
+    if conn.execute("SELECT COUNT(*) FROM schauplaetze").fetchone()[0] == 0:
+        conn.executemany("INSERT INTO schauplaetze(beschreibung, jahreszeit) VALUES (?,?)",
+                         SCHAUPLATZ_SEED)
+
 def seed_contentkalender(conn):
     """Spielt Catrins Steuer-Contentkalender EINMALIG ein - auch in bereits bestehende DBs
     (anders als die seed_*-Startlisten, die nur bei leerer Tabelle greifen). Sentinel-Eintrag
@@ -284,6 +330,7 @@ def init_db():
         migrate(conn)
         seed_anlasstage(conn)
         seed_wissen(conn)
+        seed_schauplaetze(conn)
         seed_contentkalender(conn)
         fix_seed_umlaute(conn)
 

@@ -38,6 +38,10 @@ def auffuellen(heute=None, min_buffer=3):
     with get_conn() as conn:
         cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                            "VALUES('wissen', ?, 'erledigt', ?, ?)", (topic["titel"], topic["hook"], h))
+        # #140: Schauplatz EINMAL bei der Erzeugung waehlen (Evergreen -> Kalender-Jahreszeit,
+        # sofern kein saisonales Schlagwort im Thema steckt).
+        import schauplatz
+        schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
         conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status) "
                      "VALUES (?, 'facebook', ?, 'entwurf')", (cur.lastrowid, json.dumps(fields, ensure_ascii=False)))
         conn.execute("UPDATE wissensthemen SET zuletzt=? WHERE id=?", (heute.isoformat(), topic["id"]))
