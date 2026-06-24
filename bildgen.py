@@ -268,13 +268,19 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     die Felder ueberschrift/subline/bullets/cta/ort werden weiter genutzt).
 
     Bild-Stil 'ki_tafel' (#132): Modus wird intern aus der Einstellung gelesen (kein neuer Pflicht-
-    Parameter). Default 'standard' -> unveraendertes v11-Layout unten."""
+    Parameter). Default 'standard' -> unveraendertes v11-Layout unten.
+
+    Bild-Stil 'kreativ' (#143): das KI-Foto traegt KEINEN Text (kinoreife Szene). Darum nutzt
+    'kreativ' bewusst den STANDARD-Render-Pfad (weisses Textfeld + Ueberschrift/Bullets/Hero/CTA +
+    CI-Kreise als Code-Overlay) - NUR der ki_tafel-Stil geht in den _render_ki_tafel-Zweig."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
     try:
         import db
         stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
     except Exception:
         stil = "standard"
+    # #143: NUR 'ki_tafel' nutzt das Tafel-Layout. 'kreativ' (Foto ohne Text) und 'standard' nehmen
+    # beide den Standard-Pfad unten, damit Botschaft + CI sauber per Code daruebergelegt werden.
     if stil == "ki_tafel":
         return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
     base = _background(photo_path).convert("RGB")

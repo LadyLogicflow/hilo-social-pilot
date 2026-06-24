@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS pool_nutzung (
     verbraucht_am TEXT DEFAULT (datetime('now')),
     UNIQUE(entwurf_id, stelle_id, kanal)
 );
--- Globale Key-Value-Einstellungen (#132): z.B. 'bild_stil' = 'standard' | 'ki_tafel'.
+-- Globale Key-Value-Einstellungen (#132/#143): z.B. 'bild_stil' = 'standard' | 'ki_tafel' | 'kreativ'.
 -- Bewusst minimal (Schluessel/Wert), damit weitere globale Schalter ohne Schema-Migration moeglich sind.
 CREATE TABLE IF NOT EXISTS einstellungen (
     schluessel TEXT PRIMARY KEY,

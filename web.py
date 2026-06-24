@@ -1245,6 +1245,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
     <input type=radio name=bild_stil value="ki_tafel"{% if bild_stil=='ki_tafel' %} checked{% endif %}>
     <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
+  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <input type=radio name=bild_stil value="kreativ"{% if bild_stil=='kreativ' %} checked{% endif %}>
+    <span><b>Kreativ</b><br><span class=hint>Kinoreifes Foto ohne Text – die Bild-KI entwirft (über einen Art-Director-Schritt) eine fotorealistische Szene zur überraschendsten Erkenntnis des Beitrags. Überschrift, Bullets, CTA und HILO-Kreise kommen wie im Standard-Look exakt per Code als Overlay.</span></span></label>
   <button>Bild-Stil speichern</button>
 </div></form>
 
@@ -2954,16 +2957,18 @@ def verwaltung():
                     audit_log(conn, session["user"], "traeger_geloescht", None, tid)
                     flash("Träger gelöscht.")
             elif formular == "bildstil_save":
-                # Globaler Bild-Stil (#132): 'standard' (v11, Default) oder 'ki_tafel' (Testmodus).
+                # Globaler Bild-Stil (#132/#143): 'standard' (v11, Default), 'ki_tafel' (Testmodus)
+                # oder 'kreativ' (#143: kinoreifes Foto ohne Text, CI/Text per Code-Overlay).
                 stil = request.form.get("bild_stil", "standard").strip()
-                if stil not in ("standard", "ki_tafel"):
+                if stil not in ("standard", "ki_tafel", "kreativ"):
                     stil = "standard"
                 conn.execute(
                     "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_stil', ?) "
                     "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (stil,))
                 audit_log(conn, session["user"], "bild_stil_gesetzt", None, stil)
-                flash("Bild-Stil gespeichert: %s." % ("Standard (v11)" if stil == "standard"
-                                                      else "KI-Tafel (Testmodus)"))
+                _stil_label = {"standard": "Standard (v11)", "ki_tafel": "KI-Tafel (Testmodus)",
+                               "kreativ": "Kreativ (kinoreifes Foto ohne Text)"}
+                flash("Bild-Stil gespeichert: %s." % _stil_label.get(stil, "Standard (v11)"))
             elif formular == "bildtool_save":
                 # Globales Bild-Tool (#137): 'openai' (Default) oder 'ideogram' (Text-Spezialist).
                 # Orthogonal zum Bild-Stil; bestimmt nur, welche KI das Foto erzeugt.
