@@ -275,8 +275,9 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     CI-Kreise als Code-Overlay) - NUR der ki_tafel-Stil geht in den _render_ki_tafel-Zweig."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
     try:
-        import db
-        stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
+        # Stil PRO BEITRAG (#144): aus fields['bild_stil'] (stabil) ODER global ODER 'standard'.
+        import stilwahl
+        stil = stilwahl.aktiver_stil(fields)
     except Exception:
         stil = "standard"
     # #143: NUR 'ki_tafel' nutzt das Tafel-Layout. 'kreativ' (Foto ohne Text) und 'standard' nehmen

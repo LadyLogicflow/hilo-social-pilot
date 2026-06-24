@@ -261,10 +261,14 @@ def ensure_photo_fuer(fields):
     'icon:'-Motive (gezeichnet) bleiben unveraendert.
 
     Bild-Stil 'ki_tafel' (#132, Testmodus): die KI schreibt die Ueberschrift selbst auf eine Tafel
-    in der Szene. Der Modus wird global aus der Einstellung gelesen (db.get_einstellung('bild_stil')).
-    Default 'standard' -> unveraendertes v11-Verhalten."""
-    import db
-    stil = (db.get_einstellung("bild_stil", "standard") or "standard").strip()
+    in der Szene.
+
+    Stil PRO BEITRAG (#144): der Stil wird ueber stilwahl.aktiver_stil(fields) bestimmt -
+    fields['bild_stil'] (stabil je Beitrag gewuerfelt) ODER die globale Einstellung 'bild_stil'
+    ODER 'standard'. So koennen verschiedene Entwuerfe gleichzeitig verschiedene Stile haben;
+    Entwuerfe ohne fields['bild_stil'] bleiben rueckwaertskompatibel (Fallback global/'standard')."""
+    import stilwahl
+    stil = stilwahl.aktiver_stil(fields)
     motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
              or fields.get("bild_motiv_thema") or "").strip()
     # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel, kein kreativ-Foto).
