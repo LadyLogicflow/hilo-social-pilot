@@ -90,11 +90,47 @@ def _prompt(motiv):
             "nichts Bildwichtiges darf dort verdeckt werden. KEIN Text, keine Schrift, keine Logos oder "
             "Markennamen im Bild." % motiv)
 
+def tafel_sign_text(fields):
+    """Baut den Tafel-Text (sign_text) fuer den ki_tafel-Modus aus den Entwurfs-fields (#139).
+
+    NEU (#139): nicht nur die Ueberschrift, sondern Ueberschrift + die Stichpunkte
+    (fields['bullets'], Liste kurzer Strings) - jeder Stichpunkt in einer eigenen Zeile mit
+    '- '-Prefix, unter der Ueberschrift. Ohne (oder mit leeren) bullets bleibt es bei der
+    reinen Ueberschrift -> Fallback = bisheriges #132-Verhalten, voll rueckwaertskompatibel.
+
+    EHRLICH (#139): mehr Text auf der Tafel = hoeheres KI-Fehlerrisiko (Tippfehler/fehlende
+    Buchstaben durch die Bild-KI). Deshalb bewusst nur Ueberschrift + Stichpunkte - NICHT die
+    lange caption/subline -, damit der Schild-Text im handhabbaren Rahmen bleibt.
+
+    Robust gegen fehlende/leere Felder und gegen nicht-string Bullets (werden zu str() und
+    getrimmt; leere fallen raus). Liefert immer einen (ggf. leeren) String, crasht nie."""
+    if not isinstance(fields, dict):
+        return ""
+    ueberschrift = (fields.get("ueberschrift") or "").strip()
+    bullets_raw = fields.get("bullets")
+    zeilen = []
+    if isinstance(bullets_raw, (list, tuple)):
+        for b in bullets_raw:
+            text = (str(b) if b is not None else "").strip()
+            if text:
+                zeilen.append("- " + text)
+    if not zeilen:
+        return ueberschrift
+    if ueberschrift:
+        return ueberschrift + "\n" + "\n".join(zeilen)
+    return "\n".join(zeilen)
+
 def _tafel_prompt(scene, sign_text):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
     sign_text = die Ueberschrift (in Anfuehrungszeichen eingesetzt). Die Tafel traegt NUR diese
     Ueberschrift - sie ist die einzige Schrift im Bild (CTA + CI-Kreise kommen per Code-Overlay).
+
+    NEU (#139): sign_text ist jetzt MEHRZEILIG - erste Zeile(n) die Ueberschrift, darunter die
+    Stichpunkte (je '- '-Zeile). Der Prompt weist die KI an, die UEBERSCHRIFT prominent/gross und
+    die Stichpunkte darunter kleiner, aber gut lesbar aufs Schild zu bringen. EHRLICH: mehr Text =
+    hoeheres KI-Fehlerrisiko; bewusst nur Ueberschrift + Bullets (NICHT die lange caption), damit
+    der Schild-Text handhabbar bleibt.
 
     HINWEIS (#135): Schriftart (serifenlos/Arial-aehnlich) und Textfarbe (HILO-Dunkelblau) auf
     dem KI-Bild sind NICHT 100% erzwingbar - die Bild-KI approximiert beides; das Ergebnis wird
@@ -126,11 +162,14 @@ def _tafel_prompt(scene, sign_text):
             "Imperfektion ist erwünscht. Das Schild bleibt dabei gut "
             "sichtbar und lesbar (frontal genug zur Kamera, scharf, gut ausgeleuchtet) - nur eben als "
             "Teil der Szene, nicht als gehaltenes Plakat. Auf dem hellen Schild steht der "
-            "folgende deutsche Text - exakt Wort für Wort, KORREKT geschrieben mit richtigen "
-            "deutschen Umlauten (ae oe ue als ä ö ü, ß), groß, zentriert, in HILO-Dunkelblau und in "
-            "einer klaren, modernen SERIFENLOSEN Schrift (Arial-aehnlich, ohne Serifen), perfekt "
-            "lesbar, OHNE Rechtschreibfehler, OHNE zusätzliche, fehlende oder veränderte Buchstaben: "
-            "'%s'. Dieser Text ist die EINZIGE Schrift im gesamten Bild. KEINE weiteren Wörter, "
+            "folgende mehrzeilige deutsche Text - exakt Wort für Wort und Zeile für Zeile, KORREKT "
+            "geschrieben mit richtigen deutschen Umlauten (ae oe ue als ä ö ü, ß), zentriert, in "
+            "HILO-Dunkelblau und in einer klaren, modernen SERIFENLOSEN Schrift (Arial-aehnlich, "
+            "ohne Serifen), perfekt lesbar, OHNE Rechtschreibfehler, OHNE zusätzliche, fehlende oder "
+            "veränderte Buchstaben. Die ERSTE Zeile ist die UEBERSCHRIFT - sie steht prominent und "
+            "GROSS oben; die darunter folgenden, mit '- ' beginnenden Zeilen sind die STICHPUNKTE - "
+            "sie stehen darunter KLEINER, aber weiterhin gut und klar lesbar. Der gesamte Text "
+            "lautet:\n'%s'. Dieser Text ist die EINZIGE Schrift im gesamten Bild. KEINE weiteren Wörter, "
             "Buchstaben, Zahlen, Logos oder Wasserzeichen irgendwo sonst. Weiches, neutrales "
             "Tageslicht, geringe Schärfentiefe. Das helle Schild ist der klare Blickfang, die Szene "
             "ringsum trägt die zum Thema passende, geloeste Stimmung." % (scene, sign_text))
@@ -150,7 +189,9 @@ def ensure_photo_fuer(fields):
              or fields.get("bild_motiv_thema") or "").strip()
     # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel).
     if stil == "ki_tafel" and not motiv.startswith("icon:"):
-        sign_text = (fields.get("ueberschrift") or "").strip()
+        # NEU (#139): mehr Text aufs Schild - Ueberschrift + Stichpunkte (tafel_sign_text)
+        # statt nur der Ueberschrift. Ohne bullets bleibt es bei der Ueberschrift (Fallback).
+        sign_text = tafel_sign_text(fields)
         scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
         return ensure_photo_tafel(scene, sign_text)
     return ensure_photo(motiv)
@@ -234,7 +275,10 @@ def cache_dateien_fuer_fields(fields):
     # aufgenommen. Da der Cache tool-abhaengige Dateinamen vergibt (ideogram_-Praefix), wuerde
     # die Aufraeumung (#134) sonst das jeweils ANDERE Tool faelschlich loeschen, sobald Catrin
     # umschaltet. Wir nehmen darum fuer jeden Motiv-Pfad beide Tool-Varianten auf.
-    sign_text = (fields.get("ueberschrift") or "").strip()
+    # WICHTIG (#139): denselben sign_text-Bauer wie ensure_photo_fuer nutzen (Ueberschrift +
+    # Stichpunkte), sonst zeigt _tafel_pfad hier auf eine ANDERE Datei als die tatsaechlich
+    # erzeugte -> die aktive Tafel-Datei wuerde nach der Schonfrist faelschlich geloescht.
+    sign_text = tafel_sign_text(fields)
     scene = motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
     for tool in ("openai", "ideogram"):
         # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
