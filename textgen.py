@@ -250,6 +250,13 @@ def _create_drafts(rows, kanal):
                 # ablegen (stabil ueber Re-Renders/Personalisierung; KI-Tafel nutzt ihn als Szene).
                 import schauplatz
                 schauplatz.zuweisen_falls_fehlt(conn, data)
+                # #142: zusaetzlich den Traeger (Device der Botschaft) EINMAL waehlen, ebenfalls
+                # stabil in fields['traeger']. Robust: fehlt die Tabelle (alte DB) -> No-Op.
+                try:
+                    import traeger
+                    traeger.zuweisen_traeger_falls_fehlt(conn, data)
+                except Exception as ex:
+                    log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
                 conn.execute(
                     "INSERT INTO entwuerfe(thema_id, kanal, text, status) VALUES (?,?,?, 'entwurf')",
                     (r["id"], kanal, json.dumps(data, ensure_ascii=False)))
@@ -307,6 +314,10 @@ def regenerate_open_drafts(kanal="google"):
             "WHERE e.status='entwurf'").fetchall()
     neu = 0
     import schauplatz
+    try:
+        import traeger as _traeger
+    except Exception:
+        _traeger = None
     for r in rows:
         try:
             data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]},
@@ -314,17 +325,30 @@ def regenerate_open_drafts(kanal="google"):
             # #140: bestehenden Schauplatz uebernehmen (bleibt je Entwurf STABIL, Cache passt);
             # fehlt er (alte Entwuerfe), bei der Neu-Erzeugung einmal frisch waehlen.
             alt_sp = ""
+            alt_tr = ""
             try:
                 alt = json.loads(r["alt_text"]) if r["alt_text"] else {}
                 if isinstance(alt, dict):
                     alt_sp = (alt.get("schauplatz") or "").strip()
+                    # #142: bestehenden Traeger aus dem alten Entwurf uebernehmen (stabil).
+                    alt_tr = (alt.get("traeger") or "").strip()
             except Exception:
                 alt_sp = ""
+                alt_tr = ""
             with get_conn() as conn:
                 if alt_sp:
                     data["schauplatz"] = alt_sp
                 else:
                     schauplatz.zuweisen_falls_fehlt(conn, data)
+                # #142: bestehenden Traeger uebernehmen (bleibt je Entwurf STABIL, Cache passt);
+                # fehlt er (alte Entwuerfe), bei der Neu-Erzeugung einmal frisch waehlen.
+                if alt_tr:
+                    data["traeger"] = alt_tr
+                elif _traeger is not None:
+                    try:
+                        _traeger.zuweisen_traeger_falls_fehlt(conn, data)
+                    except Exception as ex:
+                        log.warning("Traeger-Zuweisung (regenerate) uebersprungen: %s", ex)
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), r["eid"]))
             neu += 1

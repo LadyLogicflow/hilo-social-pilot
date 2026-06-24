@@ -137,7 +137,19 @@ def _tafel_scene(fields):
              or fields.get("bild_motiv_thema") or "").strip()
     return motiv or "ein ruhiger, vertrauensvoller Moment im Alltag"
 
-def _tafel_prompt(scene, sign_text):
+def _tafel_traeger(fields):
+    """Liefert den gewaehlten Traeger (Botschafts-Device, fields['traeger']) fuer den KI-Tafel-Modus
+    (#142) oder "" (-> Prompt/Cache fallen auf das bisherige #140-Bilderrahmen-Device zurueck).
+
+    WICHTIG (#134-Retention): Producer (ensure_photo_fuer) UND Aufraeumschutz
+    (cache_dateien_fuer_fields) MUESSEN denselben traeger-Wert nutzen, sonst zeigt _tafel_pfad auf
+    eine andere Datei -> Falsch-Loeschen. Darum diese gemeinsame Helper-Funktion (analog
+    _tafel_scene)."""
+    if not isinstance(fields, dict):
+        return ""
+    return (fields.get("traeger") or "").strip()
+
+def _tafel_prompt(scene, sign_text, traeger=None):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
     sign_text = die Ueberschrift (in Anfuehrungszeichen eingesetzt). Die Tafel traegt NUR diese
@@ -149,9 +161,32 @@ def _tafel_prompt(scene, sign_text):
     hoeheres KI-Fehlerrisiko; bewusst nur Ueberschrift + Bullets (NICHT die lange caption), damit
     der Schild-Text handhabbar bleibt.
 
+    NEU (#142): 'traeger' = das gewaehlte Botschafts-DEVICE (prompt_snippet, z.B. 'eine schwarze
+    Kreidetafel ...'). Ist es gesetzt, ersetzt es das frueher hartkodierte
+    Bilderrahmen/Tisch-Aufsteller-Device - das Device wechselt also, alles uebrige (Szene, Stil,
+    Text-Anweisungen) bleibt gleich. OHNE traeger (None/leer) bleibt der Prompt WORTGLEICH zum
+    bisherigen #140-Verhalten (Bilderrahmen/Tisch-Aufsteller) -> voll rueckwaertskompatibel.
+
     HINWEIS (#135): Schriftart (serifenlos/Arial-aehnlich) und Textfarbe (HILO-Dunkelblau) auf
     dem KI-Bild sind NICHT 100% erzwingbar - die Bild-KI approximiert beides; das Ergebnis wird
     nach dem Render geprueft. Wir formulieren den Wunsch dennoch moeglichst praezise."""
+    traeger = (traeger or "").strip()
+    if not traeger:
+        # --- #140-Fallback: WORTGLEICHES Bilderrahmen/Tisch-Aufsteller-Device (rueckwaertskompatibel)
+        hauptmotiv = ("ZENTRALES, SCHARFES Hauptmotiv: ein "
+                      "eleganter, gut lesbarer, eher HELLES Schild in einem BILDERRAHMEN bzw. TISCH-AUFSTELLER "
+                      "(helles Schild oder helle Karte im Rahmen statt schwarzer Kreidetafel). Dieser "
+                      "Bilderrahmen/Tisch-Aufsteller ist NATUERLICH in die Szene integriert - er steht auf einem ")
+        device_sichtbar = "Der Bilderrahmen/Tisch-Aufsteller"
+        device_text_auf = "Auf dem hellen Schild im Bilderrahmen/Aufsteller steht der "
+        device_blickfang = "Der helle Bilderrahmen/Tisch-Aufsteller"
+    else:
+        # --- #142: gewaehlter Traeger ersetzt das Device (Szene/Stil/Text bleiben unveraendert)
+        hauptmotiv = ("ZENTRALES, SCHARFES Hauptmotiv: %s. Dieser Traeger der Botschaft "
+                      "ist NATUERLICH in die Szene integriert - er steht auf einem " % traeger)
+        device_sichtbar = "Dieser Traeger"
+        device_text_auf = "Auf diesem Traeger (%s) steht der " % traeger
+        device_blickfang = "Dieser Traeger"
     return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie, quadratisch (1:1). "
             "Authentische Szene passend zu: %s. Natuerliche, ausgewogene, realitaetsnahe Farben "
             "bei neutralem Tageslicht; NICHT uebertrieben warm, golden oder amber - normale, "
@@ -161,10 +196,7 @@ def _tafel_prompt(scene, sign_text):
             "ruhige ZUVERSICHT, Erleichterung und Souveraenitaet ausstrahlen (man fuehlt sich gut "
             "aufgehoben und beraten), KEIN froehliches Grinsen oder Feiern, das dem Ernst des Themas "
             "widerspricht; bei freudigen Themen darf die Stimmung froehlich und feiernd sein. Also "
-            "positiv UND zum Thema passend, nicht pauschal Party. ZENTRALES, SCHARFES Hauptmotiv: ein "
-            "eleganter, gut lesbarer, eher HELLES Schild in einem BILDERRAHMEN bzw. TISCH-AUFSTELLER "
-            "(helles Schild oder helle Karte im Rahmen statt schwarzer Kreidetafel). Dieser "
-            "Bilderrahmen/Tisch-Aufsteller ist NATUERLICH in die Szene integriert - er steht auf einem "
+            "positiv UND zum Thema passend, nicht pauschal Party. %s"
             "TISCH im VORDERGRUND der Szene, lehnt an einer Wand oder steht auf einer Staffelei - und "
             "wird NICHT von einer Person frontal in die Kamera GEHALTEN, niemand haelt ihn hoch. KEINE "
             "gestellten Stockfoto-Posen, niemand posiert oder blickt steif in die Kamera. Stattdessen "
@@ -177,10 +209,9 @@ def _tafel_prompt(scene, sign_text):
             "KEINE perfekten Model-Gesichter. UMGEBUNG: echte, gelebte, leicht unperfekte Räume mit "
             "konkreten, spezifischen Alltags-Details (kein steriles Studio/Showroom). ANMUTUNG: "
             "natürlich, ungestellt, candid, wie ein echtes Foto aus dem Alltag - leichte natürliche "
-            "Imperfektion ist erwünscht. Der Bilderrahmen/Tisch-Aufsteller bleibt dabei gut "
+            "Imperfektion ist erwünscht. %s bleibt dabei gut "
             "sichtbar und lesbar (frontal genug zur Kamera, scharf, gut ausgeleuchtet) - nur eben als "
-            "Teil der Szene auf dem Tisch, nicht als gehaltenes Plakat. Auf dem hellen Schild im "
-            "Bilderrahmen/Aufsteller steht der "
+            "Teil der Szene auf dem Tisch, nicht als gehaltenes Plakat. %s"
             "folgende mehrzeilige deutsche Text - exakt Wort für Wort und Zeile für Zeile, KORREKT "
             "geschrieben mit richtigen deutschen Umlauten (ae oe ue als ä ö ü, ß), zentriert, in "
             "HILO-Dunkelblau und in einer klaren, modernen SERIFENLOSEN Schrift (Arial-aehnlich, "
@@ -190,9 +221,10 @@ def _tafel_prompt(scene, sign_text):
             "sie stehen darunter KLEINER, aber weiterhin gut und klar lesbar. Der gesamte Text "
             "lautet:\n'%s'. Dieser Text ist die EINZIGE Schrift im gesamten Bild. KEINE weiteren Wörter, "
             "Buchstaben, Zahlen, Logos oder Wasserzeichen irgendwo sonst. Weiches, neutrales "
-            "Tageslicht, geringe Schärfentiefe. Der helle Bilderrahmen/Tisch-Aufsteller ist der klare "
+            "Tageslicht, geringe Schärfentiefe. %s ist der klare "
             "Blickfang im Vordergrund, die Schauplatz-Szene ringsum traegt die zum Thema passende, "
-            "geloeste Stimmung." % (scene, sign_text))
+            "geloeste Stimmung." % (scene, hauptmotiv, device_sichtbar, device_text_auf,
+                                    sign_text, device_blickfang))
 
 def ensure_photo_fuer(fields):
     """Liefert das Szene-Foto fuer den Beitrag. Bevorzugt das neue Feld 'szene_motiv'
@@ -216,7 +248,10 @@ def ensure_photo_fuer(fields):
         # das bisherige Motiv. _tafel_scene() haelt diese Fallback-Logik konsistent zwischen
         # Producer und cache_dateien_fuer_fields (#134-Retention).
         scene = _tafel_scene(fields)
-        return ensure_photo_tafel(scene, sign_text)
+        # NEU (#142): das Botschafts-Device (Traeger). Leer -> bisheriges Bilderrahmen-Device (#140).
+        # _tafel_traeger() haelt den Wert konsistent zwischen Producer und cache_dateien_fuer_fields.
+        traeger = _tafel_traeger(fields)
+        return ensure_photo_tafel(scene, sign_text, traeger)
     return ensure_photo(motiv)
 
 def _tool_praefix(tool):
@@ -253,23 +288,32 @@ def _icon_pfad(motiv):
     name = motiv.split(":", 1)[1]
     return os.path.join(MOTIV_DIR, "icon_%s.png" % name)
 
-def tafel_cache_key(scene, sign_text):
+def tafel_cache_key(scene, sign_text, traeger=None):
     """Liefert den Cache-Schluessel-String fuer ein KI-Tafel-Foto (Praefix 'tafel:', enthaelt den
-    sign_text). Ausgelagert, damit Tests den Schluessel pruefen koennen, ohne OpenAI aufzurufen."""
-    return "tafel:" + (sign_text or "").strip() + "|" + (scene or "").strip()
+    sign_text). Ausgelagert, damit Tests den Schluessel pruefen koennen, ohne OpenAI aufzurufen.
 
-def _tafel_pfad(scene, sign_text, tool=None):
+    NEU (#142): ist 'traeger' (Botschafts-Device) gesetzt, fliesst es ZUSAETZLICH in den Schluessel
+    ein -> verschiedene Traeger fuers gleiche Motiv ergeben verschiedene Bilder/Cache-Dateien.
+    OHNE traeger bleibt der Schluessel UNVERAENDERT (alter Hash, rueckwaertskompatibel mit #140)."""
+    key = "tafel:" + (sign_text or "").strip() + "|" + (scene or "").strip()
+    traeger = (traeger or "").strip()
+    if traeger:
+        key += "|traeger:" + traeger
+    return key
+
+def _tafel_pfad(scene, sign_text, tool=None, traeger=None):
     """Liefert den absoluten Cache-Pfad fuer ein KI-Tafel-Foto (Praefix 'tafel_', sha256[:16]).
     Kapselt die BESTEHENDE Schluessel-Berechnung aus ensure_photo_tafel(); Hash-Formel UNVERAENDERT.
     Verwendet dieselbe scene-Default-Logik wie ensure_photo_tafel/ensure_photo_fuer.
 
     'tool' waehlt das Bild-Backend (#137): 'openai' (Default, Dateiname unveraendert 'tafel_<h>')
-    oder 'ideogram' (Praefix 'ideogram_tafel_<h>'). None -> aktuelle Einstellung."""
+    oder 'ideogram' (Praefix 'ideogram_tafel_<h>'). None -> aktuelle Einstellung.
+    'traeger' (#142): fliesst in den Cache-Key ein, WENN gesetzt (sonst alter Key)."""
     scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
     sign_text = (sign_text or "").strip()
     if tool is None:
         tool = aktives_bild_tool()
-    h = hashlib.sha256(tafel_cache_key(scene, sign_text).lower().encode("utf-8")).hexdigest()[:16]
+    h = hashlib.sha256(tafel_cache_key(scene, sign_text, traeger).lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "tafel_" + h + ".png")
 
 def cache_dateien_fuer_fields(fields):
@@ -305,6 +349,11 @@ def cache_dateien_fuer_fields(fields):
     # NEU (#140): die KI-Tafel-Szene ist der gewaehlte Schauplatz (mit Motiv-Fallback). Producer
     # (ensure_photo_fuer) und dieser Aufraeumschutz MUESSEN denselben scene-Wert nutzen -> _tafel_scene.
     tafel_scene = _tafel_scene(fields)
+    # NEU (#142, KRITISCH): GENAU derselbe traeger-Wert wie der Producer (ensure_photo_fuer ->
+    # _tafel_traeger). Da der Traeger in den Cache-Key einfliesst, wuerde ein abweichender Wert hier
+    # auf eine ANDERE Datei zeigen -> die aktive Tafel-Datei wuerde nach der Schonfrist faelschlich
+    # geloescht (#134). Leer -> alter Schluessel (Bilderrahmen-Default), rueckwaertskompatibel.
+    tafel_traeger = _tafel_traeger(fields)
     for tool in ("openai", "ideogram"):
         # Standard-Szene-Variante (jedes Motiv aus der Fallback-Kette kann den Cache-Treffer liefern).
         for m in (fields.get("szene_motiv"), fields.get("bild_motiv"), fields.get("bild_motiv_thema")):
@@ -320,10 +369,10 @@ def cache_dateien_fuer_fields(fields):
         sp_def = _szene_pfad(szene_default, tool=tool)
         if sp_def:
             pfade.add(sp_def)
-        # KI-Tafel-Variante (#140): scene = der Schauplatz (mit Motiv-Fallback, _tafel_scene),
-        # exakt derselbe scene-Wert wie im Producer ensure_photo_fuer -> selber _tafel_pfad,
-        # kein Falsch-Loeschen der aktiven Tafel-Datei.
-        pfade.add(_tafel_pfad(tafel_scene, sign_text, tool=tool))
+        # KI-Tafel-Variante (#140/#142): scene = der Schauplatz (mit Motiv-Fallback, _tafel_scene),
+        # traeger = das Botschafts-Device (_tafel_traeger) - exakt dieselben Werte wie im Producer
+        # ensure_photo_fuer -> selber _tafel_pfad, kein Falsch-Loeschen der aktiven Tafel-Datei.
+        pfade.add(_tafel_pfad(tafel_scene, sign_text, tool=tool, traeger=tafel_traeger))
     return pfade
 
 def _openai_quality():
@@ -413,26 +462,31 @@ def erzeuge_bild(prompt, tool=None):
     return erzeuge_bild_openai(prompt)
 
 
-def tafel_payload(scene, sign_text):
+def tafel_payload(scene, sign_text, traeger=None):
     """Baut das OpenAI images/generations-Request-Payload fuer ein KI-Tafel-Foto (ohne
     Netzwerkaufruf). Modell aus HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2'), background='opaque',
-    size '1024x1024'. Ausgelagert, damit Tests Prompt + Parameter pruefen koennen."""
-    return openai_payload(_tafel_prompt(scene, sign_text))
+    size '1024x1024'. Ausgelagert, damit Tests Prompt + Parameter pruefen koennen.
+    'traeger' (#142): das Botschafts-Device; leer -> bisheriges Bilderrahmen-Device (#140)."""
+    return openai_payload(_tafel_prompt(scene, sign_text, traeger))
 
-def ensure_photo_tafel(scene, sign_text):
+def ensure_photo_tafel(scene, sign_text, traeger=None):
     """Erzeugt (oder liefert aus dem Cache) das KI-Tafel-Foto (#132): scene = Szene-Motiv,
     sign_text = die Ueberschrift, die die KI auf die Tafel schreibt. Eigener Cache-Schluessel
     (Praefix 'tafel:'), der den sign_text ENTHAELT - so bekommt jede Ueberschrift ihr eigenes Foto.
-    background='opaque', size '1024x1024'. Ohne openai_api_key wird None geliefert (Creme-Fallback)."""
+    background='opaque', size '1024x1024'. Ohne openai_api_key wird None geliefert (Creme-Fallback).
+    'traeger' (#142): das Botschafts-Device; fliesst in Cache-Key + Prompt ein, WENN gesetzt
+    (sonst alter Key/Prompt = bisheriges Bilderrahmen-Device, #140-rueckwaertskompatibel)."""
     scene = (scene or "ein ruhiger, vertrauensvoller Moment im Alltag").strip()
     sign_text = (sign_text or "").strip()
+    traeger = (traeger or "").strip()
     os.makedirs(MOTIV_DIR, exist_ok=True)
     tool = aktives_bild_tool()
-    # Cache-Pfad ist tool-abhaengig (#137): OpenAI- und Ideogram-Tafel kollidieren NICHT.
-    path = _tafel_pfad(scene, sign_text, tool=tool)
+    # Cache-Pfad ist tool-abhaengig (#137) und traeger-abhaengig (#142): OpenAI/Ideogram und
+    # verschiedene Traeger kollidieren NICHT.
+    path = _tafel_pfad(scene, sign_text, tool=tool, traeger=traeger)
     if os.path.exists(path):
         return path
-    daten = erzeuge_bild(_tafel_prompt(scene, sign_text), tool=tool)
+    daten = erzeuge_bild(_tafel_prompt(scene, sign_text, traeger), tool=tool)
     if daten is None:
         return None
     try:

@@ -1070,6 +1070,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=anlass"><h3>&#x1F4C5; Anlass-Tage</h3><p>Besondere Tage mit Steuer-Aufh&auml;nger verwalten.</p></a>
   <a class=tile href="/verwaltung?bereich=wissen"><h3>&#x1F4A1; Wissens-Serie</h3><p>Zeitlose Themen, die leere Kalendertage f&uuml;llen.</p></a>
   <a class=tile href="/verwaltung?bereich=schauplatz"><h3>&#x1F5BC; Schaupl&auml;tze</h3><p>Sch&ouml;ne saisonale Umgebungen f&uuml;r den KI-Tafel-Look (mit Bilderrahmen-Botschaft).</p></a>
+  <a class=tile href="/verwaltung?bereich=traeger"><h3>&#x1FAA7; Tr&auml;ger</h3><p>Wie die Botschaft pr&auml;sentiert wird (Tafel, Rahmen, Holzschild &hellip;) &ndash; abwechselnd gew&auml;hlt.</p></a>
   <a class=tile href="/verwaltung?bereich=bildstil"><h3>&#x1F5BC; Bild-Stil</h3><p>Standard (v11) oder Testmodus „KI schreibt den Text selbst auf eine Tafel".</p></a>
   <a class=tile href="/verwaltung?bereich=speicher"><h3>&#x1F4BE; Speicher</h3><p>Foto-Cache und freien Plattenplatz ansehen, ungenutzte KI-Fotos aufr&auml;umen.</p></a>
 </div>"""
@@ -1211,6 +1212,27 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </select>
 <label style="font-weight:normal;font-size:13px"><input type=checkbox name=aktiv value=1 checked> aktiv</label>
 <button>Schauplatz anlegen</button></form>
+{% endif %}
+{% if bereich=='traeger' %}
+<p class=hint>Der „Träger" bestimmt, WIE die Botschaft im KI-Tafel-Look präsentiert wird – z.B. als Kreidetafel, Bilderrahmen, Holzschild oder Postkarte. Pro Beitrag wird ein Träger gewählt: abwechselnd (nie zweimal hintereinander derselbe) und mit leichter Themen-Passung. „Aus" nimmt einen Träger aus der Auswahl, ohne ihn zu löschen. Das „Snippet" ist die Beschreibung, die ins KI-Bild einfließt.</p>
+<table><tr><th>Name</th><th>Prompt-Snippet</th><th>Aktiv</th><th></th></tr>
+{% for t in traeger %}<tr>
+<td><form method=post style="display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap"><input type=hidden name=formular value=traeger_save><input type=hidden name=id value="{{t.id}}">
+  <input name=name value="{{t.name}}" required style="min-width:180px">
+  <input name=prompt_snippet value="{{t.prompt_snippet}}" required style="flex:1;min-width:320px">
+  <label style="font-weight:normal;font-size:13px;white-space:nowrap"><input type=checkbox name=aktiv value=1{% if t.aktiv %} checked{% endif %}> aktiv</label>
+  <button>Speichern</button></form></td>
+<td>{{t.prompt_snippet}}</td>
+<td>{{'ja' if t.aktiv else 'nein'}}</td>
+<td class=nw>
+  <form method=post style=display:inline><input type=hidden name=formular value=traeger_toggle><input type=hidden name=id value="{{t.id}}"><button>{{'Aus' if t.aktiv else 'Ein'}}</button></form>
+  <form method=post style=display:inline onsubmit="return confirm('Diesen Träger wirklich löschen?')"><input type=hidden name=formular value=traeger_delete><input type=hidden name=id value="{{t.id}}"><button style="background:#b00020">Löschen</button></form>
+</td></tr>{% endfor %}</table>
+<form method=post><input type=hidden name=formular value=traeger_save>
+<input name=name placeholder="Name (z.B. Rustikales Holzschild)" required style="width:25%">
+<input name=prompt_snippet placeholder="Prompt-Snippet (z.B. ein rustikales Holzschild mit gut lesbarer Schrift)" required style="width:50%">
+<label style="font-weight:normal;font-size:13px"><input type=checkbox name=aktiv value=1 checked> aktiv</label>
+<button>Träger anlegen</button></form>
 {% endif %}
 
 {% if bereich=='bildstil' %}
@@ -2107,6 +2129,13 @@ def eigener():
             # Kalender-Jahreszeit, sofern das Thema keinen saisonalen Bezug hat).
             import schauplatz
             schauplatz.zuweisen_falls_fehlt(conn, data, datum=d)
+            # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
+            # Robust: fehlt die Tabelle (alte DB) -> No-Op.
+            try:
+                import traeger
+                traeger.zuweisen_traeger_falls_fehlt(conn, data, datum=d)
+            except Exception as ex:
+                log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
             conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
                          "VALUES (?, 'google', ?, 'entwurf', ?)",
                          (thema_id, json.dumps(data, ensure_ascii=False), datum))
@@ -2894,6 +2923,36 @@ def verwaltung():
                     conn.execute("DELETE FROM schauplaetze WHERE id=?", (int(sid),))
                     audit_log(conn, session["user"], "schauplatz_geloescht", None, sid)
                     flash("Schauplatz gelöscht.")
+            elif formular == "traeger_save":
+                # #142: Traeger neu anlegen ODER bestehenden bearbeiten (per id). Name + Snippet
+                # Pflicht; aktiv-Checkbox steuert die Sichtbarkeit in der Auswahl.
+                tid = request.form.get("id", "").strip()
+                name = request.form.get("name", "").strip()
+                prompt_snippet = request.form.get("prompt_snippet", "").strip()
+                aktiv = 1 if request.form.get("aktiv") else 0
+                if name and prompt_snippet:
+                    if tid.isdigit():
+                        conn.execute("UPDATE traeger SET name=?, prompt_snippet=?, aktiv=? WHERE id=?",
+                                     (name, prompt_snippet, aktiv, int(tid)))
+                        flash("Träger aktualisiert.")
+                    else:
+                        conn.execute("INSERT INTO traeger(name, prompt_snippet, aktiv) VALUES (?,?,?)",
+                                     (name, prompt_snippet, aktiv))
+                        flash("Träger angelegt.")
+                    audit_log(conn, session["user"], "traeger_gespeichert", None, name[:60])
+                else:
+                    flash("Name und Prompt-Snippet sind nötig.")
+            elif formular == "traeger_toggle":
+                tid = request.form.get("id", "").strip()
+                if tid.isdigit():
+                    conn.execute("UPDATE traeger SET aktiv=1-aktiv WHERE id=?", (int(tid),))
+                    flash("Träger geändert.")
+            elif formular == "traeger_delete":
+                tid = request.form.get("id", "").strip()
+                if tid.isdigit():
+                    conn.execute("DELETE FROM traeger WHERE id=?", (int(tid),))
+                    audit_log(conn, session["user"], "traeger_geloescht", None, tid)
+                    flash("Träger gelöscht.")
             elif formular == "bildstil_save":
                 # Globaler Bild-Stil (#132): 'standard' (v11, Default) oder 'ki_tafel' (Testmodus).
                 stil = request.form.get("bild_stil", "standard").strip()
@@ -2931,14 +2990,15 @@ def verwaltung():
             conn.commit()
             # PRG: zurueck zum passenden Bereich (kein erneutes Absenden bei Reload)
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
-                    "wissen": "wissen", "schauplatz": "schauplatz", "bildstil": "bildstil",
+                    "wissen": "wissen", "schauplatz": "schauplatz", "traeger": "traeger",
+                    "bildstil": "bildstil",
                     "bildtool": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
         bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
                          "anlass": "Anlass-Tage", "wissen": "Wissens-Serie",
-                         "schauplatz": "Schauplätze",
+                         "schauplatz": "Schauplätze", "traeger": "Träger",
                          "bildstil": "Bild-Stil", "speicher": "Speicher"}.get(bereich)
         if not bereich_titel:
             return redirect(url_for("verwaltung"))
@@ -2951,6 +3011,12 @@ def verwaltung():
             "SELECT id, beschreibung, jahreszeit, aktiv FROM schauplaetze "
             "ORDER BY CASE jahreszeit WHEN 'fruehling' THEN 1 WHEN 'sommer' THEN 2 "
             "WHEN 'herbst' THEN 3 WHEN 'winter' THEN 4 ELSE 5 END, id").fetchall()
+        # #142: Traeger nach id (Seed-Reihenfolge). Robust gegen alte DBs ohne Tabelle.
+        try:
+            traeger = conn.execute(
+                "SELECT id, name, prompt_snippet, aktiv FROM traeger ORDER BY id").fetchall()
+        except Exception:
+            traeger = []
         _bs = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_stil'").fetchone()
         bild_stil = (_bs["wert"] if _bs and _bs["wert"] else "standard")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
@@ -2973,6 +3039,7 @@ def verwaltung():
         }
     return render_template_string(VERWALTUNG, **_ctx(users=users, stellen=stellen, anlasstage=anlasstage,
                                                      wissen=wissen, schauplaetze=schauplaetze,
+                                                     traeger=traeger,
                                                      bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
                                                      fb_name=fb_name, bild_stil=bild_stil,
