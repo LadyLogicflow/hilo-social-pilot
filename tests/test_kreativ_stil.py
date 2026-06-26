@@ -291,7 +291,8 @@ def _card_pixels(img):
     return cnt
 
 
-def test_render_kreativ_standard_layout():
+def test_render_kreativ_reines_foto():
+    # #145: kreativ = reines Foto + NUR CI-Kreise -> KEINE weisse Text-Karte in der Mitte.
     data = os.environ.get("HILO_DATA_DIR", "/tmp")
     photo = _dummy_photo(os.path.join(data, "dummy_kreativ.png"))
     db.set_einstellung("bild_stil", "kreativ")
@@ -303,11 +304,18 @@ def test_render_kreativ_standard_layout():
     if img.size != (1080, 1080):
         _fail("kreativ-Bild hat falsche Groesse: %r" % (img.size,))
     card = _card_pixels(img)
-    # Standard-Layout: weisse Text-Karte in der Mitte vorhanden (KEIN textfreies Tafel-Layout)
-    if card < 200:
-        _fail("kreativ-Modus zeigt KEINE Standard-Text-Karte (weisse Mitte nur %d Pixel)" % card)
+    # Kreativ: KEINE weisse Text-Karte in der Mitte (reines Foto). Toleranz fuer Streupixel.
+    if card > 60:
+        _fail("kreativ zeigt eine Text-Karte (weisse Mitte %d Pixel) - soll reines Foto sein" % card)
+    # Standard zum Vergleich: Karte vorhanden (Regression - Standard-Layout unveraendert).
     db.set_einstellung("bild_stil", "standard")
-    print("  D) bildgen kreativ: Standard-Layout (Text-Karte=%d, KEIN Tafel-Device), 1080x1080 OK" % card)
+    out_s = os.path.join(data, "kreativ_std.png")
+    p_s = b.render(FIELDS, photo, "Wir sind HILO", out_s, portrait=None)
+    card_s = _card_pixels(Image.open(p_s))
+    if card_s < 200:
+        _fail("standard-Render hat keine Text-Karte mehr (weisse Mitte nur %d Pixel) - Regression" % card_s)
+    db.set_einstellung("bild_stil", "standard")
+    print("  D) bildgen kreativ: reines Foto ohne Karte (%d), standard behaelt Karte (%d) OK" % (card, card_s))
 
 
 # ---------------------------------------------------------------------------
@@ -358,8 +366,8 @@ if __name__ == "__main__":
     test_kreativ_scene_helper()
     test_ensure_photo_fuer_routing()
     test_retention_kreativ_in_cache_dateien()
-    print("== D) bildgen kreativ -> Standard-Layout ==")
-    test_render_kreativ_standard_layout()
+    print("== D) bildgen kreativ -> reines Foto (kein Textfeld) ==")
+    test_render_kreativ_reines_foto()
     print("== E) E2E-Retention kreativ ==")
     test_e2e_retention_kreativ()
     print("BESTANDEN: Bild-Stil 'kreativ' (#143) - alle Pruefungen gruen.")

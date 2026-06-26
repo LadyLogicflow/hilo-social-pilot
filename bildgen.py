@@ -261,6 +261,22 @@ def _render_ki_tafel(fields, photo_path, slogan, out_path, portrait=None):
     base.save(out_path)
     return out_path
 
+def _render_kreativ(fields, photo_path, slogan, out_path, portrait=None):
+    """Bild-Stil 'kreativ' (#145): EINFACH NUR das kinoreife KI-Foto (vollflaechig, cover) -
+    KEIN Textfeld/Card, KEINE Ueberschrift/Bullets/Hero, KEINE CTA-Pille, KEINE Saison-Pille,
+    keine Tafel. Per Code-Overlay kommen NUR die blau-weissen CI-Kreise (Logo + Slogan) +
+    optionales Portraet, damit die Marke erkennbar bleibt und das Foto voll wirkt. Die Botschaft
+    (Ueberschrift/CTA/Buchungslink) traegt der Begleittext (Caption). Fallback ohne Foto: Creme."""
+    base = _background(photo_path).convert("RGB")
+    # Kreis-Position rotiert je Beitrag wie im Standard-Modus; mit Portraet feste Position
+    # (diagonal2: Logo unten-links, Portraet oben-rechts).
+    pos = "diagonal2" if portrait else pick_circle_pos()
+    _draw_circles(base, slogan, pos, portrait)   # NUR die CI-Kreise (Grafik) - kein Text/CTA
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    base.save(out_path)
+    return out_path
+
+
 def render(fields, photo_path, slogan, out_path, portrait=None):
     """Rendert das Magazin-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber das
     weisse Textfeld (Pille, Ueberschrift, optionale Hero-Zahl ODER groessere Ueberschrift + Hook,
@@ -270,9 +286,9 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     Bild-Stil 'ki_tafel' (#132): Modus wird intern aus der Einstellung gelesen (kein neuer Pflicht-
     Parameter). Default 'standard' -> unveraendertes v11-Layout unten.
 
-    Bild-Stil 'kreativ' (#143): das KI-Foto traegt KEINEN Text (kinoreife Szene). Darum nutzt
-    'kreativ' bewusst den STANDARD-Render-Pfad (weisses Textfeld + Ueberschrift/Bullets/Hero/CTA +
-    CI-Kreise als Code-Overlay) - NUR der ki_tafel-Stil geht in den _render_ki_tafel-Zweig."""
+    Bild-Stil 'kreativ' (#145): EINFACH NUR das KI-Foto + die CI-Kreise (kein Textfeld/CTA) ->
+    eigener _render_kreativ-Zweig. 'standard' nutzt das v11-Layout unten; nur 'ki_tafel' geht in
+    den _render_ki_tafel-Zweig."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
     try:
         # Stil PRO BEITRAG (#144): aus fields['bild_stil'] (stabil) ODER global ODER 'standard'.
@@ -280,10 +296,11 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
         stil = stilwahl.aktiver_stil(fields)
     except Exception:
         stil = "standard"
-    # #143: NUR 'ki_tafel' nutzt das Tafel-Layout. 'kreativ' (Foto ohne Text) und 'standard' nehmen
-    # beide den Standard-Pfad unten, damit Botschaft + CI sauber per Code daruebergelegt werden.
+    # #143/#145: ki_tafel -> Tafel-Layout; kreativ -> reines Foto + Kreise; standard -> v11 unten.
     if stil == "ki_tafel":
         return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
+    if stil == "kreativ":
+        return _render_kreativ(fields, photo_path, slogan, out_path, portrait)
     base = _background(photo_path).convert("RGB")
 
     # Mit Portraet feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2');
@@ -571,6 +588,15 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, por
     Liefert die Liste der Slide-Pfade in Reihenfolge. max_slides begrenzt die Gesamtzahl."""
     os.makedirs(out_dir, exist_ok=True)
     fields = _safe_fields(fields); slogan = _safe(slogan)
+    # #145: 'kreativ' ist ein Einzelbild-Stil (reines Foto + Kreise) - genau EINE Slide, keine
+    # Text-Slides. Standard/ki_tafel-Karussell bleibt unveraendert.
+    try:
+        import stilwahl
+        if stilwahl.aktiver_stil(fields) == "kreativ":
+            p = os.path.join(out_dir, "%s_01.png" % prefix)
+            return [_render_kreativ(fields, photo_path, slogan, p, portrait)]
+    except Exception:
+        pass
     bullets = [b for b in (fields.get("bullets") or []) if b]
     bullets = bullets[:max(1, max_slides - 2)]   # Title + CTA belegen 2 Slides
     total = 1 + len(bullets) + 1
