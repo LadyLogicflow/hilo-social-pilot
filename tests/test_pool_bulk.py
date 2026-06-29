@@ -66,9 +66,14 @@ def main():
     # --- Lauf 1: alle offenen Entwuerfe poolen ---
     r = client.post("/pool-aufnehmen-alle", follow_redirects=False)
     if r.status_code not in (302, 303):
-        _fail("Erwartete Redirect nach /pool, bekam HTTP %d" % r.status_code)
-    if "/pool" not in r.headers.get("Location", ""):
-        _fail("Redirect-Ziel ist nicht /pool: %r" % r.headers.get("Location"))
+        _fail("Erwartete Redirect nach der Pool-Aufnahme, bekam HTTP %d" % r.status_code)
+    # #neu: Nach der Pool-Aufnahme NICHT mehr auf die Pool-Seite umleiten (Catrin), sondern zurueck
+    # zur Ausgangsseite (Freigabe/Einplanung). Ohne Referer faellt _pool_back auf /einplanung zurueck.
+    loc = r.headers.get("Location", "")
+    if loc.rstrip("/").endswith("/pool"):
+        _fail("Redirect fuehrt faelschlich auf die Pool-Seite (soll zurueck zur Ausgangsseite): %r" % loc)
+    if not (loc.endswith("/einplanung") or loc.endswith("/entwuerfe")):
+        _fail("Redirect-Ziel ist nicht die Ausgangsseite (Freigabe/Einplanung): %r" % loc)
 
     with db.get_conn() as conn:
         # (1) Die 3 offenen Entwuerfe sind jetzt 'pool' mit aktivem pool-Eintrag.

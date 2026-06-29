@@ -563,7 +563,7 @@ button{background:#1f428d;color:#fff;border:0;padding:9px 14px;border-radius:8px
 .flash{color:#1f428d;margin:8px 0;font-weight:bold}.hint{color:#777;font-size:13px}"""
 
 _NAV = """<div class=top><div><b style="color:#1f428d;font-size:20px">HISOME</b> <span style="color:#60a33c;font-size:13px">HILO Social Media Tool</span></div>
-<div><a href="/pool">Pool</a> &middot; <a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
+<div><a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
 
 LOGIN = """<!doctype html><meta charset=utf-8><title>HISOME - HILO Social Media Tool</title>
 <style>
@@ -712,6 +712,8 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button class=no name=aktion value=verwerfen>Verwerfen</button>
       <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
+    <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
+      <button class=ok style="background:#4c7b2d" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px;display:inline" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
       <input type=hidden name=zurueck value=entwuerfe>
       <button style="background:#6b7280" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
@@ -823,7 +825,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
 <div class=top><h2 style="margin:0;color:#1f428d">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
-{% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
+{% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „3. Freigabe" oder „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
 {% for e in items %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
@@ -832,7 +834,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
   </div></div>
-{% else %}<p style="text-align:center;max-width:1040px;margin:20px auto">Der Topf ist noch leer. Gib unter <a href="/einplanung">„4. Einplanung"</a> bei einem freigegebenen Beitrag „In den Pool" frei.</p>{% endfor %}"""
+{% else %}<p style="text-align:center;max-width:1040px;margin:20px auto">Der Topf ist noch leer. Lege bei einem Beitrag unter <a href="/entwuerfe">„3. Freigabe"</a> oder <a href="/einplanung">„4. Einplanung"</a> „In den Pool".</p>{% endfor %}"""
 
 VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentlichung</title><style>""" + _STYLE + """
 .bar{max-width:1200px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
@@ -1454,6 +1456,14 @@ def pool_seite():
         kanaele=[poolmod.KANAL_LABEL[k] for k in poolmod.POOL_KANAELE],
         warn=warn, schwelle=poolmod.WARNSCHWELLE))
 
+def _pool_back():
+    """Nach einer Pool-Aufnahme NICHT auf die Pool-Seite umleiten (ueberfluessig), sondern zurueck
+    zur Ausgangsseite (Freigabe oder Einplanung). Die Pool-Seite erreicht man nur ueber die
+    Startseiten-Kachel. Endpunkt anhand des Referers, Default Einplanung."""
+    if "/entwuerfe" in (request.referrer or ""):
+        return redirect(url_for("entwuerfe"))
+    return redirect(url_for("einplanung"))
+
 @app.route("/pool-aufnehmen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def pool_aufnehmen(eid):
@@ -1471,7 +1481,7 @@ def pool_aufnehmen(eid):
         audit_log(conn, user, "pool_aufgenommen", eid, "in den Zufalls-Pool aufgenommen (alle Stellen)")
         conn.commit()
     flash("Beitrag %d ist im Pool – er wird ab jetzt automatisch je Beratungsstelle ausgespielt (jeder Beitrag je Stelle genau einmal pro Kanal)." % eid)
-    return redirect(url_for("pool_seite"))
+    return _pool_back()
 
 @app.route("/pool-entfernen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
@@ -1510,7 +1520,7 @@ def pool_aufnehmen_alle():
               "ausgespielt. Einzelne kannst du hier jederzeit wieder „Aus dem Pool nehmen\"." % n)
     else:
         flash("Es gab keine offenen Entwürfe, die in den Pool aufgenommen werden konnten.")
-    return redirect(url_for("pool_seite"))
+    return _pool_back()
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
