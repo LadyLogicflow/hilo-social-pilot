@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""HISOME - HILO Social Media Tool. Kachel-Dashboard (Flask):
+"""ShareNext - HILO Social Media Tool. Kachel-Dashboard (Flask):
 Startseite mit Workflow-Kacheln, Stufe 1 (Themenauswahl), Texte/Bilder erzeugen,
 Stufe 2 (Entwuerfe freigeben), Einplanung/Veroeffentlichung, eigene Quellen,
 Admin-Verwaltung (Benutzer + Beratungsstellen). Taeglicher Radar-Lauf um 7 Uhr."""
@@ -554,51 +554,70 @@ def rolle_required(*rollen):
     return deco
 
 # --- Stilvorlagen -----------------------------------------------------------
-_STYLE = """body{font-family:Arial,Helvetica,sans-serif;background:#eef1f4;padding:20px;margin:0;color:#15336e}
-.box{max-width:920px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:22px}
-h2{color:#1f428d;margin-top:0}h3{color:#15336e}a{color:#1f428d;text-decoration:none}
-table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
-th{color:#4c7b2d}input,select{padding:9px;border:1px solid #ccd3df;border-radius:8px;margin:4px 6px 4px 0}
-button{background:#1f428d;color:#fff;border:0;padding:9px 14px;border-radius:8px;cursor:pointer}
-.flash{color:#1f428d;margin:8px 0;font-weight:bold}.hint{color:#777;font-size:13px}"""
+# --- BSt-Next-CI: self-hosted Fonts (kein Google-CDN) + Design-Tokens + Wortmarken-Chevron ---
+_FONTS = """@font-face{font-family:'Archivo Black';font-weight:400;font-display:swap;src:url('/fonts/archivoblack-400.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('/fonts/inter-400.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('/fonts/inter-500.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('/fonts/inter-600.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('/fonts/inter-700.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:400;font-display:swap;src:url('/fonts/jetbrainsmono-400.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:500;font-display:swap;src:url('/fonts/jetbrainsmono-500.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:700;font-display:swap;src:url('/fonts/jetbrainsmono-700.woff2') format('woff2')}
+:root{--navy900:#0B2545;--navy500:#1E4A8A;--navy100:#E8F0F8;--lime:#A3E635;--lime600:#4D7C0F;--paper:#F8FAFC;--ink:#15191F;--inksoft:#4B5563}
+.stx{display:inline-flex;align-items:center}
+.stx-chev{width:.42em;height:.58em;margin-left:.05em;margin-bottom:.17em;align-self:flex-end;color:#A3E635;flex:none}
+.chev{display:inline-block;width:.5em;height:.72em;vertical-align:-2px;background:no-repeat center/contain;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 32%22><path d=%22M6 4 L20 16 L6 28%22 fill=%22none%22 stroke=%22%23A3E635%22 stroke-width=%226.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>")}
+"""
 
-_NAV = """<div class=top><div><b style="color:#1f428d;font-size:20px">HISOME</b> <span style="color:#60a33c;font-size:13px">HILO Social Media Tool</span></div>
+_STYLE = _FONTS + """body{font-family:'Inter',system-ui,Arial,sans-serif;background:var(--paper);padding:20px;margin:0;color:var(--ink)}
+.box{max-width:920px;margin:0 auto;background:#fff;border:1.5px solid var(--navy100);border-radius:16px;box-shadow:0 6px 18px rgba(11,37,69,.06);padding:24px}
+h1,h2{font-family:'Archivo Black',sans-serif;color:var(--navy900);margin-top:0}h3{color:var(--navy900)}a{color:var(--navy500);text-decoration:none}
+table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px;border-bottom:1px solid var(--navy100);text-align:left;font-size:14px}
+th{font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--lime600)}input,select,textarea{font-family:'Inter',sans-serif;padding:9px;border:1px solid #ccd3df;border-radius:8px;margin:4px 6px 4px 0}
+button{background:var(--navy900);color:#fff;border:0;padding:10px 15px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600}button:hover{filter:brightness(1.15)}
+.flash{color:var(--navy500);margin:8px 0;font-weight:700}.hint{font-family:'JetBrains Mono',monospace;color:var(--inksoft);font-size:12px}"""
+
+_NAV = """<div class=top><div class="stx" style="font-family:'Archivo Black',sans-serif;font-size:23px;color:var(--navy900)">ShareNext<svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
 <div><a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
 
-LOGIN = """<!doctype html><meta charset=utf-8><title>HISOME - HILO Social Media Tool</title>
-<style>
-body{font-family:Arial,Helvetica,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1f428d 0%,#60a33c 100%)}
-.box{background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.25);width:330px;overflow:hidden}
-.head{padding:28px 26px 4px;text-align:center}.head img{height:46px}
-.head h1{color:#1f428d;font-size:22px;margin:14px 0 2px}.head p{color:#60a33c;font-size:13px;margin:0;font-weight:bold;letter-spacing:.5px}
-.body{padding:10px 26px 26px}
-input{display:block;width:100%;box-sizing:border-box;margin:9px 0;padding:11px;border:1px solid #ccd3df;border-radius:9px}
-button{width:100%;background:#1f428d;color:#fff;border:0;padding:12px;border-radius:9px;font-weight:bold;cursor:pointer;margin-top:6px}
+LOGIN = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
+<style>""" + _FONTS + """
+body{font-family:'Inter',system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy900);color:var(--ink)}
+.box{background:#fff;border:1px solid var(--navy100);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.35);width:340px;overflow:hidden}
+.head{padding:30px 28px 4px;text-align:center}
+.head .wm{font-family:'Archivo Black',sans-serif;font-size:30px;color:var(--navy900)}
+.head .tag{font-family:'JetBrains Mono',monospace;color:var(--lime600);font-size:12px;margin:8px 0 0;letter-spacing:.3px}
+.eyebrow{font-family:'JetBrains Mono',monospace;color:var(--lime600);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:16px 28px 0}
+.body{padding:6px 28px 28px}
+input{display:block;width:100%;box-sizing:border-box;margin:9px 0;padding:11px;border:1px solid #ccd3df;border-radius:9px;font-family:'Inter',sans-serif}
+button{width:100%;background:var(--navy900);color:#fff;border:0;padding:12px;border-radius:9px;font-weight:700;cursor:pointer;margin-top:6px;font-family:'Inter',sans-serif}
+button:hover{filter:brightness(1.15)}
 .err{color:#b00020;font-size:13px;text-align:center}
 </style>
-<div class=box><div class=head><img src="/logo.png" alt="HILO"><h1>HISOME</h1><p>HILO Social Media Tool</p></div>
+<div class=box><div class=head><div class="wm"><span class="stx">ShareNext<svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><p class=tag>digital. effizient. besser.</p></div>
+<div class=eyebrow>Anmeldung</div>
 <div class=body>
 {% with m=get_flashed_messages() %}{% if m %}<p class=err>{{m[0]}}</p>{% endif %}{% endwith %}
 <form method=post><input name=name placeholder="Benutzer" autofocus><input name=passwort type=password placeholder="Passwort"><button>Anmelden</button></form>
 </div></div>"""
 
-_TOP = """body{font-family:Arial,Helvetica,sans-serif;background:#eef1f4;margin:0;padding:18px;color:#15336e}
+_TOP = _FONTS + """body{font-family:'Inter',system-ui,Arial,sans-serif;background:var(--paper);margin:0;padding:18px;color:var(--ink)}
 .top{display:flex;justify-content:space-between;align-items:center;max-width:1040px;margin:0 auto 14px}
-.top a{color:#1f428d;text-decoration:none}
-.flash{max-width:1040px;margin:0 auto 12px;color:#1f428d;font-weight:bold}"""
+.top a{color:var(--navy500);text-decoration:none}
+.flash{max-width:1040px;margin:0 auto 12px;color:var(--navy500);font-weight:700}"""
 
-HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
+HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 <style>""" + _TOP + """
-.info{max-width:1040px;margin:0 auto 16px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#1f428d;font-weight:bold;font-size:14px}
+.info{max-width:1040px;margin:0 auto 16px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#0B2545;font-weight:bold;font-size:14px}
 .grid{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:18px;position:relative;border-top:5px solid #1f428d;min-height:150px;color:inherit;text-decoration:none}
+.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:18px;position:relative;border-top:5px solid #0B2545;min-height:150px;color:inherit;text-decoration:none}
 .tile:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14);transition:.15s}
-.tile.action{border-top-color:#4c7b2d;background:linear-gradient(180deg,#f6faf2,#fff)}
-.tile h3{color:#1f428d;margin:6px 0 4px;font-size:16px}.tile p{color:#6b7280;font-size:13px;margin:0}
-.badge{position:absolute;bottom:14px;right:16px;background:#1f428d;color:#fff;border-radius:18px;padding:2px 11px;font-weight:bold;font-size:14px}
-.badge.g{background:#4c7b2d}
-.tile form{margin:10px 0 0}.tile button{background:#4c7b2d;color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
-.run{color:#4c7b2d;font-weight:bold;font-size:13px;margin-top:8px}</style>
+.tile.action{border-top-color:#4D7C0F;background:linear-gradient(180deg,#f6faf2,#fff)}
+.tile h3{color:#0B2545;margin:6px 0 4px;font-size:16px}.tile p{color:#6b7280;font-size:13px;margin:0}
+.badge{position:absolute;bottom:14px;right:16px;background:#0B2545;color:#fff;border-radius:18px;padding:2px 11px;font-weight:bold;font-size:14px}
+.badge.g{background:#4D7C0F}
+.tile form{margin:10px 0 0}.tile button{background:#4D7C0F;color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
+.run{color:#4D7C0F;font-weight:bold;font-size:13px;margin-top:8px}</style>
 """ + _NAV + """
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=info>&#x1F552; Themen werden täglich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
@@ -608,21 +627,21 @@ HOME = """<!doctype html><meta charset=utf-8><title>HISOME</title>
   <a class=tile href="/entwuerfe">{% if entwuerfe_offen %}<span class=badge>{{entwuerfe_offen}}</span>{% endif %}<h3>3. Freigabe: Texte &amp; Bilder</h3><p>Entwürfe prüfen, überarbeiten, freigeben (Stufe 2).</p></a>
   <a class=tile href="/einplanung">{% if freigegeben_offen %}<span class="badge g">{{freigegeben_offen}}</span>{% endif %}<h3>4. Einplanung Veröffentlichung</h3><p>Freigegebene Beiträge veröffentlichen.</p></a>
 </div>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4c7b2d" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>"""
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>"""
 
 ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
 .bar{max-width:920px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
-.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
-.allrow{display:flex;align-items:center;gap:8px;background:#dfe7f3;color:#1f428d;padding:9px 11px;border-radius:8px;font-weight:bold;cursor:pointer}
+.bar a{background:#0B2545;color:#fff;padding:7px 13px;border-radius:8px}
+.allrow{display:flex;align-items:center;gap:8px;background:#dfe7f3;color:#0B2545;padding:9px 11px;border-radius:8px;font-weight:bold;cursor:pointer}
 .qgroup{border:1px solid #e3e7ee;border-radius:10px;margin:10px 0;overflow:hidden}
-.qhead{display:flex;align-items:center;gap:8px;background:#eef2f8;color:#1f428d;padding:9px 11px;cursor:pointer;margin:0}
-.qrow{display:flex;gap:11px;align-items:flex-start;padding:10px 11px;border-top:1px solid #eef1f4;cursor:pointer;margin:0}
+.qhead{display:flex;align-items:center;gap:8px;background:#eef2f8;color:#0B2545;padding:9px 11px;cursor:pointer;margin:0}
+.qrow{display:flex;gap:11px;align-items:flex-start;padding:10px 11px;border-top:1px solid #F8FAFC;cursor:pointer;margin:0}
 .qrow:hover{background:#f6f8fb}
 .qhead input{margin:0}.qrow input{margin:3px 0 0}
-.ti{font-weight:bold;color:#15336e}.meta{font-size:12px;color:#7a8694}
+.ti{font-weight:bold;color:#15191F}.meta{font-size:12px;color:#7a8694}
 .delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:auto;align-self:center}</style>
 <div class=bar><h2 style="margin:0">Themen auswählen &amp; erzeugen</h2><a href="/">&larr; Startseite</a></div>
 <div class=box>
@@ -662,11 +681,11 @@ document.addEventListener('change',function(e){if(e.target&&e.target.name==='the
 EIGENER = """<!doctype html><meta charset=utf-8><title>Eigenen Beitrag erstellen</title>
 <style>""" + _TOP + """
 .card{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:22px}
-label{display:block;font-weight:bold;color:#15336e;margin:16px 0 4px}
+label{display:block;font-weight:bold;color:#15191F;margin:16px 0 4px}
 textarea,input[type=date]{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccd3df;border-radius:8px;font-size:15px}
 textarea{min-height:84px;resize:vertical}
-button{margin-top:18px;background:#4c7b2d;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:bold}</style>
-<div class=top><h2 style="margin:0;color:#1f428d">Eigenen Beitrag erstellen</h2><a href="/">&larr; Startseite</a></div>
+button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:bold}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Eigenen Beitrag erstellen</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=card>
   <p class=hint>Gib ein <b>Thema</b> und einen <b>Tag</b> an. Das Tool erstellt daraus einen Entwurf (Text&nbsp;+&nbsp;Bild) wie bei den automatischen Themen. Nach deiner Freigabe unter „3. Freigabe: Texte &amp; Bilder" wird er fest für den gewählten Tag eingeplant.</p>
@@ -683,12 +702,12 @@ ENTWUERFE = """<!doctype html><meta charset=utf-8><title>Freigabe: Texte & Bilde
 <style>""" + _TOP + """
 .card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
 .card img{width:340px;height:340px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
-.t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
-.cta{display:inline-block;background:#1f428d;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
+.cta{display:inline-block;background:#0B2545;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
 textarea{width:100%;min-height:54px;margin:8px 0;border:1px solid #ccd;border-radius:8px;padding:8px}
 button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6px;color:#fff}
-.ok{background:#2e7d32}.no{background:#9aa0a6}.re{background:#1f428d}.del{background:#b00020}</style>
-<div class=top><h2 style="margin:0;color:#1f428d">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
+.ok{background:#4D7C0F}.no{background:#9aa0a6}.re{background:#0B2545}.del{background:#b00020}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 {% if entwuerfe %}<div style="max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
   <span style="color:#6b7280;font-size:13px">Tipp: Nach geänderten Vorgaben (Bildstil, keine Abkürzungen …) kannst du alle offenen Entwürfe neu erzeugen lassen.</span>
@@ -713,7 +732,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
-      <button class=ok style="background:#4c7b2d" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
+      <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px;display:inline" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
       <input type=hidden name=zurueck value=entwuerfe>
       <button style="background:#6b7280" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
@@ -727,46 +746,46 @@ EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentl
 <style>""" + _TOP + """
 .card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
 .card img{width:240px;height:240px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
-.t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
 select,button{padding:9px;border-radius:8px;margin:4px 6px 4px 0}
-button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
+button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
 .checks{margin:6px 0;display:flex;flex-wrap:wrap;gap:8px 14px}
 .checks label{font-size:14px;background:#eef2f8;padding:4px 10px;border-radius:7px;cursor:pointer}
 .checks .stelle{display:flex;align-items:center;gap:6px;background:#eef2f8;padding:4px 8px;border-radius:7px}
 .checks .stelle label{background:none;padding:0}
 .checks .stelle select{padding:4px 6px;margin:0;font-size:13px;border-radius:6px}
-.fmt{font-size:13px;color:#15336e;margin-right:6px}.fmt select{font-size:13px;padding:6px}</style>
+.fmt{font-size:13px;color:#15191F;margin-right:6px}.fmt select{font-size:13px;padding:6px}</style>
 <script>function need(f,n,m){return f.querySelectorAll('input[name='+n+']:checked').length>0||(alert(m),false);}</script>
-<div class=top><h2 style="margin:0;color:#1f428d">Einplanung Veröffentlichung</h2><div><a href="/geplant">&#x23F0; Geplante Veröffentlichungen</a> &middot; <a href="/">Startseite</a></div></div>
+<div class=top><h2 style="margin:0;color:#0B2545">Einplanung Veröffentlichung</h2><div><a href="/geplant">&#x23F0; Geplante Veröffentlichungen</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <p class=hint style="max-width:1040px;margin:0 auto 12px">Neu freigegebene Beiträge sind zunächst <b>„Noch nicht geplant"</b>. Das Tool schlägt den nächsten freien <b>Werktag nach der letzten Einplanung</b> vor (max. 1 pro Tag, Sa+So frei) – mit einem Klick bestätigen. Termin bleibt jederzeit anpassbar.</p>
 {% if pages_err %}<div class=flash style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}}</div>{% endif %}
 {% for e in freigegeben %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
-    <p>{% if e.geplant_fuer %}<b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
+    <p>{% if e.geplant_fuer %}<b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:8px">
          <input type=date name=geplant_fuer value="{{e.geplant_fuer}}" style="padding:5px">
-         <button style="background:#1f428d;padding:6px 10px">Termin ändern</button></form>
+         <button style="background:#0B2545;padding:6px 10px">Termin ändern</button></form>
        {% else %}<span style="display:inline-block;background:#b00020;color:#fff;font-size:16px;font-weight:bold;padding:10px 16px;border-radius:8px">&#x26A0;&#xFE0F; Noch nicht geplant</span>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:10px">
          <span class=hint>Vorschlag: <b>{{e.vorschlag_de}}</b></span>
          <input type=date name=geplant_fuer value="{{e.vorschlag}}" style="padding:5px;margin-left:4px">
-         <button style="background:#2e7d32;color:#fff;padding:8px 13px;border-radius:8px;font-weight:bold">Für diesen Tag einplanen</button></form>
+         <button style="background:#4D7C0F;color:#fff;padding:8px 13px;border-radius:8px;font-weight:bold">Für diesen Tag einplanen</button></form>
        {% endif %}
        <form method=post action="/beitrag-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag nach den aktuellen Vorgaben neu erzeugen (Text + Bild)? Der geplante Termin bleibt erhalten.')">
-         <button style="background:#4c7b2d;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form>
+         <button style="background:#4D7C0F;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form>
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
     <form method=post action="/text-neu/{{e.id}}" style="margin:4px 0 8px" onsubmit="if(!this.feedback.value.trim()){alert('Bitte kurz angeben, was am Text geändert werden soll.');return false}return confirm('Nur den Text mit Ihrem Hinweis überarbeiten? Das nutzt die Text-KI; das Bild wird kostenlos an den neuen Text angepasst. Termin bleibt.')">
       <input type=hidden name=zurueck value=einplanung>
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
-      <button style="background:#1f428d;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
+      <button style="background:#0B2545;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
-    <p><a href="/beitrag/{{e.id}}" style="color:#1f428d;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
+    <p><a href="/beitrag/{{e.id}}" style="color:#0B2545;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:4px 0 10px" onsubmit="return confirm('Diesen zeitlosen Beitrag in den Zufalls-Pool aufnehmen?\n\nEr wird dann automatisch ausgespielt – je Beratungsstelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal. Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
-      <button style="background:#4c7b2d" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
+      <button style="background:#4D7C0F" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
       <span class=hint>für zeitlose Beiträge – statt manuell einzuplanen</span></form>
     {% if stellen %}
     <form method=post action="/vorschau/{{e.id}}" onsubmit="return need(this,'stelle_id','Bitte mindestens eine Beratungsstelle auswählen.')">
@@ -784,7 +803,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
-      <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
+      <button formaction="/auto-einplanen/{{e.id}}" style="background:#0B2545" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt für die gewählten Beratungsstellen veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
     <p class=hint>Bild-CTA und Begleittext werden automatisch auf die Beratungsstelle angepasst. Der <b>Kanal ist je Beratungsstelle wählbar</b> (ohne Instagram-Konto automatisch nur Facebook). <b>„Automatisch einplanen"</b> postet zur vorgeschlagenen Uhrzeit (gestreut 07–19 Uhr, anpassbar unter <a href="/geplant">Geplante Veröffentlichungen</a>).</p>
@@ -804,7 +823,7 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
-      <button formaction="/auto-einplanen/{{e.id}}" style="background:#1f428d" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
+      <button formaction="/auto-einplanen/{{e.id}}" style="background:#0B2545" title="Zur vorgeschlagenen Uhrzeit automatisch veröffentlichen">&#x23F0; Automatisch einplanen</button>
       <button formaction="/veroeffentlichen/{{e.id}}" onclick="return confirm('Ohne Vorschau direkt auf den gewählten Facebook-Seiten veröffentlichen?')" style="background:#6b7280">Direkt veröffentlichen</button>
     </form>
     <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
@@ -815,14 +834,14 @@ button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
 POOL = """<!doctype html><meta charset=utf-8><title>Zufalls-Pool</title><style>""" + _TOP + """
 .card{display:flex;gap:16px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:14px;max-width:1040px;margin:0 auto 14px}
 .card img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
-.t{flex:1}.t h3{color:#15336e;margin:.2em 0}.sub{color:#4c7b2d;font-weight:bold}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
 .meta{font-size:13px;color:#6b7280;margin:6px 0}
 button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;border-radius:8px}
-.intro{max-width:1040px;margin:0 auto 14px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#1f428d;font-size:14px}
+.intro{max-width:1040px;margin:0 auto 14px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#0B2545;font-size:14px}
 .warn{max-width:1040px;margin:0 auto 14px;background:#fff3cd;border:1px solid #ffe69c;border-radius:10px;padding:11px 16px;color:#7a5b00;font-size:14px}
-.hint{color:#777;font-size:13px}</style>
+.hint{color:#4B5563;font-size:13px}</style>
 """ + _NAV + """
-<div class=top><h2 style="margin:0;color:#1f428d">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
+<div class=top><h2 style="margin:0;color:#0B2545">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
 {% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „3. Freigabe" oder „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
@@ -838,12 +857,12 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
 
 VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentlichung</title><style>""" + _STYLE + """
 .bar{max-width:1200px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
-.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
+.bar a{background:#0B2545;color:#fff;padding:7px 13px;border-radius:8px}
 .pv{display:flex;flex-wrap:wrap;gap:18px;justify-content:center}
 .pvc{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:12px;width:340px}
-.pvc img{width:316px;height:316px;object-fit:cover;border-radius:8px;border:1px solid #eef1f4}
-.pvh{font-weight:bold;color:#15336e;margin-bottom:8px}
-.pvc details{margin-top:8px}.pvc summary{cursor:pointer;color:#1f428d;font-size:13px}
+.pvc img{width:316px;height:316px;object-fit:cover;border-radius:8px;border:1px solid #F8FAFC}
+.pvh{font-weight:bold;color:#15191F;margin-bottom:8px}
+.pvc details{margin-top:8px}.pvc summary{cursor:pointer;color:#0B2545;font-size:13px}
 .pvc .cap{font-size:13px;color:#444;margin:6px 0 0}
 .foot{max-width:1200px;margin:16px auto 0;display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:12px;padding:14px}</style>
 <div class=bar><h2 style="margin:0">Vorschau vor Veröffentlichung</h2><a href="/einplanung">&larr; Einplanung</a></div>
@@ -855,7 +874,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 {% for it in items %}
   <div class=pvc>
     <div class=pvh>{{it.label}}{% if not it.ok %} <span style="color:#b00020">– Vorschau-Fehler</span>{% endif %}</div>
-    <div style="font-size:12px;color:#4c7b2d;font-weight:bold;margin-bottom:6px">Kanal: {{it.kanal_de}}</div>
+    <div style="font-size:12px;color:#4D7C0F;font-weight:bold;margin-bottom:6px">Kanal: {{it.kanal_de}}</div>
     {% if it.ok %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
     {% if it.ok %}{% for kn, cap in it.caps %}<details{% if loop.first %} open{% endif %}><summary>Begleittext {{kn}}</summary><p class=cap style="white-space:pre-wrap">{{cap}}</p></details>{% endfor %}{% endif %}
   </div>
@@ -872,14 +891,14 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 
 GEPLANT = """<!doctype html><meta charset=utf-8><title>Geplante Veröffentlichungen</title><style>""" + _STYLE + """
 .bar{max-width:1120px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
-.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px}
+.bar a{background:#0B2545;color:#fff;padding:7px 13px;border-radius:8px}
 table.gp{max-width:1120px;margin:0 auto;width:100%}
 .gp td,.gp th{font-size:13px;vertical-align:middle}
 .st{font-weight:bold;font-size:12px;border-radius:6px;padding:2px 8px}
-.st.geplant{background:#eaf0fa;color:#1f428d}.st.veroeffentlicht{background:#e3efe0;color:#3c6322}
+.st.geplant{background:#eaf0fa;color:#0B2545}.st.veroeffentlicht{background:#e3efe0;color:#3c6322}
 .st.fehler{background:#fdeaea;color:#b00020}.st.laeuft{background:#fff3e0;color:#9a6a00}
 .gp input{padding:4px 6px;margin:0}.gp form button{padding:5px 9px;margin:0}</style>
-<div class=bar><h2 style="margin:0;color:#1f428d">Geplante Veröffentlichungen</h2><a href="/einplanung">&larr; Einplanung</a></div>
+<div class=bar><h2 style="margin:0;color:#0B2545">Geplante Veröffentlichungen</h2><a href="/einplanung">&larr; Einplanung</a></div>
 <div class=box style="max-width:1120px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 {% if posts %}
@@ -900,27 +919,27 @@ table.gp{max-width:1120px;margin:0 auto;width:100%}
 KALENDER = """<!doctype html><meta charset=utf-8><title>Content-Kalender</title>
 <style>""" + _TOP + """
 .kbar{max-width:1120px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
-.kbar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px;text-decoration:none}
+.kbar a{background:#0B2545;color:#fff;padding:7px 13px;border-radius:8px;text-decoration:none}
 table.kal{max-width:1120px;margin:0 auto;border-collapse:collapse;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.08)}
-.kal th{background:#1f428d;color:#fff;padding:8px;font-size:13px}
-.kal td{border:1px solid #eef1f4;vertical-align:top;height:98px;width:14.28%;padding:4px 6px;font-size:12px}
+.kal th{background:#0B2545;color:#fff;padding:8px;font-size:13px}
+.kal td{border:1px solid #F8FAFC;vertical-align:top;height:98px;width:14.28%;padding:4px 6px;font-size:12px}
 .kal td.out{background:#f6f7f9;color:#c2c8d0}
 .kal td.we{background:#fafbfc}
-.kal td.heute{outline:3px solid #4c7b2d;outline-offset:-3px}
-.kt{font-weight:bold;color:#1f428d}
+.kal td.heute{outline:3px solid #4D7C0F;outline-offset:-3px}
+.kt{font-weight:bold;color:#0B2545}
 .anl{display:block;background:#eaf3e2;color:#3c6322;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .frist{display:block;background:#fdeaea;color:#b00020;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.post{display:block;background:#eaf0fa;color:#15336e;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post{display:block;background:#eaf0fa;color:#15191F;border-radius:6px;padding:1px 5px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .post.pub{background:#e3efe0;color:#3c6322}
 a.anl{text-decoration:none;cursor:pointer}a.anl:hover{filter:brightness(.94)}
 a.post{text-decoration:none;cursor:pointer}a.post:hover{filter:brightness(.94)}
-.addpost{display:inline-block;margin-top:4px;color:#4c7b2d;font-size:11px;font-weight:bold;text-decoration:none}
+.addpost{display:inline-block;margin-top:4px;color:#4D7C0F;font-size:11px;font-weight:bold;text-decoration:none}
 .addpost:hover{text-decoration:underline}</style>
 """ + _NAV + """
-<div style="max-width:1120px;margin:0 auto 10px"><a href="/" style="color:#1f428d;text-decoration:none;font-weight:bold">&larr; Startseite</a></div>
+<div style="max-width:1120px;margin:0 auto 10px"><a href="/" style="color:#0B2545;text-decoration:none;font-weight:bold">&larr; Startseite</a></div>
 <div class=kbar>
   <a href="/kalender?jahr={{prev.year}}&monat={{prev.month}}">&larr; {{prev_name}}</a>
-  <h2 style="margin:0;color:#1f428d">{{monatname}} {{jahr}}</h2>
+  <h2 style="margin:0;color:#0B2545">{{monatname}} {{jahr}}</h2>
   <a href="/kalender?jahr={{nxt.year}}&monat={{nxt.month}}">{{nxt_name}} &rarr;</a>
 </div>
 <table class=kal><tr>{% for d in ['Mo','Di','Mi','Do','Fr','Sa','So'] %}<th>{{d}}</th>{% endfor %}</tr>
@@ -937,24 +956,24 @@ a.post{text-decoration:none;cursor:pointer}a.post:hover{filter:brightness(.94)}
 
 BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><style>""" + _STYLE + """
 .bar{max-width:1000px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
-.bar a{background:#1f428d;color:#fff;padding:7px 13px;border-radius:8px;margin-left:6px}
+.bar a{background:#0B2545;color:#fff;padding:7px 13px;border-radius:8px;margin-left:6px}
 .slides{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:6px 0}
 .slides figure{margin:0}
 .slides img,.single img{width:300px;height:300px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
 .slides figcaption{text-align:center;font-size:12px;color:#7a8694;margin-top:3px}
-.single{text-align:center;margin:6px 0}.meta{color:#4c7b2d;font-weight:bold}
-.wa{margin-top:18px;border-top:1px solid #eef1f4;padding-top:14px}
+.single{text-align:center;margin:6px 0}.meta{color:#4D7C0F;font-weight:bold}
+.wa{margin-top:18px;border-top:1px solid #F8FAFC;padding-top:14px}
 .wa textarea{width:100%;box-sizing:border-box;min-height:90px;border:1px solid #ccd3df;border-radius:8px;padding:8px;font:inherit}
 .wa .row{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.wa a.dl,.wa button{background:#1f428d;color:#fff;border:0;border-radius:8px;padding:8px 13px;text-decoration:none;cursor:pointer;font-size:14px}
+.wa a.dl,.wa button{background:#0B2545;color:#fff;border:0;border-radius:8px;padding:8px 13px;text-decoration:none;cursor:pointer;font-size:14px}
 .wa a.dl.gn{background:#25638f}</style>
 <script>function copyId(id,b){navigator.clipboard.writeText(document.getElementById(id).value).then(function(){var t=b.textContent;b.textContent='✓ Kopiert';setTimeout(function(){b.textContent=t;},1500);});}</script>
-<div class=bar><h2 style="margin:0;color:#1f428d">Geplanter Beitrag</h2><div><a href="/kalender">&larr; Kalender</a><a href="/einplanung">Alle geplanten</a></div></div>
+<div class=bar><h2 style="margin:0;color:#0B2545">Geplanter Beitrag</h2><div><a href="/kalender">&larr; Kalender</a><a href="/einplanung">Alle geplanten</a></div></div>
 <div class=box style="max-width:1000px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <h3 style="margin-top:0">{{e.f.ueberschrift}}</h3>
 <p class=meta>{{e.f.subline}}</p>
-<p><b style="color:#1f428d">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>{% if fmt=='karussell' %}Karussell ({{n_slides}} Slides){% else %}Einzelbild{% endif %} &middot; Status: {{status}}</span></p>
+<p><b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>{% if fmt=='karussell' %}Karussell ({{n_slides}} Slides){% else %}Einzelbild{% endif %} &middot; Status: {{status}}</span></p>
 {% if fmt=='karussell' and n_slides %}
 <div class=slides>{% for i in range(n_slides) %}<figure><img src="/beitrag-slide/{{e.id}}/{{i}}" alt="Slide {{i+1}}"><figcaption>Slide {{i+1}} von {{n_slides}}</figcaption></figure>{% endfor %}</div>
 {% elif fmt=='karussell' %}
@@ -966,7 +985,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 {% if status in ('entwurf','freigegeben') %}
 <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:10px 0;background:#f7f9fc">
-  <b style="color:#15336e">Bildtyp:</b>
+  <b style="color:#15191F">Bildtyp:</b>
   {% if e.f.bild_typ=='thema' %}Themenbild (Gegenstände){% else %}Personenbild (Beratungsszene){% endif %}
   {% if e.f.bild_motiv_thema %}
     <form method=post action="/bild-typ/{{e.id}}" style="display:inline;margin-left:8px"
@@ -985,7 +1004,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <div class=wa>
   <h3 style="margin:.2em 0">&#x1F4F2; Für WhatsApp (Kanal / Status)</h3>
   <p class=hint>WhatsApp lässt sich nicht automatisch befüllen – hier alles zum schnellen <b>manuellen</b> Posten: Text kopieren, Bild herunterladen, fertig.</p>
-  <p style="margin:.2em 0;font-weight:bold;color:#15336e">Allgemein (ohne Beratungsstelle)</p>
+  <p style="margin:.2em 0;font-weight:bold;color:#15191F">Allgemein (ohne Beratungsstelle)</p>
   <div class=hint>Kanal-Text (höchstens 3 Sätze, mit Quell-/Buchungslink)</div>
   <textarea id=watext_k readonly>{{wa_allg_kanal}}</textarea>
   <div class=row><button type=button onclick="copyId('watext_k',this)">Kanal-Text kopieren</button></div>
@@ -997,10 +1016,10 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
     <a class="dl gn" href="/bild-status/{{e.id}}" title="Hochkant 9:16, ideal für Status/Story">Status-Version (hochkant) laden</a>
   </div>
   {% if wa_stellen %}
-  <p style="margin:16px 0 .2em;font-weight:bold;color:#15336e">Personalisiert je Beratungsstelle <span class=hint style="font-weight:normal">(mit Porträt-Kreis und Ort)</span></p>
+  <p style="margin:16px 0 .2em;font-weight:bold;color:#15191F">Personalisiert je Beratungsstelle <span class=hint style="font-weight:normal">(mit Porträt-Kreis und Ort)</span></p>
   {% for w in wa_stellen %}
   <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:8px 0">
-    <b style="color:#1f428d">{{w.name}}{% if w.ort %} &middot; {{w.ort}}{% endif %}</b>
+    <b style="color:#0B2545">{{w.name}}{% if w.ort %} &middot; {{w.ort}}{% endif %}</b>
     <div class=hint style="margin-top:6px">Kanal-Text</div>
     <textarea id="watext_k_{{w.id}}" readonly>{{w.kanal}}</textarea>
     <div class=row><button type=button onclick="copyId('watext_k_{{w.id}}',this)">Kanal-Text kopieren</button></div>
@@ -1018,7 +1037,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 </div>"""
 
 THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><style>""" + _STYLE + """
-.q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
+.q{display:inline-block;background:#eaf0fa;color:#0B2545;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
 .delbtn{background:#b00020;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12px}</style>
 <script>function loeschThema(id,z){if(!confirm('Dieses Thema wirklich löschen?'))return;var f=document.createElement('form');f.method='post';f.action='/thema-loeschen/'+id;var i=document.createElement('input');i.type='hidden';i.name='zurueck';i.value=z;f.appendChild(i);document.body.appendChild(f);f.submit();}</script>
 <div class=box style="max-width:980px">
@@ -1042,11 +1061,11 @@ THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><s
 </div>"""
 
 QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><style>""" + _STYLE + """
-.q{display:inline-block;background:#eaf0fa;color:#1f428d;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
+.q{display:inline-block;background:#eaf0fa;color:#0B2545;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:bold}
 .drop{border:2px dashed #ccd3df;border-radius:12px;padding:18px;margin:8px 0;background:#fafbfc}</style>
 <div class=box>
 <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Eigene Quellen einwerfen</h2><a href="/">&larr; Startseite</a></div>
-<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. HISOME liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur öffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
+<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. ShareNext liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur öffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=drop><h3>PDF hochladen</h3>
 <form method=post enctype=multipart/form-data><input type=file name=pdf accept="application/pdf,.pdf" required>
@@ -1064,10 +1083,10 @@ QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><st
 VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title>
 <style>""" + _TOP + """
 .grid{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;border-top:5px solid #1f428d;color:inherit;text-decoration:none;min-height:92px}
+.tile{display:block;background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;border-top:5px solid #0B2545;color:inherit;text-decoration:none;min-height:92px}
 .tile:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14);transition:.15s}
-.tile h3{color:#1f428d;margin:4px 0 4px;font-size:17px}.tile p{color:#6b7280;font-size:13px;margin:0}</style>
-<div class=top><h2 style="margin:0;color:#1f428d">Verwaltung</h2><a href="/" style="color:#1f428d;text-decoration:none">&larr; Startseite</a></div>
+.tile h3{color:#0B2545;margin:4px 0 4px;font-size:17px}.tile p{color:#6b7280;font-size:13px;margin:0}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Verwaltung</h2><a href="/" style="color:#0B2545;text-decoration:none">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=grid>
   <a class=tile href="/verwaltung?bereich=benutzer"><h3>&#x1F465; Benutzer</h3><p>Konten anlegen, Rollen vergeben, aktivieren oder deaktivieren.</p></a>
@@ -1081,7 +1100,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
 </div>"""
 
 VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
-.filebtn{display:inline-block;background:#eef2f8;border:1px solid #cfd8e6;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:13px;color:#1f428d;white-space:nowrap}
+.filebtn{display:inline-block;background:#eef2f8;border:1px solid #cfd8e6;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:13px;color:#0B2545;white-space:nowrap}
 .filebtn:hover{background:#e2e9f4}
 button:disabled{opacity:.45;cursor:not-allowed}
 .wide{max-width:1480px}
@@ -1090,7 +1109,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .nw{white-space:nowrap}
 .stcards{max-width:840px;margin:0 auto}
 .stcard{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:14px 16px;margin:0 0 12px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
-.sthead{font-size:16px;color:#1f428d;margin-bottom:10px}
+.sthead{font-size:16px;color:#0B2545;margin-bottom:10px}
 .stgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
 .stfield>label{display:block;font-size:12px;font-weight:bold;color:#5a6472;margin-bottom:4px}
 .stfield select,.stfield .oid{width:100%;box-sizing:border-box;padding:7px;border:1px solid #ccd3df;border-radius:6px}
@@ -1752,9 +1771,9 @@ AUSWERTUNG = """<!doctype html><meta charset=utf-8><title>Was funktioniert</titl
 table.aw{width:100%;border-collapse:collapse}
 table.aw td{padding:4px 0;vertical-align:middle}
 .bar{background:#e7edf6;border-radius:6px;overflow:hidden}
-.bar>div{background:#1f428d;height:18px;border-radius:6px}
+.bar>div{background:#0B2545;height:18px;border-radius:6px}
 </style>
-<div style="max-width:780px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#1f428d">&#x1F4CA; Was funktioniert</h2><a href="/" style="color:#1f428d;text-decoration:none;font-weight:bold">&larr; Startseite</a></div></div>
+<div style="max-width:780px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#0B2545">&#x1F4CA; Was funktioniert</h2><a href="/" style="color:#0B2545;text-decoration:none;font-weight:bold">&larr; Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div style="max-width:780px;margin:0 auto"><div class=flash>{{m[0]}}</div></div>{% endif %}{% endwith %}
 <div class=awbox>
 <p class=hint>Ausgewertet nach <b>Reichweite</b> – wie viele Personen den Beitrag gesehen haben. {% if stand %}Letzter Abruf: {{stand}} (UTC).{% endif %}</p>
@@ -3145,6 +3164,17 @@ def logo():
         abort(404)
     return send_file(p, mimetype="image/png")
 
+@app.route("/fonts/<path:fname>")
+def serve_font(fname):
+    # Public (KEIN @login_required): self-hosted BSt-Next-Fonts, read-only, nur validierte .woff2.
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9._-]+\.woff2", fname):
+        abort(404)
+    p = os.path.join(BASE_DIR, "assets", "fonts", fname)
+    if not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="font/woff2", max_age=31536000)
+
 @app.route("/portrait/<int:sid>")
 @login_required
 def portrait(sid):
@@ -3171,21 +3201,21 @@ def _wa_call(path, method="GET", payload=None, timeout=6):
     except Exception as e:  # noqa: BLE001
         return None, str(e)
 
-WHATSAPP = """<!doctype html><meta charset=utf-8><title>HISOME - WhatsApp</title>
+WHATSAPP = """<!doctype html><meta charset=utf-8><title>ShareNext - WhatsApp</title>
 {% if wa and wa.state in ['qr','init','closed'] %}<meta http-equiv=refresh content=8>{% endif %}
 <style>""" + _TOP + """
 .wrap{max-width:760px;margin:0 auto}
 .card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;margin:0 auto 16px}
 .qr{text-align:center}.qr img{width:300px;height:300px;border:1px solid #e2e8f0;border-radius:10px}
-.ok{color:#2f7d32;font-weight:bold}.bad{color:#b00020;font-weight:bold}
+.ok{color:#4D7C0F;font-weight:bold}.bad{color:#b00020;font-weight:bold}
 .step{color:#475569;font-size:14px}
 label{display:block;margin:8px 0 3px;font-weight:bold;font-size:14px}
 input[type=text]{width:100%;box-sizing:border-box;padding:9px;border:1px solid #ccd3df;border-radius:8px}
-button{background:#1f428d;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer;margin-top:8px}
-button.g{background:#4c7b2d}button.r{background:#b00020}
+button{background:#0B2545;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer;margin-top:8px}
+button.g{background:#4D7C0F}button.r{background:#b00020}
 .muted{color:#6b7280;font-size:13px}</style>
 """ + _NAV + """
-<div style="max-width:760px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#1f428d">WhatsApp</h2><a href="/">&larr; Startseite</a></div></div>
+<div style="max-width:760px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#0B2545">WhatsApp</h2><a href="/">&larr; Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash style="max-width:760px">{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=wrap>
 {% if wa_err %}
@@ -3196,22 +3226,22 @@ button.g{background:#4c7b2d}button.r{background:#b00020}
   <div class=card><p class=ok>&#x2705; Verbunden{% if wa.me %} als <code>{{wa.me}}</code>{% endif %}.</p>
     <p class=muted>Die WhatsApp-Sitzung ist aktiv. Synchronisierte Kontakte: <b>{{wa.contacts if wa.contacts is not none else '?'}}</b>.</p>
     <form method=post action="/whatsapp/logout" onsubmit="return confirm('Sitzung wirklich trennen? Du musst danach neu scannen.')"><button class=r>Sitzung trennen</button></form></div>
-  <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Status</h3>
+  <div class=card><h3 style="margin:0 0 6px;color:#0B2545">Test: Status</h3>
     <form method=post action="/whatsapp/test-status">
-      <label>Text</label><input type=text name=caption placeholder="HISOME Test-Status">
+      <label>Text</label><input type=text name=caption placeholder="ShareNext Test-Status">
       <label class=step style="font-weight:normal;margin-top:8px"><input type=checkbox name=to_contacts value="1"> An meine Kontakte senden (sonst nur an mich &ndash; ein „nur an mich"-Status wird von WhatsApp aber nicht angezeigt)</label>
       <label style="margin-top:8px">Oder gezielt an eine Test-Nummer (international ohne +, z. B. 49160...)</label>
       <input type=text name=empfaenger placeholder="z. B. 49160...">
       <button class=g>Test-Status senden</button></form>
     <p class=muted>Ein WhatsApp-Status erscheint nur, wenn er an echte Kontakte geht. Für einen sichtbaren Test trag deine eigene Nummer ein &ndash; das Handy muss die …626-Nummer als Kontakt gespeichert haben, dann erscheint der Status dort im Status-Bereich.</p></div>
-  <div class=card><h3 style="margin:0 0 6px;color:#1f428d">Test: Kanal</h3>
+  <div class=card><h3 style="margin:0 0 6px;color:#0B2545">Test: Kanal</h3>
     <form method=post action="/whatsapp/test-channel">
       <label>Kanal-Einladungslink</label><input type=text name=invite placeholder="https://whatsapp.com/channel/...">
-      <label>Text</label><input type=text name=caption placeholder="HISOME Test-Kanalbeitrag">
+      <label>Text</label><input type=text name=caption placeholder="ShareNext Test-Kanalbeitrag">
       <button class=g>Test-Kanalbeitrag senden</button></form>
     <p class=muted>Den Einladungslink findest du in WhatsApp: Kanal öffnen &rarr; Name antippen &rarr; „Link teilen".</p></div>
 {% elif wa.state == 'qr' and wa.qr %}
-  <div class="card qr"><h3 style="color:#1f428d">QR-Code scannen</h3>
+  <div class="card qr"><h3 style="color:#0B2545">QR-Code scannen</h3>
     <img src="{{wa.qr}}" alt="WhatsApp QR">
     <ol class=step style="text-align:left;max-width:420px;margin:14px auto">
       <li>WhatsApp auf dem Handy mit der Beratungsstellen-Nummer öffnen</li>
@@ -3243,7 +3273,7 @@ def whatsapp_logout():
 @login_required
 def whatsapp_test_status():
     import re
-    caption = request.form.get("caption", "").strip() or "HISOME Test-Status"
+    caption = request.form.get("caption", "").strip() or "ShareNext Test-Status"
     to_contacts = bool(request.form.get("to_contacts"))
     payload = {"caption": caption, "toContacts": to_contacts}
     # Optionale Test-Empfaenger-Nummer -> WhatsApp-JID (deutsche 0... -> 49...)
@@ -3268,7 +3298,7 @@ def whatsapp_test_status():
 @login_required
 def whatsapp_test_channel():
     invite = request.form.get("invite", "").strip()
-    caption = request.form.get("caption", "").strip() or "HISOME Test-Kanalbeitrag"
+    caption = request.form.get("caption", "").strip() or "ShareNext Test-Kanalbeitrag"
     if not invite:
         flash("Bitte den Einladungslink des Kanals angeben.")
         return redirect(url_for("whatsapp"))
