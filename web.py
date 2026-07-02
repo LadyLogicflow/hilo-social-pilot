@@ -839,13 +839,14 @@ POOL = """<!doctype html><meta charset=utf-8><title>Zufalls-Pool</title><style>"
 button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;border-radius:8px}
 .intro{max-width:1040px;margin:0 auto 14px;background:#e6eef6;border-radius:10px;padding:11px 16px;color:#0B2545;font-size:14px}
 .warn{max-width:1040px;margin:0 auto 14px;background:#fff3cd;border:1px solid #ffe69c;border-radius:10px;padding:11px 16px;color:#7a5b00;font-size:14px}
-.hint{color:#4B5563;font-size:13px}</style>
+.hint{color:#4B5563;font-size:13px}
+.sec{max-width:1040px;margin:24px auto 10px;font-family:'Archivo Black',sans-serif;color:#0B2545;font-size:18px}</style>
 """ + _NAV + """
 <div class=top><h2 style="margin:0;color:#0B2545">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
 {% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „3. Freigabe" oder „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
-{% for e in items %}
+{% macro poolcard(e, slots, n_stellen, n_kanaele) %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
@@ -853,7 +854,15 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
   </div></div>
-{% else %}<p style="text-align:center;max-width:1040px;margin:20px auto">Der Topf ist noch leer. Lege bei einem Beitrag unter <a href="/entwuerfe">„3. Freigabe"</a> oder <a href="/einplanung">„4. Einplanung"</a> „In den Pool".</p>{% endfor %}"""
+{% endmacro %}
+<div class=sec>&#x267B;&#xFE0F; Aktiv im Umlauf ({{aktiv|length}})</div>
+{% for e in aktiv %}{{ poolcard(e, slots, n_stellen, n_kanaele) }}
+{% else %}<p style="text-align:center;max-width:1040px;margin:20px auto">{% if archiv %}Aktuell ist kein Beitrag „im Umlauf" – alle liegen im Archiv (siehe unten).{% else %}Der Topf ist noch leer. Lege bei einem Beitrag unter <a href="/entwuerfe">„3. Freigabe"</a> oder <a href="/einplanung">„4. Einplanung"</a> „In den Pool".{% endif %}</p>{% endfor %}
+{% if archiv %}
+<div class=sec>&#x1F4E6; Archiv &ndash; komplett ausgespielt ({{archiv|length}})</div>
+<p class=hint style="max-width:1040px;margin:0 auto 12px">Diese Beiträge wurden für <b>alle aktuellen Beratungsstellen</b> ausgespielt. Sie bleiben erhalten und werden für <b>neue Beratungsstellen</b> automatisch wieder herangezogen.</p>
+{% for e in archiv %}{{ poolcard(e, slots, n_stellen, n_kanaele) }}{% endfor %}
+{% endif %}"""
 
 VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentlichung</title><style>""" + _STYLE + """
 .bar{max-width:1200px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
@@ -1458,19 +1467,31 @@ def pool_seite():
         stelle_ids = [s["id"] for s in stellen]
         nutzung = {r["entwurf_id"]: r["n"] for r in
                    conn.execute("SELECT entwurf_id, COUNT(*) n FROM pool_nutzung GROUP BY entwurf_id")}
+        # #148 Archiv: "komplett ausgespielt" = fuer ALLE aktuellen aktiven Stellen auf ALLEN ihren
+        # tatsaechlich verfuegbaren Kanaelen bereits verbraucht. Bleibt im Topf (aktiv=1) und wird fuer
+        # NEUE Stellen automatisch wieder gezogen -> reine Anzeige-Gruppierung, Ziehung unveraendert.
+        verbraucht = poolmod.verbrauchte_paare(conn)
+        voll_stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 "
+                                    "AND fb_seite IS NOT NULL AND TRIM(fb_seite)!=''").fetchall()
+        kv = _kanal_verfuegbarkeit(voll_stellen) if voll_stellen else {}
+        alle_paare = {(sid, kanal) for kanal, sids in kv.items() for sid in sids}
         for e in conn.execute("SELECT p.entwurf_id id, p.freigegeben_am, e.text FROM pool p "
                               "JOIN entwuerfe e ON e.id=p.entwurf_id WHERE p.aktiv=1 "
                               "ORDER BY p.freigegeben_am, p.entwurf_id"):
             row = _parse(e)
             row["freigegeben_de"] = _de_datum((e["freigegeben_am"] or "")[:10])
             row["bespielt"] = nutzung.get(e["id"], 0)
+            row["archiv"] = bool(alle_paare) and all(
+                (e["id"], sid, kanal) in verbraucht for (sid, kanal) in alle_paare)
             items.append(row)
         knapp = poolmod.knappe_vorraete(conn, stelle_ids) if stelle_ids else []
     namen = {s["id"]: s["name"] for s in stellen}
     warn = ["%s · %s: noch %d" % (namen.get(sid, sid), poolmod.KANAL_LABEL.get(kanal, kanal), rest)
             for sid, kanal, rest in knapp]
+    aktiv = [r for r in items if not r.get("archiv")]
+    archiv = [r for r in items if r.get("archiv")]
     return render_template_string(POOL, **_ctx(
-        items=items, n_stellen=len(stellen), n_kanaele=len(poolmod.POOL_KANAELE),
+        items=items, aktiv=aktiv, archiv=archiv, n_stellen=len(stellen), n_kanaele=len(poolmod.POOL_KANAELE),
         slots=len(stellen) * len(poolmod.POOL_KANAELE),
         kanaele=[poolmod.KANAL_LABEL[k] for k in poolmod.POOL_KANAELE],
         warn=warn, schwelle=poolmod.WARNSCHWELLE))
