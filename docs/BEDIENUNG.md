@@ -46,12 +46,14 @@ Für **zeitlose Beiträge**, die immer wieder passen (Wissens-Serie, allgemeine 
 den **Zufalls-Pool**. Statt jeden Beitrag einzeln einzuplanen, legst du ihn **einmal** in den
 Topf – das Tool spielt ihn dann automatisch aus.
 
-- **In den Pool legen:** Auf der Seite **„4. Einplanung"** hat jeder freigegebene Beitrag den
-  grünen Knopf **„♻️ In den Pool (alle Stellen, automatisch)"**. Ein Klick = der Beitrag ist
-  für alle Stellen freigegeben und liegt im Topf.
-- **Pool-Seite** (Menü **„Pool"** oder Startseiten-Kachel): zeigt alle Beiträge im Topf und bei
-  jedem, **wie oft er schon ausgespielt** wurde. Mit **„Aus dem Pool nehmen"** holst du einen
-  Beitrag wieder heraus (er landet zurück bei „4. Einplanung").
+- **In den Pool legen:** Schon bei **„3. Freigabe"** (und weiterhin bei **„4. Einplanung"**) hat
+  jeder Beitrag den grünen Knopf **„♻️ In den Pool"**. Ein Klick = der Beitrag ist für alle Stellen
+  freigegeben und liegt im Topf. Nach dem Klick bleibst du auf der Seite (keine Weiterleitung).
+  Auf der Freigabe-Seite gibt es zusätzlich **„♻️ Alle in den Pool"** für alle offenen Entwürfe auf
+  einmal.
+- **Pool-Seite** (nur über die **Kachel „Zufalls-Pool" auf der Startseite**): zeigt alle Beiträge im
+  Topf und bei jedem, **wie oft er schon ausgespielt** wurde. Mit **„Aus dem Pool nehmen"** holst du
+  einen Beitrag wieder heraus (er landet zurück bei „4. Einplanung").
 - **Automatik:** Das Tool zieht täglich je Beratungsstelle einen Beitrag aus dem Topf – **für
   jede Stelle einen anderen** und **jeden Beitrag je Stelle nur einmal pro Kanal**. Bespielt wird
   nur, was die Stelle hat: Facebook immer, Instagram wo verknüpft, WhatsApp wo eingerichtet
