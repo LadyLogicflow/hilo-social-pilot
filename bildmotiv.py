@@ -181,11 +181,14 @@ def _kreativ_prompt(scene):
 # EXAKTER Wortlaut aus dem Auftrag. STIL_A_BLOCK ist der Stil-Wrapper; FINANZAMT_BLOCK wird NUR
 # angehaengt, wenn comic_brief['finanzamt_figur'] true ist (Buerger-vs-Finanzamt-Dreh).
 STIL_A_BLOCK = (
-    "Comic illustration in clean ligne claire style (like Herge / Tintin): bold even black "
-    "outlines, flat solid colours, no gradients, minimal shading, friendly and clear, editorial. "
-    "Brand palette: dominant deep navy blue (#0B2545) and fresh lime-green (#A3E635) accents, warm "
-    "off-white background. Tidy composition with generous empty negative space on the right side "
-    "for later text. High-quality vector-like linework. Square format."
+    "Comic illustration in a refined, richly detailed ligne claire style (like Herge / Tintin): "
+    "clean elegant black outlines of fine-to-medium weight, flat colours enriched with subtle soft "
+    "shading and gentle depth - polished and characterful, NOT crude, overly flat or sticker-like, "
+    "premium editorial quality. Brand accents in deep navy blue (#0B2545) and fresh lime-green "
+    "(#A3E635) on a warm off-white background, with a full lively range of colours where the scene "
+    "calls for it. A carefully illustrated setting with fine background detail, plus generous empty "
+    "negative space on the right side for later text. High-quality, detailed, professional linework. "
+    "Square format."
 )
 FINANZAMT_BLOCK = (
     "Recurring 'Finanzamt' character: a slightly over-correct, stamp-loving bureaucrat - grey suit, "
