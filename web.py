@@ -2585,7 +2585,9 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
         payload = {"caption": caption, "toContacts": True}
         if bild:
             payload["imagePath"] = bild
-        res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=60)
+        # Multi-Session: jede Beratungsstelle postet ihren Status von IHRER eigenen Nummer.
+        res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=60,
+                            session=(stelle["id"] if stelle else None))
         ok, info = _wa_ergebnis(res, err)
     elif kanal == "whatsapp_kanal":
         invite = (stelle["wa_kanal_invite"] if (stelle and "wa_kanal_invite" in stelle.keys()) else "") or ""
@@ -2605,7 +2607,9 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
             payload = {"invite": invite, "caption": kanal_text or (f.get("caption") or "")}
             if bild and os.path.exists(bild):
                 payload["imagePath"] = bild
-            res, err = _wa_call("/post-channel", method="POST", payload=payload, timeout=60)
+            # Multi-Session: Kanalbeitrag ueber die eigene Nummer der Stelle (Admin ihres Kanals).
+            res, err = _wa_call("/post-channel", method="POST", payload=payload, timeout=60,
+                                session=(stelle["id"] if stelle else None))
             ok, info = _wa_ergebnis(res, err)
     else:
         ok, info = False, "Unbekannter WhatsApp-Kanal: %s" % kanal
@@ -3210,10 +3214,18 @@ def portrait(sid):
     return send_file(row["portrait_pfad"], mimetype="image/png")
 
 # --- WhatsApp (Baileys-Dienst auf demselben Host, nur localhost) -------------
-def _wa_call(path, method="GET", payload=None, timeout=6):
-    """Ruft die lokale HTTP-API des Node-/Baileys-Dienstes auf. Gibt (daten, fehler) zurueck."""
-    import urllib.request, urllib.error
+def _wa_call(path, method="GET", payload=None, timeout=6, session=None):
+    """Ruft die lokale HTTP-API des Node-/Baileys-Dienstes auf. Gibt (daten, fehler) zurueck.
+    Mit 'session' (Multi-Session, i.d.R. die Beratungsstellen-ID) wird die WhatsApp-Verbindung
+    genau dieser Stelle angesprochen: bei GET als ?session=..., sonst im JSON-Body."""
+    import urllib.request, urllib.error, urllib.parse
     url = WHATSAPP_URL.rstrip("/") + path
+    if session is not None:
+        if method == "GET":
+            sep = "&" if "?" in url else "?"
+            url += "%ssession=%s" % (sep, urllib.parse.quote(str(session)))
+        else:
+            payload = dict(payload or {}); payload["session"] = str(session)
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={"Content-Type": "application/json"})
@@ -3226,7 +3238,7 @@ def _wa_call(path, method="GET", payload=None, timeout=6):
         return None, str(e)
 
 WHATSAPP = """<!doctype html><meta charset=utf-8><title>ShareNext - WhatsApp</title>
-{% if wa and wa.state in ['qr','init','closed'] %}<meta http-equiv=refresh content=8>{% endif %}
+{% if any_pending %}<meta http-equiv=refresh content=6>{% endif %}
 <style>""" + _TOP + """
 .wrap{max-width:760px;margin:0 auto}
 .card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:20px;margin:0 auto 16px}
@@ -3242,60 +3254,89 @@ button.g{background:#4D7C0F}button.r{background:#b00020}
 <div style="max-width:760px;margin:0 auto 10px"><div class=top><h2 style="margin:0;color:#0B2545">WhatsApp</h2><a href="/">&larr; Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash style="max-width:760px">{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=wrap>
-{% if wa_err %}
+{% if dienst_err %}
   <div class=card><p class=bad>WhatsApp-Dienst nicht erreichbar.</p>
-  <p class=muted>{{wa_err}}</p>
+  <p class=muted>{{dienst_err}}</p>
   <p class=step>Der WhatsApp-Dienst (Node/Baileys) läuft noch nicht. Bitte einmalig auf dem Pi einrichten (siehe <code>whatsapp/README.md</code>) und den Dienst starten.</p></div>
-{% elif wa.state == 'connected' %}
-  <div class=card><p class=ok>&#x2705; Verbunden{% if wa.me %} als <code>{{wa.me}}</code>{% endif %}.</p>
-    <p class=muted>Die WhatsApp-Sitzung ist aktiv. Synchronisierte Kontakte: <b>{{wa.contacts if wa.contacts is not none else '?'}}</b>.</p>
-    <form method=post action="/whatsapp/logout" onsubmit="return confirm('Sitzung wirklich trennen? Du musst danach neu scannen.')"><button class=r>Sitzung trennen</button></form></div>
-  <div class=card><h3 style="margin:0 0 6px;color:#0B2545">Test: Status</h3>
-    <form method=post action="/whatsapp/test-status">
-      <label>Text</label><input type=text name=caption placeholder="ShareNext Test-Status">
-      <label class=step style="font-weight:normal;margin-top:8px"><input type=checkbox name=to_contacts value="1"> An meine Kontakte senden (sonst nur an mich &ndash; ein „nur an mich"-Status wird von WhatsApp aber nicht angezeigt)</label>
-      <label style="margin-top:8px">Oder gezielt an eine Test-Nummer (international ohne +, z. B. 49160...)</label>
-      <input type=text name=empfaenger placeholder="z. B. 49160...">
-      <button class=g>Test-Status senden</button></form>
-    <p class=muted>Ein WhatsApp-Status erscheint nur, wenn er an echte Kontakte geht. Für einen sichtbaren Test trag deine eigene Nummer ein &ndash; das Handy muss die …626-Nummer als Kontakt gespeichert haben, dann erscheint der Status dort im Status-Bereich.</p></div>
-  <div class=card><h3 style="margin:0 0 6px;color:#0B2545">Test: Kanal</h3>
-    <form method=post action="/whatsapp/test-channel">
-      <label>Kanal-Einladungslink</label><input type=text name=invite placeholder="https://whatsapp.com/channel/...">
-      <label>Text</label><input type=text name=caption placeholder="ShareNext Test-Kanalbeitrag">
-      <button class=g>Test-Kanalbeitrag senden</button></form>
-    <p class=muted>Den Einladungslink findest du in WhatsApp: Kanal öffnen &rarr; Name antippen &rarr; „Link teilen".</p></div>
-{% elif wa.state == 'qr' and wa.qr %}
-  <div class="card qr"><h3 style="color:#0B2545">QR-Code scannen</h3>
-    <img src="{{wa.qr}}" alt="WhatsApp QR">
-    <ol class=step style="text-align:left;max-width:420px;margin:14px auto">
-      <li>WhatsApp auf dem Handy mit der Beratungsstellen-Nummer öffnen</li>
+{% endif %}
+<div class=card><p class=step>Verbinde je Beratungsstelle deren <b>eigene WhatsApp-Nummer</b> (Handy der Stelle). Danach postet jede Stelle ihren <b>eigenen Status</b> an ihre eigenen Kontakte; auch der WhatsApp-Kanal wird über die Nummer der Stelle bespielt.</p></div>
+{% for s in stellen %}
+<div class=card>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div><b>{{s.name}}</b> <span class=muted>· {{s.ort}}</span>{% if not s.status_aktiv %} <span class=muted>(Status in der Verwaltung nicht aktiviert)</span>{% endif %}</div>
+    <div>{% if s.wa.state == 'connected' %}<span class=ok>&#x2705; verbunden</span>{% elif s.wa.state == 'qr' %}<span class=step>QR bereit</span>{% else %}<span class=muted>nicht verbunden</span>{% endif %}</div>
+  </div>
+  {% if s.wa.state == 'connected' %}
+    <p class=muted>Nummer: <code>{{s.wa.me or '—'}}</code> · Kontakte: <b>{{s.wa.contacts}}</b></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+      <form method=post action="/whatsapp/test-status/{{s.id}}" style="flex:1;min-width:240px">
+        <input type=text name=empfaenger placeholder="Test-Nummer (optional, z. B. 49160…)">
+        <label class=step style="font-weight:normal;margin:6px 0"><input type=checkbox name=to_contacts value="1"> an alle Kontakte (sonst nur an die Test-Nummer bzw. die eigene Nummer)</label>
+        <button class=g>Test-Status senden</button></form>
+      <form method=post action="/whatsapp/logout/{{s.id}}" onsubmit="return confirm('Verbindung dieser Stelle trennen? Du musst danach neu scannen.')"><button class=r>Trennen</button></form>
+    </div>
+  {% elif s.wa.state == 'qr' and s.wa.qr %}
+    <div class=qr><img src="{{s.wa.qr}}" alt="WhatsApp QR"></div>
+    <ol class=step style="text-align:left;max-width:440px;margin:12px auto">
+      <li>WhatsApp auf dem Handy <b>dieser Stelle</b> öffnen</li>
       <li>Einstellungen &rarr; <b>Verknüpfte Geräte</b> &rarr; <b>Gerät verknüpfen</b></li>
       <li>Diesen QR-Code scannen</li></ol>
-    <p class=muted>Die Seite aktualisiert sich automatisch.</p></div>
+    <p class=muted>Die Seite aktualisiert sich automatisch.</p>
+  {% else %}
+    <form method=post action="/whatsapp/connect/{{s.id}}"><button>Verbinden (QR anzeigen)</button></form>
+    {% if s.wa.state in ['init','closed'] %}<p class=muted>Verbindung wird aufgebaut&hellip;{% if s.wa.error %} ({{s.wa.error}}){% endif %}</p>{% endif %}
+  {% endif %}
+</div>
 {% else %}
-  <div class=card><p class=step>Verbindung wird aufgebaut&hellip; (Status: {{wa.state if wa else '—'}})</p>
-    {% if wa and wa.error %}<p class=muted>{{wa.error}}</p>{% endif %}
-    <p class=muted>Die Seite aktualisiert sich automatisch.</p></div>
-{% endif %}
+<div class=card><p class=step>Noch keine aktiven Beratungsstellen. Lege zuerst unter <a href="/verwaltung?bereich=stellen">Verwaltung &rarr; Beratungsstellen</a> welche an.</p></div>
+{% endfor %}
 </div>"""
 
 @app.route("/whatsapp")
 @login_required
 def whatsapp():
-    st, err = _wa_call("/status")
-    return render_template_string(WHATSAPP, **_ctx(wa=st, wa_err=err))
+    """Multi-Session-Uebersicht: je aktiver Beratungsstelle eine eigene WhatsApp-Verbindung
+    (eigene Nummer -> eigener Status an eigene Kontakte). session-Schluessel = Beratungsstellen-ID."""
+    dienst_err = None
+    stellen = []
+    any_pending = False
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, name, ort, wa_status_aktiv FROM beratungsstellen "
+                            "WHERE aktiv=1 ORDER BY ort").fetchall()
+    for r in rows:
+        st, err = _wa_call("/status", session=r["id"], timeout=6)
+        if err and dienst_err is None:
+            dienst_err = err
+        wa = st or {"state": "nicht_verbunden", "qr": None, "me": None, "error": None, "contacts": 0}
+        if wa.get("state") in ("qr", "init", "closed"):
+            any_pending = True
+        stellen.append({"id": r["id"], "name": r["name"], "ort": r["ort"],
+                        "status_aktiv": bool(r["wa_status_aktiv"]), "wa": wa})
+    return render_template_string(WHATSAPP, **_ctx(stellen=stellen, dienst_err=dienst_err,
+                                                   any_pending=any_pending))
 
-@app.route("/whatsapp/logout", methods=["POST"])
+@app.route("/whatsapp/connect/<int:sid>", methods=["POST"])
 @login_required
-def whatsapp_logout():
-    _wa_call("/logout", method="POST", payload={})
-    audit_log_safe("whatsapp_logout")
-    flash("WhatsApp-Sitzung getrennt. Scanne den neuen QR-Code zum Neuverbinden.")
+def whatsapp_connect(sid):
+    res, err = _wa_call("/connect", method="POST", payload={}, session=sid, timeout=15)
+    if err:
+        flash("WhatsApp-Dienst nicht erreichbar: " + err)
+    else:
+        audit_log_safe("whatsapp_connect")
+        flash("Verbindung wird aufgebaut - der QR-Code erscheint gleich. Scanne ihn mit dem Handy dieser Stelle.")
     return redirect(url_for("whatsapp"))
 
-@app.route("/whatsapp/test-status", methods=["POST"])
+@app.route("/whatsapp/logout/<int:sid>", methods=["POST"])
 @login_required
-def whatsapp_test_status():
+def whatsapp_logout(sid):
+    _wa_call("/logout", method="POST", payload={}, session=sid)
+    audit_log_safe("whatsapp_logout")
+    flash("WhatsApp-Verbindung dieser Stelle getrennt.")
+    return redirect(url_for("whatsapp"))
+
+@app.route("/whatsapp/test-status/<int:sid>", methods=["POST"])
+@login_required
+def whatsapp_test_status(sid):
     import re
     caption = request.form.get("caption", "").strip() or "ShareNext Test-Status"
     to_contacts = bool(request.form.get("to_contacts"))
@@ -3308,7 +3349,7 @@ def whatsapp_test_status():
         digits = "49" + digits[1:]
     if digits:
         payload["statusJidList"] = [digits + "@s.whatsapp.net"]
-    res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=30)
+    res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=30, session=sid)
     if err:
         flash("Fehler: " + err)
     elif res and res.get("error"):
@@ -3316,24 +3357,6 @@ def whatsapp_test_status():
     else:
         n = res.get("recipients") if res else None
         flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
-    return redirect(url_for("whatsapp"))
-
-@app.route("/whatsapp/test-channel", methods=["POST"])
-@login_required
-def whatsapp_test_channel():
-    invite = request.form.get("invite", "").strip()
-    caption = request.form.get("caption", "").strip() or "ShareNext Test-Kanalbeitrag"
-    if not invite:
-        flash("Bitte den Einladungslink des Kanals angeben.")
-        return redirect(url_for("whatsapp"))
-    res, err = _wa_call("/post-channel", method="POST",
-                        payload={"invite": invite, "caption": caption}, timeout=30)
-    if err:
-        flash("Fehler: " + err)
-    elif res and res.get("error"):
-        flash("WhatsApp: " + res["error"])
-    else:
-        flash("Test-Kanalbeitrag gesendet.")
     return redirect(url_for("whatsapp"))
 
 def audit_log_safe(aktion):

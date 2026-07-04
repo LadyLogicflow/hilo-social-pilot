@@ -1,16 +1,22 @@
-// HISOME WhatsApp-Dienst (Baileys)
+// HISOME/ShareNext WhatsApp-Dienst (Baileys) — MULTI-SESSION
 // ----------------------------------------------------------------------------
 // Laeuft als eigener kleiner Node-Prozess NEBEN dem Python-Dashboard auf dem Pi.
-// Stellt eine schlanke HTTP-API (nur 127.0.0.1) bereit, die das Flask-Dashboard
-// aufruft:
-//   GET  /status        -> { state, qr (dataURL|null), me, error }
-//   GET  /channels      -> { channels: [...] }            (best effort)
-//   POST /post-status   -> { ok } | { error }   body: { imagePath, caption, statusJidList? }
-//   POST /post-channel  -> { ok } | { error }   body: { jid|invite, imagePath, caption }
-//   POST /logout        -> { ok }   (Auth loeschen, neuer QR)
+// Haelt MEHRERE WhatsApp-Verbindungen parallel (eine je Beratungsstelle = eigene
+// Nummer), damit jede Stelle ihren eigenen Status an ihre eigenen Kontakte posten
+// kann. Sessions werden ueber einen Schluessel (i.d.R. die Beratungsstellen-ID)
+// angesprochen; Auth liegt persistent je Session in ./auth/<key>.
+//
+// HTTP-API (nur 127.0.0.1), vom Flask-Dashboard aufgerufen:
+//   GET  /status?session=KEY   -> { state, qr, me, error, contacts }
+//   GET  /sessions             -> { sessions: { KEY: {state,me,contacts}, ... } }
+//   POST /connect              -> { ... }   body: { session }   (Session starten -> QR)
+//   POST /post-status          -> { ok }|{ error }  body: { session, imagePath, caption, statusJidList?, toContacts? }
+//   POST /post-channel         -> { ok }|{ error }  body: { session, jid|invite, imagePath, caption }
+//   POST /logout               -> { ok }   body: { session }   (Auth loeschen, neuer QR)
 //
 // Hinweis: WhatsApp-Status hat keine offizielle API. Baileys nutzt das
-// Linked-Device-Modell (QR-Scan). Sessions liegen persistent in ./auth.
+// Linked-Device-Modell (QR-Scan). Rueckwaertskompatibel: fehlt 'session', wird
+// der Standard-Schluessel 'default' benutzt.
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -31,13 +37,24 @@ const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || ''
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined
 const logger = pino({ level: process.env.HILO_WHATSAPP_LOGLEVEL || 'warn' })
 
-const S = { state: 'init', qr: null, me: null, error: null, contacts: 0 }
-const contacts = new Set()  // synchronisierte Kontakt-JIDs (moegliche Status-Empfaenger)
-let sock = null
+// --- Sessions ----------------------------------------------------------------
+// key -> { key, state, qr, me, error, contacts:Set, sock, starting }
+const sessions = new Map()
 
-function ownJid() {
-  return sock?.user?.id ? jidNormalizedUser(sock.user.id) : null
+function safeKey(key) {
+  const k = String(key == null || key === '' ? 'default' : key)
+  return k.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64) || 'default'
 }
+function authDirFor(key) { return path.join(AUTH_DIR, safeKey(key)) }
+
+function getSess(key) {
+  const k = safeKey(key)
+  let s = sessions.get(k)
+  if (!s) { s = { key: k, state: 'init', qr: null, me: null, error: null, contacts: new Set(), sock: null, starting: false }; sessions.set(k, s) }
+  return s
+}
+function pub(s) { return { state: s.state, qr: s.qr, me: s.me, error: s.error, contacts: s.contacts.size } }
+function ownJid(s) { return s.sock?.user?.id ? jidNormalizedUser(s.sock.user.id) : null }
 
 function readImage(p) {
   if (!p) return null
@@ -45,81 +62,80 @@ function readImage(p) {
   return fs.readFileSync(p)
 }
 
-async function start() {
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
-  const { version } = await fetchLatestBaileysVersion()
-  logger.info({ version: version.join('.'), proxy: proxyUrl || '(direkt)' }, 'starte WhatsApp-Sitzung')
+async function start(key) {
+  const s = getSess(key)
+  if (s.starting) return
+  s.starting = true
+  try {
+    const authDir = authDirFor(key)
+    const { state, saveCreds } = await useMultiFileAuthState(authDir)
+    const { version } = await fetchLatestBaileysVersion()
+    logger.info({ session: s.key, version: version.join('.'), proxy: proxyUrl || '(direkt)' }, 'starte WhatsApp-Sitzung')
 
-  sock = makeWASocket({
-    version,
-    auth: state,
-    logger,
-    agent,
-    fetchAgent: agent,
-    browser: Browsers.ubuntu('HISOME'),
-    markOnlineOnConnect: false,
-  })
+    const sock = makeWASocket({
+      version,
+      auth: state,
+      logger,
+      agent,
+      fetchAgent: agent,
+      browser: Browsers.ubuntu('HISOME'),
+      markOnlineOnConnect: false,
+    })
+    s.sock = sock
+    sock.ev.on('creds.update', saveCreds)
 
-  sock.ev.on('creds.update', saveCreds)
-
-  // Kontakte sammeln (Empfaenger fuer Status-Broadcasts)
-  const addContact = (c) => {
-    const id = c?.id
-    if (id && id.endsWith('@s.whatsapp.net')) { contacts.add(jidNormalizedUser(id)); S.contacts = contacts.size }
-  }
-  sock.ev.on('contacts.upsert', (cs) => (cs || []).forEach(addContact))
-  sock.ev.on('contacts.update', (cs) => (cs || []).forEach(addContact))
-  sock.ev.on('messaging-history.set', (h) => (h?.contacts || []).forEach(addContact))
-
-  sock.ev.on('connection.update', async (u) => {
-    const { connection, lastDisconnect, qr } = u
-    if (qr) {
-      S.state = 'qr'
-      S.error = null
-      try { S.qr = await qrcode.toDataURL(qr, { width: 480, margin: 2 }) }
-      catch (e) { S.error = 'QR-Render fehlgeschlagen: ' + e.message }
+    const addContact = (c) => {
+      const id = c?.id
+      if (id && id.endsWith('@s.whatsapp.net')) s.contacts.add(jidNormalizedUser(id))
     }
-    if (connection === 'open') {
-      S.state = 'connected'
-      S.qr = null
-      S.error = null
-      S.me = sock.user?.id || null
-      logger.info({ me: S.me }, 'verbunden')
-    }
-    if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode
-      const loggedOut = code === DisconnectReason.loggedOut
-      S.error = lastDisconnect?.error?.message || null
-      logger.warn({ code, loggedOut }, 'Verbindung geschlossen')
-      if (loggedOut) {
-        // Sitzung wurde entfernt/abgemeldet (z.B. 'device_removed') -> die gespeicherte
-        // Auth ist tot. Verwerfen, damit beim Neustart ein FRISCHER QR entsteht statt
-        // erneut sofort 401. Danach automatisch neu verbinden (zeigt dann den QR an).
-        S.state = 'logged_out'; S.me = null; S.qr = null; contacts.clear(); S.contacts = 0
-        try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }) }
-        catch (e) { logger.warn({ err: e.message }, 'Auth-Cleanup fehlgeschlagen') }
-        setTimeout(() => start().catch(e => { S.error = e.message }), 1500)
-      } else {
-        S.state = 'closed'
-        setTimeout(() => start().catch(e => { S.error = e.message }), 3000)
+    sock.ev.on('contacts.upsert', (cs) => (cs || []).forEach(addContact))
+    sock.ev.on('contacts.update', (cs) => (cs || []).forEach(addContact))
+    sock.ev.on('messaging-history.set', (h) => (h?.contacts || []).forEach(addContact))
+
+    sock.ev.on('connection.update', async (u) => {
+      const { connection, lastDisconnect, qr } = u
+      if (qr) {
+        s.state = 'qr'; s.error = null
+        try { s.qr = await qrcode.toDataURL(qr, { width: 480, margin: 2 }) }
+        catch (e) { s.error = 'QR-Render fehlgeschlagen: ' + e.message }
       }
-    }
-  })
+      if (connection === 'open') {
+        s.state = 'connected'; s.qr = null; s.error = null; s.me = sock.user?.id || null
+        logger.info({ session: s.key, me: s.me }, 'verbunden')
+      }
+      if (connection === 'close') {
+        const code = lastDisconnect?.error?.output?.statusCode
+        const loggedOut = code === DisconnectReason.loggedOut
+        s.error = lastDisconnect?.error?.message || null
+        logger.warn({ session: s.key, code, loggedOut }, 'Verbindung geschlossen')
+        if (loggedOut) {
+          s.state = 'logged_out'; s.me = null; s.qr = null; s.contacts.clear()
+          try { fs.rmSync(authDirFor(key), { recursive: true, force: true }) }
+          catch (e) { logger.warn({ err: e.message }, 'Auth-Cleanup fehlgeschlagen') }
+          setTimeout(() => start(key).catch(e => { s.error = e.message }), 1500)
+        } else {
+          s.state = 'closed'
+          setTimeout(() => start(key).catch(e => { s.error = e.message }), 3000)
+        }
+      }
+    })
+  } catch (e) {
+    s.state = 'closed'; s.error = e.message
+    logger.error({ session: s.key, err: e.message }, 'Session-Start fehlgeschlagen')
+  } finally {
+    s.starting = false
+  }
 }
 
 // --- Posting -----------------------------------------------------------------
-async function postStatus({ imagePath, caption, statusJidList, toContacts }) {
-  if (S.state !== 'connected') throw new Error('Nicht verbunden (Status: ' + S.state + ')')
+async function postStatus(s, { imagePath, caption, statusJidList, toContacts }) {
+  if (s.state !== 'connected') throw new Error('Nicht verbunden (Status: ' + s.state + ')')
   const img = readImage(imagePath)
-  // Ein Status-Broadcast braucht eine Empfaenger-Liste, sonst geht er ins Leere.
-  //  - explizite Liste hat Vorrang
-  //  - toContacts=true: an alle synchronisierten Kontakte (Produktiv-Reichweite)
-  //  - sonst (Test): nur an die eigene Nummer -> erscheint in "Mein Status", ohne Kontakte zu spammen
   let recipients = []
   if (Array.isArray(statusJidList) && statusJidList.length) recipients = statusJidList.slice()
-  else if (toContacts && contacts.size) recipients = Array.from(contacts)
-  const me = ownJid()
-  if (me && !recipients.includes(me)) recipients.push(me)  // eigene Sichtbarkeit garantieren
+  else if (toContacts && s.contacts.size) recipients = Array.from(s.contacts)
+  const me = ownJid(s)
+  if (me && !recipients.includes(me)) recipients.push(me)
   if (!recipients.length) throw new Error('Keine Empfaenger fuer den Status ermittelbar.')
 
   const opts = { statusJidList: recipients }
@@ -128,40 +144,47 @@ async function postStatus({ imagePath, caption, statusJidList, toContacts }) {
     content = { image: img, caption: caption || '' }
   } else {
     content = { text: caption || '' }
-    opts.backgroundColor = '#1f428d'  // HILO-Blau
+    opts.backgroundColor = '#0B2545'  // BSt-Next Navy
     opts.font = 3
   }
-  await sock.sendMessage('status@broadcast', content, opts)
+  await s.sock.sendMessage('status@broadcast', content, opts)
   return { ok: true, recipients: recipients.length }
 }
 
-async function resolveChannelJid({ jid, invite }) {
+async function resolveChannelJid(s, { jid, invite }) {
   if (jid) return jid
   if (invite) {
     const code = invite.split('/').pop()
-    const meta = await sock.newsletterMetadata('invite', code)
+    const meta = await s.sock.newsletterMetadata('invite', code)
     if (meta?.id) return meta.id
   }
   throw new Error('Kein Kanal angegeben (jid oder invite noetig)')
 }
 
-async function postChannel({ jid, invite, imagePath, caption }) {
-  if (S.state !== 'connected') throw new Error('Nicht verbunden (Status: ' + S.state + ')')
-  const target = await resolveChannelJid({ jid, invite })
+async function postChannel(s, { jid, invite, imagePath, caption }) {
+  if (s.state !== 'connected') throw new Error('Nicht verbunden (Status: ' + s.state + ')')
+  const target = await resolveChannelJid(s, { jid, invite })
   const img = readImage(imagePath)
   const content = img ? { image: img, caption: caption || '' } : { text: caption || '' }
-  await sock.sendMessage(target, content)
+  await s.sock.sendMessage(target, content)
   return { ok: true, jid: target }
 }
 
-async function listChannels() {
-  // Baileys bietet (versionsabhaengig) keine stabile "liste alle meine Kanaele"-API.
-  // Wir liefern, was wir aus dem Store kennen; ansonsten leer + Hinweis.
-  try {
-    const subs = await sock.newsletterFetchSubscribed?.()
-    if (Array.isArray(subs)) return subs.map(n => ({ id: n.id, name: n.name || n.threadMetadata?.name }))
-  } catch (_) { /* nicht verfuegbar */ }
-  return []
+async function logout(s) {
+  try { await s.sock?.logout() } catch (_) {}
+  try { fs.rmSync(authDirFor(s.key), { recursive: true, force: true }) } catch (_) {}
+  s.state = 'init'; s.qr = null; s.me = null; s.error = null; s.contacts.clear()
+  setTimeout(() => start(s.key).catch(e => { s.error = e.message }), 500)
+  return { ok: true }
+}
+
+// Beim Start: bestehende Sessions (Auth-Ordner auf Platte) automatisch wieder verbinden.
+function resumeExistingSessions() {
+  let keys = []
+  try { keys = fs.existsSync(AUTH_DIR) ? fs.readdirSync(AUTH_DIR, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name) : [] }
+  catch (_) { keys = [] }
+  for (const k of keys) start(k).catch(e => logger.warn({ session: k, err: e.message }, 'Resume fehlgeschlagen'))
+  logger.info({ count: keys.length }, 'bestehende Sessions wiederhergestellt')
 }
 
 // --- HTTP API (nur localhost) ------------------------------------------------
@@ -170,7 +193,6 @@ function sendJson(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' })
   res.end(body)
 }
-
 function readBody(req) {
   return new Promise((resolve) => {
     let d = ''
@@ -181,24 +203,39 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/status') {
-      return sendJson(res, 200, S)
+    const u = new URL(req.url, 'http://127.0.0.1')
+    const p = u.pathname
+
+    if (req.method === 'GET' && p === '/status') {
+      const key = u.searchParams.get('session') || 'default'
+      const s = sessions.get(safeKey(key))
+      // Unbekannte Session -> noch nicht verbunden (kein Auto-Start bei reinem Status-Poll).
+      return sendJson(res, 200, s ? pub(s) : { state: 'nicht_verbunden', qr: null, me: null, error: null, contacts: 0 })
     }
-    if (req.method === 'GET' && req.url === '/channels') {
-      return sendJson(res, 200, { channels: await listChannels() })
+    if (req.method === 'GET' && p === '/sessions') {
+      const out = {}
+      for (const [k, s] of sessions) out[k] = { state: s.state, me: s.me, contacts: s.contacts.size }
+      return sendJson(res, 200, { sessions: out })
     }
-    if (req.method === 'POST' && req.url === '/post-status') {
-      return sendJson(res, 200, await postStatus(await readBody(req)))
+    if (req.method === 'POST' && p === '/connect') {
+      const { session } = await readBody(req)
+      const key = safeKey(session)
+      const s = getSess(key)
+      // (Neu) verbinden, wenn nicht schon verbunden/verbindend.
+      if (s.state !== 'connected' && !s.starting) await start(key)
+      return sendJson(res, 200, pub(getSess(key)))
     }
-    if (req.method === 'POST' && req.url === '/post-channel') {
-      return sendJson(res, 200, await postChannel(await readBody(req)))
+    if (req.method === 'POST' && p === '/post-status') {
+      const body = await readBody(req)
+      return sendJson(res, 200, await postStatus(getSess(body.session), body))
     }
-    if (req.method === 'POST' && req.url === '/logout') {
-      try { await sock?.logout() } catch (_) {}
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true })
-      S.state = 'init'; S.qr = null; S.me = null; S.error = null
-      setTimeout(() => start().catch(e => { S.error = e.message }), 500)
-      return sendJson(res, 200, { ok: true })
+    if (req.method === 'POST' && p === '/post-channel') {
+      const body = await readBody(req)
+      return sendJson(res, 200, await postChannel(getSess(body.session), body))
+    }
+    if (req.method === 'POST' && p === '/logout') {
+      const { session } = await readBody(req)
+      return sendJson(res, 200, await logout(getSess(session)))
     }
     sendJson(res, 404, { error: 'unbekannte Route' })
   } catch (e) {
@@ -207,4 +244,4 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, '127.0.0.1', () => logger.info({ port: PORT }, 'HTTP-API bereit (127.0.0.1)'))
-start().catch(e => { S.state = 'closed'; S.error = e.message; logger.error(e) })
+resumeExistingSessions()
