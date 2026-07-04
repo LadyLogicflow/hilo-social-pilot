@@ -276,6 +276,16 @@ def _render_kreativ(fields, photo_path, slogan, out_path, portrait=None):
     base.save(out_path)
     return out_path
 
+def _render_comic(fields, photo_path, out_path, portrait=None):
+    """Bild-Stil 'comic': Das von ensure_comic_bild erzeugte Comic-Bild (photo_path) IST bereits das
+    fertige Bild (Illustration in HILO-Palette mit freiem Negativraum). Es wird nur noch
+    formatfuellend (cover) auf die Zielleinwand skaliert/eingepasst und gespeichert.
+    KEINE weisse Textkarte, KEINE Bullet-Overlays, KEINE CTA-Pille. Fallback ohne Foto: Creme."""
+    base = _background(photo_path).convert("RGB")
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    base.save(out_path)
+    return out_path
+
 
 def render(fields, photo_path, slogan, out_path, portrait=None):
     """Rendert das Magazin-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber das
@@ -297,6 +307,9 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     except Exception:
         stil = "standard"
     # #143/#145: ki_tafel -> Tafel-Layout; kreativ -> reines Foto + Kreise; standard -> v11 unten.
+    # comic -> reine Comic-Illustration (kein Overlay), da das Comic-Bild selbst schon fertig ist.
+    if stil == "comic":
+        return _render_comic(fields, photo_path, out_path, portrait)
     if stil == "ki_tafel":
         return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
     if stil == "kreativ":

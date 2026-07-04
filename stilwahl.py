@@ -24,13 +24,16 @@ import random
 log = logging.getLogger("hilo.stilwahl")
 
 # Alle bekannten Bild-Stile (Reihenfolge = Anzeige-/Default-Reihenfolge).
-STILE = ("standard", "ki_tafel", "kreativ")
+# NEU 'comic': Comic-/Ligne-claire-Illustration (Herge/Tintin-Anmutung, HILO-Palette). 'standard'
+# bleibt aus Rueckwaertskompatibilitaet erhalten, wird in der UI aber nicht mehr angeboten.
+STILE = ("standard", "ki_tafel", "kreativ", "comic")
 
 # Einstellungs-Schluessel je Stil (An/Aus-Flag, '1' aktiv / '0' inaktiv, Default alle aktiv).
 _FLAG_KEY = {
     "standard": "bild_stil_standard",
     "ki_tafel": "bild_stil_ki_tafel",
     "kreativ": "bild_stil_kreativ",
+    "comic": "bild_stil_comic",
 }
 
 

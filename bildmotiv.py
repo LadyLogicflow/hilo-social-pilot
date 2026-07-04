@@ -177,6 +177,50 @@ def _kreativ_prompt(scene):
             "Stopping Power. ABSOLUT KEIN Text, keine Buchstaben, Zahlen, Logos oder Wasserzeichen "
             "irgendwo im Bild." % scene)
 
+# --- Comic-Stil (Ligne claire / Herge) ---------------------------------------------------------
+# EXAKTER Wortlaut aus dem Auftrag. STIL_A_BLOCK ist der Stil-Wrapper; FINANZAMT_BLOCK wird NUR
+# angehaengt, wenn comic_brief['finanzamt_figur'] true ist (Buerger-vs-Finanzamt-Dreh).
+STIL_A_BLOCK = (
+    "Comic illustration in clean ligne claire style (like Herge / Tintin): bold even black "
+    "outlines, flat solid colours, no gradients, minimal shading, friendly and clear, editorial. "
+    "Brand palette: dominant deep navy blue (#0B2545) and fresh lime-green (#A3E635) accents, warm "
+    "off-white background. Tidy composition with generous empty negative space on the right side "
+    "for later text. High-quality vector-like linework. Square format."
+)
+FINANZAMT_BLOCK = (
+    "Recurring 'Finanzamt' character: a slightly over-correct, stamp-loving bureaucrat - grey suit, "
+    "round glasses, beige sleeve garters, pens in breast pocket, a smug friendly smile; sympathetic "
+    "and comic, never a villain. If he stamps a rejection, the imprint on the paper reads GESTRICHEN "
+    "in RED (green only for approvals); show mainly the wooden handle of the stamp, not the mirrored "
+    "rubber underside."
+)
+
+def _comic_brief(fields):
+    """Liefert das comic_brief-dict des Beitrags (Stimmung/Szene/Hook/Finanzamt-Figur). Fehlt es
+    oder ist es kein dict, wird ein neutraler Fallback aus der Ueberschrift gebaut - so bleibt der
+    Comic-Prompt auch fuer alte Entwuerfe ohne comic_brief robust."""
+    f = fields if isinstance(fields, dict) else {}
+    brief = f.get("comic_brief")
+    if isinstance(brief, dict) and brief:
+        return brief
+    szene = (f.get("ueberschrift") or f.get("szene_motiv")
+             or "eine ruhige Alltagsszene am Kuechentisch").strip()
+    return {"stimmung": "sachlich", "szene": szene, "hook": "", "finanzamt_figur": False}
+
+def _comic_prompt(fields):
+    """Baut den vollstaendigen Comic-Bildprompt aus STIL_A_BLOCK + der Alltagsszene des Bild-Briefs
+    (+ optionalem Hook, + FINANZAMT_BLOCK falls finanzamt_figur). Ausgelagert, damit Producer
+    (ensure_comic_bild) und Cache-Pfad (_comic_pfad) denselben String nutzen (konsistent, testbar)."""
+    brief = _comic_brief(fields)
+    szene = (brief.get("szene") or "").strip() or "eine ruhige Alltagsszene am Kuechentisch"
+    hook = (brief.get("hook") or "").strip()
+    prompt = STIL_A_BLOCK + "\n\nSzene: " + szene
+    if hook:
+        prompt += "\n\nBild-Hook: " + hook
+    if brief.get("finanzamt_figur"):
+        prompt += "\n\n" + FINANZAMT_BLOCK
+    return prompt
+
 def _tafel_prompt(scene, sign_text, traeger=None):
     """KI-Tafel-Prompt (#132): die Bild-KI schreibt die Ueberschrift selbst auf eine Tafel/Plakat
     in der Szene. EXAKTER Wortlaut aus dem Issue, echte deutsche Umlaute. {scene} = Szene-Motiv,
@@ -272,6 +316,10 @@ def ensure_photo_fuer(fields):
     motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
              or fields.get("bild_motiv_thema") or "").strip()
     # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel, kein kreativ-Foto).
+    if stil == "comic" and not motiv.startswith("icon:"):
+        # NEU (Comic): Ligne-claire-Illustration. Prompt = STIL_A_BLOCK + Alltagsszene (aus
+        # comic_brief) + optional FINANZAMT_BLOCK. Eigener Cache-Praefix 'comic_'.
+        return ensure_comic_bild(fields)
     if stil == "kreativ" and not motiv.startswith("icon:"):
         # NEU (#143): kreativ-Foto OHNE Text. Szene = das vom Art-Director-Schritt (textgen)
         # erzeugte kreativ_motiv (Fallback szene_motiv/bild_motiv/bild_motiv_thema) - _kreativ_scene
@@ -367,6 +415,17 @@ def _kreativ_pfad(scene, tool=None):
     h = hashlib.sha256(("kreativ:" + scene).lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "kreativ_" + h + ".png")
 
+def _comic_pfad(fields, tool=None):
+    """Liefert den absoluten Cache-Pfad fuer ein Comic-Bild. EIGENER Cache-Praefix 'comic_'
+    (sha256[:16] aus 'comic:' + vollstaendigem Comic-Prompt), getrennt von szene/tafel/kreativ - so
+    kollidiert das Comic-Bild NICHT mit den anderen Caches. Der Prompt (via _comic_prompt) enthaelt
+    Stil + Szene + optional Finanzamt-Block, sodass verschiedene Briefs verschiedene Dateien ergeben.
+    Tool-abhaengig (#137) wie die uebrigen Pfade (openai ohne, ideogram mit 'ideogram_'-Praefix)."""
+    if tool is None:
+        tool = aktives_bild_tool()
+    h = hashlib.sha256(("comic:" + _comic_prompt(fields)).lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_" + h + ".png")
+
 def cache_dateien_fuer_fields(fields):
     """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
     diesen 'fields' (Entwurfs-JSON-dict) nutzen KOENNTE - ueber BEIDE Stil-Varianten hinweg
@@ -433,6 +492,9 @@ def cache_dateien_fuer_fields(fields):
         # derselbe Wert wie im Producer ensure_photo_fuer -> selber _kreativ_pfad, kein
         # Falsch-Loeschen der aktiven kreativ-Datei.
         pfade.add(_kreativ_pfad(kreativ_scene, tool=tool))
+        # comic-Variante: derselbe Prompt-Bau wie im Producer (ensure_comic_bild -> _comic_prompt)
+        # -> selber _comic_pfad, kein Falsch-Loeschen der aktiven Comic-Datei nach der Schonfrist.
+        pfade.add(_comic_pfad(fields, tool=tool))
     return pfade
 
 def _openai_quality():
@@ -556,6 +618,30 @@ def ensure_photo_kreativ(scene):
         return path
     except Exception as ex:
         log.warning("Kreativ-Foto speichern fehlgeschlagen (%s): %s", scene[:40], ex)
+        return None
+
+def ensure_comic_bild(fields):
+    """Erzeugt (oder liefert aus dem Cache) das Comic-Bild (Ligne claire): eine Illustration in
+    HILO-Palette, die die STIMMUNG + ein Alltagsmotiv des Beitrags zeigt (nicht das Steuerthema
+    woertlich). Prompt = STIL_A_BLOCK + Szene aus comic_brief (+ optional Hook + FINANZAMT_BLOCK).
+    Eigener Cache-Praefix 'comic_' (getrennt von szene/tafel/kreativ). Tool-Routing (OpenAI/Ideogram)
+    wie bei den anderen Stilen. Ohne API-Key -> None (Creme-Fallback im Render)."""
+    os.makedirs(MOTIV_DIR, exist_ok=True)
+    tool = aktives_bild_tool()
+    path = _comic_pfad(fields, tool=tool)
+    if os.path.exists(path):
+        return path
+    prompt = _comic_prompt(fields)
+    daten = erzeuge_bild(prompt, tool=tool)
+    if daten is None:
+        return None
+    try:
+        with open(path, "wb") as f:
+            f.write(daten)
+        log.info("Comic-Bild erzeugt (%s): %s", tool, _comic_brief(fields).get("szene", "")[:50])
+        return path
+    except Exception as ex:
+        log.warning("Comic-Bild speichern fehlgeschlagen: %s", ex)
         return None
 
 def ensure_photo_tafel(scene, sign_text, traeger=None):
