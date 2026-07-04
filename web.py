@@ -2582,10 +2582,6 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
     # Orts-ID (Geotag) der Beratungsstelle - gilt fuer Facebook (place) UND Instagram (location_id).
     loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
-    # Sicherheitsnetz (Entkopplung): sorgt dafuer, dass ein gueltiges Bild existiert (rendert bei
-    # bild_pfad NULL on-demand). Ohne Stelle wird dieser Pfad direkt gepostet; mit Stelle rendert
-    # personalisierung ohnehin frisch - der Guard schadet dort nicht.
-    bild_pfad = _ensure_bild_pfad(conn, eid, f)
     _cache = {}
 
     def _caption(k):
@@ -2616,8 +2612,11 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                 slogan = bildgen.pick_slogan(f.get("slogan"))
                 bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
             else:
-                # bild_pfad ist der (ggf. on-demand gerenderte) Einzelbild-Pfad, nie ein NULL-Bild.
-                bilder = [bild_pfad]
+                # Einzelbild-Feed OHNE Stelle: hier (und NUR hier) wird das allgemeine Beitragsbild
+                # tatsaechlich als Post-Bild konsumiert. Sicherheitsnetz (Entkopplung): ist bild_pfad
+                # noch NULL, JETZT lazy on-demand rendern - so entsteht nie ungefragt ein "Notbild"
+                # fuer Stelle-/Karussell-Posts (die rendern ohnehin frisch pro Stelle).
+                bilder = [_ensure_bild_pfad(conn, eid, f)]
         bilder = [b for b in bilder if b and os.path.exists(b)]
         _cache[fmt] = bilder
         return bilder
@@ -2715,9 +2714,6 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
     ziel_name = (stelle["name"] if stelle else "WhatsApp")
     ziel_seite = "whatsapp"
     quelle_url = ""
-    # Sicherheitsnetz (Entkopplung): allgemeines Beitragsbild sicherstellen (rendert bei bild_pfad
-    # NULL on-demand). Dient als Fallback, falls das stellen-spezifische Bild nicht verfuegbar ist.
-    bild_pfad = _ensure_bild_pfad(conn, eid, f)
     try:
         kanal_text, story_text = personalisierung.whatsapp_texte(f, stelle, quelle_url)
     except Exception as ex:
@@ -2734,9 +2730,14 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
                 if quad and os.path.exists(quad):
                     bild = _status_hochkant(quad, os.path.join(
                         DATA_DIR, "preview", "wa_status_e%d_stelle_%d.png" % (eid, int(stelle["id"]))))
-            if not bild and bild_pfad and os.path.exists(bild_pfad):
-                bild = _status_hochkant(bild_pfad, os.path.join(
-                    DATA_DIR, "preview", "status_%d.png" % eid))
+            # Basisbild-Fallback NUR ohne Stelle (dann gibt es kein per-Stelle-Bild): hier wird das
+            # allgemeine Bild konsumiert -> lazy on-demand rendern erlaubt. MIT Stelle rendert
+            # _render_stelle_bild frisch; kein generisches "Notbild" erzeugen/persistieren (Klick-Regel).
+            if not bild and not stelle:
+                _bp = _ensure_bild_pfad(conn, eid, f)
+                if _bp and os.path.exists(_bp):
+                    bild = _status_hochkant(_bp, os.path.join(
+                        DATA_DIR, "preview", "status_%d.png" % eid))
         except Exception as ex:
             log.exception("WhatsApp-Status-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
             bild = None
@@ -2758,8 +2759,12 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
             try:
                 if stelle:
                     bild = _render_stelle_bild(eid, int(stelle["id"]))
-                if not bild and bild_pfad and os.path.exists(bild_pfad):
-                    bild = bild_pfad
+                # Basisbild-Fallback NUR ohne Stelle (Klick-Regel: kein generisches Bild fuer
+                # Stelle-Posts erzeugen/persistieren).
+                if not bild and not stelle:
+                    _bp = _ensure_bild_pfad(conn, eid, f)
+                    if _bp and os.path.exists(_bp):
+                        bild = _bp
             except Exception as ex:
                 log.exception("WhatsApp-Kanal-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
                 bild = None

@@ -316,6 +316,131 @@ def test_7_entwuerfe_und_pool_html():
     _ok("/pool: Stil-Picker mit Comic/Tafel/Kreativ, keine Vorauswahl")
 
 
+class _FakePublish:
+    """Minimaler Publish-Stub: zeichnet die an publish_facebook uebergebenen Bilder auf, damit der
+    Test beweisen kann, dass NIE ein None/NULL-Pfad an den echten Post geht."""
+    def __init__(self):
+        self.fb_bilder = []       # jeder an publish_facebook uebergebene Bild-Pfad
+        self.fb_carousel = []
+
+    def publish_facebook(self, seite, bild, caption, place=None):
+        self.fb_bilder.append(bild)
+        return True, "fbpost_1"
+
+    def publish_facebook_carousel(self, seite, bilder, caption, place=None):
+        self.fb_carousel.append(list(bilder))
+        return True, "fbcar_1"
+
+    def comment_facebook(self, *a, **k):
+        return True, "comment_1"
+
+
+def test_8_publish_guard_no_stelle_nie_bildlos_und_stelle_bleibt_null():
+    """Fix 1/2: (a) no-stelle Einzelbild-Feed -> publish_facebook bekommt NIE None (entweder ein
+    gerendertes Bild oder ok=False 'Kein Bild vorhanden'); (b) per-STELLE veroeffentlicht ->
+    entwuerfe.bild_pfad bleibt DANACH NULL (kein generisches 'Notbild' persistiert)."""
+    import personalisierung
+
+    # --- (a) no-stelle Einzelbild-Feed: bild_pfad NULL, Render gemockt -> Post bekommt echtes Bild ---
+    eid = _seed_entwurf(status="freigegeben",
+                        fields={"ueberschrift": "Ohne Stelle", "captions": {"facebook": "fb"},
+                                "caption": "fb", "slogan": "", "bullets": []})
+    rendered = {"n": 0}
+
+    def _fake_ensure_photo(fields):
+        return None
+
+    def _fake_render(fields, photo, slogan, out_path, portrait=None):
+        rendered["n"] += 1
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "wb") as fh:
+            fh.write(b"PNG")
+        return out_path
+
+    orig_ep = bildmotiv.ensure_photo_fuer
+    orig_rn = bildgen.render
+    bildmotiv.ensure_photo_fuer = _fake_ensure_photo
+    bildgen.render = _fake_render
+    fake_pub = _FakePublish()
+    try:
+        with db.get_conn() as conn:
+            e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+            f = json.loads(e["text"])
+            web._veroeffentliche_ziel(conn, e, eid, f, "einzelbild", "einzelbild", "facebook",
+                                      None, "PAGE_1", "tester", fake_pub, story=False, story_fb=False)
+    finally:
+        bildmotiv.ensure_photo_fuer = orig_ep
+        bildgen.render = orig_rn
+
+    if not fake_pub.fb_bilder:
+        _fail("(a) publish_facebook wurde nicht aufgerufen")
+    for b in fake_pub.fb_bilder:
+        if b is None or not (isinstance(b, str) and os.path.exists(b)):
+            _fail("(a) publish_facebook bekam ein NULL/nicht-existentes Bild: %r" % b)
+    if rendered["n"] < 1:
+        _fail("(a) On-demand-Render wurde im no-stelle-Feed nicht ausgeloest")
+    _ok("(a) no-stelle Feed: publish_facebook bekommt nie ein NULL-Bild (on-demand gerendert)")
+
+    # --- (b) per-STELLE: bild_pfad NULL bleibt NULL (kein generisches Bild persistiert) ---
+    eid2 = _seed_entwurf(status="freigegeben",
+                         fields={"ueberschrift": "Mit Stelle", "captions": {"facebook": "fb"},
+                                 "caption": "fb", "slogan": "", "bullets": []})
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO beratungsstellen(name, ort, fb_seite, buchungs_url, aktiv) "
+                     "VALUES ('Teststelle', 'Testort', 'fbseite_1', '', 1)")
+        conn.commit()
+        stelle = conn.execute("SELECT * FROM beratungsstellen WHERE name='Teststelle'").fetchone()
+
+    def _fake_render_fuer_stelle(fields, st, out, *a, **k):
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out, "wb") as fh:
+            fh.write(b"PNG")
+        return "portrait", out
+
+    def _fake_caption_fuer_stelle(fields, st, k):
+        return "personalisierter Text"
+
+    def _fake_buchungslink(st):
+        return ""
+
+    # Guard-Wachhund: _ensure_bild_pfad darf im Stelle-Pfad NICHT aufgerufen werden.
+    guard = {"calls": 0}
+    orig_ensure = web._ensure_bild_pfad
+
+    def _spy_ensure(conn, eid_, fields):
+        guard["calls"] += 1
+        return orig_ensure(conn, eid_, fields)
+
+    orig_rfs = personalisierung.render_fuer_stelle
+    orig_cfs = personalisierung.caption_fuer_stelle
+    orig_bl = personalisierung.buchungslink
+    personalisierung.render_fuer_stelle = _fake_render_fuer_stelle
+    personalisierung.caption_fuer_stelle = _fake_caption_fuer_stelle
+    personalisierung.buchungslink = _fake_buchungslink
+    web._ensure_bild_pfad = _spy_ensure
+    fake_pub2 = _FakePublish()
+    try:
+        with db.get_conn() as conn:
+            e2 = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid2,)).fetchone()
+            f2 = json.loads(e2["text"])
+            web._veroeffentliche_ziel(conn, e2, eid2, f2, "einzelbild", "einzelbild", "facebook",
+                                      stelle, None, "tester", fake_pub2, story=False, story_fb=False)
+    finally:
+        personalisierung.render_fuer_stelle = orig_rfs
+        personalisierung.caption_fuer_stelle = orig_cfs
+        personalisierung.buchungslink = orig_bl
+        web._ensure_bild_pfad = orig_ensure
+
+    if guard["calls"] != 0:
+        _fail("(b) _ensure_bild_pfad wurde im Stelle-Pfad aufgerufen (darf nicht)")
+    if _bild_pfad(eid2) not in (None, ""):
+        _fail("(b) bild_pfad wurde im Stelle-Pfad gesetzt (generisches Notbild persistiert): %r"
+              % _bild_pfad(eid2))
+    if not fake_pub2.fb_bilder:
+        _fail("(b) publish_facebook (Stelle) wurde nicht aufgerufen")
+    _ok("(b) per-Stelle Veroeffentlichung: bild_pfad bleibt NULL, kein _ensure_bild_pfad")
+
+
 def main():
     db.init_db()
     test_1_entkoppeln_launchers_kein_render()
@@ -325,6 +450,7 @@ def main():
     test_5_ensure_comic_bild_prompt()
     test_6_stilwahl_comic()
     test_7_entwuerfe_und_pool_html()
+    test_8_publish_guard_no_stelle_nie_bildlos_und_stelle_bleibt_null()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 
