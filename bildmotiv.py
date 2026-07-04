@@ -198,6 +198,46 @@ FINANZAMT_BLOCK = (
     "rubber underside."
 )
 
+# --- Comic per Referenzbild (OpenAI images/edits) ----------------------------------------------
+# Referenz-Assets liegen im Repo (assets/comic_refs/), Pfad relativ zum Modul, damit es auch auf
+# dem Pi funktioniert. stil_ref = allgemeine Stil-Referenz (Ligne claire, genehmigt),
+# finanzamt_ref = der wiederkehrende Finanzamt-Beamte (Charakter-Konstanz).
+_COMIC_REF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "comic_refs")
+STIL_REF_PATH = os.path.join(_COMIC_REF_DIR, "stil_ref.png")
+FINANZAMT_REF_PATH = os.path.join(_COMIC_REF_DIR, "finanzamt_ref.png")
+# OpenAI images/edits (Bild-zu-Bild mit Referenzen). gpt-image-1 akzeptiert mehrere Referenzbilder.
+COMIC_EDITS_URL = "https://api.openai.com/v1/images/edits"
+# Instruktion, die dem Comic-Prompt beim Referenz-Call vorangestellt wird: die KI soll den STIL und
+# den wiederkehrenden Charakter der Referenz uebernehmen, aber NICHT deren Szene/Inhalt kopieren.
+REF_INSTRUCTION = (
+    "Create a NEW original illustration of the scene described below. Match the drawing style, "
+    "linework, colouring and finish of the provided reference image(s). If a tax-office "
+    "('Finanzamt') official appears, draw him as the SAME recurring character shown in the "
+    "reference. Do NOT copy the reference's scene or content - only its style and that character.\n\n"
+)
+
+
+def _comic_referenz_aktiv():
+    """True, wenn der Referenzbild-Pfad (OpenAI images/edits) aktiv ist. Steuerung ueber
+    HILO_COMIC_REFERENCE (Default '1'); '0'/'false'/'no'/'off' schaltet zurueck auf den
+    bisherigen generations-Weg. Kapselt die ENV-Auswertung, damit Producer und Cache-Key
+    dieselbe Quelle nutzen."""
+    return (os.environ.get("HILO_COMIC_REFERENCE") or "1").strip().lower() not in (
+        "0", "false", "no", "off", "")
+
+
+def _comic_refs(fields):
+    """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade fuer diesen Beitrag: immer die
+    Stil-Referenz (stil_ref); zusaetzlich die Finanzamt-Referenz (finanzamt_ref), wenn der
+    Bild-Brief finanzamt_figur=True traegt. Nur tatsaechlich vorhandene Dateien werden aufgenommen,
+    damit ein fehlendes Asset nicht zum Fehler fuehrt (Aufrufer faellt dann zurueck)."""
+    refs = []
+    if os.path.exists(STIL_REF_PATH):
+        refs.append(STIL_REF_PATH)
+    if _comic_brief(fields).get("finanzamt_figur") and os.path.exists(FINANZAMT_REF_PATH):
+        refs.append(FINANZAMT_REF_PATH)
+    return refs
+
 def _comic_brief(fields):
     """Liefert das comic_brief-dict des Beitrags (Stimmung/Szene/Hook/Finanzamt-Figur). Fehlt es
     oder ist es kein dict, wird ein neutraler Fallback aus der Ueberschrift gebaut - so bleibt der
@@ -418,15 +458,28 @@ def _kreativ_pfad(scene, tool=None):
     h = hashlib.sha256(("kreativ:" + scene).lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "kreativ_" + h + ".png")
 
+def _comic_cache_input(fields):
+    """Baut den Hash-Eingabestring fuer den Comic-Cache-Key: 'comic:' + vollstaendiger Comic-Prompt
+    PLUS der Referenz-Modus. In den Modus fliessen ein: ob der Referenzpfad (images/edits) aktiv ist
+    UND die Basisnamen der tatsaechlich verwendeten Referenzbilder. So kollidieren Referenz- vs.
+    Nicht-Referenz-Bilder NICHT und finanzamt- vs. nicht-finanzamt-Referenzen bekommen getrennte
+    Dateien. Producer (_comic_pfad) und Aufraeumschutz (cache_dateien_fuer_fields, via _comic_pfad)
+    nutzen exakt diesen Bauer -> kein Falsch-Loeschen."""
+    aktiv = _comic_referenz_aktiv()
+    refs = _comic_refs(fields) if aktiv else []
+    ref_teil = "ref=%d;%s" % (1 if refs else 0, ",".join(os.path.basename(p) for p in refs))
+    return "comic:" + _comic_prompt(fields) + "|" + ref_teil
+
 def _comic_pfad(fields, tool=None):
     """Liefert den absoluten Cache-Pfad fuer ein Comic-Bild. EIGENER Cache-Praefix 'comic_'
-    (sha256[:16] aus 'comic:' + vollstaendigem Comic-Prompt), getrennt von szene/tafel/kreativ - so
-    kollidiert das Comic-Bild NICHT mit den anderen Caches. Der Prompt (via _comic_prompt) enthaelt
-    Stil + Szene + optional Finanzamt-Block, sodass verschiedene Briefs verschiedene Dateien ergeben.
-    Tool-abhaengig (#137) wie die uebrigen Pfade (openai ohne, ideogram mit 'ideogram_'-Praefix)."""
+    (sha256[:16] aus _comic_cache_input: 'comic:' + vollstaendiger Comic-Prompt + Referenz-Modus),
+    getrennt von szene/tafel/kreativ - so kollidiert das Comic-Bild NICHT mit den anderen Caches.
+    Der Prompt (via _comic_prompt) enthaelt Stil + Szene + optional Finanzamt-Block, der Referenz-Teil
+    unterscheidet Referenz- von Nicht-Referenz-Bildern, sodass verschiedene Briefs/Modi verschiedene
+    Dateien ergeben. Tool-abhaengig (#137) wie die uebrigen Pfade (openai ohne, ideogram-Praefix)."""
     if tool is None:
         tool = aktives_bild_tool()
-    h = hashlib.sha256(("comic:" + _comic_prompt(fields)).lower().encode("utf-8")).hexdigest()[:16]
+    h = hashlib.sha256(_comic_cache_input(fields).lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_" + h + ".png")
 
 def cache_dateien_fuer_fields(fields):
@@ -549,6 +602,49 @@ def erzeuge_bild_openai(prompt):
         return None
 
 
+def erzeuge_comic_bild_ref(prompt, refs):
+    """Erzeugt ein Comic-Bild via OpenAI images/edits MIT Referenzbildern (Stil- + optional
+    Charakter-Referenz) und liefert die PNG-Bytes (oder None). multipart/form-data wie
+    erzeuge_bild_openai (gleicher Key/Bearer/Timeout-Stil):
+      data:  model, prompt, size='1024x1024', quality, n='1' (KEIN background-Feld beim edits-Call)
+      files: fuer JEDEN Pfad in 'refs' ein Feld ('image[]', (basename, filehandle, 'image/png')) -
+             gpt-image-1 akzeptiert mehrere Referenzbilder.
+    Ohne 'openai_api_key', bei HTTP-/Netz-Fehler oder sonstiger Exception -> None (der Aufrufer
+    faellt dann auf den generations-Weg zurueck). Der Key wird NIE geloggt; alle geoeffneten
+    Dateihandles werden im finally sauber geschlossen. Content-Type setzt requests selbst
+    (multipart-Boundary) - hier NICHT manuell setzen."""
+    key = get_secret("openai_api_key")
+    if not key:
+        log.info("Comic-Referenzbild uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
+        return None
+    handles = []
+    try:
+        import requests
+        data = {"model": openai_image_model(), "prompt": prompt, "size": "1024x1024",
+                "quality": _openai_quality(), "n": "1"}
+        files = []
+        for path in refs:
+            fh = open(path, "rb")
+            handles.append(fh)
+            files.append(("image[]", (os.path.basename(path), fh, "image/png")))
+        r = requests.post(
+            COMIC_EDITS_URL,
+            headers={"Authorization": "Bearer %s" % key},
+            data=data, files=files, timeout=120)
+        r.raise_for_status()
+        b64 = r.json()["data"][0]["b64_json"]
+        return base64.b64decode(b64)
+    except Exception as ex:
+        log.warning("OpenAI-Comic-Referenzbild fehlgeschlagen: %s", ex)
+        return None
+    finally:
+        for fh in handles:
+            try:
+                fh.close()
+            except Exception:
+                pass
+
+
 def erzeuge_bild_ideogram(prompt):
     """Erzeugt ein Bild via Ideogram v4 (Text-Spezialist) und liefert die PNG-Bytes (oder None).
     POST IDEOGRAM_URL mit Header 'Api-Key' + JSON-Body (text_prompt, quadratisches Format). Die
@@ -628,14 +724,26 @@ def ensure_comic_bild(fields):
     HILO-Palette, die die STIMMUNG + ein Alltagsmotiv des Beitrags zeigt (nicht das Steuerthema
     woertlich). Prompt = STIL_A_BLOCK + Szene aus comic_brief (+ optional Hook + FINANZAMT_BLOCK).
     Eigener Cache-Praefix 'comic_' (getrennt von szene/tafel/kreativ). Tool-Routing (OpenAI/Ideogram)
-    wie bei den anderen Stilen. Ohne API-Key -> None (Creme-Fallback im Render)."""
+    wie bei den anderen Stilen. Ohne API-Key -> None (Creme-Fallback im Render).
+
+    NEU (Referenzbild): Ist HILO_COMIC_REFERENCE aktiv (Default) UND liegt mindestens eine
+    Referenzdatei vor, wird das Bild ueber OpenAI images/edits mit Referenzen erzeugt
+    (Stil-Referenz + optional der wiederkehrende Finanzamt-Charakter) - REF_INSTRUCTION + Comic-Prompt.
+    Ist der Referenzpfad deaktiviert, fehlt jede Referenz ODER liefert der Referenz-Call None
+    (kein Key/Fehler), faellt die Erzeugung auf den bisherigen generations-Weg (erzeuge_bild) zurueck."""
     os.makedirs(MOTIV_DIR, exist_ok=True)
     tool = aktives_bild_tool()
     path = _comic_pfad(fields, tool=tool)
     if os.path.exists(path):
         return path
-    prompt = _comic_prompt(fields)
-    daten = erzeuge_bild(prompt, tool=tool)
+    daten = None
+    refs = _comic_refs(fields)
+    if _comic_referenz_aktiv() and refs:
+        prompt_ref = REF_INSTRUCTION + _comic_prompt(fields)
+        daten = erzeuge_comic_bild_ref(prompt_ref, refs)
+    if daten is None:
+        # Fallback: Referenzpfad deaktiviert, keine Referenz vorhanden ODER kein Key/Fehler.
+        daten = erzeuge_bild(_comic_prompt(fields), tool=tool)
     if daten is None:
         return None
     try:
