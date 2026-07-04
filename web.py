@@ -790,6 +790,14 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
+    <form method=post action="/bild-generieren/{{e.id}}" style="margin:0 0 8px;display:block">
+      <input type=hidden name=zurueck value=einplanung>
+      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+        <option value="" disabled selected>– Stil wählen –</option>
+        <option value="comic">Comic</option>
+        <option value="ki_tafel">Tafel</option>
+        <option value="kreativ">Kreativ</option></select>
+      <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
     <form method=post action="/text-neu/{{e.id}}" style="margin:4px 0 8px" onsubmit="if(!this.feedback.value.trim()){alert('Bitte kurz angeben, was am Text geändert werden soll.');return false}return confirm('Nur den Text mit Ihrem Hinweis überarbeiten? Das nutzt die Text-KI; das Bild wird kostenlos an den neuen Text angepasst. Termin bleibt.')">
       <input type=hidden name=zurueck value=einplanung>
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
@@ -1838,7 +1846,9 @@ def bild_generieren(eid):
     (kein 500 fuer die Nutzerin, sondern eine verstaendliche Meldung). Gilt fuer /entwuerfe UND /pool
     (Rueckkehr ueber den zurueck-Parameter)."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("pool_seite") if zurueck == "pool" else url_for("entwuerfe")
+    ziel = (url_for("pool_seite") if zurueck == "pool"
+            else url_for("einplanung") if zurueck == "einplanung"
+            else url_for("entwuerfe"))
     stil = (request.form.get("bild_stil") or "").strip()
     if stil not in ("comic", "ki_tafel", "kreativ"):
         flash("Bitte einen Stil wählen.")
