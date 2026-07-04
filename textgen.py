@@ -238,7 +238,8 @@ def _comic_brief_prompt(fields):
         "unbemerkt Euro-Muenzen aus der Hosentasche kullern.'\n\n"
         "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown):\n"
         '{"stimmung": "humor|positiv|wuerdevoll|sachlich", '
-        '"szene": "ein bis zwei Saetze, der konkrete visuelle Einfall, deutsch", '
+        '"szene": "ein bis zwei Saetze, der konkrete visuelle Einfall MIT Umgebung/Hintergrund '
+        '(Figur + Ort + ein zwei atmosphaerische Details), bildreich, deutsch", '
         '"hook": "kurzer Bild-Hook oder leerer String", '
         '"finanzamt_figur": true oder false}\n\n%s' % beitrag
     )
