@@ -124,8 +124,8 @@ def test_openai_routing_und_modell():
     if url != "https://api.openai.com/v1/images/generations":
         _fail("OpenAI-URL falsch: %r" % url)
     body = kw.get("json") or {}
-    if body.get("model") != "gpt-image-2":
-        _fail("OpenAI-Default-Modell muss 'gpt-image-2' sein, war %r" % body.get("model"))
+    if body.get("model") != "gpt-image-1":
+        _fail("OpenAI-Default-Modell muss 'gpt-image-1' sein, war %r" % body.get("model"))
     if body.get("background") != "opaque" or body.get("size") != "1024x1024":
         _fail("OpenAI-Payload background/size falsch: %r" % body)
     if body.get("prompt") != PROMPT:
@@ -138,7 +138,7 @@ def test_openai_routing_und_modell():
     if bildmotiv.openai_payload(PROMPT)["model"] != "gpt-image-5-experimental":
         _fail("HILO_OPENAI_IMAGE_MODEL ueberschreibt das Modell nicht")
     os.environ.pop("HILO_OPENAI_IMAGE_MODEL", None)
-    print("  B/C) erzeuge_bild routet zu OpenAI; Modell-Default 'gpt-image-2' + env-ueberschreibbar: OK")
+    print("  B/C) erzeuge_bild routet zu OpenAI; Modell-Default 'gpt-image-1' + env-ueberschreibbar: OK")
 
 
 # ---------------------------------------------------------------------------

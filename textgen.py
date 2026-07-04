@@ -209,18 +209,36 @@ def _comic_brief_prompt(fields):
     beitrag = ("Ueberschrift: %s\n\nBeitragstext: %s\n\nStichpunkte: %s"
                % (ueberschrift or "-", caption or "-", bullets or "-"))
     return (
-        "Lies den folgenden HILO-Steuerbeitrag. Entwirf den Bild-Brief fuer EINE Comic-Illustration. "
+        "Lies den folgenden HILO-Steuerbeitrag und erfinde den BILD-EINFALL fuer EINE clevere "
+        "Comic-Illustration. Ziel ist ein WITZIGES, ueberraschendes Bild, das man sich merkt - "
+        "NICHT eine brave, austauschbare Szene.\n\n"
         "REGELN:\n"
-        "- Das Bild illustriert NICHT das Steuerthema woertlich, sondern die STIMMUNG des Beitrags "
-        "plus ein greifbares, konkretes ALLTAGSMOTIV (eine kleine Szene aus dem echten Leben).\n"
-        "- NIEMALS Humor bei Pflege, Krankheit, Tod oder Trauer - dort ist die Stimmung 'wuerdevoll'.\n"
-        "- 'finanzamt_figur' nur auf true setzen, wenn der Beitrag einen klaren "
-        "'Buerger-gegen-Finanzamt'-Dreh hat (Falle, Ablehnung, Bescheid) UND die Stimmung NICHT "
-        "'wuerdevoll' ist; sonst false.\n\n"
-        "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown) mit genau diesen "
-        "Feldern:\n"
+        "- VERBOTEN ist die langweilige Standardloesung 'eine sorgenvolle/nachdenkliche Person am "
+        "Tisch mit einem Brief'. Finde stattdessen einen echten EINFALL - waehle einen dieser Wege:\n"
+        "  * KUNST-/KULTUR-ANSPIELUNG passend zum Thema (z.B. bei Auslands-/Laenderbezug ein "
+        "beruehmter Maler oder ein Wahrzeichen des Landes; bei Zeit/Frist eine surreale schmelzende "
+        "Uhr im Dali-Stil), ODER\n"
+        "  * visuelle METAPHER / Wortwitz (z.B. Geld, das jemandem unbemerkt aus der Tasche faellt; "
+        "eine Falle, die zuschnappt; ein Regenschirm, der nicht schuetzt; eine Tuer, die aufgeht), ODER\n"
+        "  * die wiederkehrende FINANZAMT-FIGUR (ein leicht ueberkorrekter, stempel-verliebter "
+        "Beamter mit Riesenstempel), die dem Buerger einen Strich durch die Rechnung macht.\n"
+        "- Das Bild illustriert also NICHT den Paragraphen, sondern bringt Thema + Stimmung mit einem "
+        "Augenzwinkern auf den Punkt.\n"
+        "- AUSNAHME Ton: bei Pflege, Krankheit, Tod, Trauer oder Familie in Not KEIN Humor. Dann "
+        "stimmung='wuerdevoll' und ein STILLES, kuenstlerisches Motiv (z.B. zwei Haende, alt und jung, "
+        "die sich halten) - poetisch, wuerdevoll, ohne Gag und ohne Finanzamt-Figur.\n"
+        "- 'finanzamt_figur' nur true, wenn ein klarer 'Buerger-gegen-Finanzamt'-Dreh passt (Falle, "
+        "Ablehnung, Bescheid, gestrichen) UND stimmung != 'wuerdevoll'.\n\n"
+        "BEISPIELE (Thema -> szene):\n"
+        "- 'Rente aus den Niederlanden, Aerger mit dem Finanzamt' -> 'Eine Karikatur von Vincent van "
+        "Gogh (Strohhut, roter Bart) haelt ratlos einen deutschen Finanzamt-Brief in den Haenden.'\n"
+        "- 'Frist verpasst, Brief kam zu spaet' -> 'Eine schmelzende Taschenuhr im Dali-Stil, ueber "
+        "deren Rand ein amtlicher Briefumschlag zerlaeuft, daneben ein Wandkalender.'\n"
+        "- 'Steuer-App verschenkt Geld' -> 'Eine Person tippt begeistert aufs Handy, waehrend ihr "
+        "unbemerkt Euro-Muenzen aus der Hosentasche kullern.'\n\n"
+        "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown):\n"
         '{"stimmung": "humor|positiv|wuerdevoll|sachlich", '
-        '"szene": "ein Satz, konkrete Alltagsszene, deutsch", '
+        '"szene": "ein bis zwei Saetze, der konkrete visuelle Einfall, deutsch", '
         '"hook": "kurzer Bild-Hook oder leerer String", '
         '"finanzamt_figur": true oder false}\n\n%s' % beitrag
     )

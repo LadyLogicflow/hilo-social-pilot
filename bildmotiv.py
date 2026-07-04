@@ -22,10 +22,10 @@ from config import DATA_DIR
 log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
-# Default-Bildmodell fuer den OpenAI-Pfad (#137 Ergaenzung: Bump gpt-image-1 -> gpt-image-2).
-# Per Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ohne Code-Aenderung ueberschreibbar, falls der
-# exakte images/generations-Modellname beim OpenAI-API abweicht.
-OPENAI_IMAGE_MODEL_DEFAULT = "gpt-image-2"
+# Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
+# Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
+# reicher/plastischer als gpt-image-2. Per Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ueberschreibbar.
+OPENAI_IMAGE_MODEL_DEFAULT = "gpt-image-1"
 # Ideogram v4 Generate-Endpoint (Text-Spezialist). Quadratisches Format per Default; per
 # Umgebungsvariable HILO_IDEOGRAM_RESOLUTION ueberschreibbar, falls der Enum-Name abweicht.
 IDEOGRAM_URL = "https://api.ideogram.ai/v1/ideogram-v4/generate"
@@ -499,8 +499,8 @@ def cache_dateien_fuer_fields(fields):
 
 def _openai_quality():
     """Liefert die OpenAI-Bildqualitaet aus HILO_IMAGE_QUALITY (Default 'medium', validiert)."""
-    quality = (os.environ.get("HILO_IMAGE_QUALITY") or "medium").strip().lower()
-    return quality if quality in ("low", "medium", "high", "auto") else "medium"
+    quality = (os.environ.get("HILO_IMAGE_QUALITY") or "high").strip().lower()
+    return quality if quality in ("low", "medium", "high", "auto") else "high"
 
 
 def openai_payload(prompt):
