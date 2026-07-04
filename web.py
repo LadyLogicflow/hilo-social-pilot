@@ -1158,10 +1158,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <button style="padding:7px 13px">OK</button></form>
     </div>
     <div class=stfield><label>WhatsApp (Pool)</label>
-      <form method=post class=oidrow><input type=hidden name=formular value=stelle_whatsapp><input type=hidden name=stelle_id value="{{b.id}}">
-        <label style="font-weight:normal;font-size:13px;margin:0 0 4px"><input type=checkbox name=wa_status_aktiv value="1"{% if b.wa_status_aktiv %} checked{% endif %}> Täglichen WhatsApp-Status bespielen</label>
-        <input class=oid name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="WhatsApp-Kanal-Einladungslink (optional)" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool">
-        <button style="padding:7px 13px">OK</button></form>
+      <form method=post><input type=hidden name=formular value=stelle_whatsapp><input type=hidden name=stelle_id value="{{b.id}}">
+        <label style="font-weight:normal;font-size:13px;display:block;margin:0 0 8px"><input type=checkbox name=wa_status_aktiv value="1"{% if b.wa_status_aktiv %} checked{% endif %}> Täglichen WhatsApp-Status bespielen</label>
+        <label style="font-weight:normal;font-size:13px;display:block;margin:0 0 3px">WhatsApp-Kanal-Link <span class=hint>(optional – Einladungslink des Kanals dieser Stelle)</span></label>
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+          <input name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="https://whatsapp.com/channel/…" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool" style="flex:1;min-width:260px">
+          <button style="padding:7px 13px">OK</button>
+        </div></form>
     </div>
     <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
     <div class=stfield><label>Porträt (Kreis)</label>
