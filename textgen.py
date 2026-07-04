@@ -183,6 +183,108 @@ def art_director_motiv(fields, client=None):
         log.warning("Art-Director-Schritt fehlgeschlagen (#143): %s", ex)
     return fields
 
+# --- Comic-Stil: Bild-Brief-Schritt (NUR im Bild-Stil 'comic') -----------------------------------
+# Analog zu art_director_motiv: NACH der Texterzeugung liefert die Text-KI (Claude) einen kompakten
+# "Bild-Brief" (fields['comic_brief']) fuer eine Comic-Illustration. Das Bild soll NICHT das
+# Steuerthema woertlich illustrieren, sondern die STIMMUNG + ein greifbares Alltagsmotiv.
+COMIC_BRIEF_SYSTEM = (
+    "Du bist Bildredakteur und Comic-Art-Director fuer einen serioesen Lohnsteuerhilfeverein."
+)
+
+def _comic_brief_prompt(fields):
+    """Baut die Comic-Brief-Anweisung aus dem fertigen Beitrag (Ueberschrift + Caption + Bullets).
+    Exakter deutscher Wortlaut mit echten Umlauten. Die KI liefert NUR ein JSON-Objekt zurueck -
+    daraus wird fields['comic_brief']."""
+    f = fields if isinstance(fields, dict) else {}
+    ueberschrift = (f.get("ueberschrift") or "").strip()
+    caption = (f.get("caption") or "").strip()
+    if not caption:
+        caps = f.get("captions") if isinstance(f.get("captions"), dict) else {}
+        caption = (caps.get("facebook") or caps.get("instagram") or "").strip()
+    bullets_raw = f.get("bullets")
+    bullets = ""
+    if isinstance(bullets_raw, (list, tuple)):
+        bullets = "; ".join((str(b) if b is not None else "").strip()
+                            for b in bullets_raw if b is not None and str(b).strip())
+    beitrag = ("Ueberschrift: %s\n\nBeitragstext: %s\n\nStichpunkte: %s"
+               % (ueberschrift or "-", caption or "-", bullets or "-"))
+    return (
+        "Lies den folgenden HILO-Steuerbeitrag. Entwirf den Bild-Brief fuer EINE Comic-Illustration. "
+        "REGELN:\n"
+        "- Das Bild illustriert NICHT das Steuerthema woertlich, sondern die STIMMUNG des Beitrags "
+        "plus ein greifbares, konkretes ALLTAGSMOTIV (eine kleine Szene aus dem echten Leben).\n"
+        "- NIEMALS Humor bei Pflege, Krankheit, Tod oder Trauer - dort ist die Stimmung 'wuerdevoll'.\n"
+        "- 'finanzamt_figur' nur auf true setzen, wenn der Beitrag einen klaren "
+        "'Buerger-gegen-Finanzamt'-Dreh hat (Falle, Ablehnung, Bescheid) UND die Stimmung NICHT "
+        "'wuerdevoll' ist; sonst false.\n\n"
+        "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown) mit genau diesen "
+        "Feldern:\n"
+        '{"stimmung": "humor|positiv|wuerdevoll|sachlich", '
+        '"szene": "ein Satz, konkrete Alltagsszene, deutsch", '
+        '"hook": "kurzer Bild-Hook oder leerer String", '
+        '"finanzamt_figur": true oder false}\n\n%s' % beitrag
+    )
+
+def _comic_brief_fallback(fields):
+    """Robuster Fallback, wenn der Comic-Brief-Aufruf/das Parsen fehlschlaegt: neutrale, sachliche
+    Stimmung; Szene aus der Ueberschrift; kein Hook, keine Finanzamt-Figur."""
+    f = fields if isinstance(fields, dict) else {}
+    ueberschrift = (f.get("ueberschrift") or "").strip()
+    return {"stimmung": "sachlich",
+            "szene": (ueberschrift or "eine ruhige Alltagsszene am Kuechentisch")[:200],
+            "hook": "", "finanzamt_figur": False}
+
+def comic_brief(fields, client=None):
+    """Setzt fields['comic_brief'] - einen kompakten Bild-Brief (Stimmung + Alltagsszene) fuer die
+    Comic-Illustration - per zusaetzlichem Claude-Aufruf. Eigenschaften analog art_director_motiv:
+
+    - STABIL: ist fields['comic_brief'] bereits ein dict, bleibt es UNVERAENDERT (kein neuer Aufruf).
+    - ROBUST: jeder Fehler (kein Key, KI-/Parse-Fehler) faellt auf _comic_brief_fallback zurueck -
+      fields['comic_brief'] ist danach IMMER ein gueltiges dict (nie None).
+
+    'client' kann ein bereits erzeugter anthropic-Client sein (mockbar in Tests). Rueckgabe: fields.
+    Anders als art_director_motiv gibt es hier KEIN Stil-Gate: der Aufrufer (Bild-Generieren-Route)
+    ruft comic_brief NUR im Comic-Fall auf - so bleibt der Token-Verbrauch on-demand."""
+    if not isinstance(fields, dict):
+        return fields
+    if isinstance(fields.get("comic_brief"), dict) and fields["comic_brief"]:
+        return fields
+    brief = None
+    try:
+        if client is None:
+            key = get_secret("anthropic_api_key")
+            if not key:
+                log.info("Comic-Brief uebersprungen: kein 'anthropic_api_key' hinterlegt.")
+                fields["comic_brief"] = _comic_brief_fallback(fields)
+                return fields
+            import anthropic  # lazy
+            client = anthropic.Anthropic(api_key=key)
+        msg = client.messages.create(
+            model=_model(), max_tokens=400, system=COMIC_BRIEF_SYSTEM,
+            messages=[{"role": "user", "content": _comic_brief_prompt(fields)}],
+        )
+        raw = "".join(getattr(b, "text", "") for b in msg.content)
+        data = _parse_json(raw)
+        if isinstance(data, dict):
+            stimmung = str(data.get("stimmung") or "sachlich").strip().lower()
+            if stimmung not in ("humor", "positiv", "wuerdevoll", "sachlich"):
+                stimmung = "sachlich"
+            szene = (str(data.get("szene") or "").strip()
+                     or _comic_brief_fallback(fields)["szene"])
+            hook = str(data.get("hook") or "").strip()
+            finanzamt = bool(data.get("finanzamt_figur"))
+            # Sicherung: bei wuerdevoller Stimmung NIE die (comic-hafte) Finanzamt-Figur.
+            if stimmung == "wuerdevoll":
+                finanzamt = False
+            brief = {"stimmung": stimmung, "szene": szene[:400],
+                     "hook": hook[:200], "finanzamt_figur": finanzamt}
+            log.info("Comic-Brief erzeugt: %s / %s", stimmung, szene[:50])
+    except Exception as ex:
+        log.warning("Comic-Brief fehlgeschlagen: %s", ex)
+        brief = None
+    fields["comic_brief"] = brief or _comic_brief_fallback(fields)
+    return fields
+
 def _build_prompt(thema, kanal=None):
     """Ein Auftrag erzeugt den Beitrag fuer Facebook UND Instagram in einem Rutsch: Bild, Ueberschrift
     und Stichpunkte sind fuer beide Kanaele gleich; NUR der Begleittext (caption) unterscheidet sich je

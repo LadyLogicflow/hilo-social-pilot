@@ -190,27 +190,31 @@ def _generation_running():
     return p is not None and p.poll() is None
 
 def _start_generation(anzahl):
+    # Entkoppelt (Comic-Workflow): NUR Text erzeugen, KEIN '--render'. Das Bild entsteht erst,
+    # wenn die Nutzerin je Beitrag einen Stil waehlt und auf "Bild generieren" klickt.
     os.makedirs(DATA_DIR, exist_ok=True)
     logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
     _gen["proc"] = subprocess.Popen(
-        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--generate", str(anzahl), "--render"],
+        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--generate", str(anzahl)],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
 def _start_generation_ids(ids):
-    """Hintergrund-Erzeugung nur fuer die ausgewaehlten Thema-IDs (+ Bilder)."""
+    """Hintergrund-Erzeugung nur fuer die ausgewaehlten Thema-IDs. Entkoppelt: NUR Text, KEIN
+    Bild (kein '--render') - das Bild wird spaeter je Beitrag per Klick erzeugt."""
     os.makedirs(DATA_DIR, exist_ok=True)
     logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
     _gen["proc"] = subprocess.Popen(
         [sys.executable, os.path.join(BASE_DIR, "main.py"),
-         "--generate-ids", ",".join(str(i) for i in ids), "--render"],
+         "--generate-ids", ",".join(str(i) for i in ids)],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
 def _start_regenerate():
-    """Hintergrund: alle offenen Entwuerfe nach aktuellen Vorgaben neu erzeugen (+ Bilder neu)."""
+    """Hintergrund: alle offenen Entwuerfe nach aktuellen Vorgaben neu erzeugen. Entkoppelt: NUR
+    Text (kein '--render') - das Bild wird spaeter je Beitrag per Klick erzeugt."""
     os.makedirs(DATA_DIR, exist_ok=True)
     logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
     _gen["proc"] = subprocess.Popen(
-        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--regenerate-drafts", "--render"],
+        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--regenerate-drafts"],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
 # --- Taeglicher Radar-Lauf (7 Uhr), als Subprozess -------------------------
@@ -739,6 +743,14 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <form method=post action="/anderes-bild/{{e.id}}" style="margin-top:6px;display:inline;margin-left:6px" onsubmit="return confirm('Für diesen Beitrag einen anderen Bild-Stil würfeln und das Bild neu erzeugen?\n\nDas kostet ein neues KI-Bild. Text und Termin bleiben unverändert.')">
       <input type=hidden name=zurueck value=entwuerfe>
       <button style="background:#7a4fae" title="Anderen aktiven Bild-Stil würfeln und das Bild neu erzeugen (kostet ein neues KI-Bild). Text bleibt">&#x1F3B2; Anderes Bild</button></form>
+    <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px;display:block">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+        <option value="" disabled selected>– Stil wählen –</option>
+        <option value="comic">Comic</option>
+        <option value="ki_tafel">Tafel</option>
+        <option value="kreativ">Kreativ</option></select>
+      <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
@@ -851,8 +863,16 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
-    <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
+    <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
+    <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:8px;display:block">
+      <input type=hidden name=zurueck value=pool>
+      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+        <option value="" disabled selected>– Stil wählen –</option>
+        <option value="comic">Comic</option>
+        <option value="ki_tafel">Tafel</option>
+        <option value="kreativ">Kreativ</option></select>
+      <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
   </div></div>
 {% endmacro %}
 <div class=sec>&#x267B;&#xFE0F; Aktiv im Umlauf ({{aktiv|length}})</div>
@@ -1799,11 +1819,56 @@ def anderes_bild(eid):
                          (json.dumps(data, ensure_ascii=False), out, eid))
             audit_log(conn, session["user"], "bild_stil_gewechselt", eid, neu)
             conn.commit()
-        _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ"}
+        _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ",
+                       "comic": "Comic"}
         flash("Beitrag %d hat ein anderes Bild (Stil: %s, neues KI-Bild). Text und Termin bleiben."
               % (eid, _stil_label.get(neu, neu)))
     except Exception as ex:
         flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
+    return redirect(ziel)
+
+@app.route("/bild-generieren/<int:eid>", methods=["POST"])
+@login_required
+def bild_generieren(eid):
+    """Comic-Workflow (entkoppelt): erzeugt AUF KLICK der Nutzerin das Bild eines Entwurfs im
+    von ihr GEWAEHLTEN Stil (Formularfeld bild_stil) - es gibt KEINE Stil-Vorauswahl. Ablauf
+    (Vorbild: anderes_bild): Stil validieren -> data['bild_stil'] setzen -> je nach Stil den noetigen
+    KI-Vorbereitungsschritt (comic: comic_brief, kreativ: art_director_motiv) -> ensure_photo_fuer ->
+    pick_slogan -> render -> bild_pfad speichern. Alle externen KI-/Bild-Aufrufe sind gekapselt
+    (kein 500 fuer die Nutzerin, sondern eine verstaendliche Meldung). Gilt fuer /entwuerfe UND /pool
+    (Rueckkehr ueber den zurueck-Parameter)."""
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("pool_seite") if zurueck == "pool" else url_for("entwuerfe")
+    stil = (request.form.get("bild_stil") or "").strip()
+    if stil not in ("comic", "ki_tafel", "kreativ"):
+        flash("Bitte einen Stil wählen.")
+        return redirect(ziel)
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    try:
+        import bildmotiv, textgen
+        data = json.loads(e["text"])
+        data["bild_stil"] = stil
+        # Nur der jeweils noetige KI-Vorbereitungsschritt (on-demand, nur beim gewaehlten Stil):
+        if stil == "comic" and not (isinstance(data.get("comic_brief"), dict) and data.get("comic_brief")):
+            textgen.comic_brief(data)          # Stimmung + Alltagsszene fuer die Comic-Illustration
+        elif stil == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
+            textgen.art_director_motiv(data)   # kinoreifes Motiv (No-Op ohne Key)
+        photo = bildmotiv.ensure_photo_fuer(data)
+        slogan = bildgen.pick_slogan(data.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(data, photo, slogan, out)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), out, eid))
+            audit_log(conn, session["user"], "bild_generiert", eid, stil)
+            conn.commit()
+        _stil_label = {"comic": "Comic", "ki_tafel": "Tafel", "kreativ": "Kreativ"}
+        flash("Bild für Beitrag %d im Stil „%s“ erzeugt." % (eid, _stil_label.get(stil, stil)))
+    except Exception as ex:
+        flash("Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
 
 @app.route("/bild-typ/<int:eid>", methods=["POST"])
@@ -2310,12 +2375,11 @@ def eigener():
                          (thema_id, json.dumps(data, ensure_ascii=False), datum))
             audit_log(conn, session["user"], "eigener_beitrag", None, "Thema '%s' fuer %s" % (thema_txt[:60], datum))
             conn.commit()
-        try:
-            bildgen.render_drafts()
-        except Exception:
-            pass   # Bild wird sonst beim naechsten Lauf nachgerendert; Entwurf existiert bereits
+        # Entkoppelt (Comic-Workflow): KEIN automatisches Rendern mehr. bild_pfad bleibt NULL;
+        # die Nutzerin waehlt spaeter unter "3. Freigabe" je Beitrag einen Stil und erzeugt das
+        # Bild per Klick ("Bild generieren").
         flash("Beitrag-Entwurf zum Thema „%s“ für %s erstellt – jetzt unter „3. Freigabe: Texte & Bilder“ "
-              "prüfen und freigeben." % (thema_txt[:60], _de_datum(datum)))
+              "prüfen, Bild-Stil wählen und Bild erzeugen." % (thema_txt[:60], _de_datum(datum)))
         return redirect(url_for("entwuerfe"))
     # GET: Vorgaben aus dem Kalender-Klick (Datum, optional Thema aus einem Anlass-Tag)
     vorgabe_datum = request.args.get("datum", "").strip()
@@ -2478,6 +2542,37 @@ def _publish_story(publish, fb_page_id, bilder, eid, stelle_id, do_ig=True, do_f
     return False, "; ".join(fehler) or "Story fehlgeschlagen"
 
 
+def _ensure_bild_pfad(conn, eid, fields):
+    """Sicherheitsnetz nach dem Entkoppeln von Text und Bild (Comic-Workflow): liefert einen
+    gueltigen Bild-Pfad fuer den Entwurf. Ist entwuerfe.bild_pfad noch NULL (Bild noch nicht per
+    Klick erzeugt), wird das Bild JETZT on-demand gerendert (ensure_photo_fuer -> pick_slogan ->
+    render) und in bild_pfad gespeichert - damit ein automatischer Pool-Post NIE ohne Bild rausgeht.
+
+    Robust: schlaegt das Rendern fehl, wird None geliefert (der Aufrufer meldet dann 'Kein Bild
+    vorhanden' statt zu crashen)."""
+    try:
+        row = conn.execute("SELECT bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    except Exception:
+        row = None
+    pfad = (row["bild_pfad"] if row else None)
+    if pfad and os.path.exists(pfad):
+        return pfad
+    try:
+        import bildmotiv
+        photo = bildmotiv.ensure_photo_fuer(fields)
+        slogan = bildgen.pick_slogan(fields.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(fields, photo, slogan, out)
+        conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, eid))
+        conn.commit()
+        log.info("Bild on-demand gerendert (Veroeffentlichungs-Fallback) fuer Beitrag %s", eid)
+        return out
+    except Exception as ex:
+        log.warning("On-demand-Bild (Veroeffentlichungs-Fallback) fuer Beitrag %s fehlgeschlagen: %s",
+                    eid, ex)
+        return None
+
+
 def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_id, user, publish, story=True, story_fb=False):
     """Veroeffentlicht den Entwurf an EIN Ziel (Beratungsstelle personalisiert ODER Facebook-Seite).
     Das Bildformat ist je Kanal waehlbar: fmt_fb fuer Facebook, fmt_ig fuer Instagram
@@ -2487,6 +2582,10 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
     # Orts-ID (Geotag) der Beratungsstelle - gilt fuer Facebook (place) UND Instagram (location_id).
     loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
+    # Sicherheitsnetz (Entkopplung): sorgt dafuer, dass ein gueltiges Bild existiert (rendert bei
+    # bild_pfad NULL on-demand). Ohne Stelle wird dieser Pfad direkt gepostet; mit Stelle rendert
+    # personalisierung ohnehin frisch - der Guard schadet dort nicht.
+    bild_pfad = _ensure_bild_pfad(conn, eid, f)
     _cache = {}
 
     def _caption(k):
@@ -2517,7 +2616,8 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                 slogan = bildgen.pick_slogan(f.get("slogan"))
                 bilder = bildgen.render_slides(f, photo, slogan, out_dir, "slide")
             else:
-                bilder = [e["bild_pfad"]]
+                # bild_pfad ist der (ggf. on-demand gerenderte) Einzelbild-Pfad, nie ein NULL-Bild.
+                bilder = [bild_pfad]
         bilder = [b for b in bilder if b and os.path.exists(b)]
         _cache[fmt] = bilder
         return bilder
@@ -2615,6 +2715,9 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
     ziel_name = (stelle["name"] if stelle else "WhatsApp")
     ziel_seite = "whatsapp"
     quelle_url = ""
+    # Sicherheitsnetz (Entkopplung): allgemeines Beitragsbild sicherstellen (rendert bei bild_pfad
+    # NULL on-demand). Dient als Fallback, falls das stellen-spezifische Bild nicht verfuegbar ist.
+    bild_pfad = _ensure_bild_pfad(conn, eid, f)
     try:
         kanal_text, story_text = personalisierung.whatsapp_texte(f, stelle, quelle_url)
     except Exception as ex:
@@ -2631,8 +2734,8 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
                 if quad and os.path.exists(quad):
                     bild = _status_hochkant(quad, os.path.join(
                         DATA_DIR, "preview", "wa_status_e%d_stelle_%d.png" % (eid, int(stelle["id"]))))
-            if not bild and e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
-                bild = _status_hochkant(e["bild_pfad"], os.path.join(
+            if not bild and bild_pfad and os.path.exists(bild_pfad):
+                bild = _status_hochkant(bild_pfad, os.path.join(
                     DATA_DIR, "preview", "status_%d.png" % eid))
         except Exception as ex:
             log.exception("WhatsApp-Status-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
@@ -2655,8 +2758,8 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
             try:
                 if stelle:
                     bild = _render_stelle_bild(eid, int(stelle["id"]))
-                if not bild and e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
-                    bild = e["bild_pfad"]
+                if not bild and bild_pfad and os.path.exists(bild_pfad):
+                    bild = bild_pfad
             except Exception as ex:
                 log.exception("WhatsApp-Kanal-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
                 bild = None
