@@ -1852,8 +1852,12 @@ def bild_generieren(eid):
         data = json.loads(e["text"])
         data["bild_stil"] = stil
         # Nur der jeweils noetige KI-Vorbereitungsschritt (on-demand, nur beim gewaehlten Stil):
-        if stil == "comic" and not (isinstance(data.get("comic_brief"), dict) and data.get("comic_brief")):
-            textgen.comic_brief(data)          # Stimmung + Alltagsszene fuer die Comic-Illustration
+        if stil == "comic":
+            # Bei jedem expliziten Klick einen FRISCHEN Bild-Einfall wuerfeln: alten Brief verwerfen,
+            # damit (a) "Bild generieren" erneut eine NEUE Idee liefert und (b) der verbesserte Prompt
+            # + das hoehere Modell wirklich greifen (der Bild-Cache haengt am Prompt-String).
+            data.pop("comic_brief", None)
+            textgen.comic_brief(data)          # neuer Einfall (Kunst/Metapher/Finanzamt-Typ)
         elif stil == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
             textgen.art_director_motiv(data)   # kinoreifes Motiv (No-Op ohne Key)
         photo = bildmotiv.ensure_photo_fuer(data)
