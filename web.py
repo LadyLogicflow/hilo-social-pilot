@@ -842,7 +842,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
 .hint{color:#4B5563;font-size:13px}
 .sec{max-width:1040px;margin:24px auto 10px;font-family:'Archivo Black',sans-serif;color:#0B2545;font-size:18px}</style>
 """ + _NAV + """
-<div class=top><h2 style="margin:0;color:#0B2545">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
+<div class=top><h2 style="margin:0;color:#0B2545">&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h2><div><form method=get action="/pool-export" style="display:inline;margin:0"><button title="Alle Pool-Beitragstexte als Textdatei herunterladen">&#x2B07;&#xFE0F; Pool exportieren</button></form> &middot; <a href="/einplanung">&larr; Einplanung</a> &middot; <a href="/">Startseite</a></div></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
 {% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „3. Freigabe" oder „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
@@ -1498,6 +1498,62 @@ def pool_seite():
         slots=len(stellen) * len(poolmod.POOL_KANAELE),
         kanaele=[poolmod.KANAL_LABEL[k] for k in poolmod.POOL_KANAELE],
         warn=warn, schwelle=poolmod.WARNSCHWELLE))
+
+def _pool_export_body(f):
+    """Voller Begleittext eines Pool-Beitrags fuer den Export. Bevorzugt die kanal-spezifischen
+    Captions (captions.*), faellt auf das einfache Feld caption zurueck. Sind mehrere Kanal-Texte
+    unterschiedlich, werden sie je Kanal beschriftet ausgegeben, damit nichts verloren geht."""
+    caps = f.get("captions")
+    if isinstance(caps, dict) and caps:
+        texte = [(k, (v or "").strip()) for k, v in caps.items() if (v or "").strip()]
+        if texte:
+            if len({t for _, t in texte}) == 1:
+                return texte[0][1]
+            label = {"facebook": "Facebook", "instagram": "Instagram",
+                     "whatsapp_kanal": "WhatsApp-Kanal", "whatsapp_story": "WhatsApp-Status"}
+            return "\n\n".join("[%s]\n%s" % (label.get(k, k), t) for k, t in texte)
+    return (f.get("caption") or "").strip() or "(kein Begleittext hinterlegt)"
+
+@app.route("/pool-export")
+@login_required
+def pool_export():
+    """Ein-Klick-Export ALLER aktuell im Zufalls-Pool liegenden Beitraege als herunterladbare
+    UTF-8-Textdatei. Nutzt dieselbe Datenquelle wie pool_seite() (Tabelle pool JOIN entwuerfe,
+    aktiv=1, gleiche Sortierung), zusaetzlich Quelle/Kanal fuer Stream- und Kanal-Angabe.
+    Rein lesend - aendert nichts im Pool."""
+    import datetime
+    from flask import Response
+    trenn = "=" * 60
+    zeilen = []
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT p.entwurf_id id, p.freigegeben_am, e.text, e.kanal, t.quelle "
+            "FROM pool p JOIN entwuerfe e ON e.id=p.entwurf_id "
+            "LEFT JOIN themen t ON t.id=e.thema_id "
+            "WHERE p.aktiv=1 ORDER BY p.freigegeben_am, p.entwurf_id").fetchall()
+    for i, r in enumerate(rows, 1):
+        f = _parse(r).get("f", {})
+        titel = (f.get("ueberschrift") or f.get("subline") or "(ohne Titel)").strip()
+        stream = _stream(r["quelle"])
+        kanal = _KANAL_DE.get(r["kanal"], r["kanal"] or "-")
+        zeilen.append(trenn)
+        zeilen.append("[%d] %s" % (i, titel))
+        zeilen.append("Stream: %s" % stream)
+        zeilen.append("Kanal: %s" % kanal)
+        zeilen.append("-" * 60)
+        zeilen.append(_pool_export_body(f))
+        zeilen.append("")
+    jetzt = datetime.datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
+    kopf = ["ShareNext – Zufalls-Pool: Export aller Beitragstexte",
+            "Erstellt: %s" % jetzt,
+            "Anzahl Beiträge: %d" % len(rows), ""]
+    inhalt = "\n".join(kopf + zeilen)
+    if not inhalt.endswith("\n"):
+        inhalt += "\n"
+    resp = Response(inhalt, mimetype="text/plain")
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Disposition"] = 'attachment; filename="sharenext-pool-export.txt"'
+    return resp
 
 def _pool_back():
     """Nach einer Pool-Aufnahme NICHT auf die Pool-Seite umleiten (ueberfluessig), sondern zurueck
