@@ -281,6 +281,17 @@ REF_INSTRUCTION = (
     "('Finanzamt') official appears, draw him as the SAME recurring character shown in the "
     "reference. Do NOT copy the reference's scene or content - only its style and that character.\n\n"
 )
+# Referenz-Anker (#159): verpflichtet die Bild-KI per TEXT auf das mitgegebene Referenzportrait -
+# gleiche Figur, neue Szene, NICHT neu interpretieren. Wird NUR angehaengt, wenn fuer das jeweilige
+# Bild tatsaechlich eine Charakter-Referenz mitgegeben wird (kein Anker im referenzlosen Fallback).
+# Bewusst allgemein formuliert (ohne Name), damit derselbe Anker fuer jede Referenz gilt (Finanzamt-
+# Figur UND jedes Berater-Portrait). Ergaenzt REF_INSTRUCTION: die Text-Beschreibung ist ein starker
+# Treiber - oft staerker als das Referenzbild - deshalb wird die Verpflichtung explizit verstaerkt.
+REF_ANCHOR = (
+    "Verwende das mitgegebene Referenzportrait als verbindliche Vorlage fuer Gesicht, Proportionen, "
+    "Frisur, Brille/Bart und Mimik. Die Figur nicht neu interpretieren, sondern als dieselbe "
+    "Comicfigur in einer anderen Szene zeigen; alle charakteristischen Merkmale bleiben unveraendert."
+)
 
 
 def _ref_signatur(path):
@@ -354,6 +365,12 @@ def _comic_prompt(fields):
         if fa_text:
             prompt += ("\n\nVerbindliche Charakter-Beschreibung des Finanzamt-Beamten "
                        "(Finanzamt-Bible): " + fa_text)
+    # #159: Referenz-Anker anhaengen, WENN fuer dieses Bild tatsaechlich eine Charakter-Referenz
+    # genutzt wird (Referenzpfad aktiv UND mindestens ein Referenzbild vorhanden). Deterministisch aus
+    # fields ableitbar, damit Producer (ensure_comic_bild) UND Cache-Key (_comic_cache_input) denselben
+    # Prompt sehen. OHNE Referenz (deaktiviert/keine Assets) bleibt der Prompt unveraendert.
+    if _comic_referenz_aktiv() and _comic_refs(fields):
+        prompt += "\n\n" + REF_ANCHOR
     return prompt
 
 def _tafel_prompt(scene, sign_text, traeger=None):
@@ -938,7 +955,7 @@ def _finanzamt_ref_pfad():
     steuern (#151), ohne dass sich ohne Bible etwas am bisherigen Verhalten aendert."""
     return _finanzamt_bibel_bild() or FINANZAMT_REF_PATH
 
-def _comic_beratung_prompt(fields):
+def _comic_beratung_prompt(fields, berater_ref_pfad=None):
     """Baut den Comic-Beratung-Bildprompt: HILO_COMIC_MASTER (der von Catrins ChatGPT-Projekt
     entwickelte, ausgereifte HILO-Stil-Masterprompt) + BERATUNG_BLOCK (Komposition + HILO-Buero).
     Bewusst OHNE das Beitrags-Thema (kein 'Thema/Anlass'): das Thema trieb die Szene sonst woertlich
@@ -959,6 +976,12 @@ def _comic_beratung_prompt(fields):
     if bibel_text:
         prompt += ("\n\nVerbindliche Charakter-Beschreibung des/der Berater:in "
                    "(Character-Bible der Stelle): " + bibel_text)
+    # #159: Referenz-Anker anhaengen, WENN eine (existierende) Berater-Referenz vorliegt - dann geht
+    # das Berater-Portrait als images/edits-Referenz mit und wird per Text verbindlich verankert.
+    # OHNE gueltige Referenz (Default None / fehlendes Asset) bleibt der Prompt unveraendert; beide
+    # Aufrufer (Cache-Key + Producer) reichen denselben Pfad durch -> identischer Prompt/Schluessel.
+    if _comic_beratung_refs(berater_ref_pfad):
+        prompt += "\n\n" + REF_ANCHOR
     return prompt
 
 def _comic_beratung_refs(berater_comic_pfad):
@@ -988,7 +1011,8 @@ def _comic_beratung_cache_input(fields, berater_comic_pfad):
     # #158: Signatur (basename@mtime) statt nur Basename - ein ersetzter Berater-Comic mit gleichem
     # Dateinamen (neue mtime) erneuert den Cache. Format '|berater=' bleibt stabil.
     base = _ref_signatur(berater_comic_pfad)
-    return "comic_beratung:" + _comic_beratung_prompt(fields) + "|berater=" + base
+    return ("comic_beratung:" + _comic_beratung_prompt(fields, berater_comic_pfad)
+            + "|berater=" + base)
 
 def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
     """Absoluter Cache-Pfad fuer ein Comic-Beratung-Bild. EIGENER Praefix 'comic_beratung_'
@@ -1021,7 +1045,7 @@ def ensure_comic_beratung_bild(fields, berater_comic_pfad):
     path = _comic_beratung_pfad(fields, p, tool=tool)
     if os.path.exists(path):
         return path
-    prompt = _comic_beratung_prompt(fields)
+    prompt = _comic_beratung_prompt(fields, p)
     refs = _comic_beratung_refs(p)
     daten = erzeuge_comic_bild_ref(prompt, refs) if refs else None
     if daten is None:
@@ -1117,6 +1141,41 @@ COMIC_STRIP_POINTE_ARCHETYP = {
     "warnung": "Komm zu HILO - wir machen es einfach!",
 }
 
+# --- #160: Szenen-/Posen-Varianten je Panel-Rolle (pro Beitrag deterministisch anders) -----------
+# Damit zwei Beitraege mit derselben Rolle NICHT exakt dasselbe Bild bekommen (langweilig), variieren
+# wir Umgebung/Pose je Beitrag. Der KERN (Rolle, Mimik, Sprechblase, Archetyp) bleibt im Panel-Delta
+# unveraendert; die Variante ist nur ein kurzer Umgebungs-Zusatz. Deutsch, echte Umlaute.
+# Feld 2 (Aermelschoner) - gilt fuer beide Archetypen (Kern -> trauriger bzw. schadenfroher Beamter):
+COMIC_STRIP_SZENEN_AERMELSCHONER = (
+    "an seinem ueberladenen Schreibtisch",
+    "vor einem Aktenschrank voller Ordner",
+    "mit einem Stempel in der Hand",
+    "neben einem hohen Papierstapel",
+    "am Fenster mit Blick auf graue Amtsflure",
+    "vor einer Pinnwand voller Formulare",
+)
+# Feld 1 'vorteil' (Beratungsszene mit dem/der Berater:in):
+COMIC_STRIP_SZENEN_BERATUNG = (
+    "am Schreibtisch mit Laptop",
+    "am Besprechungstisch mit Unterlagen",
+    "mit einem Tablet erklaerend",
+    "vor dem Buecherregal stehend",
+)
+# Feld 1 'warnung' (die Person fuellt ALLEIN am Handy aus):
+COMIC_STRIP_SZENEN_ALLEIN = (
+    "am Kuechentisch",
+    "auf dem Sofa",
+    "am heimischen Schreibtisch",
+    "in einem Cafe",
+)
+# Feld 3 (Berater:in, Daumen hoch) - fuer beide Archetypen gleich:
+COMIC_STRIP_SZENEN_DAUMEN = (
+    "am Schreibtisch",
+    "im Beratungsraum vor dem Regal",
+    "vor einem HILO-Plakat",
+    "am Fenster",
+)
+
 # Panel-Reihenfolge (vorteil = Default/v1): (Delta-Text, Zeilen-Quelle). Die Zeilen-Quelle ist ein
 # Marker; die konkrete Zeile wird in _comic_strip_zeile aufgeloest (Feld 1 = Ueberschrift/Override,
 # 2 = Bild-2-Variante, 3 = Pointe). v2 (#155): _comic_strip_panels(archetyp) liefert die passenden
@@ -1159,6 +1218,51 @@ def _comic_strip_variante_archetyp(text):
         if t in varianten:
             return arche
     return None
+
+
+def _comic_strip_szenen_liste(quelle, archetyp):
+    """Liefert die Szenen-/Posen-Varianten-Liste (#160) fuer ein Panel je Rolle:
+      - 'jammer' (Feld 2): Aermelschoner-Umgebungen (fuer beide Archetypen gleich).
+      - 'pointe' (Feld 3): Berater:in Daumen-hoch-Umgebungen (fuer beide Archetypen gleich).
+      - 'ueberschrift' (Feld 1): archetyp-abhaengig - 'warnung' = allein am Handy, sonst Beratungsszene.
+    Der KERN der Rolle (aus dem Panel-Delta) bleibt unveraendert; die Variante ergaenzt nur Umgebung/Pose."""
+    if quelle == "jammer":
+        return COMIC_STRIP_SZENEN_AERMELSCHONER
+    if quelle == "pointe":
+        return COMIC_STRIP_SZENEN_DAUMEN
+    if _norm_archetyp(archetyp) == "warnung":
+        return COMIC_STRIP_SZENEN_ALLEIN
+    return COMIC_STRIP_SZENEN_BERATUNG
+
+
+def _comic_strip_beitrag_kennung(fields):
+    """Liefert eine STABILE Beitrags-Kennung fuer die deterministische Szenen-Auswahl (#160):
+    bevorzugt eine vorhandene ID (id/entwurf_id/eid/beitrag_id), sonst die Ueberschrift, sonst
+    strip_zeile1. Gleicher Beitrag -> gleiche Kennung -> stabile Szenen-Variante; anderer Beitrag ->
+    andere Kennung -> i.d.R. andere Variante. Leerer/ungueltiger Input -> ''."""
+    f = fields if isinstance(fields, dict) else {}
+    for schluessel in ("id", "entwurf_id", "eid", "beitrag_id"):
+        v = f.get(schluessel)
+        if v not in (None, "", 0):
+            return str(v)
+    return ((f.get("ueberschrift") or "").strip()
+            or (f.get("strip_zeile1") or "").strip())
+
+
+def _comic_strip_szene(fields, quelle, archetyp):
+    """Waehlt DETERMINISTISCH die Szenen-/Posen-Variante fuer dieses Panel (#160):
+    Index = sha256(Beitrags-Kennung + '|' + Rolle) % len(varianten). Die Rolle ('quelle') wird
+    mit-gehasht, damit die drei Felder eines Beitrags UNABHAENGIG variieren (nicht alle denselben
+    Index). Gleicher Beitrag -> gleiche Variante je Feld (stabil, gleicher Cache); anderer Beitrag ->
+    i.d.R. andere Variante -> anderer Cache-Pfad -> anders aussehende Panels. Leere Kennung/leere
+    Liste -> '' (kein Zusatz, bisheriges Verhalten)."""
+    varianten = _comic_strip_szenen_liste(quelle, archetyp)
+    kennung = _comic_strip_beitrag_kennung(fields)
+    if not varianten or not kennung:
+        return ""
+    roh = ("%s|%s" % (kennung, quelle)).encode("utf-8")
+    idx = int(hashlib.sha256(roh).hexdigest(), 16) % len(varianten)
+    return varianten[idx]
 
 
 def _comic_strip_archetyp(fields):
@@ -1207,14 +1311,28 @@ def _comic_strip_zeile(fields, quelle, archetyp="vorteil"):
             or COMIC_STRIP_POINTE_ARCHETYP.get(archetyp, COMIC_STRIP_POINTE))
 
 
-def _comic_strip_prompt(fields, delta, zeile):
+def _comic_strip_prompt(fields, delta, zeile, hat_ref=False, szene=""):
     """Baut den Panel-Prompt: HILO_COMIC_MASTER + Panel-Delta (Szene/Rolle) + explizite Sprechblasen-
     Anweisung (Variante A): die KI schreibt GENAU den gegebenen deutschen Satz in eine Sprech-/
-    Gedankenblase, fehlerfrei und ohne weitere Woerter; Markenname exakt 'HILO'."""
+    Gedankenblase, fehlerfrei und ohne weitere Woerter; Markenname exakt 'HILO'.
+
+    #160: 'szene' (kurzer Umgebungs-/Posen-Zusatz) wird - wenn gesetzt - an das Panel-Delta gehaengt.
+    So aendert sich der Prompt je Beitrag -> _comic_strip_pfad-Cache differiert je Beitrag -> jeder
+    Beitrag bekommt EIGENE, anders aussehende Panels (Kern/Rolle bleibt aus dem Delta erhalten).
+
+    #159: 'hat_ref' - ist fuer dieses Panel tatsaechlich eine Charakter-Referenz vorhanden, wird der
+    Referenz-Anker (REF_ANCHOR) angehaengt, der die KI auf das mitgegebene Referenzportrait
+    verpflichtet. OHNE Referenz (generations-Fallback) bleibt der Prompt ohne Anker."""
     zeile = (zeile or "").strip()
+    szene = (szene or "").strip()
+    if szene:
+        delta = delta + " Konkrete Umgebung/Pose fuer dieses Bild: " + szene + "."
     blase = ('Zeichne eine Sprech-/Gedankenblase mit exakt diesem deutschen Text, fehlerfrei und '
              'ohne weitere Woerter: "%s". Markenname exakt HILO.' % zeile)
-    return HILO_COMIC_MASTER + "\n\n" + delta + "\n\n" + blase
+    prompt = HILO_COMIC_MASTER + "\n\n" + delta + "\n\n" + blase
+    if hat_ref:
+        prompt += "\n\n" + REF_ANCHOR
+    return prompt
 
 
 def _comic_strip_refs(idx, berater_ref_pfad):
@@ -1273,12 +1391,17 @@ def ensure_comic_strip_bilder(fields, berater_ref_pfad):
     pfade = []
     for idx, (delta, quelle) in enumerate(_comic_strip_panels(archetyp)):
         zeile = _comic_strip_zeile(fields, quelle, archetyp)
-        prompt = _comic_strip_prompt(fields, delta, zeile)
+        # #160: pro Beitrag deterministisch gewaehlte Szenen-/Posen-Variante (Kern der Rolle bleibt).
+        szene = _comic_strip_szene(fields, quelle, archetyp)
+        # #159: existieren fuer dieses Panel Referenzen (Feld 1/3 Berater, Feld 2 Finanzamt), wird der
+        # Referenz-Anker in den Prompt aufgenommen. refs VOR der Pfad-Berechnung ermitteln, damit
+        # Producer und _comic_strip_pfad DENSELBEN Prompt/Schluessel nutzen.
+        refs = _comic_strip_refs(idx, berater)
+        prompt = _comic_strip_prompt(fields, delta, zeile, hat_ref=bool(refs), szene=szene)
         path = _comic_strip_pfad(idx, prompt, berater, tool=tool)
         if os.path.exists(path):
             pfade.append(path)
             continue
-        refs = _comic_strip_refs(idx, berater)
         daten = erzeuge_comic_bild_ref(prompt, refs) if refs else None
         if daten is None:
             # Keine Referenz vorhanden ODER Referenz-Call ohne Key/Fehler -> generations-Weg
