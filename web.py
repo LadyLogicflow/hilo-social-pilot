@@ -1222,7 +1222,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     </div>
     <div class=stfield><label>Comic-Berater <span class=hint style="font-weight:normal">(für den Stil „Comic Beratung")</span></label>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        {% if b.berater_comic %}<img src="/berater-comic-bild/{{b.id}}?v={{b.id}}" alt="Comic-Berater" title="Comic-Portrait der Leitung – für den Stil „Comic Beratung“" style="width:44px;height:44px;border-radius:50%;object-fit:cover">{% endif %}
+        {% if b.berater_comic %}<a href="/berater-comic-bild/{{b.id}}" target="_blank" title="Comic-Portrait der Leitung – klicken für große Ansicht"><img src="/berater-comic-bild/{{b.id}}?v={{b.id}}" alt="Comic-Berater" style="width:170px;height:170px;border-radius:12px;object-fit:cover;border:1px solid #ccd3df"></a>{% endif %}
         {% if b.portrait_pfad %}<form method=post action="/berater-comic/{{b.id}}" style="margin:0"><button style="padding:6px 12px">{% if b.berater_comic %}Comic-Berater neu erzeugen{% else %}Comic-Berater erzeugen{% endif %}</button></form>
         {% else %}<span class=hint>Erst ein Porträt hochladen, dann kann der Comic-Berater erzeugt werden.</span>{% endif %}
       </div>
