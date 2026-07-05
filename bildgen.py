@@ -307,8 +307,10 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     except Exception:
         stil = "standard"
     # #143/#145: ki_tafel -> Tafel-Layout; kreativ -> reines Foto + Kreise; standard -> v11 unten.
-    # comic -> reine Comic-Illustration (kein Overlay), da das Comic-Bild selbst schon fertig ist.
-    if stil == "comic":
+    # comic / comic_beratung -> reine Comic-Illustration (kein Overlay), da das Comic-Bild selbst
+    # schon fertig ist (bei comic_beratung inkl. Berater vorne + Finanzamt hinten - die Szene IST
+    # das Bild, KEINE weisse Textkarte drueber).
+    if stil in ("comic", "comic_beratung"):
         return _render_comic(fields, photo_path, out_path, portrait)
     if stil == "ki_tafel":
         return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
