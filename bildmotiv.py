@@ -299,14 +299,19 @@ def _comic_referenz_aktiv():
 
 def _comic_refs(fields):
     """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade fuer diesen Beitrag: immer die
-    Stil-Referenz (stil_ref); zusaetzlich die Finanzamt-Referenz (finanzamt_ref), wenn der
-    Bild-Brief finanzamt_figur=True traegt. Nur tatsaechlich vorhandene Dateien werden aufgenommen,
+    Stil-Referenz (stil_ref); zusaetzlich die Finanzamt-Referenz, wenn der Bild-Brief
+    finanzamt_figur=True traegt. Fuer den Finanzamt-Charakter wird die globale Finanzamt-Bible
+    (finanzamt_bibel_bild) bevorzugt - sonst die Default-Referenz FINANZAMT_REF_PATH
+    (_finanzamt_ref_pfad); so nutzt der normale Comic denselben, konsistenten Aermelschoner wie
+    'Comic Beratung' (Catrin, Variante a). Nur tatsaechlich vorhandene Dateien werden aufgenommen,
     damit ein fehlendes Asset nicht zum Fehler fuehrt (Aufrufer faellt dann zurueck)."""
     refs = []
     if os.path.exists(STIL_REF_PATH):
         refs.append(STIL_REF_PATH)
-    if _comic_brief(fields).get("finanzamt_figur") and os.path.exists(FINANZAMT_REF_PATH):
-        refs.append(FINANZAMT_REF_PATH)
+    if _comic_brief(fields).get("finanzamt_figur"):
+        fa = _finanzamt_ref_pfad()
+        if os.path.exists(fa):
+            refs.append(fa)
     return refs
 
 def _comic_brief(fields):
@@ -333,6 +338,10 @@ def _comic_prompt(fields):
         prompt += "\n\nBild-Hook: " + hook
     if brief.get("finanzamt_figur"):
         prompt += "\n\n" + FINANZAMT_BLOCK
+        fa_text = _finanzamt_bibel_text()
+        if fa_text:
+            prompt += ("\n\nVerbindliche Charakter-Beschreibung des Finanzamt-Beamten "
+                       "(Finanzamt-Bible): " + fa_text)
     return prompt
 
 def _tafel_prompt(scene, sign_text, traeger=None):
