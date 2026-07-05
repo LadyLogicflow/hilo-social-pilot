@@ -202,6 +202,13 @@ def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     f = fuer_stelle(fields, stelle)
     if stilwahl.aktiver_stil(f) == "comic_strip":
         os.makedirs(out_dir, exist_ok=True)
+        # #161 (Reihenfolge Stil -> Figur -> Szene): den Berater-Steckbrief der Stelle (bibel_text)
+        # durchreichen - analog _setze_berater_comic fuer comic_beratung. ensure_comic_strip_bilder
+        # setzt ihn in Feld 1/3 (der/die Berater:in) als Figur-Steckbrief ein; ohne bibel_text bleibt
+        # das Verhalten unveraendert.
+        text = _bibel_text(stelle)
+        if text:
+            f["bibel_text"] = text
         paths = bildmotiv.ensure_comic_strip_bilder(f, _berater_ref(stelle))
         return f, paths
     _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
