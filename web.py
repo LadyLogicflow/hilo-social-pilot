@@ -746,7 +746,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=re{% if gen_running %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>&#x21BB; Alle nach neuen Vorgaben neu erzeugen</button>
   </form></div></div>{% endif %}
 {% for e in entwuerfe %}
-<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+<div class=card>{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
@@ -804,7 +804,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
 <p class=hint style="max-width:1040px;margin:0 auto 12px">Neu freigegebene Beiträge sind zunächst <b>„Noch nicht geplant"</b>. Das Tool schlägt den nächsten freien <b>Werktag nach der letzten Einplanung</b> vor (max. 1 pro Tag, Sa+So frei) – mit einem Klick bestätigen. Termin bleibt jederzeit anpassbar.</p>
 {% if pages_err %}<div class=flash style="color:#b00020">Facebook-Seiten konnten nicht geladen werden: {{pages_err}}</div>{% endif %}
 {% for e in freigegeben %}
-<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+<div class=card>{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p>{% if e.geplant_fuer %}<b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b>
        <form method=post action="/umplanen/{{e.id}}" style="display:inline;margin-left:8px">
@@ -906,7 +906,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
 <div class=intro>Im Topf liegen <b>{{items|length}}</b> zeitlose Beiträge. Das Tool spielt sie automatisch aus – <b>je Beratungsstelle ein anderer</b> und <b>jeder Beitrag je Stelle genau einmal pro Kanal</b> ({{kanaele|join(', ')}}). Datumsgebundene Inhalte (Anlass-Tage, Fristen) laufen weiter über die <a href="/einplanung">Einplanung</a>.</div>
 {% if warn %}<div class=warn>&#x26A0;&#xFE0F; <b>Nachschub nötig</b> – bei diesen Stellen/Kanälen sind weniger als {{schwelle}} Beiträge übrig:<br>{{ warn|join(' · ') }}<br><span class=hint>Lege weitere zeitlose Beiträge in den Topf (über „3. Freigabe" oder „4. Einplanung" &rarr; „In den Pool").</span></div>{% endif %}
 {% macro poolcard(e, slots, n_stellen, n_kanaele) %}
-<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+<div class=card>{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
     <details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>
@@ -1990,6 +1990,11 @@ def bild_generieren(eid):
         import bildmotiv, textgen
         data = json.loads(e["text"])
         data["bild_stil"] = stil
+        # #157: strip_panels gehoeren ausschliesslich zum comic_strip. Wird ein ANDERER Stil
+        # generiert, die (ggf. alten) Panel-Verweise entfernen, damit die Vorschau nicht
+        # faelschlich weiter den alten 3er-Strip statt des neuen Einzelbilds zeigt.
+        if stil != "comic_strip":
+            data.pop("strip_panels", None)
         # comic_strip (#154): 3-Felder-Comic-Karussell mit Sprechblasen, personalisiert pro Stelle.
         # Fuer die stellenlose Vorschau REPRAESENTATIV mit dem Berater DER ERSTEN aktiven Stelle
         # rendern, die eine Berater-Referenz hat (bibel_bild > berater_comic). Gibt es keine ->
@@ -2042,6 +2047,11 @@ def bild_generieren(eid):
             if not panels:
                 flash("Comic-Strip konnte gerade nicht erzeugt werden (Bild-KI nicht erreichbar?).")
                 return redirect(ziel)
+            # #157: alle drei Panels zusaetzlich im Entwurf-JSON persistieren, damit die
+            # Beitrags-Vorschau (Entwuerfe/Pool/Einplanung) alle drei Bilder DIREKT zeigt.
+            # Gleiches Pfad-Format wie bild_pfad -> Auslieferung ueber die /strip-panel-Route.
+            # bild_pfad bleibt Panel 1 (Einzel-Fallback). Nur tatsaechlich vorhandene Pfade.
+            data["strip_panels"] = [p for p in panels if p and os.path.exists(p)]
             with get_conn() as conn:
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=?, format='karussell' WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), panels[0], eid))
@@ -2632,6 +2642,28 @@ def bild(eid):
     if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
         abort(404)
     return send_file(e["bild_pfad"], mimetype="image/png")
+
+@app.route("/strip-panel/<int:eid>/<int:idx>")
+@login_required
+def strip_panel(eid, idx):
+    """#157: liefert Panel <idx> (0..2) des Comic-Strips eines Entwurfs aus - GLEICHE Schutzstufe
+    (@login_required) wie das Einzel-Vorschaubild /bild. Die Panel-Pfade stammen aus dem
+    Entwurf-JSON (Feld 'strip_panels'), das beim comic_strip-Generieren gefuellt wird. Existiert
+    das Feld/der Index/die Datei nicht -> 404 (kein oeffentlicher Zugriff, keine neuen Rechte)."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    try:
+        panels = (json.loads(e["text"]) or {}).get("strip_panels") or []
+    except Exception:
+        panels = []
+    if not (0 <= idx < len(panels)):
+        abort(404)
+    pfad = panels[idx]
+    if not pfad or not os.path.exists(pfad):
+        abort(404)
+    return send_file(pfad, mimetype="image/png")
 
 @app.route("/aktion/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
