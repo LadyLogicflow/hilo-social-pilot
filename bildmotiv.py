@@ -196,7 +196,8 @@ STIL_A_BLOCK = (
 BERATUNG_BLOCK = (
     "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style. "
     "In the FOREGROUND, the HILO tax advisor - the SAME person as in the first reference image, "
-    "matching their face, hairstyle, AGE and build EXACTLY (do NOT make them younger or different) - "
+    "matching their face, hairstyle, AGE and build EXACTLY (do NOT make them younger or different), "
+    "wearing a small blue 'HILO' logo badge on the lapel or chest of their jacket/top - "
     "sits at a tidy office DESK across from a friendly client, explaining and reassuring them, with "
     "papers or a laptop on the desk, in a modern, friendly advisory office. It must clearly read as "
     "professional tax ADVICE at a desk. Do NOT show any cash, banknotes or money changing hands "
@@ -684,7 +685,8 @@ BERATER_PORTRAIT_PROMPT = (
     "yet still a natural adult (NOT a 20-year-old, NOT an idealised face). No deep wrinkles, no heavy "
     "face shading, no extra weight. Recognisable, dignified, likeable, with a friendly smile "
     "and bright, wide-awake, alert and attentive eyes - a lively, energetic expression, NOT tired, "
-    "sleepy or droopy. Simple clean light background. Square format."
+    "sleepy or droopy. They wear a small blue 'HILO' logo badge on the lapel or chest of their "
+    "jacket/top. Simple clean light background. Square format."
 )
 
 
