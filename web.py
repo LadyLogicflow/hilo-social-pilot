@@ -759,6 +759,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
+        <option value="comic_beratung">Comic Beratung</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -806,6 +807,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
+        <option value="comic_beratung">Comic Beratung</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -889,6 +891,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
+        <option value="comic_beratung">Comic Beratung</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -1890,7 +1893,7 @@ def bild_generieren(eid):
             else url_for("einplanung") if zurueck == "einplanung"
             else url_for("entwuerfe"))
     stil = (request.form.get("bild_stil") or "").strip()
-    if stil not in ("comic", "ki_tafel", "kreativ"):
+    if stil not in ("comic", "comic_beratung", "ki_tafel", "kreativ"):
         flash("Bitte einen Stil wählen.")
         return redirect(ziel)
     with get_conn() as conn:
@@ -1901,11 +1904,26 @@ def bild_generieren(eid):
         import bildmotiv, textgen
         data = json.loads(e["text"])
         data["bild_stil"] = stil
+        # comic_beratung ist personalisiert pro Stelle; in der stellenlosen Vorschau rendern wir
+        # REPRAESENTATIV mit dem Berater-Comic der ERSTEN aktiven Stelle, die einen hinterlegt hat.
+        # Gibt es keine -> Hinweis + kein Bild (der Berater-Comic wird in der Verwaltung erzeugt).
+        if stil == "comic_beratung":
+            with get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT berater_comic FROM beratungsstellen WHERE aktiv=1 "
+                    "AND berater_comic IS NOT NULL AND TRIM(berater_comic)<>'' ORDER BY id").fetchall()
+            bc = next((r["berater_comic"] for r in rows
+                       if r["berater_comic"] and os.path.exists(r["berater_comic"])), None)
+            if not bc:
+                flash("Bitte zuerst mind. einen Comic-Berater in der Beratungsstellen-Verwaltung erzeugen.")
+                return redirect(ziel)
+            data["berater_comic"] = bc
         # Nur der jeweils noetige KI-Vorbereitungsschritt (on-demand, nur beim gewaehlten Stil):
-        if stil == "comic":
+        if stil in ("comic", "comic_beratung"):
             # Bei jedem expliziten Klick einen FRISCHEN Bild-Einfall wuerfeln: alten Brief verwerfen,
             # damit (a) "Bild generieren" erneut eine NEUE Idee liefert und (b) der verbesserte Prompt
-            # + das hoehere Modell wirklich greifen (der Bild-Cache haengt am Prompt-String).
+            # + das hoehere Modell wirklich greifen (der Bild-Cache haengt am Prompt-String). Bei
+            # comic_beratung liefert der Brief das optionale Thema/Anlass (szene) fuer den Prompt.
             data.pop("comic_brief", None)
             textgen.comic_brief(data)          # neuer Einfall (Kunst/Metapher/Finanzamt-Typ)
         elif stil == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
@@ -1919,7 +1937,8 @@ def bild_generieren(eid):
                          (json.dumps(data, ensure_ascii=False), out, eid))
             audit_log(conn, session["user"], "bild_generiert", eid, stil)
             conn.commit()
-        _stil_label = {"comic": "Comic", "ki_tafel": "Tafel", "kreativ": "Kreativ"}
+        _stil_label = {"comic": "Comic", "comic_beratung": "Comic Beratung",
+                       "ki_tafel": "Tafel", "kreativ": "Kreativ"}
         flash("Bild für Beitrag %d im Stil „%s“ erzeugt." % (eid, _stil_label.get(stil, stil)))
     except Exception as ex:
         flash("Bild konnte nicht erzeugt werden: %s" % ex)

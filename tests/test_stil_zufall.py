@@ -58,13 +58,14 @@ class _FakeClient:
         return _FakeMsg(self.antwort)
 
 
-def _flags(standard, ki_tafel, kreativ, comic=False):
-    # 'comic' (neuer Stil) standardmaessig AUS, damit die bestehenden Faelle ihren exakten
-    # Stil-Topf behalten; einzelne Tests koennen ihn per Keyword aktivieren.
+def _flags(standard, ki_tafel, kreativ, comic=False, comic_beratung=False):
+    # 'comic' und 'comic_beratung' (neuere Stile) standardmaessig AUS, damit die bestehenden Faelle
+    # ihren exakten Stil-Topf behalten; einzelne Tests koennen sie per Keyword aktivieren.
     db.set_einstellung("bild_stil_standard", "1" if standard else "0")
     db.set_einstellung("bild_stil_ki_tafel", "1" if ki_tafel else "0")
     db.set_einstellung("bild_stil_kreativ", "1" if kreativ else "0")
     db.set_einstellung("bild_stil_comic", "1" if comic else "0")
+    db.set_einstellung("bild_stil_comic_beratung", "1" if comic_beratung else "0")
 
 
 def _dummy_photo(name="dummy_stil.png"):
@@ -76,11 +77,12 @@ def _dummy_photo(name="dummy_stil.png"):
 
 # --- A) aktive_stile -------------------------------------------------------------------------
 def test_aktive_stile():
-    # Default (kein Flag gesetzt) -> alle Stile aktiv (inkl. neuem 'comic')
-    for k in ("bild_stil_standard", "bild_stil_ki_tafel", "bild_stil_kreativ", "bild_stil_comic"):
+    # Default (kein Flag gesetzt) -> alle Stile aktiv (inkl. neuem 'comic' und 'comic_beratung')
+    for k in ("bild_stil_standard", "bild_stil_ki_tafel", "bild_stil_kreativ", "bild_stil_comic",
+              "bild_stil_comic_beratung"):
         db.set_einstellung(k, None)
     aktiv = stilwahl.aktive_stile()
-    if set(aktiv) != {"standard", "ki_tafel", "kreativ", "comic"}:
+    if set(aktiv) != {"standard", "ki_tafel", "kreativ", "comic", "comic_beratung"}:
         _fail("Default: alle Stile aktiv erwartet, war %r" % aktiv)
     # nur ki_tafel aktiv
     _flags(False, True, False)

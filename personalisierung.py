@@ -121,11 +121,33 @@ def _portrait(stelle):
     return p if (p and os.path.exists(p)) else None
 
 
+def _berater_comic(stelle):
+    """Pfad zum Comic-Portrait der Leitung DIESER Stelle (Feld berater_comic, Stil 'Comic Beratung'),
+    falls hinterlegt und vorhanden - sonst None."""
+    p = (stelle["berater_comic"] or "").strip() if _has(stelle, "berater_comic") else ""
+    return p if (p and os.path.exists(p)) else None
+
+
+def _setze_berater_comic(f, stelle):
+    """Legt fuer den Stil 'comic_beratung' den Berater-Comic DIESER Stelle in f['berater_comic'] ab,
+    damit bildmotiv.ensure_photo_fuer das personalisierte Comic-Beratung-Bild mit dem eigenen
+    Berater-Gesicht der Stelle erzeugt (jede Stelle ihr eigenes Bild). Andere Stile bleiben unberuehrt;
+    hat die Stelle keinen Berater-Comic, wird nichts gesetzt (bildmotiv faellt dann auf den normalen
+    Comic zurueck). Liefert f zurueck."""
+    import stilwahl
+    if stilwahl.aktiver_stil(f) == "comic_beratung":
+        bc = _berater_comic(stelle)
+        if bc:
+            f["berater_comic"] = bc
+    return f
+
+
 def render_fuer_stelle(fields, stelle, out_path):
     """Rendert das Bild mit personalisiertem CTA (gleiches Foto/Design). Liefert (felder, pfad).
     Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
+    _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
     photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -138,6 +160,7 @@ def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     Liefert (felder, [pfade]). Kreisportraet der Stelle ersetzt ggf. den blauen Slogan-Punkt."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
+    _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
     photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))
     paths = bildgen.render_slides(f, photo, slogan, out_dir, prefix, portrait=_portrait(stelle))

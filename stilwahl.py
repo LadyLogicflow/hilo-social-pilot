@@ -26,7 +26,10 @@ log = logging.getLogger("hilo.stilwahl")
 # Alle bekannten Bild-Stile (Reihenfolge = Anzeige-/Default-Reihenfolge).
 # NEU 'comic': Comic-/Ligne-claire-Illustration (Herge/Tintin-Anmutung, HILO-Palette). 'standard'
 # bleibt aus Rueckwaertskompatibilitaet erhalten, wird in der UI aber nicht mehr angeboten.
-STILE = ("standard", "ki_tafel", "kreativ", "comic")
+# NEU 'comic_beratung': personalisierte Comic-Szene - vorne der/die Berater:in DER STELLE (eigene
+# Comic-Figur), hinten der wiederkehrende Finanzamt-Beamte, der leer ausgeht. Letzter Baustein der
+# Comic-Familie; pro Beratungsstelle mit deren eigenem Berater-Comic (berater_comic) gerendert.
+STILE = ("standard", "ki_tafel", "kreativ", "comic", "comic_beratung")
 
 # Einstellungs-Schluessel je Stil (An/Aus-Flag, '1' aktiv / '0' inaktiv, Default alle aktiv).
 _FLAG_KEY = {
@@ -34,6 +37,7 @@ _FLAG_KEY = {
     "ki_tafel": "bild_stil_ki_tafel",
     "kreativ": "bild_stil_kreativ",
     "comic": "bild_stil_comic",
+    "comic_beratung": "bild_stil_comic_beratung",
 }
 
 
