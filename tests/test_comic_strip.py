@@ -391,6 +391,41 @@ def test_8_route_persistiert_override():
     _ok("#156 /bild-generieren reicht strip_zeile1 bis ensure_comic_strip_bilder durch + persistiert es (Reset bei leer)")
 
 
+def test_9_ref_signatur_invalidiert_cache():
+    """#158: Wird die Berater- ODER Finanzamt-Referenz durch ein neues Bild MIT GLEICHEM DATEINAMEN
+    (neue mtime) ersetzt, MUSS sich der Panel-Cache-Pfad aendern. Panel 1/3 haengen an der Berater-
+    Referenz, Panel 2 (Finanzamt) an _finanzamt_ref_pfad. Ohne Aenderung bleibt der Pfad gleich."""
+    prompt = "PANEL-PROMPT-REFSIG-158"
+    berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_refsig.png"))
+
+    # (a) Berater-Panel (idx 0): unveraendert -> gleicher Pfad, ersetzt (neue mtime) -> neuer Pfad.
+    p0 = bildmotiv._comic_strip_pfad(0, prompt, berater, tool="openai")
+    if bildmotiv._comic_strip_pfad(0, prompt, berater, tool="openai") != p0:
+        _fail("#158: unveraenderte Berater-Referenz aendert den Panel-Pfad (nicht mehr effizient)")
+    t = os.path.getmtime(berater)
+    os.utime(berater, (t + 10, t + 10))
+    if bildmotiv._comic_strip_pfad(0, prompt, berater, tool="openai") == p0:
+        _fail("#158: ersetzte Berater-Referenz (neue mtime) erzeugt KEINEN neuen Panel-Pfad")
+
+    # (b) Finanzamt-Panel (idx 1): ein ersetztes Finanzamt-Bible-Bild muss Panel 2 erneuern,
+    # obwohl Berater/Prompt unveraendert bleiben.
+    fa = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "bibeln", "finanzamt.png"))
+    db.set_einstellung("finanzamt_bibel_bild", fa)  # -> _finanzamt_ref_pfad = fa
+    try:
+        if bildmotiv._finanzamt_ref_pfad() != fa:
+            _fail("#158: _finanzamt_ref_pfad liefert nicht das gesetzte Bible-Bild")
+        p1 = bildmotiv._comic_strip_pfad(1, prompt, berater, tool="openai")
+        if bildmotiv._comic_strip_pfad(1, prompt, berater, tool="openai") != p1:
+            _fail("#158: unveraendertes Finanzamt-Bild aendert den Panel-2-Pfad")
+        tf = os.path.getmtime(fa)
+        os.utime(fa, (tf + 10, tf + 10))
+        if bildmotiv._comic_strip_pfad(1, prompt, berater, tool="openai") == p1:
+            _fail("#158: ersetztes Finanzamt-Bild (neue mtime) erneuert Panel 2 NICHT")
+    finally:
+        db.set_einstellung("finanzamt_bibel_bild", None)
+    _ok("#158: ersetzte Berater-/Finanzamt-Referenz (neue mtime) -> neuer Panel-Pfad; unveraendert -> gleich")
+
+
 def main():
     db.init_db()
     test_1_stilwahl()
@@ -401,6 +436,7 @@ def main():
     test_6_override_feld1()
     test_7_override_input_in_pickern()
     test_8_route_persistiert_override()
+    test_9_ref_signatur_invalidiert_cache()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 

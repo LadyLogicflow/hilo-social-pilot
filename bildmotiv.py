@@ -283,6 +283,23 @@ REF_INSTRUCTION = (
 )
 
 
+def _ref_signatur(path):
+    """Liefert eine Cache-stabile Signatur einer Referenzdatei: '<basename>@<int(mtime)>' (#158).
+    So ergibt ein ERSETZTES Referenzbild MIT GLEICHEM DATEINAMEN (neue mtime) einen NEUEN
+    Cache-Schluessel -> frisches Bild; eine UNVERAENDERTE Datei behaelt ihren Schluessel (weiter
+    effizient gecacht). Fehlt der Pfad oder existiert die Datei nicht -> '' (bisheriges Verhalten
+    fuer fehlende Refs). Robust: kann die mtime nicht gelesen werden, faellt es auf den blossen
+    Basename zurueck, damit der Schluessel trotzdem stabil bleibt."""
+    p = (path or "").strip()
+    if not p or not os.path.exists(p):
+        return ""
+    base = os.path.basename(p)
+    try:
+        return "%s@%d" % (base, int(os.path.getmtime(p)))
+    except Exception:
+        return base
+
+
 def _comic_referenz_aktiv():
     """True, wenn der Referenzbild-Pfad (OpenAI images/edits) aktiv ist. Steuerung ueber
     HILO_COMIC_REFERENCE (Default '1'); '0'/'false'/'no'/'off' schaltet zurueck auf den
@@ -548,7 +565,9 @@ def _comic_cache_input(fields):
     nutzen exakt diesen Bauer -> kein Falsch-Loeschen."""
     aktiv = _comic_referenz_aktiv()
     refs = _comic_refs(fields) if aktiv else []
-    ref_teil = "ref=%d;%s" % (1 if refs else 0, ",".join(os.path.basename(p) for p in refs))
+    # #158: Signatur (basename@mtime) statt nur Basename - ein ersetztes Referenzbild mit gleichem
+    # Dateinamen (neue mtime) erneuert den Cache. Reihenfolge/Format bleiben stabil.
+    ref_teil = "ref=%d;%s" % (1 if refs else 0, ",".join(_ref_signatur(p) for p in refs))
     return "comic:" + _comic_prompt(fields) + "|" + ref_teil
 
 def _comic_pfad(fields, tool=None):
@@ -966,7 +985,9 @@ def _comic_beratung_cache_input(fields, berater_comic_pfad):
 
     #153: Der Finanzamt-Beamte ist aus 'Comic Beratung' entfernt - die Finanzamt-Bible fliesst NICHT
     mehr in den Schluessel. Da sich BERATUNG_BLOCK aendert, erneuert sich der Cache ohnehin automatisch."""
-    base = os.path.basename((berater_comic_pfad or "").strip())
+    # #158: Signatur (basename@mtime) statt nur Basename - ein ersetzter Berater-Comic mit gleichem
+    # Dateinamen (neue mtime) erneuert den Cache. Format '|berater=' bleibt stabil.
+    base = _ref_signatur(berater_comic_pfad)
     return "comic_beratung:" + _comic_beratung_prompt(fields) + "|berater=" + base
 
 def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
@@ -1216,8 +1237,14 @@ def _comic_strip_pfad(idx, prompt, berater_ref_pfad, tool=None):
     Berater-Basename trennt die Stellen. Tool-abhaengig (#137) wie die uebrigen Pfade."""
     if tool is None:
         tool = aktives_bild_tool()
-    base = os.path.basename((berater_ref_pfad or "").strip())
-    schluessel = "comic_strip:%d:%s|berater=%s" % (idx, prompt, base)
+    # #158: Signatur (basename@mtime) statt nur Basename der Berater-Referenz - ein ersetztes
+    # Referenzbild mit gleichem Dateinamen (neue mtime) erneuert den Cache.
+    base = _ref_signatur(berater_ref_pfad)
+    # ZUSAETZLICH die fuer DIESES Panel tatsaechlich genutzte Referenz (Feld 2 = Finanzamt) in den
+    # Schluessel aufnehmen - so erneuert auch ein ersetztes Finanzamt-Bild Panel 2. Dieselbe Quelle
+    # (_comic_strip_refs) wie der Producer (ensure_comic_strip_bilder) -> identischer Schluessel.
+    panel_refs = ";".join(_ref_signatur(r) for r in _comic_strip_refs(idx, berater_ref_pfad))
+    schluessel = "comic_strip:%d:%s|berater=%s|refs=%s" % (idx, prompt, base, panel_refs)
     h = hashlib.sha256(schluessel.lower().encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_strip_" + h + ".png")
 

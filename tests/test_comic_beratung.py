@@ -311,6 +311,32 @@ def test_7_finanzamt_entfernt():
     _ok("#153: comic_beratung finanzamtfrei - refs=[berater], kein finanzamt_bibel_text im Prompt")
 
 
+def test_8_ref_signatur_invalidiert_cache():
+    """#158: Wird der Berater-Comic durch ein neues Bild MIT GLEICHEM DATEINAMEN ersetzt (neue
+    mtime), MUSS sich der Cache-Pfad aendern. Ohne Aenderung bleibt er gleich (weiter effizient)."""
+    b = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_refsig.png"))
+    fields = _fields("Signaturtest")
+
+    p1 = bildmotiv._comic_beratung_pfad(fields, b, tool="openai")
+    # Gleicher Input, gleiche Datei -> gleicher Pfad (Cache-Treffer bleibt effizient).
+    if bildmotiv._comic_beratung_pfad(fields, b, tool="openai") != p1:
+        _fail("#158: unveraenderte Referenz aendert den Cache-Pfad (nicht mehr effizient)")
+
+    # Referenzbild "ersetzen" -> mtime sicher aendern (int(mtime) muss sich unterscheiden).
+    t = os.path.getmtime(b)
+    os.utime(b, (t + 10, t + 10))
+    p2 = bildmotiv._comic_beratung_pfad(fields, b, tool="openai")
+    if p2 == p1:
+        _fail("#158: ersetzter Berater-Comic (neue mtime) erzeugt KEINEN neuen Cache-Pfad")
+
+    # Und die Signatur selbst: existierende Datei -> 'basename@mtime', fehlende -> ''.
+    if not bildmotiv._ref_signatur(b).startswith("comic_refsig.png@"):
+        _fail("#158: _ref_signatur liefert nicht 'basename@mtime' fuer existierende Datei")
+    if bildmotiv._ref_signatur(os.path.join(bildmotiv.DATA_DIR, "berater", "fehlt.png")) != "":
+        _fail("#158: _ref_signatur liefert fuer fehlende Datei nicht ''")
+    _ok("#158: ersetztes Referenzbild (neue mtime) -> neuer Cache-Pfad; unveraendert -> gleicher Pfad")
+
+
 def main():
     db.init_db()
     test_1_stilwahl()
@@ -320,6 +346,7 @@ def main():
     test_5_fallback_normaler_comic()
     test_6_character_bible()
     test_7_finanzamt_entfernt()
+    test_8_ref_signatur_invalidiert_cache()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 
