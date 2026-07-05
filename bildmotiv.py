@@ -660,8 +660,9 @@ BERATER_PORTRAIT_PROMPT = (
     "professional. Keep their natural character and real features so they clearly look like "
     "THEMSELVES (some age and character is welcome and good): do NOT smooth them into a generic, "
     "idealised or unrealistically young face, and do NOT harshly age them or add heavy shading, "
-    "deep wrinkles or extra weight either. Recognisable, dignified, likeable, with a friendly smile. "
-    "Simple clean light background. Square format."
+    "deep wrinkles or extra weight either. Recognisable, dignified, likeable, with a friendly smile "
+    "and bright, wide-awake, alert and attentive eyes - a lively, energetic expression, NOT tired, "
+    "sleepy or droopy. Simple clean light background. Square format."
 )
 
 
