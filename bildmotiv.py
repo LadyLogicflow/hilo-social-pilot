@@ -194,16 +194,19 @@ STIL_A_BLOCK = (
 # der Beratungsstelle (Comic-Figur nach dem ersten Referenzbild), HINTEN der wiederkehrende
 # Finanzamt-Beamte, der leer ausgeht. EXAKTER Wortlaut aus dem Auftrag.
 BERATUNG_BLOCK = (
-    "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style. "
-    "In the FOREGROUND, the HILO tax advisor - the SAME person as in the first reference image, "
-    "matching their face, hairstyle, AGE and build EXACTLY (do NOT make them younger or different), "
-    "wearing a small blue 'HILO' logo badge on the lapel or chest of their jacket/top - "
-    "sits at a tidy office DESK across from a friendly client, explaining and reassuring them, with "
-    "papers or a laptop on the desk, in a modern, friendly advisory office. It must clearly read as "
-    "professional tax ADVICE at a desk. Do NOT show any cash, banknotes or money changing hands "
-    "(nothing that looks like a shady deal). In the BACKGROUND, smaller and off to one side, the "
-    "recurring 'Finanzamt' bureaucrat (grey suit, round glasses, beige sleeve garters) looks sad, "
-    "disappointed and empty-handed - HILO helps, the tax office loses out. Warm and friendly overall; "
+    "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style, "
+    "at a tidy office desk. In the FOREGROUND there are EXACTLY TWO people of the SAME size and scale, "
+    "sitting across the desk and clearly FACING EACH OTHER with friendly EYE CONTACT, in conversation: "
+    "(1) the HILO tax advisor - the SAME person as in the first reference image, matching their face, "
+    "hairstyle, AGE and build EXACTLY (do NOT make them younger or different), wearing a small HILO "
+    "logo badge with the wordmark 'HILO' in WHITE letters on the lapel/chest; and (2) the client - "
+    "drawn at the SAME size as the advisor, NOT smaller, also fully in the foreground. Papers or a "
+    "laptop on the desk; a modern, friendly advisory office. It must clearly read as professional tax "
+    "ADVICE. Do NOT show any cash, banknotes or money changing hands. In the BACKGROUND there is "
+    "EXACTLY ONE 'Finanzamt' bureaucrat (grey suit, round glasses, beige sleeve garters) - only ONE, "
+    "never two - drawn SMALL and clearly SEPARATE, NOT overlapping the two foreground people, with a "
+    "small sign reading 'Finanzamt' above his head; he looks sad, disappointed and empty-handed (HILO "
+    "helps, the tax office loses out). Warm and friendly overall; "
     "gentle humour only in the small background figure. Keep generous empty negative space on one "
     "side for later text."
 )
@@ -685,8 +688,8 @@ BERATER_PORTRAIT_PROMPT = (
     "yet still a natural adult (NOT a 20-year-old, NOT an idealised face). No deep wrinkles, no heavy "
     "face shading, no extra weight. Recognisable, dignified, likeable, with a friendly smile "
     "and bright, wide-awake, alert and attentive eyes - a lively, energetic expression, NOT tired, "
-    "sleepy or droopy. They wear a small blue 'HILO' logo badge on the lapel or chest of their "
-    "jacket/top. Simple clean light background. Square format."
+    "sleepy or droopy. They wear a small HILO logo badge with the wordmark 'HILO' in WHITE letters "
+    "on the lapel or chest. Simple clean light background. Square format."
 )
 
 
