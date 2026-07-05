@@ -144,8 +144,8 @@ def test_3_prompt_und_refs():
     finally:
         bildmotiv.erzeuge_comic_bild_ref, bildmotiv.erzeuge_bild = orig_ref, orig_gen
 
-    if bildmotiv.STIL_A_BLOCK not in (captured["prompt"] or ""):
-        _fail("Prompt enthaelt STIL_A_BLOCK nicht")
+    if bildmotiv.HILO_COMIC_MASTER not in (captured["prompt"] or ""):
+        _fail("Prompt enthaelt HILO_COMIC_MASTER nicht")
     if bildmotiv.BERATUNG_BLOCK not in (captured["prompt"] or ""):
         _fail("Prompt enthaelt BERATUNG_BLOCK nicht")
     if captured["refs"] != [berater, bildmotiv.FINANZAMT_REF_PATH]:
