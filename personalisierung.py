@@ -192,7 +192,11 @@ def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     Stelle. Statt der normalen Slide-Pipeline werden die 3 ROHEN KI-Panels (kein Text-Karten-Overlay,
     keine CI-Kreise) ueber bildmotiv.ensure_comic_strip_bilder erzeugt und deren Pfade geliefert. Die
     Berater-Referenz der Stelle (bibel_bild > berater_comic) fuellt Feld 1+3; hat die Stelle keine,
-    degradieren die Panels sinnvoll (ohne Berater-Gesicht) statt zu crashen."""
+    degradieren die Panels sinnvoll (ohne Berater-Gesicht) statt zu crashen.
+
+    v2 (#155): der Archetyp (vorteil/warnung) + die Bild-2-Variante reisen als fields['strip_archetyp']
+    /['strip_zeile2'] mit (fuer_stelle kopiert sie unveraendert). ensure_comic_strip_bilder loest sie
+    auf; fehlen sie (Alt-Entwurf), greift dort die KI-Vorauswahl bzw. der Default 'vorteil'."""
     import bildgen, bildmotiv
     import stilwahl
     f = fuer_stelle(fields, stelle)
