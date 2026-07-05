@@ -655,11 +655,13 @@ def erzeuge_comic_bild_ref(prompt, refs):
 BERATER_PORTRAIT_PROMPT = (
     "Create a friendly, modern comic portrait, head and shoulders, of the SAME person shown in the "
     "provided photograph, redrawn in a clean ligne claire comic style (clean elegant outlines, flat "
-    "bright colours, MINIMAL shading) matching the style reference image. Make the person look "
-    "YOUTHFUL, SLIM and fresh: a slender face and jawline, smooth clear skin, NO wrinkles, NO "
-    "nasolabial folds, NO extra weight and NO double chin, do NOT age them. A warm, approachable, "
-    "professional advisor with a friendly smile. Simple clean light background. Keep the person "
-    "clearly recognisable but flattering, noticeably younger and slimmer. Square format."
+    "colours, light natural shading) matching the style reference image. Aim for a FLATTERING but "
+    "AUTHENTIC likeness that is TRUE TO THE PERSON'S REAL AGE and character - a mature adult "
+    "professional. Keep their natural character and real features so they clearly look like "
+    "THEMSELVES (some age and character is welcome and good): do NOT smooth them into a generic, "
+    "idealised or unrealistically young face, and do NOT harshly age them or add heavy shading, "
+    "deep wrinkles or extra weight either. Recognisable, dignified, likeable, with a friendly smile. "
+    "Simple clean light background. Square format."
 )
 
 
