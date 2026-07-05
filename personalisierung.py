@@ -177,11 +177,29 @@ def render_fuer_stelle(fields, stelle, out_path):
     return f, out_path
 
 
+def _berater_ref(stelle):
+    """Liefert die Berater-Referenz DIESER Stelle fuer die Comic-Familie: bibel_bild (Character-Bible,
+    #151) hat Vorrang vor dem aus dem Foto abgeleiteten berater_comic; sonst None. Gleiche
+    Aufloesung wie _setze_berater_comic (dort fuer comic_beratung)."""
+    return _bibel_bild(stelle) or _berater_comic(stelle)
+
+
 def render_slides_fuer_stelle(fields, stelle, out_dir, prefix):
     """Rendert ein Karussell mit personalisiertem CTA (gleiches Foto/Design je Stelle).
-    Liefert (felder, [pfade]). Kreisportraet der Stelle ersetzt ggf. den blauen Slogan-Punkt."""
+    Liefert (felder, [pfade]). Kreisportraet der Stelle ersetzt ggf. den blauen Slogan-Punkt.
+
+    Stil 'comic_strip' (#154): ein 3-Felder-Comic-Karussell mit Sprechblasen, personalisiert je
+    Stelle. Statt der normalen Slide-Pipeline werden die 3 ROHEN KI-Panels (kein Text-Karten-Overlay,
+    keine CI-Kreise) ueber bildmotiv.ensure_comic_strip_bilder erzeugt und deren Pfade geliefert. Die
+    Berater-Referenz der Stelle (bibel_bild > berater_comic) fuellt Feld 1+3; hat die Stelle keine,
+    degradieren die Panels sinnvoll (ohne Berater-Gesicht) statt zu crashen."""
     import bildgen, bildmotiv
+    import stilwahl
     f = fuer_stelle(fields, stelle)
+    if stilwahl.aktiver_stil(f) == "comic_strip":
+        os.makedirs(out_dir, exist_ok=True)
+        paths = bildmotiv.ensure_comic_strip_bilder(f, _berater_ref(stelle))
+        return f, paths
     _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
     photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))

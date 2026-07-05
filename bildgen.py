@@ -607,9 +607,17 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, por
     # Text-Slides. Standard/ki_tafel-Karussell bleibt unveraendert.
     try:
         import stilwahl
-        if stilwahl.aktiver_stil(fields) == "kreativ":
+        aktiv = stilwahl.aktiver_stil(fields)
+        if aktiv == "kreativ":
             p = os.path.join(out_dir, "%s_01.png" % prefix)
             return [_render_kreativ(fields, photo_path, slogan, p, portrait)]
+        if aktiv == "comic_strip":
+            # #154: comic_strip ist ein 3-Felder-Comic-Karussell (rohe KI-Panels, kein Overlay).
+            # Der personalisierte Weg laeuft ueber personalisierung.render_slides_fuer_stelle (mit
+            # Berater-Referenz der Stelle). Hier (stellenlos, z.B. Detail-Vorschau/FB-Seite) wird
+            # ohne Berater-Gesicht degradiert - die Panels sind bereits fertige Bilder.
+            import bildmotiv
+            return bildmotiv.ensure_comic_strip_bilder(fields, "")
     except Exception:
         pass
     bullets = [b for b in (fields.get("bullets") or []) if b]
