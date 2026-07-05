@@ -99,8 +99,8 @@ def test_2_erzeuge_berater_comic():
     finally:
         bildmotiv.erzeuge_comic_bild_ref = orig
 
-    if captured["refs"] != [foto_path, bildmotiv.STIL_REF_PATH]:
-        _fail("refs != [foto_path, STIL_REF_PATH]: %r" % captured["refs"])
+    if captured["refs"] != [foto_path]:
+        _fail("refs != [foto_path] (Portrait ohne Stil-Ref, sonst altert es): %r" % captured["refs"])
     if captured["prompt"] != bildmotiv.BERATER_PORTRAIT_PROMPT:
         _fail("Prompt != BERATER_PORTRAIT_PROMPT: %r" % captured["prompt"])
     if not pfad or not os.path.exists(pfad):

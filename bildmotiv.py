@@ -655,7 +655,7 @@ def erzeuge_comic_bild_ref(prompt, refs):
 BERATER_PORTRAIT_PROMPT = (
     "Create a friendly, modern comic portrait, head and shoulders, of the SAME person shown in the "
     "provided photograph, redrawn in a clean ligne claire comic style (clean elegant outlines, flat "
-    "colours, light natural shading) matching the style reference image. Aim for a FLATTERING but "
+    "colours, light natural shading, a warm friendly modern comic look). Aim for a FLATTERING but "
     "AUTHENTIC likeness that is TRUE TO THE PERSON'S REAL AGE and character - a mature adult "
     "professional. Keep their natural character and real features so they clearly look like "
     "THEMSELVES (some age and character is welcome and good): do NOT smooth them into a generic, "
@@ -669,8 +669,9 @@ def erzeuge_berater_comic(foto_path):
     """Erzeugt aus dem Leitungs-Foto einer Beratungsstelle ein Comic-Portrait (Stil "Comic
     Beratung") und liefert den gespeicherten PNG-Pfad (oder None).
 
-    Ruft erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path, STIL_REF_PATH]) auf - das
-    Leitungs-Foto liefert die Person, STIL_REF_PATH den Ligne-claire-Stil. Die Ergebnis-Bytes
+    Ruft erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path]) auf - NUR das Leitungs-Foto
+    als Referenz (KEIN Stil-Referenzbild: das van-Gogh-Stilbild wuerde fremde Alters-/Gesichtszuege
+    einmischen und die Person aelter machen; der Ligne-claire-Stil kommt aus dem Prompt). Ergebnis
     werden nach DATA_DIR/berater/comic_<stelleid>.png geschrieben (die Stellen-ID wird aus dem
     Datei-Basenamen des Fotos abgeleitet - 'stelle_<id>' oder 'foto_<id>'), der Pfad zurueckgegeben.
 
@@ -680,7 +681,7 @@ def erzeuge_berater_comic(foto_path):
         log.info("Berater-Comic uebersprungen: kein Leitungs-Foto vorhanden (%r).", foto_path)
         return None
     try:
-        daten = erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path, STIL_REF_PATH])
+        daten = erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path])
     except Exception as ex:
         log.warning("Berater-Comic (Referenz-Call) fehlgeschlagen: %s", ex)
         return None
