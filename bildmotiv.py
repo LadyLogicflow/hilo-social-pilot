@@ -193,26 +193,64 @@ STIL_A_BLOCK = (
 # Stil "Comic Beratung" (comic_beratung): personalisierte Beratungsszene - VORNE der/die Berater:in
 # der Beratungsstelle (Comic-Figur nach dem ersten Referenzbild), HINTEN der wiederkehrende
 # Finanzamt-Beamte, der leer ausgeht. EXAKTER Wortlaut aus dem Auftrag.
+# HILO-Masterprompt (von Catrins ChatGPT-Projekt entwickelt, deutsch, getreu): der HILO-Comic-Stil
+# fuer SERIOESE Illustrationen (Beratung). Bewusst NUR fuer comic_beratung - NICHT fuer den witzigen
+# 'comic'-Stil (der lebt von Karikatur; der Master sagt 'keine Karikaturen').
+HILO_COMIC_MASTER = (
+    "Erstelle eine hochwertige Illustration im Stil der Ligne claire (klare Linie), inspiriert von "
+    "klassischen frankobelgischen Comics wie Tim & Struppi, jedoch modern interpretiert und auf "
+    "hoechstem professionellen Illustrationsniveau. Elegant, zeitlos und hochwertig - nicht kindlich "
+    "oder cartoonhaft; wie von einem professionellen Comiczeichner erstellt.\n"
+    "Zeichenstil: kraeftige, gleichmaessige schwarze Konturen; absolut saubere, geschlossene "
+    "Linienfuehrung; flaechige Farben; nur minimale weiche Schattierungen; keine Texturen, keine "
+    "Pinselstriche, keine Skizzenoptik, keine Manga-, Disney- oder Chibi-Elemente, keine Karikaturen, "
+    "keine ueberzeichnete Mimik. Figuren realistisch proportioniert, nur im Ligne-claire-Stil illustriert.\n"
+    "Farbwelt: ruhige, harmonische Palette - dominierend Navy-Blau, HILO-Gruen, warmes Papierweiss, "
+    "dezente Grautoene, natuerliche Hautfarben; Akzentfarben sparsam; frisch, freundlich, serioes.\n"
+    "Licht: weiches Tageslicht, keine harten Schatten, keine dramatische Beleuchtung, helle "
+    "freundliche Atmosphaere.\n"
+    "Perspektive: Augenhoehe, leichte Dreiviertelperspektive, natuerliche Kameraposition; keine "
+    "extremen Brennweiten, keine Vogel- oder Froschperspektive.\n"
+    "Personen: sympathisch, kompetent, aufmerksam, ruhig, authentisch, natuerlich; keine Model-Posen, "
+    "keine uebertriebene Mimik, keine kuenstlichen Gesten.\n"
+    "Gesicht (bei Fotovorlage): Gesicht moeglichst exakt uebernehmen - Gesichtsform, Frisur, "
+    "Haarfarbe, Alter, Augen, Nase, Mund; eindeutig erkennbar dieselbe Person.\n"
+    "Koerperproportionen: realistisch; keine uebergrossen Koepfe, keine verkuerzten Arme, keine "
+    "Cartoon-Haende, keine Comic-Verzerrungen.\n"
+    "Kleidung: modern, Business Casual, gepflegt, schlichte Stoffe, keine auffaelligen Muster; Farben "
+    "harmonieren mit der HILO-CI.\n"
+    "Bildqualitaet: extrem hohe Detailqualitaet, professionelle Comicillustration, Druckqualitaet, "
+    "sehr saubere Konturen, perfekte Anatomie, perfekte Haende, perfekte Perspektive, klare Formen, "
+    "keine KI-Artefakte.\n"
+    "Negativ: keine Manga-/Disney-/Pixar-/Anime-Optik, keine Karikaturen, keine Chibi-Figuren, keine "
+    "uebertriebenen Gesichtsausdruecke, keine verzerrten Haende, keine schiefen Augen, keine schiefen "
+    "Perspektiven, keine ueberladenen Hintergruende, keine grellen Farben, keine Sprechblasen, keine "
+    "Wasserzeichen, keine kuenstlichen Effekte, keine Koernung, keine Texturen.\n"
+    "Konsistenz: alle HILO-Illustrationen gehoeren zu derselben gezeichneten Welt - Figuren, "
+    "Architektur, Farbpalette, Perspektive, Linienfuehrung und Lichtstimmung bleiben konsistent; "
+    "wiederkehrende Charaktere behalten stets dieselbe Gesichtsform, Frisur, Kleidung und Proportionen."
+)
+
+# Beratungs-Delta (auf HILO_COMIC_MASTER): Komposition + HILO-Buero + unser wiederkehrender
+# Finanzamt-Typ im Hintergrund + Referenz-Zuordnung (1. Ref = Berater, 2. Ref = Finanzamt).
 BERATUNG_BLOCK = (
-    "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style, "
-    "at a tidy office desk. In the FOREGROUND there are EXACTLY TWO people who sit on OPPOSITE sides "
-    "of the desk, each turned in three-quarter profile to FACE the other with clear friendly EYE "
-    "CONTACT (both faces visible, looking at each other - NOT side by side, NOT both facing the "
-    "viewer). Draw BOTH at EXACTLY the same height and the same head size, equally large and prominent "
-    "- the client is NOT smaller, NOT further back and NOT turned away; a balanced two-shot across the "
-    "desk. The two are: (1) the HILO tax advisor - the SAME person as in the "
-    "first reference image, matching their face, hairstyle, AGE and build EXACTLY (do NOT make them "
-    "younger or different), wearing a small HILO logo badge with the wordmark 'HILO' in WHITE letters "
-    "on the lapel/chest; and (2) the client/member, drawn the SAME height and SAME head size as the "
-    "advisor (equally large, NOT smaller, NOT further back). Papers or a "
-    "laptop on the desk; a modern, friendly advisory office. It must clearly read as professional tax "
-    "ADVICE. Do NOT show any cash, banknotes or money changing hands. In the BACKGROUND there is "
-    "EXACTLY ONE 'Finanzamt' bureaucrat (grey suit, round glasses, beige sleeve garters) - only ONE, "
-    "never two - drawn SMALL and clearly SEPARATE, NOT overlapping the two foreground people, with a "
-    "small sign reading 'Finanzamt' above his head; he looks sad, disappointed and empty-handed (HILO "
-    "helps, the tax office loses out). Warm and friendly overall; "
-    "gentle humour only in the small background figure. Keep generous empty negative space on one "
-    "side for later text."
+    "Szene: eine HILO-Steuerberatung. Die beiden Personen sitzen sich GEGENUEBER an einem Schreibtisch, "
+    "auf DERSELBEN Ebene, EXAKT gleich gross - keine Person wirkt dominanter; echter BLICKKONTAKT, "
+    "natuerliche Gespraechssituation. Der/die Berater:in hoert aufmerksam zu, das Mitglied wirkt "
+    "entspannt. Der/die Berater:in sieht aus wie die ERSTE Referenz (Gesicht, Frisur, Alter exakt "
+    "uebernehmen) und traegt ein kleines HILO-Logo (Schriftzug 'HILO' in WEISSER Schrift) am Revers.\n"
+    "Hintergrund: moderner deutscher Beratungsraum - helle Raeume, grosse Fenster, Pflanzen, "
+    "Buecherregale, Schreibtisch, Laptop, Steuerunterlagen; ein dezentes HILO-Plakat mit dem Text "
+    "'Persoenlich. Kompetent. Fuer Sie da.' (kleiner gruener Unterstrich), ein Laptop mit kleinem "
+    "'Wir sind HILO', Papiere mit 'Steuererklaerung'; alles reduziert und ordentlich; der "
+    "Hintergrund unterstuetzt die Szene, lenkt aber nie von den Personen ab.\n"
+    "Zusaetzlich: im Hintergrund GENAU EIN Finanzamt-Beamter, gezeichnet wie die ZWEITE Referenz "
+    "(unser wiederkehrender Finanzamt-Charakter mit runder Brille, grauem Anzug, Aermelschonern) - "
+    "nur EINER, klein und klar getrennt, NICHT die beiden Personen ueberlappend; er zieht "
+    "enttaeuscht durch eine Tuer mit dem Schild 'Finanzamt' ab und geht leer aus (traurige Miene). "
+    "KEIN Bargeld, keine Gelduebergabe.\n"
+    "Kleine Raum- oder Tuerschilder (wie 'Finanzamt') sind erlaubt; sonst kein weiterer Text. Rechts "
+    "oder links viel freier Negativraum fuer spaeteren Text."
 )
 FINANZAMT_BLOCK = (
     "Recurring 'Finanzamt' character (draw him consistently): a slightly over-correct bureaucrat - "
@@ -846,13 +884,14 @@ def ensure_comic_bild(fields):
 
 # --- Stil "Comic Beratung" (comic_beratung) - personalisiert pro Beratungsstelle ----------------
 def _comic_beratung_prompt(fields):
-    """Baut den Comic-Beratung-Bildprompt: STIL_A_BLOCK + BERATUNG_BLOCK. Bewusst OHNE das
-    Beitrags-Thema (kein 'Thema/Anlass'): das Thema trieb die Szene sonst woertlich (z.B. eine
-    Gelduebergabe -> wirkte wie ein 'Deal' statt Beratung). 'Comic Beratung' ist IMMER eine warme
-    Schreibtisch-Beratung; der inhaltliche Bezug lebt im Begleittext des Posts. 'fields' wird fuer
-    kuenftige (dezente) Varianten durchgereicht. KEIN Finanzamt-Block (Beamter steckt im
-    BERATUNG_BLOCK als kleine Hintergrundfigur)."""
-    return STIL_A_BLOCK + "\n\n" + BERATUNG_BLOCK
+    """Baut den Comic-Beratung-Bildprompt: HILO_COMIC_MASTER (der von Catrins ChatGPT-Projekt
+    entwickelte, ausgereifte HILO-Stil-Masterprompt) + BERATUNG_BLOCK (Komposition + HILO-Buero +
+    wiederkehrender Finanzamt-Typ). Bewusst OHNE das Beitrags-Thema (kein 'Thema/Anlass'): das Thema
+    trieb die Szene sonst woertlich (z.B. eine Gelduebergabe -> wirkte wie ein 'Deal'). 'Comic
+    Beratung' ist IMMER eine warme Schreibtisch-Beratung; der inhaltliche Bezug lebt im Begleittext.
+    'fields' wird fuer kuenftige Varianten durchgereicht. NICHT STIL_A_BLOCK (das ist der witzige
+    Comic-Stil mit Karikaturen - der Master verlangt bewusst KEINE Karikaturen)."""
+    return HILO_COMIC_MASTER + "\n\n" + BERATUNG_BLOCK
 
 def _comic_beratung_refs(berater_comic_pfad):
     """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade: ZUERST der Berater-Comic der Stelle
