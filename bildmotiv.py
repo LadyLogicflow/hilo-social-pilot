@@ -647,7 +647,12 @@ def _comic_pfad(fields, tool=None):
         tool = aktives_bild_tool()
     h = hashlib.sha256(_comic_cache_input(fields).lower().encode("utf-8")).hexdigest()[:16]
     # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_" + h + ".png")
+    # #162: Fidelity-Marker (hf_ bei input_fidelity=high, sonst leer) -> Umschalten auf high liefert
+    # einmalig frische, treuere Bilder (Prompt/Refs unveraendert). Genau EIN Ort pro Kette (hier).
+    # Reihenfolge: Fidelity VOR Modell, damit der g2_-Modell-Praefix direkt an 'comic_' grenzt (bleibt
+    # rueckwaertskompatibel zur bestehenden Praefix-Konvention).
+    return os.path.join(MOTIV_DIR,
+                        _tool_praefix(tool) + _fidelity_marker() + _modell_praefix(tool) + "comic_" + h + ".png")
 
 def cache_dateien_fuer_fields(fields):
     """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
@@ -726,6 +731,28 @@ def _openai_quality():
     return quality if quality in ("low", "medium", "high", "auto") else "high"
 
 
+def _input_fidelity():
+    """Liefert den input_fidelity-Modus fuer den Comic-Referenz-/Edit-Call (images/edits) aus
+    HILO_INPUT_FIDELITY (Default 'high', validiert) - #162. 'high' uebernimmt die Gesichter/Details
+    der mitgegebenen Referenzbilder deutlich treuer (wichtig fuer den wiederkehrenden Aermelschoner
+    und die Berater-Portraits); 'low' entspricht dem alten API-Default (das Gesicht wird
+    generalisiert). Ungueltige Werte fallen sicher auf 'high' zurueck. Kapselt die ENV-Auswertung,
+    damit Producer (erzeuge_comic_bild_ref) UND Cache-Marker (_fidelity_marker) dieselbe Quelle
+    nutzen - nur so bleiben gesendeter Parameter und Cache-Datei konsistent."""
+    v = (os.environ.get("HILO_INPUT_FIDELITY") or "high").strip().lower()
+    return v if v in ("high", "low") else "high"
+
+
+def _fidelity_marker():
+    """Cache-Datei-Marker fuer input_fidelity (#162), analog _modell_praefix: 'hf_' wenn high-fidelity
+    aktiv, sonst '' (low -> bestehende Comic-Cache-Dateien bleiben gueltig, rueckwaertskompatibel).
+    input_fidelity aendert das Ergebnis, OHNE dass sich Prompt/Referenzen aendern; ohne diesen Marker
+    wuerde der Cache die alten low-fidelity-Bilder liefern. Der Marker sitzt (wie _modell_praefix) an
+    genau EINEM Ort pro Cache-Kette - in den *_pfad-Funktionen -, sodass Producer UND Aufraeumschutz
+    denselben Schluessel sehen und beim Umschalten auf 'high' EINMALIG frische Bilder entstehen."""
+    return "hf_" if _input_fidelity() == "high" else ""
+
+
 def openai_payload(prompt, modell=None):
     """Baut das OpenAI images/generations-Request-Payload (ohne Netzwerkaufruf). Modell aus der
     Einstellung 'bild_modell' (openai_image_model(), Default gpt-image-1), background='opaque',
@@ -782,64 +809,101 @@ def erzeuge_bild_openai(prompt, modell=None):
         return None
 
 
+def _comic_edits_versuche(modell, sende_fidelity):
+    """Liefert die geordnete, ENDLICHE Liste der images/edits-Versuche fuer den Comic-Referenz-/Edit-
+    Pfad (#162) als Tupel (modell, mit_fidelity). Reihenfolge des Sicherheitsnetzes:
+      1. gewaehltes Modell MIT input_fidelity=high (nur wenn sende_fidelity, also HILO_INPUT_FIDELITY
+         == 'high'),
+      2. gewaehltes Modell OHNE input_fidelity (deckt 'Parameter unbekannt' ab - die API kennt den
+         Parameter evtl. nicht),
+      3. gpt-image-1 OHNE input_fidelity (bestehender Modell-Fallback #161), nur wenn das gewaehlte
+         Modell NICHT bereits der Default ist.
+    Duplikate (gleiche (modell, mit_fidelity)-Kombination) werden unter Erhalt der Reihenfolge
+    entfernt - so entstehen bei 'low' (keine Fidelity) oder bereits gesetztem Default-Modell KEINE
+    unnoetigen Doppel-Calls und garantiert keine Endlosschleife (feste, kleine Versuchsliste)."""
+    versuche = []
+    if sende_fidelity:
+        versuche.append((modell, True))
+    versuche.append((modell, False))
+    if modell != OPENAI_IMAGE_MODEL_DEFAULT:
+        versuche.append((OPENAI_IMAGE_MODEL_DEFAULT, False))
+    entdoppelt = []
+    for v in versuche:
+        if v not in entdoppelt:
+            entdoppelt.append(v)
+    return entdoppelt
+
+
 def erzeuge_comic_bild_ref(prompt, refs, modell=None):
     """Erzeugt ein Comic-Bild via OpenAI images/edits MIT Referenzbildern (Stil- + optional
     Charakter-Referenz) und liefert die PNG-Bytes (oder None). multipart/form-data wie
     erzeuge_bild_openai (gleicher Key/Bearer/Timeout-Stil):
-      data:  model, prompt, size='1024x1024', quality, n='1' (KEIN background-Feld beim edits-Call)
+      data:  model, prompt, size='1024x1024', quality, n='1' (KEIN background-Feld beim edits-Call);
+             #162: bei HILO_INPUT_FIDELITY='high' zusaetzlich input_fidelity='high' - uebernimmt die
+             Gesichter/Details der Referenzbilder deutlich treuer.
       files: fuer JEDEN Pfad in 'refs' ein Feld ('image[]', (basename, filehandle, 'image/png')) -
              gpt-image-1 akzeptiert mehrere Referenzbilder.
     Ohne 'openai_api_key', bei HTTP-/Netz-Fehler oder sonstiger Exception -> None (der Aufrufer
     faellt dann auf den generations-Weg zurueck). Der Key wird NIE geloggt; alle geoeffneten
-    Dateihandles werden im finally sauber geschlossen. Content-Type setzt requests selbst
+    Dateihandles werden je Versuch im finally sauber geschlossen. Content-Type setzt requests selbst
     (multipart-Boundary) - hier NICHT manuell setzen.
 
     'modell' (#161): das zu nutzende OpenAI-Bildmodell; None -> aktuelles Einstellungs-Modell
-    (openai_image_model()). Sicherheitsnetz: schlaegt der Call mit dem gewaehlten Modell fehl UND war
-    es NICHT bereits gpt-image-1, wird EINMAL automatisch mit 'gpt-image-1' nachgezogen (log.warning);
-    die Dateihandles der fehlgeschlagenen Runde werden vorher geschlossen (der Retry oeffnet frische)."""
+    (openai_image_model()).
+
+    Sicherheitsnetz (#162, ENDLICH, ohne Rekursion): kennt die API input_fidelity nicht (oder schlaegt
+    der Call anderweitig fehl), wird die feste Versuchsliste aus _comic_edits_versuche() abgearbeitet:
+    (1) gewaehltes Modell mit input_fidelity=high, (2) gewaehltes Modell OHNE input_fidelity,
+    (3) gpt-image-1 OHNE input_fidelity (Modell-Fallback). Jeder Versuch oeffnet FRISCHE Dateihandles
+    und schliesst sie im finally, bevor der naechste startet (log.warning je Fallback). Erst wenn ALLE
+    Versuche scheitern -> None."""
     key = get_secret("openai_api_key")
     if not key:
         log.info("Comic-Referenzbild uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
         return None
     if modell is None:
         modell = openai_image_model()
-    handles = []
-    try:
-        import requests
-        data = {"model": modell, "prompt": prompt, "size": "1024x1024",
-                "quality": _openai_quality(), "n": "1"}
-        files = []
-        for path in refs:
-            fh = open(path, "rb")
-            handles.append(fh)
-            files.append(("image[]", (os.path.basename(path), fh, "image/png")))
-        r = requests.post(
-            COMIC_EDITS_URL,
-            headers={"Authorization": "Bearer %s" % key},
-            data=data, files=files, timeout=120)
-        r.raise_for_status()
-        b64 = r.json()["data"][0]["b64_json"]
-        return base64.b64decode(b64)
-    except Exception as ex:
-        log.warning("OpenAI-Comic-Referenzbild fehlgeschlagen (Modell %s): %s", modell, ex)
-        if modell != OPENAI_IMAGE_MODEL_DEFAULT:
-            log.warning("OpenAI-Comic-Referenzbild: Fallback-Retry mit %s statt %s.",
-                        OPENAI_IMAGE_MODEL_DEFAULT, modell)
+    fidelity = _input_fidelity()
+    versuche = _comic_edits_versuche(modell, fidelity == "high")
+    letzter = len(versuche) - 1
+    for i, (versuch_modell, mit_fidelity) in enumerate(versuche):
+        handles = []
+        try:
+            import requests
+            data = {"model": versuch_modell, "prompt": prompt, "size": "1024x1024",
+                    "quality": _openai_quality(), "n": "1"}
+            # #162: input_fidelity NUR im Edit-/Referenzpfad und nur solange der Versuch es vorsieht
+            # (Versuch 1). Faellt der Parameter als Fehlerursache aus, laesst ihn der naechste Versuch
+            # bewusst weg. Der generations-Weg (erzeuge_bild_openai) bleibt hiervon unberuehrt.
+            if mit_fidelity:
+                data["input_fidelity"] = fidelity
+            files = []
+            for path in refs:
+                fh = open(path, "rb")
+                handles.append(fh)
+                files.append(("image[]", (os.path.basename(path), fh, "image/png")))
+            r = requests.post(
+                COMIC_EDITS_URL,
+                headers={"Authorization": "Bearer %s" % key},
+                data=data, files=files, timeout=120)
+            r.raise_for_status()
+            b64 = r.json()["data"][0]["b64_json"]
+            return base64.b64decode(b64)
+        except Exception as ex:
+            log.warning("OpenAI-Comic-Referenzbild fehlgeschlagen (Modell %s, input_fidelity=%s): %s",
+                        versuch_modell, fidelity if mit_fidelity else "-", ex)
+            if i < letzter:
+                naechst_modell, naechst_fid = versuche[i + 1]
+                log.warning("OpenAI-Comic-Referenzbild: Fallback-Retry (Modell %s, input_fidelity=%s).",
+                            naechst_modell, fidelity if naechst_fid else "-")
+            # letzter Versuch fehlgeschlagen -> nach dem finally faellt die Schleife auf 'return None'.
+        finally:
             for fh in handles:
                 try:
                     fh.close()
                 except Exception:
                     pass
-            handles = []
-            return erzeuge_comic_bild_ref(prompt, refs, modell=OPENAI_IMAGE_MODEL_DEFAULT)
-        return None
-    finally:
-        for fh in handles:
-            try:
-                fh.close()
-            except Exception:
-                pass
+    return None
 
 
 # --- Comic-Portrait der Beratungsstellen-Leitung (Stil "Comic Beratung", Setup) ----------------
@@ -1104,7 +1168,10 @@ def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
     h = hashlib.sha256(
         _comic_beratung_cache_input(fields, berater_comic_pfad).lower().encode("utf-8")).hexdigest()[:16]
     # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_beratung_" + h + ".png")
+    # #162: Fidelity-Marker (hf_ bei input_fidelity=high) analog _modell_praefix -> frische high-Bilder.
+    # Fidelity VOR Modell, damit der g2_-Praefix direkt an 'comic_beratung_' grenzt (Konvention).
+    return os.path.join(MOTIV_DIR,
+                        _tool_praefix(tool) + _fidelity_marker() + _modell_praefix(tool) + "comic_beratung_" + h + ".png")
 
 def ensure_comic_beratung_bild(fields, berater_comic_pfad):
     """Erzeugt (oder liefert aus dem Cache) das personalisierte Comic-Beratung-Bild: vorne der/die
@@ -1458,7 +1525,10 @@ def _comic_strip_pfad(idx, prompt, berater_ref_pfad, tool=None):
     schluessel = "comic_strip:%d:%s|berater=%s|refs=%s" % (idx, prompt, base, panel_refs)
     h = hashlib.sha256(schluessel.lower().encode("utf-8")).hexdigest()[:16]
     # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_strip_" + h + ".png")
+    # #162: Fidelity-Marker (hf_ bei input_fidelity=high) analog _modell_praefix -> frische high-Bilder.
+    # Fidelity VOR Modell, damit der g2_-Praefix direkt an 'comic_strip_' grenzt (Konvention).
+    return os.path.join(MOTIV_DIR,
+                        _tool_praefix(tool) + _fidelity_marker() + _modell_praefix(tool) + "comic_strip_" + h + ".png")
 
 
 def ensure_comic_strip_bilder(fields, berater_ref_pfad):

@@ -278,6 +278,10 @@ def test_7_fallback_retry():
         _fail("Fallback-Retry-Reihenfolge (generations) falsch: %r" % versuche["modelle"])
 
     # b) edits-Weg (erzeuge_comic_bild_ref): gpt-image-2 wirft, gpt-image-1 gelingt.
+    # #162: HIER wird der reine MODELL-Fallback (#161) geprueft, deshalb input_fidelity=low pinnen -
+    # so faellt der zusaetzliche 'ohne input_fidelity'-Versuch (#162) weg und die Modell-Reihenfolge
+    # bleibt gpt-image-2 -> gpt-image-1. Der Fidelity-Fallback (mit->ohne) ist in
+    # test_comic_input_fidelity.py separat abgedeckt.
     ref = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_161retry.png"))
     bildmotiv.get_secret = lambda name, required=False: "sk-TESTKEY-should-not-leak"
     versuche2 = {"modelle": []}
@@ -288,11 +292,13 @@ def test_7_fallback_retry():
         return _Resp(modell == "gpt-image-1")
 
     requests.post = _fake_post2
+    os.environ["HILO_INPUT_FIDELITY"] = "low"
     try:
         daten2 = bildmotiv.erzeuge_comic_bild_ref("PROMPT", [ref])
     finally:
         requests.post = orig_post
         bildmotiv.get_secret = orig_secret
+        os.environ.pop("HILO_INPUT_FIDELITY", None)
     if daten2 != b"OKPNG":
         _fail("Fallback-Retry (edits) liefert kein Bild: %r" % daten2)
     if versuche2["modelle"] != ["gpt-image-2", "gpt-image-1"]:
