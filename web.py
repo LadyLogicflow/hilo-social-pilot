@@ -772,6 +772,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
         <option value="comic_beratung">Comic Beratung</option>
+        <option value="comic_strip">Comic-Strip</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -820,6 +821,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
         <option value="comic_beratung">Comic Beratung</option>
+        <option value="comic_strip">Comic-Strip</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -904,6 +906,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
         <option value="comic_beratung">Comic Beratung</option>
+        <option value="comic_strip">Comic-Strip</option>
         <option value="ki_tafel">Tafel</option>
         <option value="kreativ">Kreativ</option></select>
       <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
@@ -1952,7 +1955,7 @@ def bild_generieren(eid):
             else url_for("einplanung") if zurueck == "einplanung"
             else url_for("entwuerfe"))
     stil = (request.form.get("bild_stil") or "").strip()
-    if stil not in ("comic", "comic_beratung", "ki_tafel", "kreativ"):
+    if stil not in ("comic", "comic_beratung", "comic_strip", "ki_tafel", "kreativ"):
         flash("Bitte einen Stil wählen.")
         return redirect(ziel)
     with get_conn() as conn:
@@ -1963,6 +1966,40 @@ def bild_generieren(eid):
         import bildmotiv, textgen
         data = json.loads(e["text"])
         data["bild_stil"] = stil
+        # comic_strip (#154): 3-Felder-Comic-Karussell mit Sprechblasen, personalisiert pro Stelle.
+        # Fuer die stellenlose Vorschau REPRAESENTATIV mit dem Berater DER ERSTEN aktiven Stelle
+        # rendern, die eine Berater-Referenz hat (bibel_bild > berater_comic). Gibt es keine ->
+        # Hinweis + kein Bild. Die 3 rohen Panels werden erzeugt; als Einzel-Vorschau (bild_pfad)
+        # dient Panel 1, und das Format wird als 'karussell' festgehalten.
+        if stil == "comic_strip":
+            with get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT berater_comic, bibel_bild FROM beratungsstellen WHERE aktiv=1 "
+                    "AND ((berater_comic IS NOT NULL AND TRIM(berater_comic)<>'') "
+                    "OR (bibel_bild IS NOT NULL AND TRIM(bibel_bild)<>'')) ORDER BY id").fetchall()
+            berater_ref = None
+            for r in rows:
+                for feld in ("bibel_bild", "berater_comic"):
+                    p = (r[feld] or "").strip()
+                    if p and os.path.exists(p):
+                        berater_ref = p
+                        break
+                if berater_ref:
+                    break
+            if not berater_ref:
+                flash("Bitte zuerst mind. einen Comic-Berater in der Beratungsstellen-Verwaltung erzeugen.")
+                return redirect(ziel)
+            panels = bildmotiv.ensure_comic_strip_bilder(data, berater_ref)
+            if not panels:
+                flash("Comic-Strip konnte gerade nicht erzeugt werden (Bild-KI nicht erreichbar?).")
+                return redirect(ziel)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=?, format='karussell' WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), panels[0], eid))
+                audit_log(conn, session["user"], "bild_generiert", eid, stil)
+                conn.commit()
+            flash("Comic-Strip (3-Felder-Karussell) für Beitrag %d erzeugt." % eid)
+            return redirect(ziel)
         # comic_beratung ist personalisiert pro Stelle; in der stellenlosen Vorschau rendern wir
         # REPRAESENTATIV mit dem Berater-Comic der ERSTEN aktiven Stelle, die einen hinterlegt hat.
         # Gibt es keine -> Hinweis + kein Bild (der Berater-Comic wird in der Verwaltung erzeugt).

@@ -1017,6 +1017,140 @@ def ensure_comic_beratung_bild(fields, berater_comic_pfad):
         log.warning("Comic-Beratung-Bild speichern fehlgeschlagen: %s", ex)
         return None
 
+# --- Stil "Comic-Strip" (comic_strip, #154) - 3-Felder-Karussell mit Sprechblasen ----------------
+# Ein 3-teiliger Comic als Karussell (immer 3 Panels/Slides) mit KI-geschriebenen Sprechblasen,
+# personalisiert pro Beratungsstelle. Text-Variante A: die Bild-KI schreibt den vorgegebenen
+# deutschen Satz direkt in eine Sprech-/Gedankenblase (menschliche Freigabe faengt Vertipper ab).
+# Panel-Delta-Texte (auf HILO_COMIC_MASTER): je Feld die Szene + Rolle. Die 1. Referenz ist der/die
+# Berater:in DER STELLE (Feld 1+3), in Feld 2 der wiederkehrende Finanzamt-Beamte.
+COMIC_STRIP_PANEL1_DELTA = (
+    "Szene (Feld 1 von 3): der/die HILO-Berater:in sitzt mit einem Mitglied an einem Schreibtisch in "
+    "einem hellen, modernen HILO-Beratungsraum und erklaert freundlich und kompetent einen Vorteil. "
+    "Der/die Berater:in sieht aus wie die ERSTE Referenz (Gesicht, Frisur, Alter exakt uebernehmen) "
+    "und traegt ein kleines HILO-Logo (Schriftzug 'HILO' in WEISSER Schrift) am Revers. Freundliche, "
+    "zugewandte Gespraechssituation, echter Blickkontakt."
+)
+COMIC_STRIP_PANEL2_DELTA = (
+    "Szene (Feld 2 von 3): der wiederkehrende Finanzamt-Beamte (grauer Anzug, runde Brille, beige "
+    "Aermelschoner, Stifte in der Brusttasche) sitzt deprimiert und geknickt an seinem Schreibtisch "
+    "unter einem gut lesbaren Schild mit der Aufschrift 'Finanzamt'. Er sieht aus wie die ERSTE "
+    "Referenz (gleicher wiederkehrender Charakter). Sympathisch und komisch, nie boesartig; seine "
+    "Miene ist niedergeschlagen, weil ihm Steuern entgehen."
+)
+COMIC_STRIP_PANEL3_DELTA = (
+    "Szene (Feld 3 von 3): der/die HILO-Berater:in laechelt zufrieden und zeigt Daumen hoch. "
+    "Der/die Berater:in sieht aus wie die ERSTE Referenz (Gesicht, Frisur, Alter exakt uebernehmen) "
+    "und traegt ein kleines HILO-Logo (Schriftzug 'HILO' in WEISSER Schrift) am Revers. Positive, "
+    "abschliessende Stimmung wie am Ende einer gelungenen Beratung."
+)
+# Default-Jammersatz fuer Feld 2 (v1 fest; themenspezifischer Jammersatz erst in v2). Wortlaut aus
+# dem Auftrag (Catrin), Markenname exakt "HILO".
+COMIC_STRIP_JAMMER = ("Jetzt entgehen mir schon wieder Steuern, weil jemand bei HILO zur Beratung "
+                      "war.")
+# Feste Pointe fuer Feld 3 (v1 fest, Markenname exakt "HILO").
+COMIC_STRIP_POINTE = "HILO - wir machen es einfach!"
+
+# Panel-Reihenfolge: (Delta-Text, Zeilen-Quelle). Die Zeilen-Quelle ist ein Marker; die konkrete
+# Zeile wird in ensure_comic_strip_bilder aufgeloest (Feld 1 = ueberschrift, 2 = Jammer, 3 = Pointe).
+_COMIC_STRIP_PANELS = (
+    (COMIC_STRIP_PANEL1_DELTA, "ueberschrift"),
+    (COMIC_STRIP_PANEL2_DELTA, "jammer"),
+    (COMIC_STRIP_PANEL3_DELTA, "pointe"),
+)
+
+
+def _comic_strip_zeile(fields, quelle):
+    """Liefert den Sprechblasen-Text fuer ein Panel je Quelle: 'ueberschrift' -> die Kernbotschaft
+    des Beitrags (fields['ueberschrift'], getrimmt); 'jammer' -> der feste Default-Jammersatz;
+    'pointe' -> die feste Pointe. Robust gegen fehlende/leere Ueberschrift (Fallback Pointe)."""
+    if quelle == "jammer":
+        return COMIC_STRIP_JAMMER
+    if quelle == "pointe":
+        return COMIC_STRIP_POINTE
+    f = fields if isinstance(fields, dict) else {}
+    return (f.get("ueberschrift") or "").strip() or COMIC_STRIP_POINTE
+
+
+def _comic_strip_prompt(fields, delta, zeile):
+    """Baut den Panel-Prompt: HILO_COMIC_MASTER + Panel-Delta (Szene/Rolle) + explizite Sprechblasen-
+    Anweisung (Variante A): die KI schreibt GENAU den gegebenen deutschen Satz in eine Sprech-/
+    Gedankenblase, fehlerfrei und ohne weitere Woerter; Markenname exakt 'HILO'."""
+    zeile = (zeile or "").strip()
+    blase = ('Zeichne eine Sprech-/Gedankenblase mit exakt diesem deutschen Text, fehlerfrei und '
+             'ohne weitere Woerter: "%s". Markenname exakt HILO.' % zeile)
+    return HILO_COMIC_MASTER + "\n\n" + delta + "\n\n" + blase
+
+
+def _comic_strip_refs(idx, berater_ref_pfad):
+    """Liefert die EXISTIERENDEN Referenzbild-Pfade fuer Panel 'idx' (0-basiert): Feld 1+3 (idx 0/2)
+    nutzen die Berater-Referenz DER STELLE, Feld 2 (idx 1) den wiederkehrenden Finanzamt-Beamten
+    (_finanzamt_ref_pfad). Nur tatsaechlich vorhandene Dateien werden aufgenommen, damit ein
+    fehlendes Asset nicht zum Fehler fuehrt (der Aufrufer faellt dann auf erzeuge_bild zurueck)."""
+    if idx == 1:
+        kandidat = _finanzamt_ref_pfad()
+    else:
+        kandidat = (berater_ref_pfad or "").strip()
+    return [kandidat] if (kandidat and os.path.exists(kandidat)) else []
+
+
+def _comic_strip_pfad(idx, prompt, berater_ref_pfad, tool=None):
+    """Absoluter Cache-Pfad fuer EIN Comic-Strip-Panel. EIGENER Praefix 'comic_strip_' (sha256[:16]
+    aus 'comic_strip:<idx>:' + Panel-Prompt + '|berater=' + Basename der Berater-Referenz), getrennt
+    von szene/tafel/kreativ/comic/comic_beratung. Da der Panel-Prompt die Sprechblasen-Zeile (u.a.
+    die Ueberschrift) enthaelt, erneuert sich der Cache bei geaenderter Ueberschrift automatisch; der
+    Berater-Basename trennt die Stellen. Tool-abhaengig (#137) wie die uebrigen Pfade."""
+    if tool is None:
+        tool = aktives_bild_tool()
+    base = os.path.basename((berater_ref_pfad or "").strip())
+    schluessel = "comic_strip:%d:%s|berater=%s" % (idx, prompt, base)
+    h = hashlib.sha256(schluessel.lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_strip_" + h + ".png")
+
+
+def ensure_comic_strip_bilder(fields, berater_ref_pfad):
+    """Erzeugt (oder liefert aus dem Cache) die DREI Panels des Comic-Strips (#154) und liefert die
+    Liste der 3 existierenden Panel-Pfade in Reihenfolge (Feld 1..3). Pro Panel:
+      - Prompt = HILO_COMIC_MASTER + Panel-Delta + Sprechblasen-Anweisung (Variante A) mit der
+        Panel-Zeile (Feld 1 = Ueberschrift, Feld 2 = Default-Jammer, Feld 3 = feste Pointe).
+      - refs: Feld 1+3 = [Berater-Referenz der Stelle], Feld 2 = [Finanzamt-Referenz]; nur wenn die
+        Datei existiert. Erzeugung via erzeuge_comic_bild_ref(prompt, refs); sind KEINE Referenzen
+        vorhanden (z.B. Stelle ohne Berater-Bible), wird auf erzeuge_bild(prompt) zurueckgefallen -
+        das Panel entsteht dann OHNE Berater-Gesicht, ES GIBT ABER KEINEN CRASH.
+      - Cache pro Panel (eigener Praefix, Berater-Basename + Ueberschrift im Hash) -> verschiedene
+        Stellen/Ueberschriften kollidieren nicht.
+    Liefert nur die tatsaechlich vorhandenen (erfolgreich erzeugten oder gecachten) Panel-Pfade;
+    liefert ein Panel weder Referenz- noch generations-Bild (kein Key/Fehler), fehlt es in der Liste
+    (der Render/Aufrufer degradiert dann sichtbar, ohne zu crashen)."""
+    os.makedirs(MOTIV_DIR, exist_ok=True)
+    tool = aktives_bild_tool()
+    berater = (berater_ref_pfad or "").strip()
+    pfade = []
+    for idx, (delta, quelle) in enumerate(_COMIC_STRIP_PANELS):
+        zeile = _comic_strip_zeile(fields, quelle)
+        prompt = _comic_strip_prompt(fields, delta, zeile)
+        path = _comic_strip_pfad(idx, prompt, berater, tool=tool)
+        if os.path.exists(path):
+            pfade.append(path)
+            continue
+        refs = _comic_strip_refs(idx, berater)
+        daten = erzeuge_comic_bild_ref(prompt, refs) if refs else None
+        if daten is None:
+            # Keine Referenz vorhanden ODER Referenz-Call ohne Key/Fehler -> generations-Weg
+            # (Panel ohne Berater-Gesicht, aber kein Crash).
+            daten = erzeuge_bild(prompt, tool=tool)
+        if daten is None:
+            log.warning("Comic-Strip Panel %d konnte nicht erzeugt werden (kein Key/Fehler).", idx + 1)
+            continue
+        try:
+            with open(path, "wb") as f:
+                f.write(daten)
+            log.info("Comic-Strip Panel %d erzeugt (%s), Berater=%s", idx + 1, tool,
+                     os.path.basename(berater) or "-")
+            pfade.append(path)
+        except Exception as ex:
+            log.warning("Comic-Strip Panel %d speichern fehlgeschlagen: %s", idx + 1, ex)
+    return pfade
+
 def ensure_photo_tafel(scene, sign_text, traeger=None):
     """Erzeugt (oder liefert aus dem Cache) das KI-Tafel-Foto (#132): scene = Szene-Motiv,
     sign_text = die Ueberschrift, die die KI auf die Tafel schreibt. Eigener Cache-Schluessel

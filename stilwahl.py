@@ -29,7 +29,13 @@ log = logging.getLogger("hilo.stilwahl")
 # NEU 'comic_beratung': personalisierte Comic-Szene - vorne der/die Berater:in DER STELLE (eigene
 # Comic-Figur), hinten der wiederkehrende Finanzamt-Beamte, der leer ausgeht. Letzter Baustein der
 # Comic-Familie; pro Beratungsstelle mit deren eigenem Berater-Comic (berater_comic) gerendert.
-STILE = ("standard", "ki_tafel", "kreativ", "comic", "comic_beratung")
+# NEU 'comic_strip' (#154): 3-teiliger Comic als KARUSSELL (immer 3 Slides) mit Sprechblasen -
+# eine Mini-Story pro Beratungsstelle (Berater erklaert Vorteil / Finanzamt-Beamter deprimiert /
+# Berater Daumen hoch). Personalisiert pro Stelle (Berater-Referenz noetig). Bewusst KEIN
+# Zufalls-Stil: comic_strip wird nur MANUELL im Picker gewaehlt (Default-Flag '0', s. _FLAG_DEFAULT)
+# und ist daher NICHT im Zufalls-Topf (aktive_stile), damit er nie ungewollt einem Beitrag
+# zugelost wird.
+STILE = ("standard", "ki_tafel", "kreativ", "comic", "comic_beratung", "comic_strip")
 
 # Einstellungs-Schluessel je Stil (An/Aus-Flag, '1' aktiv / '0' inaktiv, Default alle aktiv).
 _FLAG_KEY = {
@@ -38,6 +44,14 @@ _FLAG_KEY = {
     "kreativ": "bild_stil_kreativ",
     "comic": "bild_stil_comic",
     "comic_beratung": "bild_stil_comic_beratung",
+    "comic_strip": "bild_stil_comic_strip",
+}
+
+# Abweichender Default fuer das An/Aus-Flag (sonst '1' = aktiv). comic_strip (#154) startet auf '0'
+# (INAKTIV), damit er NICHT in den Zufalls-Topf faellt - er ist ein manuell gewaehlter Karussell-
+# Stil (braucht eine Berater-Referenz pro Stelle) und darf keinem Beitrag zufaellig zugelost werden.
+_FLAG_DEFAULT = {
+    "comic_strip": "0",
 }
 
 
@@ -55,7 +69,7 @@ def aktive_stile(conn=None):
     import db
     aktiv = []
     for stil in STILE:
-        wert = db.get_einstellung(_FLAG_KEY[stil], "1")
+        wert = db.get_einstellung(_FLAG_KEY[stil], _FLAG_DEFAULT.get(stil, "1"))
         if str(wert).strip() != "0":
             aktiv.append(stil)
     return aktiv or ["standard"]
