@@ -323,6 +323,11 @@ def migrate(conn):
     # Facebook-Orts-ID (Place ID) je Stelle - fuer den Instagram-Geotag beim Posten
     if "ort_id" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN ort_id TEXT")
+    # Comic-Portrait der Leitung je Stelle (Stil "Comic Beratung", Setup-Schritt): aus dem
+    # vorhandenen Leitungs-Foto (portrait_pfad) erzeugtes Comic-Portrait. Nur ueber login-geschuetzte
+    # Routen ausgeliefert (echtes Gesicht, DSGVO), gespeichert unter DATA_DIR/berater/comic_<id>.png.
+    if "berater_comic" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN berater_comic TEXT")
     # WhatsApp-Kanal je Stelle (Pool Phase 3, #127): Einladungslink des WhatsApp-Kanals der Stelle.
     # Gesetzt = die Stelle hat einen WhatsApp-Kanal -> wird bei der Pool-Ziehung bespielt; leer = nicht.
     if "wa_kanal_invite" not in bcols:

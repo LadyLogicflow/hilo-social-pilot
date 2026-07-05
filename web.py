@@ -43,6 +43,17 @@ def _under_portraits(path):
     except Exception:
         return False
 
+def _under_berater(path):
+    """True nur, wenn der (aufgeloeste) Pfad innerhalb von DATA_DIR/berater liegt.
+    Schutz davor, dass ein manipulierter DB-Wert eine fremde Datei ausliefert (wie
+    _under_portraits). Die Comic-Portraits zeigen echte Gesichter -> nur login-geschuetzt."""
+    try:
+        base = os.path.realpath(os.path.join(DATA_DIR, "berater"))
+        rp = os.path.realpath(path)
+        return rp == base or rp.startswith(base + os.sep)
+    except Exception:
+        return False
+
 # --- Facebook-Seiten (gecacht) ---------------------------------------------
 _pages_cache = {"ts": 0, "data": None, "err": None}
 
@@ -1208,6 +1219,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </form>
         {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
       </div>
+    </div>
+    <div class=stfield><label>Comic-Berater <span class=hint style="font-weight:normal">(für den Stil „Comic Beratung")</span></label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        {% if b.berater_comic %}<img src="/berater-comic-bild/{{b.id}}?v={{b.id}}" alt="Comic-Berater" title="Comic-Portrait der Leitung – für den Stil „Comic Beratung“" style="width:44px;height:44px;border-radius:50%;object-fit:cover">{% endif %}
+        {% if b.portrait_pfad %}<form method=post action="/berater-comic/{{b.id}}" style="margin:0"><button style="padding:6px 12px">{% if b.berater_comic %}Comic-Berater neu erzeugen{% else %}Comic-Berater erzeugen{% endif %}</button></form>
+        {% else %}<span class=hint>Erst ein Porträt hochladen, dann kann der Comic-Berater erzeugt werden.</span>{% endif %}
+      </div>
+      {% if b.berater_comic %}<p class=hint style="margin:6px 0 0">Wird für den Stil „Comic Beratung“ verwendet.</p>{% endif %}
     </div>
   </div>
 </div>
@@ -3390,6 +3409,43 @@ def portrait(sid):
             or not os.path.exists(row["portrait_pfad"])):
         abort(404)
     return send_file(row["portrait_pfad"], mimetype="image/png")
+
+@app.route("/berater-comic/<int:stelleid>", methods=["POST"])
+@admin_required
+def berater_comic_erzeugen(stelleid):
+    """Erzeugt (oder erneuert) das Comic-Portrait der Leitung aus dem vorhandenen Leitungs-Foto
+    (portrait_pfad) der Stelle. Rolle wie die uebrige Beratungsstellen-Verwaltung (admin).
+    Ohne Foto -> flash-Hinweis. Ergebnis wird nach DATA_DIR/berater/comic_<id>.png geschrieben und
+    in berater_comic hinterlegt. Erneutes Erzeugen ueberschreibt die alte Datei."""
+    import bildmotiv
+    with get_conn() as conn:
+        row = conn.execute("SELECT portrait_pfad FROM beratungsstellen WHERE id=?", (stelleid,)).fetchone()
+        if not row:
+            abort(404)
+        foto = row["portrait_pfad"]
+        if not foto or not _under_portraits(foto) or not os.path.exists(foto):
+            flash("Für diese Stelle ist noch kein Leitungs-Foto (Porträt) hinterlegt – bitte erst oben ein Porträt hochladen.")
+            return redirect(url_for("verwaltung", bereich="stellen"))
+        pfad = bildmotiv.erzeuge_berater_comic(foto)
+        if pfad and _under_berater(pfad) and os.path.exists(pfad):
+            conn.execute("UPDATE beratungsstellen SET berater_comic=? WHERE id=?", (pfad, stelleid))
+            audit_log(conn, session["user"], "beratungsstelle_berater_comic_erzeugt", None, "Stelle %s" % stelleid)
+            flash("Comic-Berater erzeugt – Vorschau erscheint unten.")
+        else:
+            flash("Comic-Berater konnte nicht erzeugt werden (kein API-Zugang oder Bild-Fehler). Bitte später erneut versuchen.")
+    return redirect(url_for("verwaltung", bereich="stellen"))
+
+@app.route("/berater-comic-bild/<int:stelleid>")
+@login_required
+def berater_comic_bild(stelleid):
+    """Liefert das Comic-Portrait der Leitung aus (login-geschützt – echtes Gesicht, DSGVO, NICHT
+    public). Analog zur Portrait-Route: Pfad-Guard (_under_berater) gegen manipulierte DB-Werte."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT berater_comic FROM beratungsstellen WHERE id=?", (stelleid,)).fetchone()
+    if (not row or not row["berater_comic"] or not _under_berater(row["berater_comic"])
+            or not os.path.exists(row["berater_comic"])):
+        abort(404)
+    return send_file(row["berater_comic"], mimetype="image/png", max_age=0)
 
 # --- WhatsApp (Baileys-Dienst auf demselben Host, nur localhost) -------------
 def _wa_call(path, method="GET", payload=None, timeout=6, session=None):
