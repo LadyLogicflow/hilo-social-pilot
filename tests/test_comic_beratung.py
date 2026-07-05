@@ -7,8 +7,8 @@ Beweist die VERDRAHTUNG (KEINE echten externen KI-/Bild-APIs - alles gemockt):
      erkennt ihn; er ist per Default aktiv (im Zufalls-Topf).
   2. Picker: /entwuerfe-, /pool-, /einplanung-Template enthalten die Option "Comic Beratung";
      die /bild-generieren-Whitelist akzeptiert comic_beratung (und lehnt Unbekanntes ab).
-  3. ensure_comic_beratung_bild: erzeuge_comic_bild_ref gepatcht -> Prompt enthaelt STIL_A_BLOCK
-     UND BERATUNG_BLOCK; refs == [berater_comic, FINANZAMT_REF_PATH].
+  3. ensure_comic_beratung_bild: erzeuge_comic_bild_ref gepatcht -> Prompt enthaelt HILO_COMIC_MASTER
+     UND BERATUNG_BLOCK; refs == [berater_comic] (Finanzamt entfernt, #153).
   4. Per-Stelle: zwei Stellen mit verschiedenem berater_comic -> verschiedene refs UND
      verschiedene Cache-Pfade (jede Stelle ihr eigenes Bild).
   5. Fallback: ohne berater_comic faellt ensure_comic_beratung_bild auf den normalen Comic
@@ -148,13 +148,13 @@ def test_3_prompt_und_refs():
         _fail("Prompt enthaelt HILO_COMIC_MASTER nicht")
     if bildmotiv.BERATUNG_BLOCK not in (captured["prompt"] or ""):
         _fail("Prompt enthaelt BERATUNG_BLOCK nicht")
-    if captured["refs"] != [berater, bildmotiv.FINANZAMT_REF_PATH]:
-        _fail("refs != [berater_comic, FINANZAMT_REF_PATH]: %r" % captured["refs"])
+    if captured["refs"] != [berater]:
+        _fail("refs != [berater_comic] (Finanzamt entfernt, #153): %r" % captured["refs"])
     if captured["gen_called"]:
         _fail("erzeuge_bild (generations) wurde faelschlich aufgerufen (Referenz lieferte Bytes)")
     if not path or not os.path.exists(path):
         _fail("ensure_comic_beratung_bild lieferte keinen gueltigen Cache-Pfad")
-    _ok("ensure_comic_beratung_bild: Prompt=STIL_A_BLOCK+BERATUNG_BLOCK, refs=[berater,finanzamt]")
+    _ok("ensure_comic_beratung_bild: Prompt=HILO_COMIC_MASTER+BERATUNG_BLOCK, refs=[berater]")
 
 
 # --- 4) Per-Stelle: verschiedene Berater -> verschiedene refs + Cache-Pfade -------------------
@@ -280,32 +280,35 @@ def test_6_character_bible():
     _ok("Character-Bible: bibel_bild-Vorrang, bibel_text im Prompt, Fallback unveraendert")
 
 
-# --- 7) Finanzamt-Bible (#151): eigenes Referenzbild ersetzt die Default-Finanzamt-Referenz ----
-def test_7_finanzamt_bible():
+# --- 7) #153: Finanzamt aus 'Comic Beratung' entfernt (bleibt nur im witzigen Comic) -----------
+def test_7_finanzamt_entfernt():
     berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_88.png"))
     fa_bild = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "bibeln", "finanzamt.png"))
 
-    # Default (keine Finanzamt-Bible): 2. Ref ist FINANZAMT_REF_PATH.
+    # Ohne Finanzamt-Bible: refs ist NUR der Berater - KEINE Finanzamt-Referenz mehr.
     db.set_einstellung("finanzamt_bibel_bild", None)
     db.set_einstellung("finanzamt_bibel_text", None)
     refs_default = bildmotiv._comic_beratung_refs(berater)
-    if refs_default != [berater, bildmotiv.FINANZAMT_REF_PATH]:
-        _fail("Default-Finanzamt-Referenz falsch: %r" % refs_default)
+    if refs_default != [berater]:
+        _fail("comic_beratung-refs enthaelt nicht nur den Berater (#153): %r" % refs_default)
 
-    # Mit Finanzamt-Bible: 2. Ref ist das hinterlegte Bild; finanzamt_bibel_text landet im Prompt.
+    # Auch MIT gesetzter Finanzamt-Bible bleibt comic_beratung finanzamtfrei: keine Finanzamt-/
+    # Bible-Referenz in refs, kein finanzamt_bibel_text im Prompt.
     db.set_einstellung("finanzamt_bibel_bild", fa_bild)
     db.set_einstellung("finanzamt_bibel_text", "FINANZAMT-BESCHREIBUNG-EINDEUTIG-QRS")
     try:
         refs_bibel = bildmotiv._comic_beratung_refs(berater)
-        if refs_bibel != [berater, fa_bild]:
-            _fail("Finanzamt-Bible-Bild ersetzt die Default-Referenz nicht: %r" % refs_bibel)
+        if refs_bibel != [berater]:
+            _fail("Finanzamt-Bible taucht faelschlich in comic_beratung-refs auf (#153): %r" % refs_bibel)
+        if bildmotiv.FINANZAMT_REF_PATH in refs_bibel or fa_bild in refs_bibel:
+            _fail("comic_beratung-refs enthaelt eine Finanzamt-Referenz (#153): %r" % refs_bibel)
         prompt = bildmotiv._comic_beratung_prompt(_fields())
-        if "FINANZAMT-BESCHREIBUNG-EINDEUTIG-QRS" not in prompt:
-            _fail("finanzamt_bibel_text landet nicht im Prompt")
+        if "FINANZAMT-BESCHREIBUNG-EINDEUTIG-QRS" in prompt:
+            _fail("finanzamt_bibel_text landet faelschlich im comic_beratung-Prompt (#153)")
     finally:
         db.set_einstellung("finanzamt_bibel_bild", None)
         db.set_einstellung("finanzamt_bibel_text", None)
-    _ok("Finanzamt-Bible: eigenes Referenzbild + Beschreibung greifen; Default unveraendert")
+    _ok("#153: comic_beratung finanzamtfrei - refs=[berater], kein finanzamt_bibel_text im Prompt")
 
 
 def main():
@@ -316,7 +319,7 @@ def main():
     test_4_pro_stelle()
     test_5_fallback_normaler_comic()
     test_6_character_bible()
-    test_7_finanzamt_bible()
+    test_7_finanzamt_entfernt()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 
