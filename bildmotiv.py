@@ -195,11 +195,12 @@ STIL_A_BLOCK = (
 # Finanzamt-Beamte, der leer ausgeht. EXAKTER Wortlaut aus dem Auftrag.
 BERATUNG_BLOCK = (
     "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style, "
-    "at a tidy office desk. In the FOREGROUND, shown from the SIDE so BOTH people are at the SAME "
-    "distance from the viewer, there are EXACTLY TWO people drawn at EXACTLY the same height and the "
-    "same head size - a balanced, symmetrical two-shot; the advisor is NOT larger, closer or more "
-    "prominent than the client, both are equally big. They sit at the desk clearly FACING EACH OTHER "
-    "with friendly EYE CONTACT, in conversation: (1) the HILO tax advisor - the SAME person as in the "
+    "at a tidy office desk. In the FOREGROUND there are EXACTLY TWO people who sit on OPPOSITE sides "
+    "of the desk, each turned in three-quarter profile to FACE the other with clear friendly EYE "
+    "CONTACT (both faces visible, looking at each other - NOT side by side, NOT both facing the "
+    "viewer). Draw BOTH at EXACTLY the same height and the same head size, equally large and prominent "
+    "- the client is NOT smaller, NOT further back and NOT turned away; a balanced two-shot across the "
+    "desk. The two are: (1) the HILO tax advisor - the SAME person as in the "
     "first reference image, matching their face, hairstyle, AGE and build EXACTLY (do NOT make them "
     "younger or different), wearing a small HILO logo badge with the wordmark 'HILO' in WHITE letters "
     "on the lapel/chest; and (2) the client/member, drawn the SAME height and SAME head size as the "
