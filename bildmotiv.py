@@ -43,8 +43,24 @@ def aktives_bild_tool():
 
 
 def openai_image_model():
-    """Liefert den OpenAI-Bildmodell-Namen aus HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2')."""
-    return (os.environ.get("HILO_OPENAI_IMAGE_MODEL") or OPENAI_IMAGE_MODEL_DEFAULT).strip()
+    """Liefert den OpenAI-Bildmodell-Namen fuer den Bild-Call.
+
+    Reihenfolge (#161): die globale Einstellung 'bild_modell' (in der Verwaltung -> Bild-Stil
+    umschaltbar) hat Vorrang, ist aber auf die erlaubten Werte 'gpt-image-1'/'gpt-image-2' begrenzt -
+    ein unbekannter/leerer Wert faellt auf den Default zurueck. Der Default bleibt der bisherige:
+    HILO_OPENAI_IMAGE_MODEL (Env, falls gesetzt) sonst OPENAI_IMAGE_MODEL_DEFAULT ('gpt-image-1').
+    So kann Catrin gpt-image-1 vs. gpt-image-2 am selben Beitrag vergleichen (A/B), ohne dass der
+    Default sich aendert. Fehlt die DB (Import-/DB-Fehler), gilt der Default (kein Crash)."""
+    default = (os.environ.get("HILO_OPENAI_IMAGE_MODEL") or OPENAI_IMAGE_MODEL_DEFAULT).strip()
+    try:
+        import db
+        wert = db.get_einstellung("bild_modell", None)
+    except Exception:
+        wert = None
+    if wert is None:
+        return default
+    wert = str(wert).strip()
+    return wert if wert in ("gpt-image-1", "gpt-image-2") else default
 
 def _prompt(motiv):
     """Einheitlicher Szene-Prompt fuer ein vollflaechiges, opakes Magazin-/Editorial-Foto MIT
@@ -252,6 +268,17 @@ BERATUNG_BLOCK = (
     "fuer spaeteren Text. Das Bild NICHT randlos bis in alle Ecken fuellen - klare Luft und Freiraum "
     "rechts oben lassen, weite ruhige Einstellung wie ein professionelles Agenturbild."
 )
+# Figur-Steckbrief des wiederkehrenden Finanzamt-Beamten (#161, deutsch, echte Umlaute). Wird - wenn
+# gesetzt - direkt NACH der Stilregel (HILO_COMIC_MASTER bzw. STIL_A_BLOCK) und VOR der Szene in den
+# Prompt gesetzt (Reihenfolge Stil -> Figur -> Szene). Ein praeziser Text-Steckbrief verstaerkt das
+# Referenzbild (Text ist ein starker Treiber). Markenname exakt "HILO"; die Figur traegt KEINE
+# HILO-Accessoires (sie gehoert zum Finanzamt, nicht zu HILO).
+FINANZAMT_FIGUR = (
+    "Herr Aermelschoner: rundes freundliches Gesicht, grosse runde schwarze Brille, hoher kahler "
+    "Oberkopf, kurzer dunkler Haarkranz, grauer Anzug, weisses Hemd, dunkelblaue Krawatte, beige "
+    "Aermelschoner, zwei gruene Stifte in der Brusttasche. Keine HILO-Accessoires. Im Finanzamt-Buero "
+    "ist der Bundesadler sichtbar."
+)
 FINANZAMT_BLOCK = (
     "Recurring 'Finanzamt' character (draw him consistently): a slightly over-correct bureaucrat - "
     "grey suit, round glasses, beige sleeve garters, pens in breast pocket, a smug friendly smile; "
@@ -356,7 +383,15 @@ def _comic_prompt(fields):
     brief = _comic_brief(fields)
     szene = (brief.get("szene") or "").strip() or "eine ruhige Alltagsszene am Kuechentisch"
     hook = (brief.get("hook") or "").strip()
-    prompt = STIL_A_BLOCK + "\n\nSzene: " + szene
+    prompt = STIL_A_BLOCK
+    # #161 (Reihenfolge Stil -> Figur -> Szene): traegt der Brief die Finanzamt-Figur, wird der
+    # praezise Figur-Steckbrief FINANZAMT_FIGUR direkt NACH der Stilregel und VOR der Szene eingefuegt
+    # (ergaenzend zu FINANZAMT_BLOCK, der weiter unten die Handlung/Requisiten regelt). Der Text-
+    # Steckbrief verstaerkt das Referenzbild. Deterministisch aus fields -> Producer (ensure_comic_bild)
+    # und Cache-Key (_comic_cache_input) sehen denselben Prompt.
+    if brief.get("finanzamt_figur"):
+        prompt += "\n\n" + FINANZAMT_FIGUR
+    prompt += "\n\nSzene: " + szene
     if hook:
         prompt += "\n\nBild-Hook: " + hook
     if brief.get("finanzamt_figur"):
@@ -504,6 +539,20 @@ def _tool_praefix(tool):
     return "ideogram_" if (tool or "openai") == "ideogram" else ""
 
 
+def _modell_praefix(tool=None):
+    """Liefert den Datei-Praefix fuer das aktive OpenAI-Bildmodell in den COMIC-Caches (#161).
+    Analog zum Tool-Praefix (#137): das Default-Modell gpt-image-1 traegt KEINEN Praefix (bestehende
+    Comic-Cache-Dateien bleiben gueltig); gpt-image-2 traegt 'g2_'. So erzeugt ein Modellwechsel
+    FRISCHE Bilder (A/B am selben Beitrag) statt das alte, mit dem anderen Modell erzeugte Bild aus
+    dem Cache zu liefern. Nur der OpenAI-Pfad ist modellabhaengig - fuer Ideogram (kein GPT-Image)
+    entfaellt der Praefix, damit sich dessen Cache beim Modellwechsel NICHT unnoetig aendert."""
+    if tool is None:
+        tool = aktives_bild_tool()
+    if tool == "ideogram":
+        return ""
+    return "g2_" if openai_image_model() == "gpt-image-2" else ""
+
+
 def _szene_pfad(motiv, tool=None):
     """Liefert den absoluten Cache-Pfad fuer das Standard-Szene-Foto zu 'motiv'.
     Kapselt die BESTEHENDE Schluessel-Berechnung (Praefix 'szene:', sha256[:16]) aus
@@ -597,7 +646,8 @@ def _comic_pfad(fields, tool=None):
     if tool is None:
         tool = aktives_bild_tool()
     h = hashlib.sha256(_comic_cache_input(fields).lower().encode("utf-8")).hexdigest()[:16]
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_" + h + ".png")
+    # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_" + h + ".png")
 
 def cache_dateien_fuer_fields(fields):
     """Liefert ein set() ALLER absoluten Cache-Dateipfade unter MOTIV_DIR, die ein Beitrag mit
@@ -676,11 +726,13 @@ def _openai_quality():
     return quality if quality in ("low", "medium", "high", "auto") else "high"
 
 
-def openai_payload(prompt):
-    """Baut das OpenAI images/generations-Request-Payload (ohne Netzwerkaufruf). Modell aus
-    HILO_OPENAI_IMAGE_MODEL (Default 'gpt-image-2'), background='opaque', size '1024x1024',
-    quality aus HILO_IMAGE_QUALITY. Ausgelagert, damit Tests Modell/Parameter ohne Netz pruefen."""
-    return {"model": openai_image_model(), "prompt": prompt, "size": "1024x1024",
+def openai_payload(prompt, modell=None):
+    """Baut das OpenAI images/generations-Request-Payload (ohne Netzwerkaufruf). Modell aus der
+    Einstellung 'bild_modell' (openai_image_model(), Default gpt-image-1), background='opaque',
+    size '1024x1024', quality aus HILO_IMAGE_QUALITY. Ausgelagert, damit Tests Modell/Parameter ohne
+    Netz pruefen. 'modell' (#161): erlaubt dem Aufrufer, das Modell explizit zu setzen - genutzt vom
+    Fallback-Retry in erzeuge_bild_openai (gpt-image-1). None -> aktuelles Einstellungs-Modell."""
+    return {"model": modell or openai_image_model(), "prompt": prompt, "size": "1024x1024",
             "quality": _openai_quality(), "background": "opaque", "output_format": "png", "n": 1}
 
 
@@ -695,13 +747,21 @@ def ideogram_payload(prompt):
     return {"text_prompt": prompt, "resolution": resolution, "rendering_speed": speed}
 
 
-def erzeuge_bild_openai(prompt):
+def erzeuge_bild_openai(prompt, modell=None):
     """Erzeugt ein Bild via OpenAI images/generations und liefert die PNG-Bytes (oder None).
-    Ohne 'openai_api_key' -> None + Log (kein Crash). Robust gegen Netz-/API-Fehler."""
+    Ohne 'openai_api_key' -> None + Log (kein Crash). Robust gegen Netz-/API-Fehler.
+
+    'modell' (#161): das zu nutzende OpenAI-Bildmodell; None -> aktuelles Einstellungs-Modell
+    (openai_image_model()). Sicherheitsnetz: schlaegt der Call mit dem gewaehlten Modell fehl (z.B.
+    Modell nicht verfuegbar) UND war es NICHT bereits gpt-image-1, wird EINMAL automatisch mit
+    'gpt-image-1' (dem bewaehrten Default) nachgezogen (log.warning) - kein Ausfall durch ein
+    fehlendes Test-Modell."""
     key = get_secret("openai_api_key")
     if not key:
         log.info("Bild uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
         return None
+    if modell is None:
+        modell = openai_image_model()
     try:
         import requests
         # Bildqualitaet steuert die OpenAI-Kosten stark: low (~1-2ct) < medium (~4-6ct) < high
@@ -709,17 +769,20 @@ def erzeuge_bild_openai(prompt):
         r = requests.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
-            json=openai_payload(prompt),
+            json=openai_payload(prompt, modell=modell),
             timeout=120)
         r.raise_for_status()
         b64 = r.json()["data"][0]["b64_json"]
         return base64.b64decode(b64)
     except Exception as ex:
-        log.warning("OpenAI-Bild fehlgeschlagen: %s", ex)
+        log.warning("OpenAI-Bild fehlgeschlagen (Modell %s): %s", modell, ex)
+        if modell != OPENAI_IMAGE_MODEL_DEFAULT:
+            log.warning("OpenAI-Bild: Fallback-Retry mit %s statt %s.", OPENAI_IMAGE_MODEL_DEFAULT, modell)
+            return erzeuge_bild_openai(prompt, modell=OPENAI_IMAGE_MODEL_DEFAULT)
         return None
 
 
-def erzeuge_comic_bild_ref(prompt, refs):
+def erzeuge_comic_bild_ref(prompt, refs, modell=None):
     """Erzeugt ein Comic-Bild via OpenAI images/edits MIT Referenzbildern (Stil- + optional
     Charakter-Referenz) und liefert die PNG-Bytes (oder None). multipart/form-data wie
     erzeuge_bild_openai (gleicher Key/Bearer/Timeout-Stil):
@@ -729,15 +792,22 @@ def erzeuge_comic_bild_ref(prompt, refs):
     Ohne 'openai_api_key', bei HTTP-/Netz-Fehler oder sonstiger Exception -> None (der Aufrufer
     faellt dann auf den generations-Weg zurueck). Der Key wird NIE geloggt; alle geoeffneten
     Dateihandles werden im finally sauber geschlossen. Content-Type setzt requests selbst
-    (multipart-Boundary) - hier NICHT manuell setzen."""
+    (multipart-Boundary) - hier NICHT manuell setzen.
+
+    'modell' (#161): das zu nutzende OpenAI-Bildmodell; None -> aktuelles Einstellungs-Modell
+    (openai_image_model()). Sicherheitsnetz: schlaegt der Call mit dem gewaehlten Modell fehl UND war
+    es NICHT bereits gpt-image-1, wird EINMAL automatisch mit 'gpt-image-1' nachgezogen (log.warning);
+    die Dateihandles der fehlgeschlagenen Runde werden vorher geschlossen (der Retry oeffnet frische)."""
     key = get_secret("openai_api_key")
     if not key:
         log.info("Comic-Referenzbild uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
         return None
+    if modell is None:
+        modell = openai_image_model()
     handles = []
     try:
         import requests
-        data = {"model": openai_image_model(), "prompt": prompt, "size": "1024x1024",
+        data = {"model": modell, "prompt": prompt, "size": "1024x1024",
                 "quality": _openai_quality(), "n": "1"}
         files = []
         for path in refs:
@@ -752,7 +822,17 @@ def erzeuge_comic_bild_ref(prompt, refs):
         b64 = r.json()["data"][0]["b64_json"]
         return base64.b64decode(b64)
     except Exception as ex:
-        log.warning("OpenAI-Comic-Referenzbild fehlgeschlagen: %s", ex)
+        log.warning("OpenAI-Comic-Referenzbild fehlgeschlagen (Modell %s): %s", modell, ex)
+        if modell != OPENAI_IMAGE_MODEL_DEFAULT:
+            log.warning("OpenAI-Comic-Referenzbild: Fallback-Retry mit %s statt %s.",
+                        OPENAI_IMAGE_MODEL_DEFAULT, modell)
+            for fh in handles:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+            handles = []
+            return erzeuge_comic_bild_ref(prompt, refs, modell=OPENAI_IMAGE_MODEL_DEFAULT)
         return None
     finally:
         for fh in handles:
@@ -1023,7 +1103,8 @@ def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
         tool = aktives_bild_tool()
     h = hashlib.sha256(
         _comic_beratung_cache_input(fields, berater_comic_pfad).lower().encode("utf-8")).hexdigest()[:16]
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_beratung_" + h + ".png")
+    # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_beratung_" + h + ".png")
 
 def ensure_comic_beratung_bild(fields, berater_comic_pfad):
     """Erzeugt (oder liefert aus dem Cache) das personalisierte Comic-Beratung-Bild: vorne der/die
@@ -1311,10 +1392,18 @@ def _comic_strip_zeile(fields, quelle, archetyp="vorteil"):
             or COMIC_STRIP_POINTE_ARCHETYP.get(archetyp, COMIC_STRIP_POINTE))
 
 
-def _comic_strip_prompt(fields, delta, zeile, hat_ref=False, szene=""):
-    """Baut den Panel-Prompt: HILO_COMIC_MASTER + Panel-Delta (Szene/Rolle) + explizite Sprechblasen-
-    Anweisung (Variante A): die KI schreibt GENAU den gegebenen deutschen Satz in eine Sprech-/
-    Gedankenblase, fehlerfrei und ohne weitere Woerter; Markenname exakt 'HILO'.
+def _comic_strip_prompt(fields, delta, zeile, hat_ref=False, szene="", figur=""):
+    """Baut den Panel-Prompt: HILO_COMIC_MASTER + optionaler Figur-Steckbrief + Panel-Delta
+    (Szene/Rolle) + explizite Sprechblasen-Anweisung (Variante A): die KI schreibt GENAU den gegebenen
+    deutschen Satz in eine Sprech-/Gedankenblase, fehlerfrei und ohne weitere Woerter; Markenname
+    exakt 'HILO'.
+
+    #161 (Reihenfolge Stil -> Figur -> Szene): 'figur' (kurzer Figur-Steckbrief) wird - wenn gesetzt -
+    zwischen die Stilregel (HILO_COMIC_MASTER) und das Panel-Delta (Szene) gesetzt. Feld 2 nutzt den
+    Finanzamt-Steckbrief (FINANZAMT_FIGUR), Feld 1/3 den Berater-Steckbrief der Stelle (bibel_text) -
+    beides bestimmt der Aufrufer (ensure_comic_strip_bilder). Da 'figur' Teil des Panel-Prompts ist
+    und derselbe Prompt-String in _comic_strip_pfad fliesst, sehen Producer und Cache-Key denselben
+    Prompt (kein Falsch-Cache, wie bei #159/#160).
 
     #160: 'szene' (kurzer Umgebungs-/Posen-Zusatz) wird - wenn gesetzt - an das Panel-Delta gehaengt.
     So aendert sich der Prompt je Beitrag -> _comic_strip_pfad-Cache differiert je Beitrag -> jeder
@@ -1325,11 +1414,15 @@ def _comic_strip_prompt(fields, delta, zeile, hat_ref=False, szene=""):
     verpflichtet. OHNE Referenz (generations-Fallback) bleibt der Prompt ohne Anker."""
     zeile = (zeile or "").strip()
     szene = (szene or "").strip()
+    figur = (figur or "").strip()
     if szene:
         delta = delta + " Konkrete Umgebung/Pose fuer dieses Bild: " + szene + "."
     blase = ('Zeichne eine Sprech-/Gedankenblase mit exakt diesem deutschen Text, fehlerfrei und '
              'ohne weitere Woerter: "%s". Markenname exakt HILO.' % zeile)
-    prompt = HILO_COMIC_MASTER + "\n\n" + delta + "\n\n" + blase
+    prompt = HILO_COMIC_MASTER
+    if figur:
+        prompt += "\n\n" + figur
+    prompt += "\n\n" + delta + "\n\n" + blase
     if hat_ref:
         prompt += "\n\n" + REF_ANCHOR
     return prompt
@@ -1364,7 +1457,8 @@ def _comic_strip_pfad(idx, prompt, berater_ref_pfad, tool=None):
     panel_refs = ";".join(_ref_signatur(r) for r in _comic_strip_refs(idx, berater_ref_pfad))
     schluessel = "comic_strip:%d:%s|berater=%s|refs=%s" % (idx, prompt, base, panel_refs)
     h = hashlib.sha256(schluessel.lower().encode("utf-8")).hexdigest()[:16]
-    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_strip_" + h + ".png")
+    # #161: Modell-Praefix (g2_ fuer gpt-image-2, sonst leer) -> Modellwechsel liefert frische Bilder.
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + _modell_praefix(tool) + "comic_strip_" + h + ".png")
 
 
 def ensure_comic_strip_bilder(fields, berater_ref_pfad):
@@ -1388,16 +1482,23 @@ def ensure_comic_strip_bilder(fields, berater_ref_pfad):
     # Fallback). Danach je Archetyp die passenden Panel-Deltas + Zeilen; der Panel-Prompt (Delta +
     # Zeilen) fliesst weiter in den Cache-Key -> Archetyp-/Zeilen-Wechsel erneuert den Cache.
     archetyp = _comic_strip_archetyp(fields)
+    # #161: Berater-Steckbrief der Stelle (bibel_text) fuer Feld 1/3 (von personalisierung durchgereicht).
+    f = fields if isinstance(fields, dict) else {}
+    bibel_text = (f.get("bibel_text") or "").strip()
     pfade = []
     for idx, (delta, quelle) in enumerate(_comic_strip_panels(archetyp)):
         zeile = _comic_strip_zeile(fields, quelle, archetyp)
         # #160: pro Beitrag deterministisch gewaehlte Szenen-/Posen-Variante (Kern der Rolle bleibt).
         szene = _comic_strip_szene(fields, quelle, archetyp)
+        # #161 (Reihenfolge Stil -> Figur -> Szene): der Figur-Steckbrief je Panel. Feld 2 (idx 1,
+        # der Aermelschoner) -> FINANZAMT_FIGUR; Feld 1/3 (der/die Berater:in) -> bibel_text der Stelle
+        # (falls vorhanden, sonst ''). Der Steckbrief fliesst in den Panel-Prompt (nur wenn nicht leer).
+        figur = FINANZAMT_FIGUR if idx == 1 else bibel_text
         # #159: existieren fuer dieses Panel Referenzen (Feld 1/3 Berater, Feld 2 Finanzamt), wird der
         # Referenz-Anker in den Prompt aufgenommen. refs VOR der Pfad-Berechnung ermitteln, damit
         # Producer und _comic_strip_pfad DENSELBEN Prompt/Schluessel nutzen.
         refs = _comic_strip_refs(idx, berater)
-        prompt = _comic_strip_prompt(fields, delta, zeile, hat_ref=bool(refs), szene=szene)
+        prompt = _comic_strip_prompt(fields, delta, zeile, hat_ref=bool(refs), szene=szene, figur=figur)
         path = _comic_strip_pfad(idx, prompt, berater, tool=tool)
         if os.path.exists(path):
             pfade.append(path)

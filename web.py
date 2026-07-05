@@ -1431,6 +1431,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <button>Bild-Tool speichern</button>
 </div></form>
 
+<h3 style="margin-top:26px">Bild-Modell <span class=hint style="font-weight:normal">(OpenAI, für die Comic-Bilder)</span></h3>
+<p class=hint>Legt fest, <b>welches OpenAI-Bildmodell</b> die Comic-Bilder erzeugt. <b>gpt-image-1</b> ist die bewährte Standard-Wahl (wirkt oft reicher und plastischer). <b>gpt-image-2</b> ist ein Testmodell zum Vergleichen. Nach dem Umschalten erzeugt „Neu erzeugen“ ein <b>frisches</b> Bild mit dem gewählten Modell – so lassen sich beide am selben Beitrag vergleichen (A/B). Schlägt das Testmodell fehl, wird automatisch auf gpt-image-1 zurückgefallen.</p>
+<form method=post><input type=hidden name=formular value=bildmodell_save>
+<div style="max-width:560px">
+  <label style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <span><b>Bild-Modell:</b></span>
+    <select name=bild_modell style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff" title="OpenAI-Bildmodell für die Comic-Bilder wählen">
+      <option value="gpt-image-1"{% if bild_modell=='gpt-image-1' %} selected{% endif %}>gpt-image-1 (Standard)</option>
+      <option value="gpt-image-2"{% if bild_modell=='gpt-image-2' %} selected{% endif %}>gpt-image-2 (Test)</option>
+    </select>
+  </label>
+  <button>Bild-Modell speichern</button>
+</div></form>
+
 <h3 style="margin-top:26px">Finanzamt-Bible <span class=hint style="font-weight:normal">(global, für den Stil „Comic Beratung")</span></h3>
 <p class=hint>Globale Comic-/Stylesheet-Vorlage des wiederkehrenden Finanzamt-Charakters. Ist ein Bild hinterlegt, wird es beim Rendern <b>statt</b> der eingebauten Standard-Referenz als Finanzamt-Vorlage genutzt; die Beschreibung fließt zusätzlich in den Bild-Prompt ein. Ohne Eintrag bleibt alles wie bisher. Anzeige nur nach Login (Datenschutz).</p>
 <form method=post enctype="multipart/form-data" style="max-width:560px">
@@ -3579,6 +3593,19 @@ def verwaltung():
                     "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (tool,))
                 audit_log(conn, session["user"], "bild_tool_gesetzt", None, tool)
                 flash("Bild-Tool gespeichert: %s." % ("OpenAI" if tool == "openai" else "Ideogram"))
+            elif formular == "bildmodell_save":
+                # Globales OpenAI-Bild-Modell (#161): 'gpt-image-1' (Default/Standard) oder
+                # 'gpt-image-2' (Test). Umschaltbar fuer den A/B-Vergleich am selben Beitrag; ein
+                # Modellwechsel erzeugt frische Comic-Bilder (Modell-Praefix im Cache). Der Default
+                # (gpt-image-1) aendert sich NICHT; unbekannte Werte fallen darauf zurueck.
+                modell = request.form.get("bild_modell", "gpt-image-1").strip().lower()
+                if modell not in ("gpt-image-1", "gpt-image-2"):
+                    modell = "gpt-image-1"
+                conn.execute(
+                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_modell', ?) "
+                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (modell,))
+                audit_log(conn, session["user"], "bild_modell_gesetzt", None, modell)
+                flash("Bild-Modell gespeichert: %s." % modell)
             elif formular == "finanzamt_bibel":
                 # Globale Finanzamt-Bible (#151): optionaler Bild-Upload (Comic-/Stylesheet-Vorlage des
                 # wiederkehrenden Finanzamt-Charakters) + Charakter-Beschreibung. Key/Value in
@@ -3641,7 +3668,8 @@ def verwaltung():
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
                     "wissen": "wissen", "schauplatz": "schauplatz", "traeger": "traeger",
                     "bildstil": "bildstil",
-                    "bildtool": "bildstil", "finanzamt": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
+                    "bildtool": "bildstil", "bildmodell": "bildstil", "finanzamt": "bildstil",
+                    "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
@@ -3677,6 +3705,9 @@ def verwaltung():
         stil_kreativ = _stil_aktiv("kreativ")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
+        # OpenAI-Bild-Modell (#161): aktueller Stand fuers Dropdown. Unbekannt/leer -> Standard.
+        _bm = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_modell'").fetchone()
+        bild_modell = (_bm["wert"] if _bm and _bm["wert"] in ("gpt-image-1", "gpt-image-2") else "gpt-image-1")
         # Globale Finanzamt-Bible (#151): aktueller Stand fuer die Anzeige im Bild-Stil-Bereich.
         _fab = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_bild'").fetchone()
         finanzamt_bibel_bild = (_fab["wert"] if _fab and _fab["wert"] else "")
@@ -3737,6 +3768,7 @@ def verwaltung():
                                                      wa_dienst_err=wa_dienst_err,
                                                      any_wa_pending=any_wa_pending,
                                                      bild_tool=bild_tool,
+                                                     bild_modell=bild_modell,
                                                      finanzamt_bibel_bild=finanzamt_bibel_bild,
                                                      finanzamt_bibel_text=finanzamt_bibel_text,
                                                      **speicher))
