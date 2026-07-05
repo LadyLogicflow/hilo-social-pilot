@@ -653,11 +653,13 @@ def erzeuge_comic_bild_ref(prompt, refs):
 # Exakter Prompt fuer das wiederkehrende Comic-Portrait der Leitung. Bewusst als Konstante, damit
 # Producer (erzeuge_berater_comic) und Tests denselben Wortlaut nutzen.
 BERATER_PORTRAIT_PROMPT = (
-    "Create a friendly comic portrait, head and shoulders, of the SAME person shown in the "
-    "provided photograph, redrawn in a refined ligne claire comic style (clean elegant outlines, "
-    "flat colours with subtle shading, warm and characterful) matching the style reference image. "
-    "A warm, approachable, professional tax advisor with a friendly smile. Simple clean light "
-    "background. Keep the person clearly recognisable. Square format."
+    "Create a friendly, modern comic portrait, head and shoulders, of the SAME person shown in the "
+    "provided photograph, redrawn in a clean ligne claire comic style (clean elegant outlines, flat "
+    "bright colours, MINIMAL shading) matching the style reference image. Make the person look "
+    "YOUTHFUL, SLIM and fresh: a slender face and jawline, smooth clear skin, NO wrinkles, NO "
+    "nasolabial folds, NO extra weight and NO double chin, do NOT age them. A warm, approachable, "
+    "professional advisor with a friendly smile. Simple clean light background. Keep the person "
+    "clearly recognisable but flattering, noticeably younger and slimmer. Square format."
 )
 
 
