@@ -1147,7 +1147,8 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=speicher"><h3>&#x1F4BE; Speicher</h3><p>Foto-Cache und freien Plattenplatz ansehen, ungenutzte KI-Fotos aufr&auml;umen.</p></a>
 </div>"""
 
-VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title><style>""" + _STYLE + """
+VERWALTUNG = """<!doctype html><meta charset=utf-8><title>{{bereich_titel}} - Verwaltung</title>
+{% if any_wa_pending %}<meta http-equiv=refresh content=6>{% endif %}<style>""" + _STYLE + """
 .filebtn{display:inline-block;background:#eef2f8;border:1px solid #cfd8e6;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:13px;color:#0B2545;white-space:nowrap}
 .filebtn:hover{background:#e2e9f4}
 button:disabled{opacity:.45;cursor:not-allowed}
@@ -1204,6 +1205,26 @@ button:disabled{opacity:.45;cursor:not-allowed}
           <input name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="https://whatsapp.com/channel/…" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool" style="flex:1;min-width:260px">
           <button style="padding:7px 13px">OK</button>
         </div></form>
+    </div>
+    <div class=stfield><label>WhatsApp-Verbindung</label>
+      {% if wa_dienst_err %}<div class=hint>WhatsApp-Dienst nicht erreichbar.</div>{% endif %}
+      <div style="margin:0 0 6px">
+        {% if b.wa.state == 'connected' %}<span style="color:#4D7C0F;font-weight:bold">&#x2705; verbunden</span>{% if b.wa.me %} <span class=hint>· {{b.wa.me}}</span>{% endif %}
+        {% elif b.wa.state == 'qr' %}<span style="color:#475569;font-weight:bold">QR bereit</span>
+        {% else %}<span class=hint>nicht verbunden</span>{% endif %}
+      </div>
+      {% if b.wa.state == 'connected' %}
+        <form method=post action="/whatsapp/logout/{{b.id}}" onsubmit="return confirm('Verbindung dieser Stelle trennen? Du musst danach neu scannen.')"><input type=hidden name=zurueck value=verwaltung><button style="background:#b00020;padding:6px 12px">Trennen</button></form>
+      {% elif b.wa.state == 'qr' and b.wa.qr %}
+        <img src="{{b.wa.qr}}" alt="WhatsApp QR" style="width:180px;height:180px;border:1px solid #e2e8f0;border-radius:8px">
+        <ol class=hint style="margin:6px 0;padding-left:18px">
+          <li>WhatsApp auf dem Handy <b>dieser Stelle</b> öffnen</li>
+          <li>Einstellungen &rarr; <b>Verknüpfte Geräte</b> &rarr; <b>Gerät verknüpfen</b></li>
+          <li>Diesen QR-Code scannen</li></ol>
+        <p class=hint style="margin:4px 0 0">Die Seite aktualisiert sich automatisch.</p>
+      {% else %}
+        <form method=post action="/whatsapp/connect/{{b.id}}"><input type=hidden name=zurueck value=verwaltung><button style="padding:6px 12px">Verbinden (QR anzeigen)</button></form>
+      {% endif %}
     </div>
     <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
     <div class=stfield><label>Porträt (Kreis)</label>
@@ -3358,6 +3379,33 @@ def verwaltung():
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
     page_id_set = {str(p["id"]) for p in pages}
     fb_name = {str(p["id"]): p["name"] for p in pages}
+    # WhatsApp-Verbindung je Stelle direkt in der Beratungsstellen-Verwaltung (#alles-an-einem-Ort).
+    # NUR im Stellen-Bereich, NUR fuer aktive Stellen, kurzer Timeout und komplett fehlertolerant:
+    # ist der Node-/Baileys-Dienst aus, merken wir EINEN wa_dienst_err und zeigen die Stelle als
+    # "nicht_verbunden" - die Verwaltung darf davon NIE brechen.
+    wa_dienst_err = None
+    any_wa_pending = False
+    if bereich == "stellen":
+        stellen_mit_wa = []
+        for r in stellen:
+            b = dict(r)
+            wa = {"state": "nicht_verbunden", "qr": None, "me": None, "error": None, "contacts": 0}
+            if r["aktiv"]:
+                try:
+                    st, err = _wa_call("/status", session=r["id"], timeout=4)
+                    if err:
+                        if wa_dienst_err is None:
+                            wa_dienst_err = err
+                    elif st:
+                        wa = st
+                except Exception as e:  # noqa: BLE001 - Verwaltung robust halten
+                    if wa_dienst_err is None:
+                        wa_dienst_err = str(e)
+            b["wa"] = wa
+            if wa.get("state") in ("qr", "init", "closed"):
+                any_wa_pending = True
+            stellen_mit_wa.append(b)
+        stellen = stellen_mit_wa
     # Speicher-Status (#134): Foto-Cache-Groesse + freier Plattenplatz, menschenlesbar.
     speicher = {"schonfrist_tage": 14, "motive_lesbar": "", "frei_lesbar": "",
                 "gesamt_lesbar": "", "speicher_warnung": False}
@@ -3380,6 +3428,8 @@ def verwaltung():
                                                      stil_standard=stil_standard,
                                                      stil_ki_tafel=stil_ki_tafel,
                                                      stil_kreativ=stil_kreativ,
+                                                     wa_dienst_err=wa_dienst_err,
+                                                     any_wa_pending=any_wa_pending,
                                                      bild_tool=bild_tool, **speicher))
 
 @app.route("/logo.png")
@@ -3549,6 +3599,13 @@ def whatsapp():
     return render_template_string(WHATSAPP, **_ctx(stellen=stellen, dienst_err=dienst_err,
                                                    any_pending=any_pending))
 
+def _wa_zurueck():
+    """Ziel nach Verbinden/Trennen: zurueck zur Beratungsstellen-Verwaltung, wenn das Formular
+    von dort kam (hidden zurueck=verwaltung), sonst zur bestehenden /whatsapp-Uebersicht."""
+    if request.form.get("zurueck") == "verwaltung":
+        return redirect(url_for("verwaltung", bereich="stellen"))
+    return redirect(url_for("whatsapp"))
+
 @app.route("/whatsapp/connect/<int:sid>", methods=["POST"])
 @login_required
 def whatsapp_connect(sid):
@@ -3558,7 +3615,7 @@ def whatsapp_connect(sid):
     else:
         audit_log_safe("whatsapp_connect")
         flash("Verbindung wird aufgebaut - der QR-Code erscheint gleich. Scanne ihn mit dem Handy dieser Stelle.")
-    return redirect(url_for("whatsapp"))
+    return _wa_zurueck()
 
 @app.route("/whatsapp/logout/<int:sid>", methods=["POST"])
 @login_required
@@ -3566,7 +3623,7 @@ def whatsapp_logout(sid):
     _wa_call("/logout", method="POST", payload={}, session=sid)
     audit_log_safe("whatsapp_logout")
     flash("WhatsApp-Verbindung dieser Stelle getrennt.")
-    return redirect(url_for("whatsapp"))
+    return _wa_zurueck()
 
 @app.route("/whatsapp/test-status/<int:sid>", methods=["POST"])
 @login_required
