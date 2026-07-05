@@ -251,6 +251,146 @@ def test_5_picker_und_whitelist():
     _ok("Whitelist akzeptiert comic_strip; Vorschau ohne Berater -> Hinweis + kein Bild")
 
 
+# --- 6) #156: optionales Override fuer Feld 1 (strip_zeile1) ---------------------------------
+def test_6_override_feld1():
+    # 6a) _comic_strip_zeile direkt: nicht-leeres Override -> Vorrang vor der Ueberschrift;
+    #     leeres/fehlendes Override -> weiter die Ueberschrift. Feld 2/3 IMMER unveraendert.
+    ueberschrift = "URSPRUNG-UEBERSCHRIFT-156"
+    override = "EIGENER-FELD1-SATZ-156"
+    mit = {"ueberschrift": ueberschrift, "strip_zeile1": override}
+    ohne = {"ueberschrift": ueberschrift, "strip_zeile1": ""}
+    fehlt = {"ueberschrift": ueberschrift}
+    if bildmotiv._comic_strip_zeile(mit, "ueberschrift") != override:
+        _fail("Override wird bei 'ueberschrift' nicht bevorzugt")
+    if bildmotiv._comic_strip_zeile(ohne, "ueberschrift") != ueberschrift:
+        _fail("leeres Override -> es muss weiter die Ueberschrift gelten")
+    if bildmotiv._comic_strip_zeile(fehlt, "ueberschrift") != ueberschrift:
+        _fail("fehlendes Override -> es muss weiter die Ueberschrift gelten")
+    # Whitespace-only Override zaehlt als leer
+    if bildmotiv._comic_strip_zeile({"ueberschrift": ueberschrift, "strip_zeile1": "   "},
+                                    "ueberschrift") != ueberschrift:
+        _fail("Whitespace-only Override muss als leer gelten (weiter Ueberschrift)")
+    # Feld 2/3 duerfen sich durch das Override NICHT aendern
+    if bildmotiv._comic_strip_zeile(mit, "jammer") != bildmotiv.COMIC_STRIP_JAMMER:
+        _fail("Override hat faelschlich Feld 2 (Jammer) veraendert")
+    if bildmotiv._comic_strip_zeile(mit, "pointe") != bildmotiv.COMIC_STRIP_POINTE:
+        _fail("Override hat faelschlich Feld 3 (Pointe) veraendert")
+
+    # 6b) ensure_comic_strip_bilder: gesetztes Override landet im Panel-1-Prompt STATT der
+    #     Ueberschrift; Feld 2 = Jammer, Feld 3 = Pointe unveraendert.
+    berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_156.png"))
+    db.set_einstellung("finanzamt_bibel_bild", None)
+
+    def _run(fields):
+        captured = []
+
+        def _fake_ref(prompt, refs):
+            captured.append(prompt)
+            return b"PANELPNG"
+
+        def _fake_gen(prompt, tool=None):
+            captured.append(prompt)
+            return b"GENPNG"
+
+        orig_ref, orig_gen = bildmotiv.erzeuge_comic_bild_ref, bildmotiv.erzeuge_bild
+        bildmotiv.erzeuge_comic_bild_ref = _fake_ref
+        bildmotiv.erzeuge_bild = _fake_gen
+        try:
+            bildmotiv.ensure_comic_strip_bilder(fields, berater)
+        finally:
+            bildmotiv.erzeuge_comic_bild_ref, bildmotiv.erzeuge_bild = orig_ref, orig_gen
+        return captured
+
+    us_a = "PANEL1-UEBERSCHRIFT-156-A"
+    ov_a = "PANEL1-OVERRIDE-156-A"
+    cap = _run({"bild_stil": "comic_strip", "ueberschrift": us_a, "strip_zeile1": ov_a})
+    if len(cap) != 3:
+        _fail("Override-Lauf: nicht genau 3 Panel-Prompts: %r" % len(cap))
+    if ov_a not in cap[0]:
+        _fail("Override steht NICHT im Panel-1-Prompt")
+    if us_a in cap[0]:
+        _fail("Ueberschrift steht faelschlich weiter im Panel-1-Prompt (Override sollte ersetzen)")
+    if bildmotiv.COMIC_STRIP_JAMMER not in cap[1]:
+        _fail("Feld 2 (Jammer) im Override-Lauf veraendert")
+    if bildmotiv.COMIC_STRIP_POINTE not in cap[2]:
+        _fail("Feld 3 (Pointe) im Override-Lauf veraendert")
+    if ov_a in cap[1] or ov_a in cap[2]:
+        _fail("Override ist faelschlich in Feld 2/3 gelandet")
+
+    # 6c) leeres Override -> Panel-1 enthaelt weiter die Ueberschrift (neue Ueberschrift -> neuer Cache)
+    us_b = "PANEL1-UEBERSCHRIFT-156-B"
+    cap2 = _run({"bild_stil": "comic_strip", "ueberschrift": us_b, "strip_zeile1": ""})
+    if us_b not in cap2[0]:
+        _fail("leeres Override: Ueberschrift fehlt im Panel-1-Prompt")
+    _ok("#156 Override Feld 1: strip_zeile1 ersetzt die Ueberschrift in Panel 1; leer -> Ueberschrift; Feld 2/3 unveraendert")
+
+
+# --- 7) #156: optionales Textfeld in ALLEN DREI Pickern (Entwuerfe/Pool/Einplanung) -----------
+def test_7_override_input_in_pickern():
+    import web
+    for name, tpl in (("ENTWUERFE", web.ENTWUERFE), ("EINPLANUNG", web.EINPLANUNG),
+                      ("POOL", web.POOL)):
+        if "name=strip_zeile1" not in tpl:
+            _fail("Picker %s enthaelt das Override-Feld (name=strip_zeile1) nicht" % name)
+        if "e.f.strip_zeile1" not in tpl:
+            _fail("Picker %s befuellt das Override-Feld nicht mit dem gespeicherten Wert" % name)
+    _ok("#156 Override-Textfeld ist in allen drei Pickern (Entwuerfe/Pool/Einplanung) vorhanden + vorbefuellt")
+
+
+# --- 8) #156: Override wird ueber /bild-generieren persistiert + bis ensure_... durchgereicht --
+def test_8_route_persistiert_override():
+    import json as _json
+    import web
+    web.app.config["TESTING"] = True
+    web.app.secret_key = web.app.secret_key or "test"
+
+    # Aktive Stelle MIT Berater-Referenz, damit der comic_strip-Zweig nicht vorzeitig abbricht.
+    berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_stelle_156.png"))
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO beratungsstellen(name, ort, aktiv, berater_comic) "
+                     "VALUES (?,?,1,?)", ("Teststelle 156", "Musterstadt", berater))
+        cur = conn.execute("INSERT INTO entwuerfe(text, status) VALUES (?, 'entwurf')",
+                           (_json.dumps({"ueberschrift": "URSPRUNG-156"}),))
+        conn.commit()
+        eid = cur.lastrowid
+
+    # ensure_comic_strip_bilder mocken (keine echte Bild-KI) + die uebergebenen fields mitschneiden.
+    gesehen = {}
+    dummy_panel = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "bilder", "panel_156.png"))
+
+    def _fake_ensure(fields, berater_ref):
+        gesehen["strip_zeile1"] = (fields or {}).get("strip_zeile1")
+        return [dummy_panel, dummy_panel, dummy_panel]
+
+    orig = bildmotiv.ensure_comic_strip_bilder
+    bildmotiv.ensure_comic_strip_bilder = _fake_ensure
+    c = web.app.test_client()
+    with c.session_transaction() as sess:
+        sess["user"] = "tester"; sess["rolle"] = "admin"
+    try:
+        # (a) Override gesetzt -> muss bei ensure_... ankommen UND im Entwurf-JSON persistiert werden.
+        c.post("/bild-generieren/%d" % eid,
+               data={"bild_stil": "comic_strip", "zurueck": "entwuerfe",
+                     "strip_zeile1": "  ROUTE-OVERRIDE-156  "})
+        if gesehen.get("strip_zeile1") != "ROUTE-OVERRIDE-156":
+            _fail("Override kam nicht (getrimmt) in ensure_comic_strip_bilder an: %r" % gesehen.get("strip_zeile1"))
+        with db.get_conn() as conn:
+            data = _json.loads(conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()["text"])
+        if data.get("strip_zeile1") != "ROUTE-OVERRIDE-156":
+            _fail("Override wurde nicht im Entwurf-JSON persistiert: %r" % data.get("strip_zeile1"))
+
+        # (b) leeres Override -> wird auf '' zurueckgesetzt (wieder Ueberschrift).
+        c.post("/bild-generieren/%d" % eid,
+               data={"bild_stil": "comic_strip", "zurueck": "entwuerfe", "strip_zeile1": ""})
+        with db.get_conn() as conn:
+            data2 = _json.loads(conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()["text"])
+        if data2.get("strip_zeile1") != "":
+            _fail("leeres Override wurde nicht als '' persistiert (Reset): %r" % data2.get("strip_zeile1"))
+    finally:
+        bildmotiv.ensure_comic_strip_bilder = orig
+    _ok("#156 /bild-generieren reicht strip_zeile1 bis ensure_comic_strip_bilder durch + persistiert es (Reset bei leer)")
+
+
 def main():
     db.init_db()
     test_1_stilwahl()
@@ -258,6 +398,9 @@ def main():
     test_3_fallback_ohne_berater()
     test_4_render_slides_fuer_stelle()
     test_5_picker_und_whitelist()
+    test_6_override_feld1()
+    test_7_override_input_in_pickern()
+    test_8_route_persistiert_override()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 

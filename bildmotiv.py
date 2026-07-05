@@ -1062,12 +1062,19 @@ _COMIC_STRIP_PANELS = (
 def _comic_strip_zeile(fields, quelle):
     """Liefert den Sprechblasen-Text fuer ein Panel je Quelle: 'ueberschrift' -> die Kernbotschaft
     des Beitrags (fields['ueberschrift'], getrimmt); 'jammer' -> der feste Default-Jammersatz;
-    'pointe' -> die feste Pointe. Robust gegen fehlende/leere Ueberschrift (Fallback Pointe)."""
+    'pointe' -> die feste Pointe. Robust gegen fehlende/leere Ueberschrift (Fallback Pointe).
+
+    #156 (nur Feld 1): ist ein optionales Override gesetzt (fields['strip_zeile1'], nicht leer),
+    hat es fuer die Quelle 'ueberschrift' VORRANG vor der Beitrags-Ueberschrift. Feld 2 (Jammer)
+    und Feld 3 (Pointe) bleiben unveraendert."""
     if quelle == "jammer":
         return COMIC_STRIP_JAMMER
     if quelle == "pointe":
         return COMIC_STRIP_POINTE
     f = fields if isinstance(fields, dict) else {}
+    override = (f.get("strip_zeile1") or "").strip()
+    if override:
+        return override
     return (f.get("ueberschrift") or "").strip() or COMIC_STRIP_POINTE
 
 
