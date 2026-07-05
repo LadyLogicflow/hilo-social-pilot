@@ -190,6 +190,19 @@ STIL_A_BLOCK = (
     "negative space on the right side for later text. High-quality, detailed, professional linework. "
     "Square format."
 )
+# Stil "Comic Beratung" (comic_beratung): personalisierte Beratungsszene - VORNE der/die Berater:in
+# der Beratungsstelle (Comic-Figur nach dem ersten Referenzbild), HINTEN der wiederkehrende
+# Finanzamt-Beamte, der leer ausgeht. EXAKTER Wortlaut aus dem Auftrag.
+BERATUNG_BLOCK = (
+    "Composition for a consultation scene, same clean ligne claire comic style: in the FOREGROUND a "
+    "warm, friendly HILO tax advisor whose face and appearance MATCH the first reference image (the "
+    "very same person), sitting or standing with a citizen/client, actively helping and reassuring "
+    "them - positive and warm. In the BACKGROUND, smaller and to one side, the recurring 'Finanzamt' "
+    "bureaucrat (grey suit, round glasses, beige sleeve garters) looking sad, disappointed and "
+    "empty-handed. The picture tells the story: HILO helps you and the tax office loses out. Warm and "
+    "friendly overall; gentle humour only in the small background figure. Keep generous empty negative "
+    "space on one side for later text."
+)
 FINANZAMT_BLOCK = (
     "Recurring 'Finanzamt' character (draw him consistently): a slightly over-correct bureaucrat - "
     "grey suit, round glasses, beige sleeve garters, pens in breast pocket, a smug friendly smile; "
@@ -363,6 +376,12 @@ def ensure_photo_fuer(fields):
     motiv = (fields.get("szene_motiv") or fields.get("bild_motiv")
              or fields.get("bild_motiv_thema") or "").strip()
     # 'icon:'-Motive bleiben in jedem Stil gezeichnet (kein OpenAI, keine Tafel, kein kreativ-Foto).
+    if stil == "comic_beratung" and not motiv.startswith("icon:"):
+        # NEU (Comic Beratung): personalisierte Szene - vorne der/die Berater:in DER STELLE, hinten
+        # der Finanzamt-Beamte. Der Berater-Comic-Pfad der Stelle wird im per-Stelle-Render
+        # (personalisierung.render_fuer_stelle) in fields['berater_comic'] injiziert; fehlt er, faellt
+        # ensure_comic_beratung_bild auf den normalen Comic zurueck (kein Crash).
+        return ensure_comic_beratung_bild(fields, (fields.get("berater_comic") or "").strip())
     if stil == "comic" and not motiv.startswith("icon:"):
         # NEU (Comic): Ligne-claire-Illustration. Prompt = STIL_A_BLOCK + Alltagsszene (aus
         # comic_brief) + optional FINANZAMT_BLOCK. Eigener Cache-Praefix 'comic_'.
@@ -811,6 +830,86 @@ def ensure_comic_bild(fields):
         return path
     except Exception as ex:
         log.warning("Comic-Bild speichern fehlgeschlagen: %s", ex)
+        return None
+
+# --- Stil "Comic Beratung" (comic_beratung) - personalisiert pro Beratungsstelle ----------------
+def _comic_beratung_prompt(fields):
+    """Baut den Comic-Beratung-Bildprompt: STIL_A_BLOCK + BERATUNG_BLOCK (+ optional 'Thema/Anlass:'
+    aus comic_brief.szene). Ausgelagert, damit Producer (ensure_comic_beratung_bild) und Cache-Pfad
+    (_comic_beratung_pfad) denselben String nutzen (konsistent, testbar). KEIN Finanzamt-Block: der
+    Finanzamt-Beamte ist bereits im BERATUNG_BLOCK beschrieben (kleine Hintergrundfigur)."""
+    prompt = STIL_A_BLOCK + "\n\n" + BERATUNG_BLOCK
+    szene = (_comic_brief(fields).get("szene") or "").strip()
+    if szene:
+        prompt += "\n\nThema/Anlass: " + szene
+    return prompt
+
+def _comic_beratung_refs(berater_comic_pfad):
+    """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade: ZUERST der Berater-Comic der Stelle
+    (das 'first reference image' aus BERATUNG_BLOCK -> das Gesicht des/der Berater:in), DANN die
+    Finanzamt-Referenz (wiederkehrender Charakter). Nur tatsaechlich vorhandene Dateien werden
+    aufgenommen, damit ein fehlendes Asset nicht zum Fehler fuehrt."""
+    refs = []
+    p = (berater_comic_pfad or "").strip()
+    if p and os.path.exists(p):
+        refs.append(p)
+    if os.path.exists(FINANZAMT_REF_PATH):
+        refs.append(FINANZAMT_REF_PATH)
+    return refs
+
+def _comic_beratung_cache_input(fields, berater_comic_pfad):
+    """Hash-Eingabestring fuer den Comic-Beratung-Cache: 'comic_beratung:' + vollstaendiger Prompt +
+    Basename des Berater-Comics. So bekommt JEDE Beratungsstelle (eigener Berater-Comic) eine EIGENE
+    Cache-Datei - verschiedene Berater kollidieren nicht."""
+    base = os.path.basename((berater_comic_pfad or "").strip())
+    return "comic_beratung:" + _comic_beratung_prompt(fields) + "|berater=" + base
+
+def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
+    """Absoluter Cache-Pfad fuer ein Comic-Beratung-Bild. EIGENER Praefix 'comic_beratung_'
+    (sha256[:16] aus _comic_beratung_cache_input), getrennt von szene/tafel/kreativ/comic. Der
+    Berater-Comic-Basename fliesst in den Hash -> pro Stelle/Berater eine eigene Datei. Tool-abhaengig
+    (#137) wie die uebrigen Pfade (openai ohne, ideogram-Praefix)."""
+    if tool is None:
+        tool = aktives_bild_tool()
+    h = hashlib.sha256(
+        _comic_beratung_cache_input(fields, berater_comic_pfad).lower().encode("utf-8")).hexdigest()[:16]
+    return os.path.join(MOTIV_DIR, _tool_praefix(tool) + "comic_beratung_" + h + ".png")
+
+def ensure_comic_beratung_bild(fields, berater_comic_pfad):
+    """Erzeugt (oder liefert aus dem Cache) das personalisierte Comic-Beratung-Bild: vorne der/die
+    Berater:in DER STELLE (Comic-Figur nach 'berater_comic_pfad'), hinten der Finanzamt-Beamte, der
+    leer ausgeht. Prompt = STIL_A_BLOCK + BERATUNG_BLOCK (+ optional Thema aus comic_brief.szene);
+    refs = [berater_comic_pfad, FINANZAMT_REF_PATH] (nur existierende Dateien) via images/edits.
+
+    Cache pro Stelle/Berater (Berater-Comic-Basename im Hash). FALLBACK ohne gueltigen
+    berater_comic_pfad: es wird auf den normalen Comic (ensure_comic_bild) zurueckgefallen - so
+    entsteht nie ein Crash, nur eben ohne persoenliches Berater-Gesicht. Liefert None, wenn auch der
+    Referenz- UND der generations-Weg kein Bild liefern (kein Key/Fehler) -> Creme-Fallback im Render."""
+    p = (berater_comic_pfad or "").strip()
+    if not p or not os.path.exists(p):
+        # Kein (gueltiger) Berater-Comic -> normaler Comic, damit die Stelle trotzdem ein Bild bekommt.
+        log.info("Comic-Beratung ohne Berater-Comic (%r) -> Fallback normaler Comic.", berater_comic_pfad)
+        return ensure_comic_bild(fields)
+    os.makedirs(MOTIV_DIR, exist_ok=True)
+    tool = aktives_bild_tool()
+    path = _comic_beratung_pfad(fields, p, tool=tool)
+    if os.path.exists(path):
+        return path
+    prompt = _comic_beratung_prompt(fields)
+    refs = _comic_beratung_refs(p)
+    daten = erzeuge_comic_bild_ref(prompt, refs) if refs else None
+    if daten is None:
+        # Referenz-Call ohne Key/Fehler -> generations-Weg (ohne Berater-Gesicht, aber kein Crash).
+        daten = erzeuge_bild(prompt, tool=tool)
+    if daten is None:
+        return None
+    try:
+        with open(path, "wb") as f:
+            f.write(daten)
+        log.info("Comic-Beratung-Bild erzeugt (%s), Berater=%s", tool, os.path.basename(p))
+        return path
+    except Exception as ex:
+        log.warning("Comic-Beratung-Bild speichern fehlgeschlagen: %s", ex)
         return None
 
 def ensure_photo_tafel(scene, sign_text, traeger=None):
