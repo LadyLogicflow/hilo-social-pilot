@@ -191,11 +191,15 @@ STIL_A_BLOCK = (
     "Square format."
 )
 FINANZAMT_BLOCK = (
-    "Recurring 'Finanzamt' character: a slightly over-correct, stamp-loving bureaucrat - grey suit, "
-    "round glasses, beige sleeve garters, pens in breast pocket, a smug friendly smile; sympathetic "
-    "and comic, never a villain. If he stamps a rejection, the imprint on the paper reads GESTRICHEN "
-    "in RED (green only for approvals); show mainly the wooden handle of the stamp, not the mirrored "
-    "rubber underside."
+    "Recurring 'Finanzamt' character (draw him consistently): a slightly over-correct bureaucrat - "
+    "grey suit, round glasses, beige sleeve garters, pens in breast pocket, a smug friendly smile; "
+    "sympathetic and comic, never a villain. His ACTION and props MUST fit the scene/topic described "
+    "above - do NOT force a stamp. ONLY if the topic is genuinely about something being rejected, "
+    "struck out or denied does he stamp a red 'GESTRICHEN' (green only for approvals; show mainly the "
+    "wooden handle, not the mirrored rubber underside). For any other topic he does something fitting "
+    "instead - e.g. pointing at a rising tax-rate arrow, holding or handing over an official letter, "
+    "tapping a calculator - and shows NO 'GESTRICHEN' stamp or other symbol that would contradict the "
+    "topic."
 )
 
 # --- Comic per Referenzbild (OpenAI images/edits) ----------------------------------------------
