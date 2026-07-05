@@ -883,35 +883,94 @@ def ensure_comic_bild(fields):
         return None
 
 # --- Stil "Comic Beratung" (comic_beratung) - personalisiert pro Beratungsstelle ----------------
+def _finanzamt_bibel_bild():
+    """Liefert den Pfad zur globalen Finanzamt-Bible (Einstellung 'finanzamt_bibel_bild'), falls
+    gesetzt UND die Datei existiert - sonst ''. Kapselt den DB-Zugriff, damit Referenz-Liste und
+    Cache-Key dieselbe Quelle nutzen. Fehlertolerant (DB-/Import-Fehler -> '')."""
+    try:
+        import db
+        p = (db.get_einstellung("finanzamt_bibel_bild") or "").strip()
+        return p if (p and os.path.exists(p)) else ""
+    except Exception:
+        return ""
+
+def _finanzamt_bibel_text():
+    """Liefert die globale Finanzamt-Bible-Beschreibung (Einstellung 'finanzamt_bibel_text') oder ''.
+    Fehlertolerant (DB-/Import-Fehler -> '')."""
+    try:
+        import db
+        return (db.get_einstellung("finanzamt_bibel_text") or "").strip()
+    except Exception:
+        return ""
+
+def _finanzamt_ref_pfad():
+    """Liefert den Pfad der Finanzamt-Referenz fuer comic_beratung: die globale Finanzamt-Bible
+    (finanzamt_bibel_bild), falls gesetzt+vorhanden - sonst die Default-Referenz FINANZAMT_REF_PATH.
+    So kann Catrin den wiederkehrenden Finanzamt-Charakter global ueber eine eigene Bible-Vorlage
+    steuern (#151), ohne dass sich ohne Bible etwas am bisherigen Verhalten aendert."""
+    return _finanzamt_bibel_bild() or FINANZAMT_REF_PATH
+
 def _comic_beratung_prompt(fields):
     """Baut den Comic-Beratung-Bildprompt: HILO_COMIC_MASTER (der von Catrins ChatGPT-Projekt
     entwickelte, ausgereifte HILO-Stil-Masterprompt) + BERATUNG_BLOCK (Komposition + HILO-Buero +
     wiederkehrender Finanzamt-Typ). Bewusst OHNE das Beitrags-Thema (kein 'Thema/Anlass'): das Thema
     trieb die Szene sonst woertlich (z.B. eine Gelduebergabe -> wirkte wie ein 'Deal'). 'Comic
     Beratung' ist IMMER eine warme Schreibtisch-Beratung; der inhaltliche Bezug lebt im Begleittext.
-    'fields' wird fuer kuenftige Varianten durchgereicht. NICHT STIL_A_BLOCK (das ist der witzige
-    Comic-Stil mit Karikaturen - der Master verlangt bewusst KEINE Karikaturen)."""
-    return HILO_COMIC_MASTER + "\n\n" + BERATUNG_BLOCK
+
+    NEU (#151, Character-Bible): Ist fuer die Stelle eine Charakter-Beschreibung hinterlegt
+    (fields['bibel_text'], von personalisierung durchgereicht), wird sie ANGEHAENGT - so folgt die
+    Bild-KI der verbindlichen Beschreibung des/der Berater:in. Ebenso wird die globale
+    Finanzamt-Bible-Beschreibung (Einstellung finanzamt_bibel_text) angehaengt, falls gesetzt. OHNE
+    beide bleibt der Prompt WORTGLEICH zum bisherigen Verhalten (Minimal-Change, robust gegen leer).
+    NICHT STIL_A_BLOCK (das ist der witzige Comic-Stil mit Karikaturen - der Master verlangt bewusst
+    KEINE Karikaturen)."""
+    prompt = HILO_COMIC_MASTER + "\n\n" + BERATUNG_BLOCK
+    f = fields if isinstance(fields, dict) else {}
+    bibel_text = (f.get("bibel_text") or "").strip()
+    if bibel_text:
+        prompt += ("\n\nVerbindliche Charakter-Beschreibung des/der Berater:in "
+                   "(Character-Bible der Stelle): " + bibel_text)
+    fa_text = _finanzamt_bibel_text()
+    if fa_text:
+        prompt += ("\n\nVerbindliche Charakter-Beschreibung des Finanzamt-Beamten "
+                   "(Finanzamt-Bible): " + fa_text)
+    return prompt
 
 def _comic_beratung_refs(berater_comic_pfad):
     """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade: ZUERST der Berater-Comic der Stelle
     (das 'first reference image' aus BERATUNG_BLOCK -> das Gesicht des/der Berater:in), DANN die
     Finanzamt-Referenz (wiederkehrender Charakter). Nur tatsaechlich vorhandene Dateien werden
-    aufgenommen, damit ein fehlendes Asset nicht zum Fehler fuehrt."""
+    aufgenommen, damit ein fehlendes Asset nicht zum Fehler fuehrt.
+
+    NEU (#151): Die Finanzamt-Referenz ist die globale Finanzamt-Bible (finanzamt_bibel_bild), falls
+    gesetzt+vorhanden - sonst weiterhin die Default-Referenz FINANZAMT_REF_PATH (_finanzamt_ref_pfad).
+    Der Berater-Vorrang bibel_bild > berater_comic wird bereits in personalisierung aufgeloest (das
+    bevorzugte Bild landet in fields['berater_comic'] und damit in berater_comic_pfad)."""
     refs = []
     p = (berater_comic_pfad or "").strip()
     if p and os.path.exists(p):
         refs.append(p)
-    if os.path.exists(FINANZAMT_REF_PATH):
-        refs.append(FINANZAMT_REF_PATH)
+    fa = _finanzamt_ref_pfad()
+    if os.path.exists(fa):
+        refs.append(fa)
     return refs
 
 def _comic_beratung_cache_input(fields, berater_comic_pfad):
     """Hash-Eingabestring fuer den Comic-Beratung-Cache: 'comic_beratung:' + vollstaendiger Prompt +
     Basename des Berater-Comics. So bekommt JEDE Beratungsstelle (eigener Berater-Comic) eine EIGENE
-    Cache-Datei - verschiedene Berater kollidieren nicht."""
+    Cache-Datei - verschiedene Berater kollidieren nicht. Der Prompt enthaelt (#151) auch bibel_text +
+    finanzamt_bibel_text, sodass Aenderungen an den Charakter-Beschreibungen den Cache automatisch
+    erneuern.
+
+    NEU (#151): Ist eine EIGENE Finanzamt-Bible gesetzt (finanzamt_bibel_bild != Default), fliesst
+    ihr Basename ZUSAETZLICH in den Schluessel - so erneuert auch ein neues Finanzamt-Referenzbild den
+    Cache. OHNE eigene Finanzamt-Bible bleibt der Schluessel UNVERAENDERT (rueckwaertskompatibel)."""
     base = os.path.basename((berater_comic_pfad or "").strip())
-    return "comic_beratung:" + _comic_beratung_prompt(fields) + "|berater=" + base
+    key = "comic_beratung:" + _comic_beratung_prompt(fields) + "|berater=" + base
+    fa = _finanzamt_ref_pfad()
+    if fa != FINANZAMT_REF_PATH:
+        key += "|finanzamt=" + os.path.basename(fa)
+    return key
 
 def _comic_beratung_pfad(fields, berater_comic_pfad, tool=None):
     """Absoluter Cache-Pfad fuer ein Comic-Beratung-Bild. EIGENER Praefix 'comic_beratung_'

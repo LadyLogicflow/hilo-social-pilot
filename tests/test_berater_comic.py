@@ -228,12 +228,60 @@ def test_4_serve_route_login_geschuetzt():
     _ok("Serve-Route: ohne Login gesperrt, mit Login 200+Bytes, ohne Datei 404")
 
 
+def test_5_bibel_spalten_vorhanden():
+    """init_db legt die additiven Character-Bible-Spalten bibel_bild/bibel_text an (#151)."""
+    with db.get_conn() as conn:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(beratungsstellen)")]
+    for c in ("bibel_bild", "bibel_text"):
+        if c not in cols:
+            _fail("Spalte %s fehlt nach der Migration: %r" % (c, cols))
+    _ok("DB-Migration: beratungsstellen.bibel_bild + bibel_text vorhanden")
+
+
+def test_6_bibel_serve_route_login_geschuetzt():
+    """GET /bibel-bild/<id>: ohne Login nicht erlaubt; mit Login 200 + Bytes; ohne Datei 404 (#151)."""
+    bib_dir = os.path.join(DATA_DIR, "bibeln")
+    os.makedirs(bib_dir, exist_ok=True)
+    sid = _seed_stelle("Stelle-bibel-serve")
+    bibel_path = os.path.join(bib_dir, "stelle_%d.png" % sid)
+    with open(bibel_path, "wb") as fh:
+        fh.write(b"SERVE-BIBEL-BYTES")
+    with db.get_conn() as conn:
+        conn.execute("UPDATE beratungsstellen SET bibel_bild=? WHERE id=?", (bibel_path, sid))
+        conn.commit()
+
+    # a) OHNE Login -> nicht erlaubt (kein 200).
+    anon = _client(login=False)
+    r_anon = anon.get("/bibel-bild/%d" % sid)
+    if r_anon.status_code == 200:
+        _fail("Bibel-Serve-Route lieferte OHNE Login 200 (DSGVO!) - status %s" % r_anon.status_code)
+    if r_anon.status_code not in (301, 302, 401, 403):
+        _fail("Bibel-Serve-Route ohne Login: unerwarteter Status %s" % r_anon.status_code)
+
+    # b) MIT Login -> 200 + die Datei-Bytes.
+    c = _client(rolle="redakteur")
+    r = c.get("/bibel-bild/%d" % sid)
+    if r.status_code != 200:
+        _fail("Bibel-Serve-Route mit Login lieferte nicht 200: %s" % r.status_code)
+    if r.get_data() != b"SERVE-BIBEL-BYTES":
+        _fail("Bibel-Serve-Route lieferte nicht die Bibel-Bytes")
+
+    # c) Stelle ohne bibel_bild -> 404.
+    sid2 = _seed_stelle("Stelle-bibel-leer")
+    r404 = c.get("/bibel-bild/%d" % sid2)
+    if r404.status_code != 404:
+        _fail("Bibel-Serve-Route ohne bibel_bild lieferte nicht 404: %s" % r404.status_code)
+    _ok("Bibel-Serve-Route: ohne Login gesperrt, mit Login 200+Bytes, ohne Datei 404")
+
+
 def main():
     db.init_db()
     test_1_db_spalte_vorhanden()
     test_2_erzeuge_berater_comic()
     test_3_route_erzeugen()
     test_4_serve_route_login_geschuetzt()
+    test_5_bibel_spalten_vorhanden()
+    test_6_bibel_serve_route_login_geschuetzt()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 

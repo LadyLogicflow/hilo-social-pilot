@@ -228,6 +228,86 @@ def test_5_fallback_normaler_comic():
     _ok("Fallback ohne Berater-Comic -> normaler Comic (ensure_comic_bild), kein Referenz-Call")
 
 
+# --- 6) Character-Bible (#151): bibel_bild als erste Ref, bibel_text im Prompt, Fallback ------
+def test_6_character_bible():
+    import personalisierung
+
+    # a) personalisierung._setze_berater_comic: bibel_bild hat Vorrang vor berater_comic; bibel_text
+    #    wird durchgereicht.
+    bild = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "bibeln", "stelle_77.png"))
+    berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_77.png"))
+    stelle = {"berater_comic": berater, "bibel_bild": bild,
+              "bibel_text": "Freundliche Beraterin, kurze braune Haare, grüner Blazer",
+              "portrait_pfad": None}
+    f = personalisierung._setze_berater_comic({"bild_stil": "comic_beratung"}, stelle)
+    if f.get("berater_comic") != bild:
+        _fail("bibel_bild hat keinen Vorrang vor berater_comic: %r" % f.get("berater_comic"))
+    if f.get("bibel_text") != stelle["bibel_text"]:
+        _fail("bibel_text wurde nicht durchgereicht: %r" % f.get("bibel_text"))
+
+    # b) ohne bibel_bild -> Fallback auf berater_comic (unveraendertes Verhalten).
+    stelle_ohne = {"berater_comic": berater, "bibel_bild": None, "bibel_text": None,
+                   "portrait_pfad": None}
+    f2 = personalisierung._setze_berater_comic({"bild_stil": "comic_beratung"}, stelle_ohne)
+    if f2.get("berater_comic") != berater:
+        _fail("Fallback auf berater_comic ohne bibel_bild fehlgeschlagen: %r" % f2.get("berater_comic"))
+    if "bibel_text" in f2:
+        _fail("bibel_text wurde ohne Wert faelschlich gesetzt: %r" % f2.get("bibel_text"))
+
+    # c) bibel_text landet im comic_beratung-Prompt; ohne bibel_text bleibt der Prompt unveraendert.
+    fields_mit = _fields()
+    fields_mit["bibel_text"] = "TESTBESCHREIBUNG-EINDEUTIG-XYZ"
+    captured = {"prompt": None}
+
+    def _fake_ref(prompt, refs):
+        captured["prompt"] = prompt
+        return b"COMICPNG"
+
+    orig_ref = bildmotiv.erzeuge_comic_bild_ref
+    bildmotiv.erzeuge_comic_bild_ref = _fake_ref
+    try:
+        bildmotiv.ensure_comic_beratung_bild(fields_mit, bild)
+    finally:
+        bildmotiv.erzeuge_comic_bild_ref = orig_ref
+    if "TESTBESCHREIBUNG-EINDEUTIG-XYZ" not in (captured["prompt"] or ""):
+        _fail("bibel_text landet nicht im comic_beratung-Prompt")
+
+    # Ohne bibel_text: Prompt == HILO_COMIC_MASTER + BERATUNG_BLOCK (Fallback, unveraendert - solange
+    # keine globale Finanzamt-Bible-Beschreibung gesetzt ist; Default nach db.init_db).
+    basis = bildmotiv._comic_beratung_prompt(_fields())
+    if basis != bildmotiv.HILO_COMIC_MASTER + "\n\n" + bildmotiv.BERATUNG_BLOCK:
+        _fail("Ohne bibel_text/finanzamt_bibel_text weicht der Prompt vom bisherigen Verhalten ab")
+    _ok("Character-Bible: bibel_bild-Vorrang, bibel_text im Prompt, Fallback unveraendert")
+
+
+# --- 7) Finanzamt-Bible (#151): eigenes Referenzbild ersetzt die Default-Finanzamt-Referenz ----
+def test_7_finanzamt_bible():
+    berater = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "berater", "comic_88.png"))
+    fa_bild = _dummy_png(os.path.join(bildmotiv.DATA_DIR, "bibeln", "finanzamt.png"))
+
+    # Default (keine Finanzamt-Bible): 2. Ref ist FINANZAMT_REF_PATH.
+    db.set_einstellung("finanzamt_bibel_bild", None)
+    db.set_einstellung("finanzamt_bibel_text", None)
+    refs_default = bildmotiv._comic_beratung_refs(berater)
+    if refs_default != [berater, bildmotiv.FINANZAMT_REF_PATH]:
+        _fail("Default-Finanzamt-Referenz falsch: %r" % refs_default)
+
+    # Mit Finanzamt-Bible: 2. Ref ist das hinterlegte Bild; finanzamt_bibel_text landet im Prompt.
+    db.set_einstellung("finanzamt_bibel_bild", fa_bild)
+    db.set_einstellung("finanzamt_bibel_text", "FINANZAMT-BESCHREIBUNG-EINDEUTIG-QRS")
+    try:
+        refs_bibel = bildmotiv._comic_beratung_refs(berater)
+        if refs_bibel != [berater, fa_bild]:
+            _fail("Finanzamt-Bible-Bild ersetzt die Default-Referenz nicht: %r" % refs_bibel)
+        prompt = bildmotiv._comic_beratung_prompt(_fields())
+        if "FINANZAMT-BESCHREIBUNG-EINDEUTIG-QRS" not in prompt:
+            _fail("finanzamt_bibel_text landet nicht im Prompt")
+    finally:
+        db.set_einstellung("finanzamt_bibel_bild", None)
+        db.set_einstellung("finanzamt_bibel_text", None)
+    _ok("Finanzamt-Bible: eigenes Referenzbild + Beschreibung greifen; Default unveraendert")
+
+
 def main():
     db.init_db()
     test_1_stilwahl()
@@ -235,6 +315,8 @@ def main():
     test_3_prompt_und_refs()
     test_4_pro_stelle()
     test_5_fallback_normaler_comic()
+    test_6_character_bible()
+    test_7_finanzamt_bible()
     print("\nALLE TESTS BESTANDEN (%d Checks)." % len(_PASS))
 
 

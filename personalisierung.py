@@ -128,17 +128,39 @@ def _berater_comic(stelle):
     return p if (p and os.path.exists(p)) else None
 
 
+def _bibel_bild(stelle):
+    """Pfad zur Character-Bible / Comic-Vorlage DIESER Stelle (Feld bibel_bild, #151), falls
+    hinterlegt und vorhanden - sonst None. Hat Vorrang vor dem aus dem Foto abgeleiteten
+    berater_comic (Stil 'Comic Beratung')."""
+    p = (stelle["bibel_bild"] or "").strip() if _has(stelle, "bibel_bild") else ""
+    return p if (p and os.path.exists(p)) else None
+
+
+def _bibel_text(stelle):
+    """Charakter-Beschreibung DIESER Stelle (Feld bibel_text, #151) oder '' - wird an den
+    comic_beratung-Prompt angehaengt."""
+    return (stelle["bibel_text"] or "").strip() if _has(stelle, "bibel_text") else ""
+
+
 def _setze_berater_comic(f, stelle):
-    """Legt fuer den Stil 'comic_beratung' den Berater-Comic DIESER Stelle in f['berater_comic'] ab,
+    """Legt fuer den Stil 'comic_beratung' die Berater-Referenz DIESER Stelle in f['berater_comic'] ab,
     damit bildmotiv.ensure_photo_fuer das personalisierte Comic-Beratung-Bild mit dem eigenen
-    Berater-Gesicht der Stelle erzeugt (jede Stelle ihr eigenes Bild). Andere Stile bleiben unberuehrt;
-    hat die Stelle keinen Berater-Comic, wird nichts gesetzt (bildmotiv faellt dann auf den normalen
-    Comic zurueck). Liefert f zurueck."""
+    Berater-Gesicht der Stelle erzeugt (jede Stelle ihr eigenes Bild). Andere Stile bleiben unberuehrt.
+
+    NEU (#151, Character-Bible): Vorrang bibel_bild > berater_comic > (nichts). Ist fuer die Stelle
+    eine Character-Bible (bibel_bild) hinterlegt, wird sie STATT des aus dem Foto abgeleiteten
+    berater_comic als erste Referenz genutzt. Zusaetzlich wird die optionale Charakter-Beschreibung
+    (bibel_text) in f['bibel_text'] durchgereicht, damit sie in den Prompt einfliesst. Hat die Stelle
+    weder Bible noch Berater-Comic, wird nichts gesetzt (bildmotiv faellt dann auf den normalen Comic
+    zurueck). Liefert f zurueck."""
     import stilwahl
     if stilwahl.aktiver_stil(f) == "comic_beratung":
-        bc = _berater_comic(stelle)
-        if bc:
-            f["berater_comic"] = bc
+        bild = _bibel_bild(stelle) or _berater_comic(stelle)
+        if bild:
+            f["berater_comic"] = bild
+        text = _bibel_text(stelle)
+        if text:
+            f["bibel_text"] = text
     return f
 
 

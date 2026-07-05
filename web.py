@@ -54,6 +54,18 @@ def _under_berater(path):
     except Exception:
         return False
 
+def _under_bibeln(path):
+    """True nur, wenn der (aufgeloeste) Pfad innerhalb von DATA_DIR/bibeln liegt (#151).
+    Schutz davor, dass ein manipulierter DB-/Einstellungs-Wert eine fremde Datei ausliefert
+    (wie _under_portraits/_under_berater). Character-Bible-Bilder koennen echte Personen als Comic
+    zeigen -> nur login-geschuetzt ausliefern (DSGVO)."""
+    try:
+        base = os.path.realpath(os.path.join(DATA_DIR, "bibeln"))
+        rp = os.path.realpath(path)
+        return rp == base or rp.startswith(base + os.sep)
+    except Exception:
+        return False
+
 # --- Facebook-Seiten (gecacht) ---------------------------------------------
 _pages_cache = {"ts": 0, "data": None, "err": None}
 
@@ -1252,6 +1264,26 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </div>
       {% if b.berater_comic %}<p class=hint style="margin:6px 0 0">Wird für den Stil „Comic Beratung“ verwendet.</p>{% endif %}
     </div>
+    <div class=stfield><label>Character-Bible / Stylesheet <span class=hint style="font-weight:normal">(Comic-Vorlage für den Stil „Comic Beratung")</span></label>
+      <p class=hint style="margin:0 0 6px">Optionale Comic-/Stylesheet-Vorlage für den/die Berater:in. Ist ein Bild hinterlegt, wird es beim Rendern <b>bevorzugt</b> als Vorlage genutzt (vor dem automatisch erzeugten Comic-Berater). Die Beschreibung fließt zusätzlich in den Bild-Prompt ein. Bilder werden nur nach Login angezeigt (Datenschutz).</p>
+      <form method=post enctype="multipart/form-data" style="margin:0">
+        <input type=hidden name=formular value=stelle_bibel><input type=hidden name=stelle_id value="{{b.id}}">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          {% if b.bibel_bild %}<a href="/bibel-bild/{{b.id}}" target="_blank" title="Character-Bible – klicken für große Ansicht"><img src="/bibel-bild/{{b.id}}?v={{b.id}}" alt="Character-Bible" style="width:170px;height:170px;object-fit:cover;border-radius:12px;border:1px solid #ccd3df"></a>{% endif %}
+          <div style="flex:1;min-width:220px">
+            <textarea name=bibel_text rows=4 placeholder="Charakter-Beschreibung (Comic): z.B. Aussehen, Kleidung, Ausstrahlung des/der Berater:in" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px">{{b.bibel_text or ''}}</textarea>
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:6px">
+              <label class=filebtn>{% if b.bibel_bild %}Anderes Bild …{% else %}Bild wählen …{% endif %}
+                <input type=file name=bibel_bild accept="image/*" style="display:none"
+                       onchange="var f=this.files[0];this.form.querySelector('.bfn').textContent=f?f.name:''"></label>
+              <span class=bfn style="font-size:12px;color:#5a6472;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+              <button style="padding:6px 12px">Speichern</button>
+            </div>
+          </div>
+        </div>
+      </form>
+      {% if b.bibel_bild %}<form method=post style="margin:6px 0 0" onsubmit="return confirm('Character-Bible-Bild entfernen?')"><input type=hidden name=formular value=stelle_bibel_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Bild entfernen" style="background:#b00020;padding:6px 11px">Bild entfernen</button></form>{% endif %}
+    </div>
   </div>
 </div>
 {% endfor %}
@@ -1370,6 +1402,26 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <span><b>Ideogram</b><br><span class=hint>Bessere Schrift im Bild; braucht einen eigenen API-Schlüssel (<code>ideogram_api_key</code>).</span></span></label>
   <button>Bild-Tool speichern</button>
 </div></form>
+
+<h3 style="margin-top:26px">Finanzamt-Bible <span class=hint style="font-weight:normal">(global, für den Stil „Comic Beratung")</span></h3>
+<p class=hint>Globale Comic-/Stylesheet-Vorlage des wiederkehrenden Finanzamt-Charakters. Ist ein Bild hinterlegt, wird es beim Rendern <b>statt</b> der eingebauten Standard-Referenz als Finanzamt-Vorlage genutzt; die Beschreibung fließt zusätzlich in den Bild-Prompt ein. Ohne Eintrag bleibt alles wie bisher. Anzeige nur nach Login (Datenschutz).</p>
+<form method=post enctype="multipart/form-data" style="max-width:560px">
+  <input type=hidden name=formular value=finanzamt_bibel>
+  <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+    {% if finanzamt_bibel_bild %}<a href="/finanzamt-bibel-bild?v=1" target="_blank" title="Finanzamt-Bible – klicken für große Ansicht"><img src="/finanzamt-bibel-bild?v=1" alt="Finanzamt-Bible" style="width:170px;height:170px;object-fit:cover;border-radius:12px;border:1px solid #ccd3df"></a>{% endif %}
+    <div style="flex:1;min-width:220px">
+      <textarea name=finanzamt_bibel_text rows=4 placeholder="Charakter-Beschreibung des Finanzamt-Beamten (Comic)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px">{{finanzamt_bibel_text or ''}}</textarea>
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:6px">
+        <label class=filebtn>{% if finanzamt_bibel_bild %}Anderes Bild …{% else %}Bild wählen …{% endif %}
+          <input type=file name=finanzamt_bibel_bild accept="image/*" style="display:none"
+                 onchange="var f=this.files[0];this.form.querySelector('.ffn').textContent=f?f.name:''"></label>
+        <span class=ffn style="font-size:12px;color:#5a6472;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <button style="padding:6px 12px">Finanzamt-Bible speichern</button>
+      </div>
+    </div>
+  </div>
+</form>
+{% if finanzamt_bibel_bild %}<form method=post style="margin:6px 0 0;max-width:560px" onsubmit="return confirm('Finanzamt-Bible-Bild entfernen?')"><input type=hidden name=formular value=finanzamt_bibel_del><button title="Bild entfernen" style="background:#b00020;padding:6px 11px">Bild entfernen</button></form>{% endif %}
 {% endif %}
 
 {% if bereich=='speicher' %}
@@ -1910,14 +1962,26 @@ def bild_generieren(eid):
         if stil == "comic_beratung":
             with get_conn() as conn:
                 rows = conn.execute(
-                    "SELECT berater_comic FROM beratungsstellen WHERE aktiv=1 "
-                    "AND berater_comic IS NOT NULL AND TRIM(berater_comic)<>'' ORDER BY id").fetchall()
-            bc = next((r["berater_comic"] for r in rows
-                       if r["berater_comic"] and os.path.exists(r["berater_comic"])), None)
-            if not bc:
+                    "SELECT berater_comic, bibel_bild, bibel_text FROM beratungsstellen WHERE aktiv=1 "
+                    "AND ((berater_comic IS NOT NULL AND TRIM(berater_comic)<>'') "
+                    "OR (bibel_bild IS NOT NULL AND TRIM(bibel_bild)<>'')) ORDER BY id").fetchall()
+            # #151: Character-Bible (bibel_bild) hat Vorrang vor dem aus dem Foto abgeleiteten
+            # berater_comic; die erste Stelle mit einer vorhandenen Datei liefert die Vorschau.
+            gewaehlt = None
+            for r in rows:
+                for feld in ("bibel_bild", "berater_comic"):
+                    p = (r[feld] or "").strip()
+                    if p and os.path.exists(p):
+                        gewaehlt = r
+                        data["berater_comic"] = p
+                        break
+                if gewaehlt is not None:
+                    break
+            if gewaehlt is None:
                 flash("Bitte zuerst mind. einen Comic-Berater in der Beratungsstellen-Verwaltung erzeugen.")
                 return redirect(ziel)
-            data["berater_comic"] = bc
+            if (gewaehlt["bibel_text"] or "").strip():
+                data["bibel_text"] = gewaehlt["bibel_text"].strip()
         # Nur der jeweils noetige KI-Vorbereitungsschritt (on-demand, nur beim gewaehlten Stil):
         if stil in ("comic", "comic_beratung"):
             # Bei jedem expliziten Klick einen FRISCHEN Bild-Einfall wuerfeln: alten Brief verwerfen,
@@ -3218,6 +3282,54 @@ def verwaltung():
                     conn.execute("UPDATE beratungsstellen SET portrait_pfad=NULL WHERE id=?", (sid,))
                     audit_log(conn, session["user"], "beratungsstelle_portrait_entfernt", None, "Stelle %s" % sid)
                     flash("Porträt entfernt – wieder blauer Punkt.")
+            elif formular == "stelle_bibel":
+                # Character-Bible je Stelle (#151, Stil "Comic Beratung"): optionaler Bild-Upload
+                # (Comic-/Stylesheet-Vorlage) + Charakter-Beschreibung. Das Bild wird ueber PIL neu
+                # kodiert (entschaerft manipulierte Dateien) und nach DATA_DIR/bibeln/stelle_<id>.png
+                # geschrieben; der Text landet in bibel_text. Auslieferung nur login-geschuetzt (DSGVO).
+                sid = request.form.get("stelle_id", "").strip()
+                if sid and sid.isascii() and sid.isdigit():
+                    bibel_text = request.form.get("bibel_text", "").strip()
+                    conn.execute("UPDATE beratungsstellen SET bibel_text=? WHERE id=?",
+                                 (bibel_text or None, sid))
+                    file = request.files.get("bibel_bild")
+                    if file and file.filename:
+                        try:
+                            from PIL import Image
+                            bdir = os.path.join(DATA_DIR, "bibeln"); os.makedirs(bdir, exist_ok=True)
+                            dest = os.path.join(bdir, "stelle_%s.png" % sid)
+                            img = Image.open(file.stream)
+                            w, h = img.size                      # Header-Mass, noch nicht dekodiert
+                            if w * h > 40_000_000:               # ~40 MP Deckel (Speicher-Bomben-Schutz)
+                                raise ValueError("Bild zu gross")
+                            img = img.convert("RGB")
+                            gr = max(w, h)                       # laengste Kante deckeln (Pi-Speicher)
+                            if gr > 1536:
+                                skala = 1536.0 / gr
+                                img = img.resize((max(1, int(w*skala)), max(1, int(h*skala))), Image.LANCZOS)
+                            img.save(dest)
+                            conn.execute("UPDATE beratungsstellen SET bibel_bild=? WHERE id=?", (dest, sid))
+                            flash("Character-Bible (Bild und Beschreibung) gespeichert.")
+                        except Exception:
+                            log.exception("Character-Bible-Upload fehlgeschlagen (Stelle %s)", sid)
+                            flash("Character-Bible-Bild-Upload fehlgeschlagen – bitte eine gültige Bilddatei (max ~40 Megapixel) wählen.")
+                    else:
+                        flash("Charakter-Beschreibung gespeichert.")
+                    audit_log(conn, session["user"], "beratungsstelle_bibel_gesetzt", None, "Stelle %s" % sid)
+                else:
+                    flash("Bitte eine Beratungsstelle wählen.")
+            elif formular == "stelle_bibel_del":
+                sid = request.form.get("stelle_id", "").strip()
+                if sid:
+                    row = conn.execute("SELECT bibel_bild FROM beratungsstellen WHERE id=?", (sid,)).fetchone()
+                    if row and row["bibel_bild"] and _under_bibeln(row["bibel_bild"]):
+                        try:
+                            os.remove(row["bibel_bild"])
+                        except Exception:
+                            pass
+                    conn.execute("UPDATE beratungsstellen SET bibel_bild=NULL WHERE id=?", (sid,))
+                    audit_log(conn, session["user"], "beratungsstelle_bibel_bild_entfernt", None, "Stelle %s" % sid)
+                    flash("Character-Bible-Bild entfernt.")
             elif formular == "anlass_save":
                 datum = request.form.get("datum", "").strip(); anlass = request.form.get("anlass", "").strip()
                 if datum and anlass:
@@ -3342,6 +3454,51 @@ def verwaltung():
                     "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (tool,))
                 audit_log(conn, session["user"], "bild_tool_gesetzt", None, tool)
                 flash("Bild-Tool gespeichert: %s." % ("OpenAI" if tool == "openai" else "Ideogram"))
+            elif formular == "finanzamt_bibel":
+                # Globale Finanzamt-Bible (#151): optionaler Bild-Upload (Comic-/Stylesheet-Vorlage des
+                # wiederkehrenden Finanzamt-Charakters) + Charakter-Beschreibung. Key/Value in
+                # einstellungen (finanzamt_bibel_bild/finanzamt_bibel_text). Bild ueber PIL neu kodiert
+                # und nach DATA_DIR/bibeln/finanzamt.png geschrieben; Auslieferung nur login-geschuetzt.
+                fa_text = request.form.get("finanzamt_bibel_text", "").strip()
+                conn.execute(
+                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('finanzamt_bibel_text', ?) "
+                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (fa_text or None,))
+                file = request.files.get("finanzamt_bibel_bild")
+                if file and file.filename:
+                    try:
+                        from PIL import Image
+                        bdir = os.path.join(DATA_DIR, "bibeln"); os.makedirs(bdir, exist_ok=True)
+                        dest = os.path.join(bdir, "finanzamt.png")
+                        img = Image.open(file.stream)
+                        w, h = img.size
+                        if w * h > 40_000_000:
+                            raise ValueError("Bild zu gross")
+                        img = img.convert("RGB")
+                        gr = max(w, h)
+                        if gr > 1536:
+                            skala = 1536.0 / gr
+                            img = img.resize((max(1, int(w*skala)), max(1, int(h*skala))), Image.LANCZOS)
+                        img.save(dest)
+                        conn.execute(
+                            "INSERT INTO einstellungen(schluessel, wert) VALUES ('finanzamt_bibel_bild', ?) "
+                            "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (dest,))
+                        flash("Finanzamt-Bible (Bild und Beschreibung) gespeichert.")
+                    except Exception:
+                        log.exception("Finanzamt-Bible-Upload fehlgeschlagen")
+                        flash("Finanzamt-Bible-Bild-Upload fehlgeschlagen – bitte eine gültige Bilddatei (max ~40 Megapixel) wählen.")
+                else:
+                    flash("Finanzamt-Beschreibung gespeichert.")
+                audit_log(conn, session["user"], "finanzamt_bibel_gesetzt", None, "Bild=%s" % ("ja" if (file and file.filename) else "nein"))
+            elif formular == "finanzamt_bibel_del":
+                row = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_bild'").fetchone()
+                if row and row["wert"] and _under_bibeln(row["wert"]):
+                    try:
+                        os.remove(row["wert"])
+                    except Exception:
+                        pass
+                conn.execute("UPDATE einstellungen SET wert=NULL WHERE schluessel='finanzamt_bibel_bild'")
+                audit_log(conn, session["user"], "finanzamt_bibel_bild_entfernt", None, None)
+                flash("Finanzamt-Bible-Bild entfernt.")
             elif formular == "cache_aufraeumen":
                 # Manuelles, sicheres Aufraeumen des KI-Foto-Caches (#134): loescht nur verwaiste,
                 # alte motive/-PNGs - aktive/Pool-Fotos und icon_-Dateien bleiben.
@@ -3359,7 +3516,7 @@ def verwaltung():
             ziel = {"benutzer": "benutzer", "stelle": "stellen", "anlass": "anlass",
                     "wissen": "wissen", "schauplatz": "schauplatz", "traeger": "traeger",
                     "bildstil": "bildstil",
-                    "bildtool": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
+                    "bildtool": "bildstil", "finanzamt": "bildstil", "cache": "speicher"}.get((formular or "").split("_")[0])
             return redirect(url_for("verwaltung", bereich=ziel) if ziel else url_for("verwaltung"))
         if not bereich:
             return render_template_string(VERWALTUNG_HOME, **_ctx())
@@ -3395,6 +3552,11 @@ def verwaltung():
         stil_kreativ = _stil_aktiv("kreativ")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
+        # Globale Finanzamt-Bible (#151): aktueller Stand fuer die Anzeige im Bild-Stil-Bereich.
+        _fab = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_bild'").fetchone()
+        finanzamt_bibel_bild = (_fab["wert"] if _fab and _fab["wert"] else "")
+        _fat = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_text'").fetchone()
+        finanzamt_bibel_text = (_fat["wert"] if _fat and _fat["wert"] else "")
     pages, pages_err = (_pages() if bereich == "stellen" else ([], None))
     page_id_set = {str(p["id"]) for p in pages}
     fb_name = {str(p["id"]): p["name"] for p in pages}
@@ -3449,7 +3611,10 @@ def verwaltung():
                                                      stil_kreativ=stil_kreativ,
                                                      wa_dienst_err=wa_dienst_err,
                                                      any_wa_pending=any_wa_pending,
-                                                     bild_tool=bild_tool, **speicher))
+                                                     bild_tool=bild_tool,
+                                                     finanzamt_bibel_bild=finanzamt_bibel_bild,
+                                                     finanzamt_bibel_text=finanzamt_bibel_text,
+                                                     **speicher))
 
 @app.route("/logo.png")
 def logo():
@@ -3515,6 +3680,30 @@ def berater_comic_bild(stelleid):
             or not os.path.exists(row["berater_comic"])):
         abort(404)
     return send_file(row["berater_comic"], mimetype="image/png", max_age=0)
+
+@app.route("/bibel-bild/<int:stelleid>")
+@login_required
+def bibel_bild(stelleid):
+    """Liefert die Character-Bible / Comic-Vorlage einer Stelle aus (login-geschützt – kann echte
+    Personen als Comic zeigen, DSGVO; #151). Pfad-Guard (_under_bibeln) gegen manipulierte DB-Werte."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT bibel_bild FROM beratungsstellen WHERE id=?", (stelleid,)).fetchone()
+    if (not row or not row["bibel_bild"] or not _under_bibeln(row["bibel_bild"])
+            or not os.path.exists(row["bibel_bild"])):
+        abort(404)
+    return send_file(row["bibel_bild"], mimetype="image/png", max_age=0)
+
+@app.route("/finanzamt-bibel-bild")
+@login_required
+def finanzamt_bibel_bild():
+    """Liefert die globale Finanzamt-Bible aus (login-geschützt; #151). Pfad-Guard (_under_bibeln)
+    gegen manipulierte Einstellungs-Werte."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_bild'").fetchone()
+    p = row["wert"] if row and row["wert"] else None
+    if not p or not _under_bibeln(p) or not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="image/png", max_age=0)
 
 # --- WhatsApp (Baileys-Dienst auf demselben Host, nur localhost) -------------
 def _wa_call(path, method="GET", payload=None, timeout=6, session=None):

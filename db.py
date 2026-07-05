@@ -328,6 +328,17 @@ def migrate(conn):
     # Routen ausgeliefert (echtes Gesicht, DSGVO), gespeichert unter DATA_DIR/berater/comic_<id>.png.
     if "berater_comic" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN berater_comic TEXT")
+    # Character-Bible je Stelle (#151, Stil "Comic Beratung"): eine hochgeladene Comic-/Stylesheet-
+    # Vorlage (bibel_bild) sowie eine Charakter-Beschreibung (bibel_text). Ist ein bibel_bild
+    # hinterlegt, wird es beim comic_beratung-Rendern als ERSTE (Berater-)Referenz genutzt (Vorrang
+    # vor dem aus dem Foto abgeleiteten berater_comic); bibel_text wird an den Prompt angehaengt.
+    # Das Bild kann echte Personen zeigen -> nur ueber login-geschuetzte Routen ausgeliefert (DSGVO),
+    # gespeichert unter DATA_DIR/bibeln/stelle_<id>.png. Die globale Finanzamt-Bible liegt in den
+    # Einstellungen (finanzamt_bibel_bild/finanzamt_bibel_text), braucht also kein neues Schema.
+    if "bibel_bild" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN bibel_bild TEXT")
+    if "bibel_text" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN bibel_text TEXT")
     # WhatsApp-Kanal je Stelle (Pool Phase 3, #127): Einladungslink des WhatsApp-Kanals der Stelle.
     # Gesetzt = die Stelle hat einen WhatsApp-Kanal -> wird bei der Pool-Ziehung bespielt; leer = nicht.
     if "wa_kanal_invite" not in bcols:
