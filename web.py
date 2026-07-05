@@ -1256,6 +1256,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
         {% if b.portrait_pfad %}<form method=post style="margin:0" onsubmit="return confirm('Porträt entfernen? Dann erscheint wieder der blaue Punkt.')"><input type=hidden name=formular value=stelle_portrait_del><input type=hidden name=stelle_id value="{{b.id}}"><button title="Porträt entfernen" style="background:#b00020;padding:6px 11px">×</button></form>{% endif %}
       </div>
     </div>
+    {# #152: Comic-Berater-UI (Variante A) ausgeblendet. Seit #151 hat die Character-Bible
+       (bibel_bild) Vorrang vor dem aus dem Foto abgeleiteten berater_comic, daher ist der
+       "Comic-Berater erzeugen"-Knopf hier ueberfluessig. Der Code-Fallback bleibt vollstaendig
+       erhalten (DB-Spalte berater_comic, POST /berater-comic/<id>, GET /berater-comic-bild/<id>,
+       bildmotiv.erzeuge_berater_comic + Personalisierungs-Fallback bibel_bild > berater_comic).
+       Nur dieser UI-Block ist auskommentiert; zum Reaktivieren einfach wieder einblenden.
     <div class=stfield><label>Comic-Berater <span class=hint style="font-weight:normal">(für den Stil „Comic Beratung")</span></label>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         {% if b.berater_comic %}<a href="/berater-comic-bild/{{b.id}}" target="_blank" title="Comic-Portrait der Leitung – klicken für große Ansicht"><img src="/berater-comic-bild/{{b.id}}?v={{b.id}}" alt="Comic-Berater" style="width:170px;height:170px;border-radius:12px;object-fit:cover;border:1px solid #ccd3df"></a>{% endif %}
@@ -1264,6 +1270,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </div>
       {% if b.berater_comic %}<p class=hint style="margin:6px 0 0">Wird für den Stil „Comic Beratung“ verwendet.</p>{% endif %}
     </div>
+    #}
     <div class=stfield><label>Character-Bible / Stylesheet <span class=hint style="font-weight:normal">(Comic-Vorlage für den Stil „Comic Beratung")</span></label>
       <p class=hint style="margin:0 0 6px">Optionale Comic-/Stylesheet-Vorlage für den/die Berater:in. Ist ein Bild hinterlegt, wird es beim Rendern <b>bevorzugt</b> als Vorlage genutzt (vor dem automatisch erzeugten Comic-Berater). Die Beschreibung fließt zusätzlich in den Bild-Prompt ein. Bilder werden nur nach Login angezeigt (Datenschutz).</p>
       <form method=post enctype="multipart/form-data" style="margin:0">
