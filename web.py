@@ -768,6 +768,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <button style="background:#7a4fae" title="Anderen aktiven Bild-Stil würfeln und das Bild neu erzeugen (kostet ein neues KI-Bild). Text bleibt">&#x1F3B2; Anderes Bild</button></form>
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px;display:block">
       <input type=hidden name=zurueck value=entwuerfe>
+      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -817,6 +818,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
     <form method=post action="/bild-generieren/{{e.id}}" style="margin:0 0 8px;display:block">
       <input type=hidden name=zurueck value=einplanung>
+      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -902,6 +904,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:8px;display:block">
       <input type=hidden name=zurueck value=pool>
+      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -1972,6 +1975,12 @@ def bild_generieren(eid):
         # Hinweis + kein Bild. Die 3 rohen Panels werden erzeugt; als Einzel-Vorschau (bild_pfad)
         # dient Panel 1, und das Format wird als 'karussell' festgehalten.
         if stil == "comic_strip":
+            # #156: optionales Override fuer die Sprechblase in Feld 1. Nicht-leer -> ersetzt die
+            # Ueberschrift, leer -> Override entfernen (wieder Ueberschrift). Wird im Entwurf-JSON
+            # (data) persistiert und unten mitgeschrieben; so bleibt es bei erneutem Generieren
+            # erhalten und wird in JEDEM der drei Wege (Entwuerfe/Pool/Einplanung) bis in
+            # ensure_comic_strip_bilder als fields['strip_zeile1'] durchgereicht.
+            data["strip_zeile1"] = (request.form.get("strip_zeile1") or "").strip()
             with get_conn() as conn:
                 rows = conn.execute(
                     "SELECT berater_comic, bibel_bild FROM beratungsstellen WHERE aktiv=1 "
