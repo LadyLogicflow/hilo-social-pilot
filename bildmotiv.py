@@ -649,6 +649,54 @@ def erzeuge_comic_bild_ref(prompt, refs):
                 pass
 
 
+# --- Comic-Portrait der Beratungsstellen-Leitung (Stil "Comic Beratung", Setup) ----------------
+# Exakter Prompt fuer das wiederkehrende Comic-Portrait der Leitung. Bewusst als Konstante, damit
+# Producer (erzeuge_berater_comic) und Tests denselben Wortlaut nutzen.
+BERATER_PORTRAIT_PROMPT = (
+    "Create a friendly comic portrait, head and shoulders, of the SAME person shown in the "
+    "provided photograph, redrawn in a refined ligne claire comic style (clean elegant outlines, "
+    "flat colours with subtle shading, warm and characterful) matching the style reference image. "
+    "A warm, approachable, professional tax advisor with a friendly smile. Simple clean light "
+    "background. Keep the person clearly recognisable. Square format."
+)
+
+
+def erzeuge_berater_comic(foto_path):
+    """Erzeugt aus dem Leitungs-Foto einer Beratungsstelle ein Comic-Portrait (Stil "Comic
+    Beratung") und liefert den gespeicherten PNG-Pfad (oder None).
+
+    Ruft erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path, STIL_REF_PATH]) auf - das
+    Leitungs-Foto liefert die Person, STIL_REF_PATH den Ligne-claire-Stil. Die Ergebnis-Bytes
+    werden nach DATA_DIR/berater/comic_<stelleid>.png geschrieben (die Stellen-ID wird aus dem
+    Datei-Basenamen des Fotos abgeleitet - 'stelle_<id>' oder 'foto_<id>'), der Pfad zurueckgegeben.
+
+    Robust: fehlendes Foto, kein 'openai_api_key', API-/Netz-/Schreibfehler -> None (kein Crash).
+    Das echte Gesicht/Comic wird NUR ueber login-geschuetzte Routen ausgeliefert (DSGVO)."""
+    if not foto_path or not os.path.exists(foto_path):
+        log.info("Berater-Comic uebersprungen: kein Leitungs-Foto vorhanden (%r).", foto_path)
+        return None
+    try:
+        daten = erzeuge_comic_bild_ref(BERATER_PORTRAIT_PROMPT, [foto_path, STIL_REF_PATH])
+    except Exception as ex:
+        log.warning("Berater-Comic (Referenz-Call) fehlgeschlagen: %s", ex)
+        return None
+    if not daten:
+        return None
+    base = os.path.splitext(os.path.basename(foto_path))[0]
+    teil = base.split("_")[-1]
+    stelleid = teil if teil.isdigit() else base
+    ziel_dir = os.path.join(DATA_DIR, "berater")
+    ziel = os.path.join(ziel_dir, "comic_%s.png" % stelleid)
+    try:
+        os.makedirs(ziel_dir, exist_ok=True)
+        with open(ziel, "wb") as fh:
+            fh.write(daten)
+    except Exception as ex:
+        log.warning("Berater-Comic konnte nicht gespeichert werden: %s", ex)
+        return None
+    return ziel
+
+
 def erzeuge_bild_ideogram(prompt):
     """Erzeugt ein Bild via Ideogram v4 (Text-Spezialist) und liefert die PNG-Bytes (oder None).
     POST IDEOGRAM_URL mit Header 'Api-Key' + JSON-Body (text_prompt, quadratisches Format). Die
