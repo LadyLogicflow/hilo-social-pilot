@@ -1050,32 +1050,140 @@ COMIC_STRIP_JAMMER = ("Jetzt entgehen mir schon wieder Steuern, weil jemand bei 
 # Feste Pointe fuer Feld 3 (v1 fest, Markenname exakt "HILO").
 COMIC_STRIP_POINTE = "HILO - wir machen es einfach!"
 
-# Panel-Reihenfolge: (Delta-Text, Zeilen-Quelle). Die Zeilen-Quelle ist ein Marker; die konkrete
-# Zeile wird in ensure_comic_strip_bilder aufgeloest (Feld 1 = ueberschrift, 2 = Jammer, 3 = Pointe).
+# --- v2 (#155): zwei Story-Archetypen, gesteuert ueber die Bild-2-Auswahl -------------------------
+# 'vorteil'  = jemand WAR bei HILO -> trauriger/geknickter Aermelschoner (der bestehende v1-Strip).
+# 'warnung'  = jemand war NICHT bei HILO -> schadenfroher Aermelschoner, der rot "ABGELEHNT"
+#              stempelt. Bild 1 UND Bild 2 unterscheiden sich je Archetyp; Bild 3 zeigt in beiden
+#              Faellen den/die Berater:in (Daumen hoch) - nur der Sprechblasen-Text unterscheidet sich.
+COMIC_STRIP_PANEL1_DELTA_WARNUNG = (
+    "Szene (Feld 1 von 3): eine Person (Nichtmitglied) sitzt GANZ ALLEIN an einem Tisch und fuellt "
+    "ihre Steuererklaerung am Smartphone/Handy aus - naiv-optimistisch und gutglaeubig laechelnd, "
+    "voller Vertrauen, dass das schon passt. KEIN Berater, KEINE zweite Person im Bild. Alltaegliche "
+    "Wohnzimmer-/Kuechen-Umgebung, Belege und Papiere liegen unsortiert herum."
+)
+COMIC_STRIP_PANEL2_DELTA_WARNUNG = (
+    "Szene (Feld 2 von 3): der wiederkehrende Finanzamt-Beamte (grauer Anzug, runde Brille, beige "
+    "Aermelschoner, Stifte in der Brusttasche) sitzt schadenfroh grinsend und lachend an seinem "
+    "Schreibtisch unter einem gut lesbaren Schild mit der Aufschrift 'Finanzamt' und stempelt gerade "
+    "mit einem grossen Stempel ein deutlich lesbares, ROTES 'ABGELEHNT' auf ein Formular. Er sieht "
+    "aus wie die ERSTE Referenz (gleicher wiederkehrender Charakter). Sympathisch und komisch, nie "
+    "boesartig; haemisch-schadenfrohe Freude, weil hier jemand OHNE HILO-Beratung draufzahlt."
+)
+# Aliase fuer den bestehenden (vorteil-)Strip: Bild 1 = Beratungsszene, Bild 2 = trauriger
+# Aermelschoner (v1-Wortlaut bleibt unveraendert).
+COMIC_STRIP_PANEL1_DELTA_VORTEIL = COMIC_STRIP_PANEL1_DELTA
+COMIC_STRIP_PANEL2_DELTA_VORTEIL = COMIC_STRIP_PANEL2_DELTA
+
+# Bild-2-Sprechblasen-Varianten je Archetyp (Wortlaut aus dem #155-Design, Catrin 2026-07-05). Die
+# gewaehlte Variante bestimmt zugleich den Archetyp; Index 0 ist der Default der KI-Vorauswahl.
+COMIC_STRIP_VARIANTEN = {
+    "vorteil": [
+        "Schon wieder jemand, der bei HILO war ...",
+        "Schade, weniger Steuern fuers Finanzamt - diese HILO-Berater!",
+        "Wieder nichts zu holen - die waren bei HILO.",
+        "Diese HILO-Beratung kostet mich staendig Steuern ...",
+    ],
+    "warnung": [
+        "Ha! Mal wieder jemand, der nicht bei HILO war ...",
+        "Schoen bloed - ohne HILO zahlt man drauf.",
+        "Herrlich, wieder einer ohne HILO-Beratung!",
+        "Da freut sich das Finanzamt - kein HILO im Spiel.",
+    ],
+}
+# Feste Pointe (Bild 3) je Archetyp (Markenname exakt "HILO").
+COMIC_STRIP_POINTE_ARCHETYP = {
+    "vorteil": COMIC_STRIP_POINTE,                     # "HILO - wir machen es einfach!"
+    "warnung": "Komm zu HILO - wir machen es einfach!",
+}
+
+# Panel-Reihenfolge (vorteil = Default/v1): (Delta-Text, Zeilen-Quelle). Die Zeilen-Quelle ist ein
+# Marker; die konkrete Zeile wird in _comic_strip_zeile aufgeloest (Feld 1 = Ueberschrift/Override,
+# 2 = Bild-2-Variante, 3 = Pointe). v2 (#155): _comic_strip_panels(archetyp) liefert die passenden
+# Panel-Deltas je Archetyp.
 _COMIC_STRIP_PANELS = (
-    (COMIC_STRIP_PANEL1_DELTA, "ueberschrift"),
-    (COMIC_STRIP_PANEL2_DELTA, "jammer"),
+    (COMIC_STRIP_PANEL1_DELTA_VORTEIL, "ueberschrift"),
+    (COMIC_STRIP_PANEL2_DELTA_VORTEIL, "jammer"),
     (COMIC_STRIP_PANEL3_DELTA, "pointe"),
 )
 
 
-def _comic_strip_zeile(fields, quelle):
-    """Liefert den Sprechblasen-Text fuer ein Panel je Quelle: 'ueberschrift' -> die Kernbotschaft
-    des Beitrags (fields['ueberschrift'], getrimmt); 'jammer' -> der feste Default-Jammersatz;
-    'pointe' -> die feste Pointe. Robust gegen fehlende/leere Ueberschrift (Fallback Pointe).
+def _norm_archetyp(val):
+    """Normalisiert einen Archetyp-Wert auf 'vorteil'/'warnung' (case-insensitiv, getrimmt);
+    unbekannt/leer -> '' (der Aufrufer setzt dann seinen eigenen Default)."""
+    a = str(val).strip().lower() if val is not None else ""
+    return a if a in ("vorteil", "warnung") else ""
 
-    #156 (nur Feld 1): ist ein optionales Override gesetzt (fields['strip_zeile1'], nicht leer),
-    hat es fuer die Quelle 'ueberschrift' VORRANG vor der Beitrags-Ueberschrift. Feld 2 (Jammer)
-    und Feld 3 (Pointe) bleiben unveraendert."""
+
+def _comic_strip_panels(archetyp):
+    """Liefert die 3 (Delta, Quelle)-Panels fuer den gewaehlten Archetyp. 'warnung' nutzt die
+    Allein-am-Handy-Szene (Feld 1) + den schadenfrohen, 'ABGELEHNT'-stempelnden Aermelschoner
+    (Feld 2); 'vorteil' (Default) den bestehenden v1-Strip. Feld 3 ist in beiden Faellen der/die
+    Berater:in (Daumen hoch), nur der Text (Pointe) unterscheidet sich."""
+    if _norm_archetyp(archetyp) == "warnung":
+        return (
+            (COMIC_STRIP_PANEL1_DELTA_WARNUNG, "ueberschrift"),
+            (COMIC_STRIP_PANEL2_DELTA_WARNUNG, "jammer"),
+            (COMIC_STRIP_PANEL3_DELTA, "pointe"),
+        )
+    return _COMIC_STRIP_PANELS
+
+
+def _comic_strip_variante_archetyp(text):
+    """Liefert den Archetyp ('vorteil'/'warnung') zu einer konkreten Bild-2-Variante (exakter
+    Wortlaut aus COMIC_STRIP_VARIANTEN). Unbekannter/leerer Text -> None."""
+    t = (text or "").strip()
+    if not t:
+        return None
+    for arche, varianten in COMIC_STRIP_VARIANTEN.items():
+        if t in varianten:
+            return arche
+    return None
+
+
+def _comic_strip_archetyp(fields):
+    """Ermittelt den Archetyp fuer den Comic-Strip: zuerst fields['strip_archetyp'] (explizit aus der
+    UI persistiert), sonst die leichte KI-Vorauswahl (textgen.comic_strip_vorauswahl, robust mit
+    Fallback ohne Key), sonst 'vorteil' (bisheriges v1-Verhalten). Nie ein Crash."""
+    f = fields if isinstance(fields, dict) else {}
+    a = _norm_archetyp(f.get("strip_archetyp"))
+    if a:
+        return a
+    try:
+        import textgen
+        vor = textgen.comic_strip_vorauswahl(f)
+        a = _norm_archetyp((vor or {}).get("archetyp"))
+        if a:
+            return a
+    except Exception as ex:
+        log.warning("Comic-Strip Archetyp-Vorauswahl fehlgeschlagen: %s", ex)
+    return "vorteil"
+
+
+def _comic_strip_zeile(fields, quelle, archetyp="vorteil"):
+    """Liefert den Sprechblasen-Text fuer ein Panel je Quelle:
+      - 'ueberschrift' (Feld 1): das optionale Override fields['strip_zeile1'] (#156) hat Vorrang,
+        sonst die Beitrags-Ueberschrift, sonst die (archetyp-abhaengige) Pointe.
+      - 'jammer' (Feld 2): die gewaehlte Bild-2-Variante fields['strip_zeile2'] (falls gesetzt),
+        sonst der Default des Archetyps (vorteil = v1-Wortlaut COMIC_STRIP_JAMMER; warnung = erste
+        schadenfrohe Variante).
+      - 'pointe' (Feld 3): die feste, archetyp-abhaengige Pointe.
+    Robust gegen fehlende/leere Werte; 'archetyp' default 'vorteil' (rueckwaertskompatibel zu v1)."""
+    archetyp = _norm_archetyp(archetyp) or "vorteil"
+    f = fields if isinstance(fields, dict) else {}
     if quelle == "jammer":
+        z = (f.get("strip_zeile2") or "").strip()
+        if z:
+            return z
+        if archetyp == "warnung":
+            return COMIC_STRIP_VARIANTEN["warnung"][0]
         return COMIC_STRIP_JAMMER
     if quelle == "pointe":
-        return COMIC_STRIP_POINTE
-    f = fields if isinstance(fields, dict) else {}
+        return COMIC_STRIP_POINTE_ARCHETYP.get(archetyp, COMIC_STRIP_POINTE)
     override = (f.get("strip_zeile1") or "").strip()
     if override:
         return override
-    return (f.get("ueberschrift") or "").strip() or COMIC_STRIP_POINTE
+    return ((f.get("ueberschrift") or "").strip()
+            or COMIC_STRIP_POINTE_ARCHETYP.get(archetyp, COMIC_STRIP_POINTE))
 
 
 def _comic_strip_prompt(fields, delta, zeile):
@@ -1131,9 +1239,13 @@ def ensure_comic_strip_bilder(fields, berater_ref_pfad):
     os.makedirs(MOTIV_DIR, exist_ok=True)
     tool = aktives_bild_tool()
     berater = (berater_ref_pfad or "").strip()
+    # v2 (#155): Archetyp bestimmen (explizit aus fields['strip_archetyp'], sonst KI-Vorauswahl/
+    # Fallback). Danach je Archetyp die passenden Panel-Deltas + Zeilen; der Panel-Prompt (Delta +
+    # Zeilen) fliesst weiter in den Cache-Key -> Archetyp-/Zeilen-Wechsel erneuert den Cache.
+    archetyp = _comic_strip_archetyp(fields)
     pfade = []
-    for idx, (delta, quelle) in enumerate(_COMIC_STRIP_PANELS):
-        zeile = _comic_strip_zeile(fields, quelle)
+    for idx, (delta, quelle) in enumerate(_comic_strip_panels(archetyp)):
+        zeile = _comic_strip_zeile(fields, quelle, archetyp)
         prompt = _comic_strip_prompt(fields, delta, zeile)
         path = _comic_strip_pfad(idx, prompt, berater, tool=tool)
         if os.path.exists(path):

@@ -769,6 +769,11 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px;display:block">
       <input type=hidden name=zurueck value=entwuerfe>
       <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+      </select>
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -819,6 +824,11 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
     <form method=post action="/bild-generieren/{{e.id}}" style="margin:0 0 8px;display:block">
       <input type=hidden name=zurueck value=einplanung>
       <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+      </select>
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -905,6 +915,11 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:8px;display:block">
       <input type=hidden name=zurueck value=pool>
       <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+      </select>
       <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
         <option value="" disabled selected>– Stil wählen –</option>
         <option value="comic">Comic</option>
@@ -1506,6 +1521,12 @@ def _naechster_freier_werktag(conn, ausser_id=None):
 def _ctx(**kw):
     kw.setdefault("user", session.get("user"))
     kw.setdefault("rolle", session.get("rolle"))
+    # #155: Bild-2-Varianten (Comic-Strip) je Stimmung fuer das Dropdown in den drei Pickern.
+    try:
+        import bildmotiv
+        kw.setdefault("strip_varianten", bildmotiv.COMIC_STRIP_VARIANTEN)
+    except Exception:
+        kw.setdefault("strip_varianten", {})
     return kw
 
 # --- Routen -----------------------------------------------------------------
@@ -1981,6 +2002,25 @@ def bild_generieren(eid):
             # erhalten und wird in JEDEM der drei Wege (Entwuerfe/Pool/Einplanung) bis in
             # ensure_comic_strip_bilder als fields['strip_zeile1'] durchgereicht.
             data["strip_zeile1"] = (request.form.get("strip_zeile1") or "").strip()
+            # #155: Bild-2-Auswahl (Aermelschoner) -> steuert den Archetyp. Eine KONKRETE Variante
+            # bestimmt den Archetyp direkt (aus COMIC_STRIP_VARIANTEN). "Automatisch" (leer) ->
+            # leichte KI-Vorauswahl (robust, Fallback ohne Key) waehlt Archetyp + Variante. Beides
+            # (strip_archetyp + strip_zeile2) wird unten im Entwurf-JSON persistiert, damit alle drei
+            # Wege (Entwuerfe/Pool/Einplanung) denselben Wert lesen und es beim erneuten Generieren
+            # erhalten bleibt; ensure_comic_strip_bilder loest daraus Szenen + Sprechblasen auf.
+            strip_zeile2 = (request.form.get("strip_zeile2") or "").strip()
+            if strip_zeile2:
+                arche = bildmotiv._comic_strip_variante_archetyp(strip_zeile2) or "vorteil"
+                data["strip_zeile2"] = strip_zeile2
+                data["strip_archetyp"] = arche
+            else:
+                vor = textgen.comic_strip_vorauswahl(data)
+                arche = (vor or {}).get("archetyp") or "vorteil"
+                idx = (vor or {}).get("variant_index") or 0
+                varianten = bildmotiv.COMIC_STRIP_VARIANTEN.get(arche, [])
+                data["strip_archetyp"] = arche
+                data["strip_zeile2"] = (varianten[idx] if 0 <= idx < len(varianten)
+                                        else (varianten[0] if varianten else ""))
             with get_conn() as conn:
                 rows = conn.execute(
                     "SELECT berater_comic, bibel_bild FROM beratungsstellen WHERE aktiv=1 "

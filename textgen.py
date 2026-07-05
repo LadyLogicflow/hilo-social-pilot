@@ -316,6 +316,119 @@ def comic_brief(fields, client=None):
     fields["comic_brief"] = brief or _comic_brief_fallback(fields)
     return fields
 
+# --- Comic-Strip v2 (#155): Archetyp-/Varianten-Vorauswahl (leichter Text-KI-Schritt) -----------
+# Claude liest den fertigen Beitrag und liefert eine VORAUSWAHL fuer das Bild-2-Dropdown:
+#   {"archetyp": "vorteil"|"warnung", "variant_index": int}
+# 'vorteil' = gute Nachricht, HILO bringt einen Vorteil (trauriger Aermelschoner - jemand WAR bei
+# HILO). 'warnung' = ohne HILO Nachteil / Finanzamt lehnt ab (schadenfroher Aermelschoner - jemand
+# war NICHT bei HILO). Nur Text-Tokens, kein zusaetzliches Bild; der Aufrufer ruft die Funktion NUR
+# im Comic-Strip-Fall auf. Menschliche Freigabe bleibt (Redakteurin kann die Wahl aendern).
+COMIC_STRIP_VORAUSWAHL_SYSTEM = (
+    "Du bist Bildredakteur fuer einen serioesen Lohnsteuerhilfeverein (HILO)."
+)
+
+
+def _comic_strip_vorauswahl_fallback(fields):
+    """Robuster Fallback ohne Key/bei Fehlern: leitet den Archetyp aus einem evtl. vorhandenen
+    comic_brief ab (Stimmung/finanzamt_figur). Steht keine Info bereit -> Default 'vorteil', Index 0
+    (bisheriges v1-Verhalten). Liefert IMMER ein gueltiges dict."""
+    f = fields if isinstance(fields, dict) else {}
+    brief = f.get("comic_brief") if isinstance(f.get("comic_brief"), dict) else {}
+    stimmung = str(brief.get("stimmung") or "").strip().lower()
+    finanzamt = bool(brief.get("finanzamt_figur"))
+    # Nur wenn die Finanzamt-Figur einen 'Buerger-gegen-Finanzamt'-Dreh signalisiert UND die
+    # Stimmung nicht ausdruecklich positiv/wuerdevoll ist, deuten wir es als 'warnung'. Sonst
+    # bleibt es beim Default 'vorteil'.
+    archetyp = "warnung" if (finanzamt and stimmung not in ("positiv", "wuerdevoll")) else "vorteil"
+    return {"archetyp": archetyp, "variant_index": 0}
+
+
+def _comic_strip_vorauswahl_prompt(fields):
+    """Baut die Vorauswahl-Anweisung aus dem fertigen Beitrag + den konkreten Bild-2-Varianten
+    (aus bildmotiv.COMIC_STRIP_VARIANTEN, lazy importiert), damit Claude einen gueltigen
+    variant_index waehlen kann. Exakter deutscher Wortlaut mit echten Umlauten."""
+    f = fields if isinstance(fields, dict) else {}
+    ueberschrift = (f.get("ueberschrift") or "").strip()
+    caption = (f.get("caption") or "").strip()
+    if not caption:
+        caps = f.get("captions") if isinstance(f.get("captions"), dict) else {}
+        caption = (caps.get("facebook") or caps.get("instagram") or "").strip()
+    beitrag = "Ueberschrift: %s\n\nBeitragstext: %s" % (ueberschrift or "-", caption or "-")
+    try:
+        import bildmotiv
+        varianten = bildmotiv.COMIC_STRIP_VARIANTEN
+    except Exception:
+        varianten = {"vorteil": [], "warnung": []}
+    def _liste(key):
+        return "\n".join("  [%d] %s" % (i, v) for i, v in enumerate(varianten.get(key, [])))
+    return (
+        "Fuer einen dreiteiligen HILO-Comic-Strip gibt es zwei Story-Archetypen. Waehle anhand des "
+        "folgenden Beitrags den PASSENDEN Archetyp und die passendste Bild-2-Aussage (Aermelschoner "
+        "des Finanzamt-Beamten).\n\n"
+        "- 'vorteil': gute Nachricht - jemand WAR bei HILO und spart Steuern; der Aermelschoner ist "
+        "TRAURIG/geknickt. Waehle diesen Archetyp, wenn der Beitrag einen konkreten HILO-Vorteil, "
+        "eine Ersparnis oder eine gute Nachricht vermittelt.\n"
+        "- 'warnung': jemand war NICHT bei HILO und zahlt drauf / das Finanzamt lehnt ab; der "
+        "Aermelschoner ist SCHADENFROH. Waehle diesen Archetyp, wenn der Beitrag vor einem Fehler, "
+        "einer verpassten Chance oder einem Nachteil ohne Beratung warnt.\n\n"
+        "Bild-2-Varianten 'vorteil' (traurig):\n%s\n\n"
+        "Bild-2-Varianten 'warnung' (schadenfroh):\n%s\n\n"
+        "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown):\n"
+        '{"archetyp": "vorteil|warnung", "variant_index": <0-basierter Index in der Liste des '
+        'gewaehlten Archetyps>}\n\n%s' % (_liste("vorteil"), _liste("warnung"), beitrag)
+    )
+
+
+def comic_strip_vorauswahl(fields, client=None):
+    """#155: Leichter Text-KI-Schritt. Liest den Beitrag und liefert eine VORAUSWAHL fuer den
+    Comic-Strip: {'archetyp': 'vorteil'|'warnung', 'variant_index': int}. Eigenschaften:
+
+    - ROBUST: jeder Fehler (kein Key, KI-/Parse-Fehler) faellt auf _comic_strip_vorauswahl_fallback
+      zurueck (aus comic_brief abgeleitet bzw. Default vorteil/0). Es gibt NIE einen Crash und die
+      Rueckgabe ist IMMER ein gueltiges dict.
+    - variant_index wird gegen die tatsaechliche Variantenzahl des gewaehlten Archetyps geklemmt.
+
+    'client' kann ein bereits erzeugter anthropic-Client sein (mockbar in Tests). Es wird KEIN
+    fields mutiert - die Funktion liefert nur die Vorauswahl (der Aufrufer persistiert sie)."""
+    f = fields if isinstance(fields, dict) else {}
+    default = _comic_strip_vorauswahl_fallback(f)
+    try:
+        if client is None:
+            key = get_secret("anthropic_api_key")
+            if not key:
+                log.info("Comic-Strip-Vorauswahl uebersprungen: kein 'anthropic_api_key' hinterlegt.")
+                return default
+            import anthropic  # lazy
+            client = anthropic.Anthropic(api_key=key)
+        msg = client.messages.create(
+            model=_model(), max_tokens=200, system=COMIC_STRIP_VORAUSWAHL_SYSTEM,
+            messages=[{"role": "user", "content": _comic_strip_vorauswahl_prompt(f)}],
+        )
+        raw = "".join(getattr(b, "text", "") for b in msg.content)
+        data = _parse_json(raw)
+        if isinstance(data, dict):
+            archetyp = str(data.get("archetyp") or "").strip().lower()
+            if archetyp not in ("vorteil", "warnung"):
+                archetyp = default["archetyp"]
+            try:
+                idx = int(data.get("variant_index"))
+            except Exception:
+                idx = 0
+            try:
+                import bildmotiv
+                n = len(bildmotiv.COMIC_STRIP_VARIANTEN.get(archetyp, []))
+            except Exception:
+                n = 0
+            if n and not (0 <= idx < n):
+                idx = 0
+            elif idx < 0:
+                idx = 0
+            log.info("Comic-Strip-Vorauswahl: %s / %d", archetyp, idx)
+            return {"archetyp": archetyp, "variant_index": idx}
+    except Exception as ex:
+        log.warning("Comic-Strip-Vorauswahl fehlgeschlagen: %s", ex)
+    return default
+
 def _build_prompt(thema, kanal=None):
     """Ein Auftrag erzeugt den Beitrag fuer Facebook UND Instagram in einem Rutsch: Bild, Ueberschrift
     und Stichpunkte sind fuer beide Kanaele gleich; NUR der Begleittext (caption) unterscheidet sich je
