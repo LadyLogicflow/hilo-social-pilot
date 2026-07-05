@@ -194,14 +194,17 @@ STIL_A_BLOCK = (
 # der Beratungsstelle (Comic-Figur nach dem ersten Referenzbild), HINTEN der wiederkehrende
 # Finanzamt-Beamte, der leer ausgeht. EXAKTER Wortlaut aus dem Auftrag.
 BERATUNG_BLOCK = (
-    "Composition for a consultation scene, same clean ligne claire comic style: in the FOREGROUND a "
-    "warm, friendly HILO tax advisor whose face and appearance MATCH the first reference image (the "
-    "very same person), sitting or standing with a citizen/client, actively helping and reassuring "
-    "them - positive and warm. In the BACKGROUND, smaller and to one side, the recurring 'Finanzamt' "
-    "bureaucrat (grey suit, round glasses, beige sleeve garters) looking sad, disappointed and "
-    "empty-handed. The picture tells the story: HILO helps you and the tax office loses out. Warm and "
-    "friendly overall; gentle humour only in the small background figure. Keep generous empty negative "
-    "space on one side for later text."
+    "Composition: a warm, professional tax-CONSULTATION scene in the clean ligne claire comic style. "
+    "In the FOREGROUND, the HILO tax advisor - the SAME person as in the first reference image, "
+    "matching their face, hairstyle, AGE and build EXACTLY (do NOT make them younger or different) - "
+    "sits at a tidy office DESK across from a friendly client, explaining and reassuring them, with "
+    "papers or a laptop on the desk, in a modern, friendly advisory office. It must clearly read as "
+    "professional tax ADVICE at a desk. Do NOT show any cash, banknotes or money changing hands "
+    "(nothing that looks like a shady deal). In the BACKGROUND, smaller and off to one side, the "
+    "recurring 'Finanzamt' bureaucrat (grey suit, round glasses, beige sleeve garters) looks sad, "
+    "disappointed and empty-handed - HILO helps, the tax office loses out. Warm and friendly overall; "
+    "gentle humour only in the small background figure. Keep generous empty negative space on one "
+    "side for later text."
 )
 FINANZAMT_BLOCK = (
     "Recurring 'Finanzamt' character (draw him consistently): a slightly over-correct bureaucrat - "
@@ -834,15 +837,13 @@ def ensure_comic_bild(fields):
 
 # --- Stil "Comic Beratung" (comic_beratung) - personalisiert pro Beratungsstelle ----------------
 def _comic_beratung_prompt(fields):
-    """Baut den Comic-Beratung-Bildprompt: STIL_A_BLOCK + BERATUNG_BLOCK (+ optional 'Thema/Anlass:'
-    aus comic_brief.szene). Ausgelagert, damit Producer (ensure_comic_beratung_bild) und Cache-Pfad
-    (_comic_beratung_pfad) denselben String nutzen (konsistent, testbar). KEIN Finanzamt-Block: der
-    Finanzamt-Beamte ist bereits im BERATUNG_BLOCK beschrieben (kleine Hintergrundfigur)."""
-    prompt = STIL_A_BLOCK + "\n\n" + BERATUNG_BLOCK
-    szene = (_comic_brief(fields).get("szene") or "").strip()
-    if szene:
-        prompt += "\n\nThema/Anlass: " + szene
-    return prompt
+    """Baut den Comic-Beratung-Bildprompt: STIL_A_BLOCK + BERATUNG_BLOCK. Bewusst OHNE das
+    Beitrags-Thema (kein 'Thema/Anlass'): das Thema trieb die Szene sonst woertlich (z.B. eine
+    Gelduebergabe -> wirkte wie ein 'Deal' statt Beratung). 'Comic Beratung' ist IMMER eine warme
+    Schreibtisch-Beratung; der inhaltliche Bezug lebt im Begleittext des Posts. 'fields' wird fuer
+    kuenftige (dezente) Varianten durchgereicht. KEIN Finanzamt-Block (Beamter steckt im
+    BERATUNG_BLOCK als kleine Hintergrundfigur)."""
+    return STIL_A_BLOCK + "\n\n" + BERATUNG_BLOCK
 
 def _comic_beratung_refs(berater_comic_pfad):
     """Liefert die Liste der EXISTIERENDEN Referenzbild-Pfade: ZUERST der Berater-Comic der Stelle
