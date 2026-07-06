@@ -959,7 +959,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
   <div class=pvc>
     <div class=pvh>{{it.label}}{% if not it.ok %} <span style="color:#b00020">– Vorschau-Fehler</span>{% endif %}</div>
     <div style="font-size:12px;color:#4D7C0F;font-weight:bold;margin-bottom:6px">Kanal: {{it.kanal_de}}</div>
-    {% if it.ok %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
+    {% if it.ok %}{% if it.urls %}<div style="display:flex;gap:6px;flex-wrap:wrap">{% for u in it.urls %}<figure style="margin:0;text-align:center"><img src="{{u}}" alt="Bild {{loop.index}} {{it.label}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="{{it.url}}" alt="Vorschau {{it.label}}">{% endif %}{% else %}<p class=cap style="color:#b00020">{{it.caption}}</p>{% endif %}
     {% if it.ok %}{% for kn, cap in it.caps %}<details{% if loop.first %} open{% endif %}><summary>Begleittext {{kn}}</summary><p class=cap style="white-space:pre-wrap">{{cap}}</p></details>{% endfor %}{% endif %}
   </div>
 {% endfor %}
@@ -3268,7 +3268,8 @@ def vorschau(eid):
                     os.remove(fp)
         except Exception:
             pass
-        import personalisierung
+        import personalisierung, stilwahl, shutil
+        stil = stilwahl.aktiver_stil(f)
         def _caps_fuer(kanal, base_fn):
             """Liste (Kanal-Label, Begleittext) fuer die je Ziel gewaehlten Kanaele."""
             out = []
@@ -3284,14 +3285,36 @@ def vorschau(eid):
                 items.append({"label": "Beratungsstelle %s" % sid, "ok": False, "kanal_de": _KANAL_DE[kanal],
                               "caption": "Keine Facebook-Seite zugeordnet – wird beim Veröffentlichen übersprungen."})
                 continue
-            out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, int(stelle["id"])))
+            sid_i = int(stelle["id"])
             try:
+                caps = _caps_fuer(kanal, lambda k, st=stelle: personalisierung.caption_fuer_stelle(f, st, k))
+                label = "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else "")
+                if stil == "comic_strip":
+                    # #163: Comic-Strip als Karussell. render_slides_fuer_stelle liefert die 3 gecachten
+                    # KI-Panels DIESER Stelle (ueber deren Berater-Referenz) - kein Einzelbild-Fallback,
+                    # kein erzwungenes Neu-Rendern. Panels in den preview-Ordner kopieren, damit sie ueber
+                    # die geschuetzte /preview-strip-Route (rolle_required freigeber) ausgeliefert werden.
+                    strip_out = os.path.join(pdir, "e%d_stelle_%d_strip" % (eid, sid_i))
+                    _f, panels = personalisierung.render_slides_fuer_stelle(f, stelle, strip_out, "panel")
+                    urls = []
+                    for idx, pfad in enumerate(panels or []):
+                        if not pfad or not os.path.exists(pfad):
+                            continue
+                        ziel = os.path.join(pdir, "e%d_stelle_%d_p%d.png" % (eid, sid_i, idx))
+                        shutil.copyfile(pfad, ziel)
+                        v = int(os.path.getmtime(ziel))
+                        urls.append(url_for("preview_strip", eid=eid, sid=sid_i, idx=idx) + "?v=%d" % v)
+                    if not urls:
+                        raise RuntimeError("keine Comic-Strip-Panels")
+                    items.append({"label": label, "ok": True, "kanal_de": _KANAL_DE[kanal],
+                                  "caps": caps, "urls": urls})
+                    continue
+                out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, sid_i))
                 personalisierung.render_fuer_stelle(f, stelle, out)
                 v = int(os.path.getmtime(out))
-                caps = _caps_fuer(kanal, lambda k, st=stelle: personalisierung.caption_fuer_stelle(f, st, k))
-                items.append({"label": "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else ""),
+                items.append({"label": label,
                               "ok": True, "kanal_de": _KANAL_DE[kanal], "caps": caps,
-                              "url": url_for("preview_bild", eid=eid, sid=int(stelle["id"])) + "?v=%d" % v})
+                              "url": url_for("preview_bild", eid=eid, sid=sid_i) + "?v=%d" % v})
             except Exception:
                 log.exception("Vorschau-Render fehlgeschlagen (Entwurf %s / Stelle %s)", eid, sid)
                 items.append({"label": stelle["name"], "ok": False, "kanal_de": _KANAL_DE[kanal],
@@ -3310,6 +3333,18 @@ def vorschau(eid):
 @rolle_required("freigeber")
 def preview_bild(eid, sid):
     p = os.path.join(DATA_DIR, "preview", "e%d_stelle_%d.png" % (eid, sid))
+    if not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="image/png", max_age=0)
+
+@app.route("/preview-strip/<int:eid>/<int:sid>/<int:idx>")
+@rolle_required("freigeber")
+def preview_strip(eid, sid, idx):
+    """#163: liefert Panel <idx> des Comic-Strip-Karussells der Vorschau je Beratungsstelle aus.
+    GLEICHE Schutzstufe (rolle_required freigeber) wie preview_bild. Die Panels werden in der
+    /vorschau-Schleife als e<eid>_stelle_<sid>_p<idx>.png in den preview-Ordner kopiert; fehlt die
+    Datei -> 404."""
+    p = os.path.join(DATA_DIR, "preview", "e%d_stelle_%d_p%d.png" % (eid, sid, idx))
     if not os.path.exists(p):
         abort(404)
     return send_file(p, mimetype="image/png", max_age=0)
