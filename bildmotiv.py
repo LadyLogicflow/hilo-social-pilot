@@ -1272,13 +1272,13 @@ COMIC_STRIP_PANEL2_DELTA_VORTEIL = COMIC_STRIP_PANEL2_DELTA
 COMIC_STRIP_VARIANTEN = {
     "vorteil": [
         "Schon wieder jemand, der bei HILO war ...",
-        "Schade, weniger Steuern fuers Finanzamt - diese HILO-Berater!",
+        "Schade, weniger Steuern fürs Finanzamt - diese HILO-Berater!",
         "Wieder nichts zu holen - die waren bei HILO.",
-        "Diese HILO-Beratung kostet mich staendig Steuern ...",
+        "Diese HILO-Beratung kostet mich ständig Steuern ...",
     ],
     "warnung": [
         "Ha! Mal wieder jemand, der nicht bei HILO war ...",
-        "Schoen bloed - ohne HILO zahlt man drauf.",
+        "Schön blöd - ohne HILO zahlt man drauf.",
         "Herrlich, wieder einer ohne HILO-Beratung!",
         "Da freut sich das Finanzamt - kein HILO im Spiel.",
     ],
