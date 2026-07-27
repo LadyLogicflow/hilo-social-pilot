@@ -63,48 +63,37 @@ def openai_image_model():
     return wert if wert in ("gpt-image-1", "gpt-image-2") else default
 
 def _prompt(motiv):
-    """Einheitlicher Szene-Prompt fuer ein vollflaechiges, opakes Magazin-/Editorial-Foto MIT
-    Umgebung (kein freigestelltes Motiv mehr). Das Motiv beschreibt Jahreszeit, Gefuehl und einen
-    dezenten Themenbezug; das Foto fuellt spaeter das ganze 1080x1080-Bild als Hintergrund.
-    Ein ruhiger Bereich bleibt frei fuer das spaeter daraufgesetzte weisse Textfeld.
-    Die Szene ist bewusst als RAHMEN komponiert: bildwichtige Elemente liegen an den
-    Raendern und umrahmen eine ruhige, weitgehend leere BILDMITTE (zentraler Negativraum),
-    in die spaeter das Textfeld gesetzt wird - so wird kein Hauptmotiv vom Text verdeckt."""
-    return ("Hochwertige, emotionale Magazin-/Editorial-Fotografie. Eine stimmungsvolle, "
-            "authentische Szene, die %s vermittelt - Jahreszeit, Gefuehl und ein dezenter Bezug zum "
-            "Thema, schoen und natuerlich gestylt (KEIN steifes Stockfoto, keine steifen Posen). "
-            "Eine spontane, ungestellte, lebendige Alltagsszene (candid), natuerliche Bewegung und "
-            "Interaktion, wie ein echter, nicht gestellter Schnappschuss - niemand posiert steif in "
-            "die Kamera. Falls ein Schild oder ein Plakat in der Szene vorkommt, ist es "
-            "NATUERLICH in die Szene integriert (steht auf einem Tisch, lehnt an einer Wand, steht "
-            "auf einer Staffelei oder ist angelehnt) und wird NICHT von einer Person frontal in die "
-            "Kamera GEHALTEN. "
-            "STIL: authentische, dokumentarische/redaktionelle REPORTAGE-Fotografie - KEIN glattes "
-            "Hochglanz-Stockfoto, KEINE sterile Werbe-/Corporate-Optik, KEINE makellosen, "
-            "austauschbaren Models. MENSCHEN: echte, individuelle, charaktervolle Personen mit "
-            "natuerlicher Hautstruktur und gelebten Gesichtern (verschiedene Altersgruppen und Typen), "
-            "KEINE perfekten Model-Gesichter. UMGEBUNG: echte, gelebte, leicht unperfekte Raeume mit "
-            "konkreten, spezifischen Alltags-Details (kein steriles Studio/Showroom). ANMUTUNG: "
-            "natuerlich, ungestellt, candid, wie ein echtes Foto aus dem Alltag - leichte natuerliche "
-            "Imperfektion ist erwuenscht. "
-            "Natuerliche, ausgewogene, realitaetsnahe Farben bei neutralem Tageslicht; NICHT "
-            "uebertrieben warm, golden oder amber - normale, neutrale Farbtemperatur. Die STIMMUNG "
-            "ist zum Thema passend: grundsaetzlich froh, entspannt, erleichtert und positiv "
-            "(laechelnd, geloest); KEINE traurigen, gestressten, sorgenvollen oder depressiven "
-            "Gesichter. ABER themenangemessen - bei ERNSTEN oder Warn-Themen ruhige ZUVERSICHT, "
-            "Erleichterung und Souveraenitaet statt froehlichem Grinsen oder Feiern, das dem Ernst "
-            "des Themas widerspricht; bei freudigen Themen darf es froehlich und feiernd sein. Also "
-            "positiv UND zum Thema passend, nicht pauschal Party - auch bei "
-            "Problem-Themen wird die Erleichterung und Loesung gezeigt, nicht die Sorge. Weiches "
-            "Tageslicht, geringe Schaerfentiefe. Die Szene "
-            "fuellt das ganze Bild als Hintergrund. WICHTIG fuer die Komposition: Das Bild ist wie ein "
-            "RAHMEN aufgebaut - alle bildwichtigen Elemente (Personen, Gegenstaende, Deko, Glaeser usw.) "
-            "liegen am OBEREN, UNTEREN und an den SEITLICHEN Raendern und UMRAHMEN die Bildmitte. Die "
-            "BILDMITTE bleibt bewusst ruhig und weitgehend LEER (grosser zentraler Negativraum, weiche "
-            "Flaeche / unscharfer Hintergrund / Tischflaeche) und enthaelt KEIN Hauptmotiv und kein "
-            "zentrales Subjekt - dieser ruhige zentrale Bereich bleibt frei fuer ein spaeteres Textfeld, "
-            "nichts Bildwichtiges darf dort verdeckt werden. KEIN Text, keine Schrift, keine Logos oder "
-            "Markennamen im Bild." % motiv)
+    """Optimierter Szene-Prompt fuer vollflaechige Magazin-/Editorial-Fotos. Flexibel fuer
+    Szenen MIT Menschen oder OHNE (nur Objekte/Gegenstaende). Das Motiv (von der KI generiert)
+    steuert WAS im Bild ist; dieser Prompt gibt nur den STIL vor: professionell-freundlich,
+    hell, zuversichtlich. Rahmen-Komposition mit freier Bildmitte fuer spaeteres Textfeld."""
+    return ("Professionelle Magazin-Fotografie im redaktionellen Stil. "
+            "SZENE: Eine authentische, themenpassende Szene, die %s vermittelt. Natuerliches "
+            "Setting - entweder mit Menschen in realistischen Alltagssituationen ODER mit "
+            "aussagekraeftigen Gegenstaenden/Objekten, die das Thema symbolisieren. Nicht jedes "
+            "Bild braucht Personen. "
+            "STIMMUNG: Zuversichtlich, einladend und professionell-freundlich. Falls Menschen im "
+            "Bild sind: entspannt und vertrauenswuerdig, weder gestresst noch uebertrieben "
+            "enthusiastisch. Die Atmosphaere ist warm und einladend, aber serioes - wie eine "
+            "kompetente Beratungsstelle. "
+            "WENN MENSCHEN: Charaktervolle, sympathische Personen verschiedener Altersgruppen. "
+            "Natuerliche Gesichtsausdruecke, sanft laechelnd oder konzentriert-freundlich. Keine "
+            "extremen Emotionen. Keine steifen Posen oder Stockfoto-Klischees. Authentisch und "
+            "ungestellt, wie ein dokumentarisches Foto. "
+            "WENN OBJEKTE/GEGENSTAENDE: Hochwertig arrangiert, aber nicht steril. Natuerliches "
+            "Licht, authentische Details. Symbolische Darstellung des Themas (z.B. Aktenordner, "
+            "Kalender, Muenzstapel, Sparschwein, Taschenrechner, Stifte, Dokumente). "
+            "FARBEN: Helle, freundliche, natuerliche Farbtoene. Warmes, weiches Tageslicht. Keine "
+            "dunklen oder duesteren Bereiche. Neutrale bis leicht warme Farbtemperatur. WO MOEGLICH "
+            "Blau- und Gruentoene als Akzentfarben (HILO-Markenfarben) - z.B. in Objekten (blaue "
+            "Ordner, gruene Pflanzen), Kleidung (blaue Hemden, gruene Schals) oder Umgebungsdetails "
+            "(blaue Tassen, gruene Deko). Natuerlich integriert, nicht erzwungen. "
+            "KOMPOSITION: Rahmen-Aufbau - wichtige Elemente an den Raendern (oben, unten, Seiten), "
+            "Bildmitte bleibt ruhig und weitgehend LEER (zentraler Negativraum). Dieser freie "
+            "zentrale Bereich bleibt fuer spaeteres Textfeld reserviert - kein Hauptmotiv dort "
+            "platzieren. "
+            "STIL: Dokumentarisch, aber freundlich. Wie ein gutes Reportage-Foto aus einem positiven "
+            "Lifestyle-Magazin. Kein Text, keine Schrift, keine Logos im Bild." % motiv)
 
 def tafel_sign_text(fields):
     """Baut den Tafel-Text (sign_text) fuer den ki_tafel-Modus aus den Entwurfs-fields (#139).
