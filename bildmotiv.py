@@ -22,6 +22,11 @@ from config import DATA_DIR
 log = logging.getLogger("hilo.bildmotiv")
 MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
+# Prompt-Version: Wird in Cache-Key einbezogen - bei Änderung des Prompts erhöhen
+# damit neue Bilder generiert werden statt alte Cache-Einträge zu verwenden!
+# v3.1 = ChatGPT-optimierter Prompt (Bildidee in einem Satz, Magazin-Test, etc.)
+PROMPT_VERSION = "v3.1"
+
 # Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
 # Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
 # reicher/plastischer als gpt-image-2. Per Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ueberschreibbar.
@@ -723,10 +728,11 @@ def _modell_praefix(tool=None):
 
 def _szene_pfad(motiv, tool=None):
     """Liefert den absoluten Cache-Pfad fuer das Standard-Szene-Foto zu 'motiv'.
-    Kapselt die BESTEHENDE Schluessel-Berechnung (Praefix 'szene:', sha256[:16]) aus
-    ensure_photo(), damit sie wiederverwendbar ist. Die Hash-Formel bleibt UNVERAENDERT -
-    sonst wuerden bestehende Cache-Dateien nicht mehr getroffen. Liefert None fuer leere
-    Motive und fuer 'icon:'-Motive (die liefert _icon_pfad).
+
+    NEU: Bezieht PROMPT_VERSION in den Cache-Key ein - bei Prompt-Änderungen werden
+    neue Bilder generiert statt alte Cache-Einträge zu verwenden!
+
+    Hash-Formel: sha256("szene:" + PROMPT_VERSION + ":" + motiv)
 
     'tool' waehlt das Bild-Backend (#137): 'openai' (Default, KEIN Praefix -> bestehende
     Dateinamen unveraendert) oder 'ideogram' (Praefix 'ideogram_'). None -> aktuelle
@@ -736,7 +742,9 @@ def _szene_pfad(motiv, tool=None):
         return None
     if tool is None:
         tool = aktives_bild_tool()
-    h = hashlib.sha256(("szene:" + motiv).lower().encode("utf-8")).hexdigest()[:16]
+    # Cache-Key enthält jetzt PROMPT_VERSION - bei Prompt-Änderungen neue Bilder!
+    cache_key = f"szene:{PROMPT_VERSION}:{motiv}".lower()
+    h = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()[:16]
     return os.path.join(MOTIV_DIR, _tool_praefix(tool) + h + ".png")
 
 def _icon_pfad(motiv):
