@@ -92,21 +92,44 @@ No text, no logos, no watermarks in the image."""
 
     newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
 
-    # Kategorie-basierte Stil-Wahl (#Catrin: Abwechslung zwischen Foto/Illustration/Infografik)
+    # Exakte Stil-Wahl (#Catrin: Code gibt exakten Stil vor, OpenAI hat keine Wahl mehr)
     import random
-    kategorien = [
-        ("FOTO", "Editorial Photography, Stillleben, Symbolbild, Konzeptfotografie, Makroaufnahme, Objektfotografie", 0.4),
-        ("ILLUSTRATION", "hochwertige 3D-Illustration, moderne Editorial-Illustration, Papiercollage, Ligne-Claire-Comic (OHNE Text im Bild!)", 0.3),
-        ("INFOGRAFIK", "hochwertige Infografik, isometrische Illustration", 0.3)
+
+    # Alle Stile mit Kategorie und Gewichtung
+    stile = [
+        # FOTO (40% gesamt, gleichverteilt auf 6 Stile = ~6.67% pro Stil)
+        ("Editorial Photography", "FOTO"),
+        ("Stillleben", "FOTO"),
+        ("Symbolbild", "FOTO"),
+        ("Konzeptfotografie", "FOTO"),
+        ("Makroaufnahme", "FOTO"),
+        ("Objektfotografie", "FOTO"),
+        # ILLUSTRATION (30% gesamt, gleichverteilt auf 4 Stile = 7.5% pro Stil)
+        ("hochwertige 3D-Illustration", "ILLUSTRATION"),
+        ("moderne Editorial-Illustration", "ILLUSTRATION"),
+        ("Papiercollage", "ILLUSTRATION"),
+        ("Ligne-Claire-Comic (OHNE Text im Bild!)", "ILLUSTRATION"),
+        # INFOGRAFIK (30% gesamt, gleichverteilt auf 2 Stile = 15% pro Stil)
+        ("hochwertige Infografik", "INFOGRAFIK"),
+        ("isometrische Illustration", "INFOGRAFIK"),
     ]
-    # Gewichtete Zufallswahl
-    kategorie_name, stil_optionen, _ = random.choices(
-        kategorien,
-        weights=[k[2] for k in kategorien],
-        k=1
-    )[0]
+
+    # Gewichte berechnen: 40% Foto / 30% Illustration / 30% Infografik
+    gewichte = []
+    for stil, kategorie in stile:
+        if kategorie == "FOTO":
+            gewichte.append(0.4 / 6)  # 40% auf 6 Foto-Stile verteilt
+        elif kategorie == "ILLUSTRATION":
+            gewichte.append(0.3 / 4)  # 30% auf 4 Illustration-Stile
+        else:  # INFOGRAFIK
+            gewichte.append(0.3 / 2)  # 30% auf 2 Infografik-Stile
+
+    # Gewichtete Zufallswahl eines EXAKTEN Stils
+    gewahlter_stil, kategorie_name = random.choices(stile, weights=gewichte, k=1)[0]
+
     # Debug-Log
-    log.info("Bild-Kategorie gewählt: %s (Motiv: %s)", kategorie_name, (fields.get("ueberschrift") or "")[:40])
+    log.info("Bild-Stil gewählt: %s [%s] (Motiv: %s)",
+             gewahlter_stil, kategorie_name, (fields.get("ueberschrift") or "")[:40])
 
     # Verbesserter Masterprompt (Catrin v2 - Magazin-Titelbild-Fokus)
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
@@ -139,17 +162,15 @@ Wenn eine reale Szene stärker ist als eine Metapher, verwende diese.
 
 ---
 
-BILDSTIL WÄHLEN
+BILDSTIL
 
-Für dieses Bild wurde die Kategorie {kategorie_name} gewählt.
-
-Wähle einen passenden Stil aus dieser Kategorie:
-{stil_optionen}
+Erzeuge das Bild im folgenden Stil:
+{gewahlter_stil}
 
 WICHTIG:
-- Bei {kategorie_name}: Wähle den Stil der die Kernaussage am besten transportiert
+- Halte dich STRIKT an diesen Stil
 - KEINE Text-Elemente im Bild (außer bei Infografiken mit maximal 3-5 Wörtern)
-- Die Bildserie soll abwechslungsreich sein - wiederhole nicht immer den gleichen Stil
+- Der Stil wurde gewählt um Abwechslung in der Bildserie zu gewährleisten
 
 ---
 
