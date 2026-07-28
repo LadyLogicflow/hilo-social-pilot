@@ -62,36 +62,166 @@ def openai_image_model():
     wert = str(wert).strip()
     return wert if wert in ("gpt-image-1", "gpt-image-2") else default
 
-def _prompt(motiv):
-    """Still-Life-Prompt fuer inszenierte Objekt-Fotografie OHNE Personen. Das Motiv beschreibt
-    die Objekte und deren Arrangement; dieser Prompt gibt den fotografischen STIL vor:
-    hochwertig, professionell, warm-einladend. Rahmen-Komposition mit freier Bildmitte."""
-    return ("Hochwertige Still-Life-Fotografie im professionellen redaktionellen Stil. "
-            "SZENE: Inszenierte Objekt-Szene die %s vermittelt. KEINE Personen, KEINE Haende, "
-            "KEINE Koerperteile - ausschliesslich Objekte und Gegenstaende. "
-            "STIL: Professionelle Produkt-/Editorial-Fotografie. Hochwertig arrangiert, aber "
-            "authentisch und nicht steril. Natuerliche, lebendige Komposition - kein steriler "
-            "Katalog-Look. Wie eine ansprechende Reportage-Fotografie in einem hochwertigen Magazin. "
-            "OBJEKTE: Symbolische Gegenstaende zum Thema - z.B. Aktenordner, Kalender, "
-            "Muenzstapel, Sparschwein, Taschenrechner, Stifte, Dokumente, Stempel, Notizen. "
-            "Durchdacht arrangiert mit natuerlichen Details (leicht aufgeschlagene Seiten, "
-            "geoeffnete Ordner, gestapelte Muenzen, beschriebene Notizen). "
-            "STIMMUNG: Zuversichtlich, einladend und professionell-freundlich. AUCH BEI "
-            "WARN-THEMEN: Die Objekt-Szene soll Kompetenz und Loesungsorientierung vermitteln, "
-            "NICHT Chaos oder Probleme. Aufgeraeumt und organisiert, nicht unordentlich. "
-            "LICHT: Warmes, weiches natuerliches Tageslicht. Helle, freundliche Beleuchtung. "
-            "Keine dunklen oder duesteren Bereiche. Sanfte Schatten die Tiefe geben, aber nicht "
-            "dramatisch. Neutrale bis leicht warme Farbtemperatur. "
-            "FARBEN: Helle, freundliche, natuerliche Farbtoene. WO MOEGLICH Blau- und Gruentoene "
-            "als Akzentfarben (HILO-Markenfarben) - z.B. blaue Ordner, gruene Pflanzen im "
-            "Hintergrund, blaue Stifte, gruene Notizen. Natuerlich integriert, nicht erzwungen. "
-            "KOMPOSITION: Rahmen-Aufbau - wichtige Objekte an den Raendern (oben, unten, Seiten), "
-            "Bildmitte bleibt ruhig und weitgehend LEER (zentraler Negativraum, freie Flaeche). "
-            "Dieser freie zentrale Bereich bleibt fuer spaeteres Textfeld reserviert - kein "
-            "Hauptobjekt dort platzieren. Objekte umrahmen die Bildmitte. "
-            "HINTERGRUND: Natuerlicher Untergrund - Holztisch, helles Papier, strukturierter Stoff, "
-            "neutrale Flaeche. Weicher unscharfer Hintergrund (geringe Schaerfentiefe) der die "
-            "Objekte hervorhebt. Kein Text, keine Schrift, keine Logos im Bild." % motiv)
+def _prompt(fields_or_motiv):
+    """ChatGPT Masterprompt fuer HILO Newsletterbilder - Creative Director Ansatz.
+    Bekommt entweder die kompletten fields (dict) ODER ein Motiv (string) fuer Rueckwaertskompatibilitaet.
+    Mit fields: OpenAI agiert als Creative Director. Mit Motiv: Fallback auf einfachen Prompt."""
+
+    # Rueckwaertskompatibilitaet: Wenn String statt dict, nutze einfachen Fallback-Prompt
+    if not isinstance(fields_or_motiv, dict):
+        motiv = str(fields_or_motiv or "").strip()
+        return f"""Professional editorial photography for a financial consulting newsletter.
+
+Scene: {motiv}
+
+Style: Modern, friendly, trustworthy, high-quality editorial look.
+Colors: Incorporate navy blue, green, and lavender accents where natural (HILO brand colors).
+Composition: Square 1:1, leave center area mostly empty for text overlay, place main subjects at edges.
+Quality: Ultra high quality, magazine-worthy, professional lighting.
+No text, no logos, no watermarks in the image."""
+
+    # Newsletter-Text aus fields zusammenbauen
+    fields = fields_or_motiv
+    ueberschrift = (fields.get("ueberschrift") or "").strip()
+    subline = (fields.get("subline") or "").strip()
+    bullets = fields.get("bullets") or []
+    if isinstance(bullets, list):
+        bullets_text = "\n".join("• " + b for b in bullets if b)
+    else:
+        bullets_text = ""
+
+    newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
+
+    # ChatGPT Masterprompt (von Catrin geliefert)
+    return f"""Du bist Creative Director und Editorial Art Director für den Lohnsteuerhilfeverein HILO.
+
+Deine Aufgabe ist es, aus dem Newsletter-Text EIN einziges Bildkonzept zu entwickeln und das Bild zu erzeugen.
+
+Das Bild soll die Kernaussage emotional und sofort verständlich vermitteln.
+Es darf den Text NICHT einfach illustrieren, sondern soll Neugier erzeugen.
+Das Bild muss hochwertig, modern und magazinwürdig wirken.
+
+---
+
+SCHRITT 1 – TEXT VERSTEHEN
+
+Analysiere zuerst den Text. Ermittle:
+- Hauptthema
+- Emotion
+- Zielgruppe
+- wichtigste Botschaft
+- welches Bild diese Botschaft am stärksten transportiert
+
+Erzeuge KEINE Collage aus allen Informationen.
+Reduziere auf EINE starke Bildidee.
+
+---
+
+SCHRITT 2 – BILDSTIL WÄHLEN
+
+Wähle selbstständig den passendsten Stil.
+Die Bildstile sollen abwechslungsreich sein.
+Bevorzuge niemals immer denselben Stil.
+
+Mögliche Stilrichtungen:
+• photorealistische Szene
+• Stillleben
+• Editorial Photography
+• Symbolbild
+• Minimalistische Illustration
+• isometrische Infografik
+• hochwertige 3D-Illustration
+• Comic im Ligne-Claire-Stil
+• Papiercollage
+• Flat Design
+• Editorial Vektorillustration
+• Makrofotografie
+• Cinematic Close-up
+• Büro-Szene
+• Objektfotografie
+• Konzeptkunst
+
+Vermeide Wiederholungen.
+Wenn der gleiche Stil mehrfach hintereinander passend wäre, wähle bewusst einen anderen.
+
+---
+
+BILDSPRACHE
+
+Das Bild soll:
+• modern wirken
+• freundlich wirken
+• seriös wirken
+• Vertrauen erzeugen
+• hochwertig wirken
+• deutsche Zielgruppe ansprechen
+• kein Stockfoto-Charakter
+• keine Cliparts
+• keine billigen Icons
+• keine übertriebene KI-Optik
+
+---
+
+FARBEN
+
+Nutze die HILO-CI dezent.
+
+Primärfarben:
+• Navy #1a3a6b
+• Grün #4a8c5c
+• Lavendel #b8c8e8
+• Weiß
+
+Die Farben sollen natürlich eingebunden werden.
+Nicht alles einfärben.
+
+---
+
+TYPOGRAFIE
+
+Keine Schrift.
+Keine Logos.
+Keine Wasserzeichen.
+Keine Buttons.
+Keine QR-Codes.
+
+---
+
+KOMPOSITION
+
+• quadratisch 1:1
+• viel Ruhe
+• klare Blickführung
+• ein dominantes Motiv
+• Editorial Look
+• viel Weißraum
+• WICHTIG: Bildmitte weitgehend LEER lassen (für späteres Text-Overlay)
+• Hauptmotive an den Rändern platzieren
+
+---
+
+MENSCHEN
+
+Nur wenn sie die Aussage verbessern.
+Authentisch.
+Keine übertriebenen Emotionen.
+
+---
+
+QUALITÄT
+
+Ultra High Quality
+Editorial
+Magazine Cover
+professionelles Licht
+perfekte Komposition
+fotografisch glaubwürdig
+
+---
+
+TEXT:
+
+{newsletter_text}"""
 
 def tafel_sign_text(fields):
     """Baut den Tafel-Text (sign_text) fuer den ki_tafel-Modus aus den Entwurfs-fields (#139).
@@ -517,7 +647,7 @@ def ensure_photo_fuer(fields):
         # _tafel_traeger() haelt den Wert konsistent zwischen Producer und cache_dateien_fuer_fields.
         traeger = _tafel_traeger(fields)
         return ensure_photo_tafel(scene, sign_text, traeger)
-    return ensure_photo(motiv)
+    return ensure_photo(motiv, fields=fields)
 
 def _tool_praefix(tool):
     """Liefert den Datei-Praefix fuer ein Bild-Tool. OpenAI traegt KEINEN Praefix (bestehende
@@ -1607,10 +1737,11 @@ def ensure_photo_tafel(scene, sign_text, traeger=None):
         log.warning("KI-Tafel-Foto speichern fehlgeschlagen (%s): %s", sign_text[:40], ex)
         return None
 
-def ensure_photo(motiv, typ=None):
+def ensure_photo(motiv, typ=None, fields=None):
     """Erzeugt (oder liefert aus dem Cache) das Szene-Foto zu 'motiv'. Der Parameter 'typ' wird
     aus Rueckwaerts-Kompatibilitaet noch akzeptiert, aber nicht mehr ausgewertet (einheitliche
-    Szene-Logik). 'icon:'-Motive werden weiterhin gezeichnet (kein OpenAI noetig)."""
+    Szene-Logik). 'icon:'-Motive werden weiterhin gezeichnet (kein OpenAI noetig).
+    NEU: 'fields' (optional) wird an _prompt() durchgereicht fuer Masterprompt mit vollem Text."""
     motiv = (motiv or "").strip()
     # Gezeichnete Motiv-Icons (z.B. 'icon:kalender') - kein OpenAI noetig
     if motiv.startswith("icon:"):
@@ -1628,7 +1759,9 @@ def ensure_photo(motiv, typ=None):
     path = _szene_pfad(motiv, tool=tool)
     if os.path.exists(path):
         return path
-    daten = erzeuge_bild(_prompt(motiv), tool=tool)
+    # Mit fields: Masterprompt, ohne: Fallback auf einfachen Prompt
+    prompt_input = fields if fields else motiv
+    daten = erzeuge_bild(_prompt(prompt_input), tool=tool)
     if daten is None:
         return None
     try:
