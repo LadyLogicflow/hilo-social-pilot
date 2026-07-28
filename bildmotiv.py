@@ -92,85 +92,84 @@ No text, no logos, no watermarks in the image."""
 
     newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
 
-    # Exakte Stil-Wahl (#Catrin: Code gibt exakten Stil vor, OpenAI hat keine Wahl mehr)
-    import random
+    # Neuer Prompt-Ansatz (Catrin v3 - ChatGPT-Feedback):
+    # KEINE Code-basierte Stil-Wahl mehr - OpenAI entscheidet selbst basierend auf:
+    # 1. Bildstrategie (Emotion, Warnung, Symbol, etc.)
+    # 2. Themen-basierte Stil-Wahl
+    # 3. Klare Infografik-Regel (NUR bei Prozessen/Zusammenhängen)
+    # 4. Prioritäten (Foto > Illustration > Infografik als letzte Wahl)
 
-    # Alle Stile mit Kategorie und Gewichtung
-    stile = [
-        # FOTO (40% gesamt, gleichverteilt auf 6 Stile = ~6.67% pro Stil)
-        ("Editorial Photography", "FOTO"),
-        ("Stillleben", "FOTO"),
-        ("Symbolbild", "FOTO"),
-        ("Konzeptfotografie", "FOTO"),
-        ("Makroaufnahme", "FOTO"),
-        ("Objektfotografie", "FOTO"),
-        # ILLUSTRATION (30% gesamt, gleichverteilt auf 4 Stile = 7.5% pro Stil)
-        ("hochwertige 3D-Illustration", "ILLUSTRATION"),
-        ("moderne Editorial-Illustration", "ILLUSTRATION"),
-        ("Papiercollage", "ILLUSTRATION"),
-        ("Ligne-Claire-Comic (OHNE Text im Bild!)", "ILLUSTRATION"),
-        # INFOGRAFIK (30% gesamt, gleichverteilt auf 2 Stile = 15% pro Stil)
-        ("hochwertige Infografik", "INFOGRAFIK"),
-        ("isometrische Illustration", "INFOGRAFIK"),
-    ]
-
-    # Gewichte berechnen: 40% Foto / 30% Illustration / 30% Infografik
-    gewichte = []
-    for stil, kategorie in stile:
-        if kategorie == "FOTO":
-            gewichte.append(0.4 / 6)  # 40% auf 6 Foto-Stile verteilt
-        elif kategorie == "ILLUSTRATION":
-            gewichte.append(0.3 / 4)  # 30% auf 4 Illustration-Stile
-        else:  # INFOGRAFIK
-            gewichte.append(0.3 / 2)  # 30% auf 2 Infografik-Stile
-
-    # Gewichtete Zufallswahl eines EXAKTEN Stils
-    gewahlter_stil, kategorie_name = random.choices(stile, weights=gewichte, k=1)[0]
-
-    # Debug-Log
-    log.info("Bild-Stil gewählt: %s [%s] (Motiv: %s)",
-             gewahlter_stil, kategorie_name, (fields.get("ueberschrift") or "")[:40])
-
-    # Verbesserter Masterprompt (Catrin v2 - Magazin-Titelbild-Fokus)
+    # Masterprompt v3 (Bildstrategie-basiert)
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
 
-Deine Aufgabe besteht darin, aus dem folgenden Newslettertext ein Bild zu entwickeln, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
+Deine Aufgabe: Entwickle aus dem Newslettertext ein Bild, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
 
 ---
 
-ARBEITSWEISE
+SCHRITT 1: BILDSTRATEGIE WÄHLEN
 
-Denke zunächst wie ein Creative Director.
+Analysiere den Text und wähle ZUERST die Bildstrategie:
 
-Analysiere den Text und bestimme:
-• die Kernaussage
-• die Zielgruppe
-• das Kommunikationsziel
-• die wichtigste Emotion
-• welches Motiv den Artikel am stärksten transportiert
-
-Reduziere den gesamten Artikel auf genau EINE Bildidee.
-
-Das Bild soll nicht den Text illustrieren.
-Es soll seine Aussage transportieren.
+• **Emotion erzeugen** – Gefühl transportieren (Hoffnung, Zuversicht, Erleichterung)
+• **Warnen** – Auf Risiken/Fallen hinweisen
+• **Symbol verwenden** – Abstrakte Metapher für das Thema
+• **Objekt in Szene setzen** – Konkreter Gegenstand als Fokus
+• **Geschichte erzählen** – Narrative Szene
+• **Menschen zeigen** – Emotionale Menschendarstellung
+• **Vergleich darstellen** – Vorher/Nachher, Mit/Ohne
+• **Erklärung visualisieren** – Prozess oder Zusammenhang zeigen
 
 Frage dich:
-"Welche Bildidee würde einen Leser innerhalb von drei Sekunden neugierig machen?"
-
-Nutze möglichst eine visuelle Metapher.
-Wenn eine reale Szene stärker ist als eine Metapher, verwende diese.
+"Welche Strategie transportiert die Kernaussage am stärksten?"
+"Welche Bildidee macht den Leser in 3 Sekunden neugierig?"
 
 ---
 
-BILDSTIL
+SCHRITT 2: BILDART NACH THEMA WÄHLEN
 
-Erzeuge das Bild im folgenden Stil:
-{gewahlter_stil}
+Wähle die Bildart basierend auf dem Thema:
 
-WICHTIG:
-- Halte dich STRIKT an diesen Stil
-- KEINE Text-Elemente im Bild (außer bei Infografiken mit maximal 3-5 Wörtern)
-- Der Stil wurde gewählt um Abwechslung in der Bildserie zu gewährleisten
+**Warnung vor Steuerfalle:**
+→ Symbolbild oder Konzeptfotografie
+
+**Emotionale Themen (Erleichterung, Freude):**
+→ Editorial Photography
+
+**Steuererstattung, finanzielle Vorteile:**
+→ Menschen (authentisch) oder Stillleben
+
+**Fristen, Termine:**
+→ Objektfotografie
+
+**Finanzwissen, Ratgeber:**
+→ Illustration oder Editorial Photography
+
+**Vergleich (Mit/Ohne Beratung):**
+→ Infografik ODER Editorial Photography
+
+**Prozess, Ablauf:**
+→ Infografik
+
+**WICHTIG:**
+Infografiken dürfen AUSSCHLIESSLICH verwendet werden, wenn Informationen oder Prozesse besser verständlich werden als durch ein fotografisches oder illustratives Motiv.
+
+In allen anderen Fällen sind fotografische oder illustrative Motive vorzuziehen.
+
+---
+
+SCHRITT 3: PRIORITÄTEN
+
+Bildarten nach Priorität (höchste zuerst):
+
+1. Editorial Photography
+2. Konzeptfotografie
+3. Symbolbild
+4. Stillleben
+5. Objektfotografie
+6. Illustration
+7. Comic (Ligne-Claire)
+8. Papiercollage
+9. **Infografik** (LETZTE WAHL – nur wenn alle anderen die Aussage schlechter transportieren)
 
 ---
 
