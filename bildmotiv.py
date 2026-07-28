@@ -63,39 +63,35 @@ def openai_image_model():
     return wert if wert in ("gpt-image-1", "gpt-image-2") else default
 
 def _prompt(motiv):
-    """Optimierter Szene-Prompt fuer vollflaechige Magazin-/Editorial-Fotos. Flexibel fuer
-    Szenen MIT Menschen oder OHNE (nur Objekte/Gegenstaende). Das Motiv (von der KI generiert)
-    steuert WAS im Bild ist; dieser Prompt gibt nur den STIL vor: professionell-freundlich,
-    hell, zuversichtlich. Rahmen-Komposition mit freier Bildmitte fuer spaeteres Textfeld."""
-    return ("Professionelle Magazin-Fotografie im redaktionellen Stil. "
-            "SZENE: Eine authentische, themenpassende Szene, die %s vermittelt. Natuerliches "
-            "Setting - entweder mit Menschen in realistischen Alltagssituationen ODER mit "
-            "aussagekraeftigen Gegenstaenden/Objekten, die das Thema symbolisieren. Nicht jedes "
-            "Bild braucht Personen. "
-            "STIMMUNG: Zuversichtlich, einladend und professionell-freundlich. WICHTIG - AUCH BEI "
-            "WARN-THEMEN: Zeige die LOESUNG, nicht das Problem. Falls Menschen im Bild sind: "
-            "ERLEICHTERT und ZUVERSICHTLICH (sie wissen was zu tun ist), NIEMALS gestresst, "
-            "schockiert, aengstlich, besorgt oder negativ. Auch bei ernsten Themen bleibt die "
-            "Stimmung ruhig-kompetent, wie ein Berater der die Loesung kennt, NICHT wie jemand "
-            "der gerade ein Problem entdeckt. Die Atmosphaere ist warm und einladend, aber serioes. "
-            "WENN MENSCHEN: Charaktervolle, sympathische Personen verschiedener Altersgruppen. "
-            "Natuerliche Gesichtsausdruecke, sanft laechelnd oder konzentriert-freundlich. Keine "
-            "extremen Emotionen. Keine steifen Posen oder Stockfoto-Klischees. Authentisch und "
-            "ungestellt, wie ein dokumentarisches Foto. "
-            "WENN OBJEKTE/GEGENSTAENDE: Hochwertig arrangiert, aber nicht steril. Natuerliches "
-            "Licht, authentische Details. Symbolische Darstellung des Themas (z.B. Aktenordner, "
-            "Kalender, Muenzstapel, Sparschwein, Taschenrechner, Stifte, Dokumente). "
-            "FARBEN: Helle, freundliche, natuerliche Farbtoene. Warmes, weiches Tageslicht. Keine "
-            "dunklen oder duesteren Bereiche. Neutrale bis leicht warme Farbtemperatur. WO MOEGLICH "
-            "Blau- und Gruentoene als Akzentfarben (HILO-Markenfarben) - z.B. in Objekten (blaue "
-            "Ordner, gruene Pflanzen), Kleidung (blaue Hemden, gruene Schals) oder Umgebungsdetails "
-            "(blaue Tassen, gruene Deko). Natuerlich integriert, nicht erzwungen. "
-            "KOMPOSITION: Rahmen-Aufbau - wichtige Elemente an den Raendern (oben, unten, Seiten), "
-            "Bildmitte bleibt ruhig und weitgehend LEER (zentraler Negativraum). Dieser freie "
-            "zentrale Bereich bleibt fuer spaeteres Textfeld reserviert - kein Hauptmotiv dort "
-            "platzieren. "
-            "STIL: Dokumentarisch, aber freundlich. Wie ein gutes Reportage-Foto aus einem positiven "
-            "Lifestyle-Magazin. Kein Text, keine Schrift, keine Logos im Bild." % motiv)
+    """Still-Life-Prompt fuer inszenierte Objekt-Fotografie OHNE Personen. Das Motiv beschreibt
+    die Objekte und deren Arrangement; dieser Prompt gibt den fotografischen STIL vor:
+    hochwertig, professionell, warm-einladend. Rahmen-Komposition mit freier Bildmitte."""
+    return ("Hochwertige Still-Life-Fotografie im professionellen redaktionellen Stil. "
+            "SZENE: Inszenierte Objekt-Szene die %s vermittelt. KEINE Personen, KEINE Haende, "
+            "KEINE Koerperteile - ausschliesslich Objekte und Gegenstaende. "
+            "STIL: Professionelle Produkt-/Editorial-Fotografie. Hochwertig arrangiert, aber "
+            "authentisch und nicht steril. Natuerliche, lebendige Komposition - kein steriler "
+            "Katalog-Look. Wie eine ansprechende Reportage-Fotografie in einem hochwertigen Magazin. "
+            "OBJEKTE: Symbolische Gegenstaende zum Thema - z.B. Aktenordner, Kalender, "
+            "Muenzstapel, Sparschwein, Taschenrechner, Stifte, Dokumente, Stempel, Notizen. "
+            "Durchdacht arrangiert mit natuerlichen Details (leicht aufgeschlagene Seiten, "
+            "geoeffnete Ordner, gestapelte Muenzen, beschriebene Notizen). "
+            "STIMMUNG: Zuversichtlich, einladend und professionell-freundlich. AUCH BEI "
+            "WARN-THEMEN: Die Objekt-Szene soll Kompetenz und Loesungsorientierung vermitteln, "
+            "NICHT Chaos oder Probleme. Aufgeraeumt und organisiert, nicht unordentlich. "
+            "LICHT: Warmes, weiches natuerliches Tageslicht. Helle, freundliche Beleuchtung. "
+            "Keine dunklen oder duesteren Bereiche. Sanfte Schatten die Tiefe geben, aber nicht "
+            "dramatisch. Neutrale bis leicht warme Farbtemperatur. "
+            "FARBEN: Helle, freundliche, natuerliche Farbtoene. WO MOEGLICH Blau- und Gruentoene "
+            "als Akzentfarben (HILO-Markenfarben) - z.B. blaue Ordner, gruene Pflanzen im "
+            "Hintergrund, blaue Stifte, gruene Notizen. Natuerlich integriert, nicht erzwungen. "
+            "KOMPOSITION: Rahmen-Aufbau - wichtige Objekte an den Raendern (oben, unten, Seiten), "
+            "Bildmitte bleibt ruhig und weitgehend LEER (zentraler Negativraum, freie Flaeche). "
+            "Dieser freie zentrale Bereich bleibt fuer spaeteres Textfeld reserviert - kein "
+            "Hauptobjekt dort platzieren. Objekte umrahmen die Bildmitte. "
+            "HINTERGRUND: Natuerlicher Untergrund - Holztisch, helles Papier, strukturierter Stoff, "
+            "neutrale Flaeche. Weicher unscharfer Hintergrund (geringe Schaerfentiefe) der die "
+            "Objekte hervorhebt. Kein Text, keine Schrift, keine Logos im Bild." % motiv)
 
 def tafel_sign_text(fields):
     """Baut den Tafel-Text (sign_text) fuer den ki_tafel-Modus aus den Entwurfs-fields (#139).
