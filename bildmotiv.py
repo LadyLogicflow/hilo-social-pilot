@@ -92,130 +92,120 @@ No text, no logos, no watermarks in the image."""
 
     newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
 
-    # ChatGPT Masterprompt (von Catrin geliefert)
-    return f"""Du bist Creative Director und Editorial Art Director für den Lohnsteuerhilfeverein HILO.
+    # Verbesserter Masterprompt (Catrin v2 - Magazin-Titelbild-Fokus)
+    return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
 
-Deine Aufgabe ist es, aus dem Newsletter-Text EIN einziges Bildkonzept zu entwickeln und das Bild zu erzeugen.
-
-Das Bild soll die Kernaussage emotional und sofort verständlich vermitteln.
-Es darf den Text NICHT einfach illustrieren, sondern soll Neugier erzeugen.
-Das Bild muss hochwertig, modern und magazinwürdig wirken.
+Deine Aufgabe besteht darin, aus dem folgenden Newslettertext ein Bild zu entwickeln, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
 
 ---
 
-SCHRITT 1 – TEXT VERSTEHEN
+ARBEITSWEISE
 
-Analysiere zuerst den Text. Ermittle:
-- Hauptthema
-- Emotion
-- Zielgruppe
-- wichtigste Botschaft
-- welches Bild diese Botschaft am stärksten transportiert
+Denke zunächst wie ein Creative Director.
 
-Erzeuge KEINE Collage aus allen Informationen.
-Reduziere auf EINE starke Bildidee.
+Analysiere den Text und bestimme:
+• die Kernaussage
+• die Zielgruppe
+• das Kommunikationsziel
+• die wichtigste Emotion
+• welches Motiv den Artikel am stärksten transportiert
 
----
+Reduziere den gesamten Artikel auf genau EINE Bildidee.
 
-SCHRITT 2 – BILDSTIL WÄHLEN
+Das Bild soll nicht den Text illustrieren.
+Es soll seine Aussage transportieren.
 
-Wähle selbstständig den passendsten Stil.
-Die Bildstile sollen abwechslungsreich sein.
-Bevorzuge niemals immer denselben Stil.
+Frage dich:
+"Welche Bildidee würde einen Leser innerhalb von drei Sekunden neugierig machen?"
 
-Mögliche Stilrichtungen:
-• photorealistische Szene
-• Stillleben
-• Editorial Photography
-• Symbolbild
-• Minimalistische Illustration
-• isometrische Infografik
-• hochwertige 3D-Illustration
-• Comic im Ligne-Claire-Stil
-• Papiercollage
-• Flat Design
-• Editorial Vektorillustration
-• Makrofotografie
-• Cinematic Close-up
-• Büro-Szene
-• Objektfotografie
-• Konzeptkunst
-
-Vermeide Wiederholungen.
-Wenn der gleiche Stil mehrfach hintereinander passend wäre, wähle bewusst einen anderen.
+Nutze möglichst eine visuelle Metapher.
+Wenn eine reale Szene stärker ist als eine Metapher, verwende diese.
 
 ---
 
-BILDSPRACHE
+BILDSTIL WÄHLEN
 
-Das Bild soll:
-• modern wirken
-• freundlich wirken
-• seriös wirken
-• Vertrauen erzeugen
-• hochwertig wirken
-• deutsche Zielgruppe ansprechen
-• kein Stockfoto-Charakter
-• keine Cliparts
-• keine billigen Icons
-• keine übertriebene KI-Optik
+Wähle anschließend den Bildstil selbstständig.
+
+Zur Auswahl stehen unter anderem:
+- Editorial Photography
+- Stillleben
+- Symbolbild
+- Konzeptfotografie
+- Makroaufnahme
+- Objektfotografie
+- isometrische Illustration
+- hochwertige Infografik
+- Papiercollage
+- hochwertige 3D-Illustration
+- Ligne-Claire-Comic
+- moderne Editorial-Illustration
+
+Die Bildserie soll abwechslungsreich sein.
+Wiederhole Bildstile möglichst selten.
 
 ---
 
 FARBEN
 
-Nutze die HILO-CI dezent.
+Nutze die HILO-CI ausschließlich als dezente Akzente.
 
-Primärfarben:
-• Navy #1a3a6b
-• Grün #4a8c5c
-• Lavendel #b8c8e8
+Farben:
+• #1a3a6b (Navy)
+• #4a8c5c (Grün)
+• #b8c8e8 (Lavendel)
 • Weiß
 
-Die Farben sollen natürlich eingebunden werden.
-Nicht alles einfärben.
-
 ---
 
-TYPOGRAFIE
+BILDSPRACHE
 
-Keine Schrift.
-Keine Logos.
-Keine Wasserzeichen.
-Keine Buttons.
-Keine QR-Codes.
-
----
-
-KOMPOSITION
-
-• quadratisch 1:1
-• viel Ruhe
+• modern
+• hochwertig
+• vertrauenswürdig
+• authentisch
+• professionell
+• emotional passend
+• ruhige Komposition
 • klare Blickführung
-• ein dominantes Motiv
-• Editorial Look
-• viel Weißraum
-• WICHTIG: Bildmitte weitgehend LEER lassen (für späteres Text-Overlay)
-• Hauptmotive an den Rändern platzieren
 
 ---
 
 MENSCHEN
 
-Nur wenn sie die Aussage verbessern.
-Authentisch.
+Verwende Menschen nur, wenn sie die Aussage verbessern.
+
+Keine gestellten Businessposen.
+Keine Daumen-hoch-Gesten.
 Keine übertriebenen Emotionen.
 
 ---
 
-QUALITÄT
+VERMEIDE
 
-Ultra High Quality
-Editorial
-Magazine Cover
-professionelles Licht
-perfekte Komposition
-fotografisch glaubwürdig
+• Stockfoto-Look
+• Geldregen
+• riesige Eurozeichen
+• überladene Szenen
+• Logos
+• QR-Codes
+• Wasserzeichen
+• Text im Bild
+
+---
+
+FORMAT
+
+Quadratisch. 1:1.
+Ultra High Quality.
+
+---
+
+PARAMETER
+
+Bildwirkung: Automatisch wählen
+Kreativitätsgrad: 3 (von 5)
+Stilpräferenz: Automatisch
 
 ---
 
