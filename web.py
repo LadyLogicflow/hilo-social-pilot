@@ -760,12 +760,17 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     </form>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
       <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
-    <form method=post action="/bild-neu/{{e.id}}" style="margin-top:6px;display:inline" onsubmit="return confirm('Nur das Bild neu erzeugen? Der Text bleibt unverändert.')">
+    <form method=post action="/bild-aktion/{{e.id}}" style="margin-top:12px;display:block">
       <input type=hidden name=zurueck value=entwuerfe>
-      <button style="background:#6b7280" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
-    <form method=post action="/anderes-bild/{{e.id}}" style="margin-top:6px;display:inline;margin-left:6px" onsubmit="return confirm('Für diesen Beitrag einen anderen Bild-Stil würfeln und das Bild neu erzeugen?\n\nDas kostet ein neues KI-Bild. Text und Termin bleiben unverändert.')">
-      <input type=hidden name=zurueck value=entwuerfe>
-      <button style="background:#7a4fae" title="Anderen aktiven Bild-Stil würfeln und das Bild neu erzeugen (kostet ein neues KI-Bild). Text bleibt">&#x1F3B2; Anderes Bild</button></form>
+      <label style="display:block;margin-bottom:4px;color:#0B2545;font-weight:500;font-size:14px">Bild-Motiv (editierbar):</label>
+      <textarea name=motiv placeholder="Beschreibe die Szene (z.B. 'Wecker am Strand, Sonnenaufgang, ruhige Atmosphäre')" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin-bottom:8px;font-size:13px;min-height:60px">{{ e.f.szene_motiv or e.f.bild_motiv or '' }}</textarea>
+      <select name=bild_aktion style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px;width:auto" required>
+        <option value="" disabled selected>– Bild-Aktion wählen –</option>
+        <option value="layout_neu">&#x21BB; Layout neu rendern (kein KI-Call, kostenlos)</option>
+        <option value="foto_neu">&#x1F3B2; Neues Foto würfeln (KI-Call, Kosten)</option>
+        <option value="stil_wechseln">&#x1F3A8; Anderer Stil (KI-Call, Kosten)</option>
+      </select>
+      <button style="background:#0B2545;padding:8px 12px" title="Gewählte Bild-Aktion ausführen">Ausführen</button></form>
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px;display:block">
       <input type=hidden name=zurueck value=entwuerfe>
       <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
@@ -1976,6 +1981,94 @@ def anderes_bild(eid):
               % (eid, _stil_label.get(neu, neu)))
     except Exception as ex:
         flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
+    return redirect(ziel)
+
+@app.route("/bild-aktion/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def bild_aktion(eid):
+    """Vereinheitlichte Bild-Aktion mit 3 Optionen: layout_neu (RE-render), foto_neu (neues KI-Foto
+    mit gleichem/editiertem Motiv), stil_wechseln (anderer Stil). Optionales Motiv-Feld erlaubt
+    manuelle Motiv-Anpassung."""
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    aktion = request.form.get("bild_aktion", "").strip()
+    motiv_neu = request.form.get("motiv", "").strip()
+
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+
+    try:
+        import bildmotiv, stilwahl, textgen
+        data = json.loads(e["text"])
+
+        # Motiv aktualisieren falls geändert
+        if motiv_neu and motiv_neu != (data.get("szene_motiv") or data.get("bild_motiv") or ""):
+            data["szene_motiv"] = motiv_neu
+            data["bild_motiv"] = motiv_neu  # Fallback
+
+        if aktion == "layout_neu":
+            # Nur Layout neu rendern (kein KI-Call)
+            photo = bildmotiv.ensure_photo_fuer(data)
+            slogan = bildgen.pick_slogan(data.get("slogan"))
+            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.render(data, photo, slogan, out)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), out, eid))
+                audit_log(conn, session["user"], "layout_neu", eid)
+                conn.commit()
+            flash("Layout von Beitrag %d neu gerendert (kein KI-Call)." % eid)
+
+        elif aktion == "foto_neu":
+            # Neues Foto würfeln (Cache löschen + neu generieren)
+            # Cache-Dateien für diesen Beitrag löschen um neues Foto zu erzwingen
+            cache_pfade = bildmotiv.cache_dateien_fuer_fields(data)
+            for pfad in cache_pfade:
+                if os.path.exists(pfad):
+                    try:
+                        os.remove(pfad)
+                    except Exception:
+                        pass
+            photo = bildmotiv.ensure_photo_fuer(data)  # Generiert neues Foto
+            slogan = bildgen.pick_slogan(data.get("slogan"))
+            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.render(data, photo, slogan, out)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), out, eid))
+                audit_log(conn, session["user"], "foto_neu_gewuerfelt", eid)
+                conn.commit()
+            flash("Neues Foto für Beitrag %d gewürfelt (KI-Call)." % eid)
+
+        elif aktion == "stil_wechseln":
+            # Anderer Stil würfeln
+            with get_conn() as conn:
+                neu = stilwahl.anderen_stil_waehlen(conn, data)
+            if neu is None:
+                flash("Es ist nur ein Bild-Stil aktiv – bitte erst in der Verwaltung weitere Stile aktivieren.")
+                return redirect(ziel)
+            if neu == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
+                textgen.art_director_motiv(data)
+            photo = bildmotiv.ensure_photo_fuer(data)
+            slogan = bildgen.pick_slogan(data.get("slogan"))
+            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.render(data, photo, slogan, out)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), out, eid))
+                audit_log(conn, session["user"], "stil_gewechselt", eid, neu)
+                conn.commit()
+            _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ", "comic": "Comic"}
+            flash("Stil gewechselt zu %s (KI-Call, neues Foto)." % _stil_label.get(neu, neu))
+        else:
+            flash("Ungültige Bild-Aktion.")
+    except Exception as ex:
+        flash("Bild-Aktion fehlgeschlagen: %s" % ex)
     return redirect(ziel)
 
 @app.route("/bild-generieren/<int:eid>", methods=["POST"])
