@@ -92,6 +92,20 @@ No text, no logos, no watermarks in the image."""
 
     newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
 
+    # Kategorie-basierte Stil-Wahl (#Catrin: Abwechslung zwischen Foto/Illustration/Infografik)
+    import random
+    kategorien = [
+        ("FOTO", "Editorial Photography, Stillleben, Symbolbild, Konzeptfotografie, Makroaufnahme, Objektfotografie", 0.4),
+        ("ILLUSTRATION", "hochwertige 3D-Illustration, moderne Editorial-Illustration, Papiercollage, Ligne-Claire-Comic (OHNE Text im Bild!)", 0.3),
+        ("INFOGRAFIK", "hochwertige Infografik, isometrische Illustration", 0.3)
+    ]
+    # Gewichtete Zufallswahl
+    kategorie_name, stil_optionen, _ = random.choices(
+        kategorien,
+        weights=[k[2] for k in kategorien],
+        k=1
+    )[0]
+
     # Verbesserter Masterprompt (Catrin v2 - Magazin-Titelbild-Fokus)
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
 
@@ -125,24 +139,15 @@ Wenn eine reale Szene stärker ist als eine Metapher, verwende diese.
 
 BILDSTIL WÄHLEN
 
-Wähle anschließend den Bildstil selbstständig.
+Für dieses Bild wurde die Kategorie {kategorie_name} gewählt.
 
-Zur Auswahl stehen unter anderem:
-- Editorial Photography
-- Stillleben
-- Symbolbild
-- Konzeptfotografie
-- Makroaufnahme
-- Objektfotografie
-- isometrische Illustration
-- hochwertige Infografik
-- Papiercollage
-- hochwertige 3D-Illustration
-- Ligne-Claire-Comic
-- moderne Editorial-Illustration
+Wähle einen passenden Stil aus dieser Kategorie:
+{stil_optionen}
 
-Die Bildserie soll abwechslungsreich sein.
-Wiederhole Bildstile möglichst selten.
+WICHTIG:
+- Bei {kategorie_name}: Wähle den Stil der die Kernaussage am besten transportiert
+- KEINE Text-Elemente im Bild (außer bei Infografiken mit maximal 3-5 Wörtern)
+- Die Bildserie soll abwechslungsreich sein - wiederhole nicht immer den gleichen Stil
 
 ---
 
