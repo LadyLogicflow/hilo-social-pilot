@@ -92,14 +92,17 @@ No text, no logos, no watermarks in the image."""
 
     newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
 
-    # Neuer Prompt-Ansatz (Catrin v3 - ChatGPT-Feedback):
-    # KEINE Code-basierte Stil-Wahl mehr - OpenAI entscheidet selbst basierend auf:
-    # 1. Bildstrategie (Emotion, Warnung, Symbol, etc.)
-    # 2. Themen-basierte Stil-Wahl
-    # 3. Klare Infografik-Regel (NUR bei Prozessen/Zusammenhängen)
-    # 4. Prioritäten (Foto > Illustration > Infografik als letzte Wahl)
+    # Masterprompt v3.1 (ChatGPT-optimiert):
+    # Verbesserungen gegenüber v3:
+    # 1. Bildstrategie und Bildart stärker getrennt (mehr kreativer Spielraum)
+    # 2. Positive Gewichtung statt negative ("bevorzuge" statt "letzte Wahl")
+    # 3. Überraschungseffekt-Regel ("Art Director-Frage")
+    # 4. ⭐ ZENTRALE BILDIDEE IN EINEM SATZ (größter Hebel!)
+    # 5. Magazin-Test am Ende ("Würde es auffallen?")
+    # 6. Neue Bildtypen: Flat Lay, Cinematic Detail Shot
+    # 7. Seriencharakter-Regel (Abwechslung über Zeit)
 
-    # Masterprompt v3 (Bildstrategie-basiert)
+    # Masterprompt v3.1 (Optimiert für kreative Qualität)
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
 
 Deine Aufgabe: Entwickle aus dem Newslettertext ein Bild, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
@@ -108,7 +111,7 @@ Deine Aufgabe: Entwickle aus dem Newslettertext ein Bild, das wie ein Titelbild 
 
 SCHRITT 1: BILDSTRATEGIE WÄHLEN
 
-Analysiere den Text und wähle ZUERST die Bildstrategie:
+Analysiere den Text und wähle die Bildstrategie:
 
 • **Emotion erzeugen** – Gefühl transportieren (Hoffnung, Zuversicht, Erleichterung)
 • **Warnen** – Auf Risiken/Fallen hinweisen
@@ -125,51 +128,54 @@ Frage dich:
 
 ---
 
-SCHRITT 2: BILDART NACH THEMA WÄHLEN
+SCHRITT 2: ZENTRALE BILDIDEE FORMULIEREN
 
-Wähle die Bildart basierend auf dem Thema:
+**Dies ist der wichtigste Schritt!**
 
-**Warnung vor Steuerfalle:**
-→ Symbolbild oder Konzeptfotografie
+Formuliere die Bildidee intern in genau EINEM Satz.
 
-**Emotionale Themen (Erleichterung, Freude):**
-→ Editorial Photography
+Beispiele für gute Bildideen:
+- "Eine geöffnete Steuerakte, aus der ein Angelhaken ragt"
+- "Eine rote Warnlampe spiegelt sich auf einem Laptop"
+- "Ein Kalender mit rot markiertem Datum, daneben ein geöffneter Brief"
+- "Hände halten einen Steuerbescheid wie eine Schatzkarte"
 
-**Steuererstattung, finanzielle Vorteile:**
-→ Menschen (authentisch) oder Stillleben
+**Wenn dieser Satz nicht spannend klingt, entwickle eine bessere Bildidee.**
 
-**Fristen, Termine:**
-→ Objektfotografie
+Frage dich zusätzlich:
+"Welche Bildidee würde ein Art Director eines hochwertigen Wirtschaftsmagazins wählen?"
 
-**Finanzwissen, Ratgeber:**
-→ Illustration oder Editorial Photography
-
-**Vergleich (Mit/Ohne Beratung):**
-→ Infografik ODER Editorial Photography
-
-**Prozess, Ablauf:**
-→ Infografik
-
-**WICHTIG:**
-Infografiken dürfen AUSSCHLIESSLICH verwendet werden, wenn Informationen oder Prozesse besser verständlich werden als durch ein fotografisches oder illustratives Motiv.
-
-In allen anderen Fällen sind fotografische oder illustrative Motive vorzuziehen.
+Wenn mehrere Lösungen funktionieren, bevorzuge die originellere.
 
 ---
 
-SCHRITT 3: PRIORITÄTEN
+SCHRITT 3: BILDART WÄHLEN
 
-Bildarten nach Priorität (höchste zuerst):
+Nachdem du die zentrale Bildidee formuliert hast, überlege **unabhängig davon**, welche Bildart diese Idee am stärksten transportiert.
 
+**Die folgenden Zuordnungen sind Orientierungshilfen und keine festen Regeln:**
+
+Warnung vor Steuerfalle → Symbolbild oder Konzeptfotografie
+Emotionale Themen → Editorial Photography
+Steuererstattung → Menschen (authentisch) oder Stillleben
+Fristen, Termine → Objektfotografie oder Editorial Flat Lay
+Finanzwissen → Illustration oder Editorial Photography
+Vergleich → Infografik ODER Editorial Photography
+Prozess, Ablauf → Infografik
+
+**Bevorzuge grundsätzlich:**
 1. Editorial Photography
 2. Konzeptfotografie
 3. Symbolbild
-4. Stillleben
-5. Objektfotografie
-6. Illustration
-7. Comic (Ligne-Claire)
-8. Papiercollage
-9. **Infografik** (LETZTE WAHL – nur wenn alle anderen die Aussage schlechter transportieren)
+4. Editorial Flat Lay
+5. Cinematic Detail Shot
+6. Stillleben
+7. Objektfotografie
+8. Illustration
+9. Comic (Ligne-Claire)
+10. Papiercollage
+
+**Nur wenn fotografische oder illustrative Motive die Aussage schlechter transportieren, verwende eine Infografik.**
 
 ---
 
@@ -233,6 +239,34 @@ PARAMETER
 Bildwirkung: Automatisch wählen
 Kreativitätsgrad: 3 (von 5)
 Stilpräferenz: Automatisch
+
+---
+
+SERIENCHARAKTER
+
+Behandle jedes neue Bild als Teil einer fortlaufenden HILO-Magazinserie.
+
+Vermeide ähnliche:
+• Motive (z.B. nicht immer Sparschwein/Taschenrechner)
+• Perspektiven (z.B. nicht immer Aufsicht)
+• Kompositionen (z.B. nicht immer zentriert)
+• Farbwirkungen (z.B. nicht immer warme Holztöne)
+
+Suche bewusst nach einer neuen visuellen Idee, die sich von typischen Finanz-/Steuermotiven abhebt.
+
+---
+
+QUALITÄTSTEST VOR BILDERZEUGUNG
+
+Überprüfe abschließend:
+
+**"Würde dieses Bild auf der Titelseite eines Magazins zwischen zehn anderen Bildern sofort auffallen?"**
+
+Falls NEIN:
+→ Verbessere die **Bildidee**, nicht den Stil.
+
+Falls JA:
+→ Erzeuge das Bild.
 
 ---
 
