@@ -108,6 +108,9 @@ No text, no logos, no watermarks in the image."""
     # 7. Seriencharakter-Regel (Abwechslung über Zeit)
 
     # Masterprompt v3.1 (Optimiert für kreative Qualität)
+    # Log dass v3.1 verwendet wird
+    log.info("Masterprompt v3.1 wird verwendet für: %s", (fields.get("ueberschrift") or motiv or "")[:50])
+
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
 
 Deine Aufgabe: Entwickle aus dem Newslettertext ein Bild, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
