@@ -105,6 +105,8 @@ No text, no logos, no watermarks in the image."""
         weights=[k[2] for k in kategorien],
         k=1
     )[0]
+    # Debug-Log
+    log.info("Bild-Kategorie gewählt: %s (Motiv: %s)", kategorie_name, (fields.get("ueberschrift") or "")[:40])
 
     # Verbesserter Masterprompt (Catrin v2 - Magazin-Titelbild-Fokus)
     return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
