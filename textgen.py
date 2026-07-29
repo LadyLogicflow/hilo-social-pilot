@@ -571,13 +571,109 @@ def generate(thema, kanal=None):
     raw = "".join(getattr(b, "text", "") for b in msg.content)
     return _normalize_bild(_normalize_captions(_parse_json(raw)))
 
-def _create_drafts(rows, kanal):
-    """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf (Claude). Rueckgabe: Anzahl."""
+
+def generate_with_campaign(thema, kanal=None, test_mode=False):
+    """Neuer 3-Stufen-Workflow mit GPT-5.6 Terra + GPT Image 2 + QA.
+
+    Statt Anthropic Claude verwenden wir den kampagne.run_campaign() Workflow:
+    1. GPT-5.6 Terra: Kampagnenplanung
+    2. GPT Image 2: Grafik-Generierung (mit Text im Bild!)
+    3. GPT-5.6 Terra: Qualitätskontrolle (Retry bei Fehlern)
+
+    Args:
+        thema: Dict mit {titel, volltext, url} oder String
+        kanal: Ziel-Kanal (für CTA)
+        test_mode: True = low quality für Tests, False = high quality
+
+    Returns:
+        Dict mit fields + bild_pfad + qa_status
+
+    Raises:
+        Exception: Bei Fehlern in der Kampagnen-Generierung
+    """
+    import kampagne
+    import os
+    from config import DATA_DIR
+
+    # Thema zu Text konvertieren
+    if isinstance(thema, dict):
+        article = f"{thema.get('titel', '')}\n\n{thema.get('volltext', '')}"
+    else:
+        article = str(thema)
+
+    # CTA basierend auf Kanal
+    cta = "Jetzt Beratungsstelle finden"
+    if kanal == "facebook":
+        cta = "Mehr erfahren"
+    elif kanal == "instagram":
+        cta = "Link in Bio"
+
+    # 3-Stufen-Workflow ausführen
+    log.info("3-Stufen-Workflow wird ausgeführt (test_mode=%s)...", test_mode)
+    plan, image_path, review = kampagne.run_campaign(
+        article=article,
+        cta=cta,
+        test_mode=test_mode,
+        max_retries=3,
+    )
+
+    # Bild in das Standard-Verzeichnis kopieren (falls nötig)
+    import shutil
+    from pathlib import Path
+    final_image_dir = os.path.join(DATA_DIR, "bilder")
+    os.makedirs(final_image_dir, exist_ok=True)
+
+    # Eindeutiger Dateiname
+    import time
+    timestamp = int(time.time())
+    final_image_path = os.path.join(final_image_dir, f"campaign_{timestamp}.png")
+    shutil.copy(image_path, final_image_path)
+
+    # Fields zusammenstellen (kompatibel mit bestehendem Format)
+    fields = {
+        "ueberschrift": plan.headline,
+        "subline": plan.core_message,  # Kernaussage als Subline
+        "bullets": plan.supporting_points,
+        "cta": plan.cta,
+        "bild_motiv": plan.visual_concept,  # Für Dokumentation
+        "bild_stil": "standard",  # v5.x wird automatisch erkannt
+        "bild_pfad": final_image_path,  # Bild ist BEREITS erstellt!
+        "qa_approved": review.approved,  # QA-Status
+        "qa_problems": review.problems if not review.approved else [],
+    }
+
+    log.info("3-Stufen-Workflow abgeschlossen: %s (QA: %s)",
+             plan.headline, "✅" if review.approved else "❌")
+
+    return fields
+
+
+def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
+    """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf.
+
+    Args:
+        rows: Themen-Zeilen aus der DB
+        kanal: Ziel-Kanal (google, facebook, instagram)
+        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
+                      False = Anthropic Claude (bisheriger Workflow)
+        test_mode: True = low quality für Tests (nur bei use_campaign=True)
+
+    Returns:
+        Anzahl erzeugter Entwuerfe
+    """
     from db import get_conn
     created = 0
     for r in rows:
         try:
-            data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
+            # WAHL: 3-Stufen-Workflow oder bisheriger Claude-Workflow
+            if use_campaign:
+                data = generate_with_campaign(
+                    {"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]},
+                    kanal,
+                    test_mode=test_mode
+                )
+            else:
+                data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
             with get_conn() as conn:
                 # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen und in
                 # fields['bild_stil'] ablegen (stabil ueber Re-Renders). Robust gegen Fehler.
@@ -609,9 +705,21 @@ def _create_drafts(rows, kanal):
             log.warning("Texterzeugung fehlgeschlagen (Thema %s): %s", r["id"], ex)
     return created
 
-def generate_drafts(limit=3, kanal="google"):
+def generate_drafts(limit=3, kanal="google", use_campaign=False, test_mode=False):
+    """Erzeugt Entwuerfe fuer ausgewaehlte Themen.
+
+    Args:
+        limit: Max. Anzahl Entwuerfe
+        kanal: Ziel-Kanal (google, facebook, instagram)
+        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
+                      False = Anthropic Claude (bisheriger Workflow)
+        test_mode: True = low quality für Tests (nur bei use_campaign=True)
+
+    Returns:
+        Anzahl erzeugter Entwuerfe
+    """
     from db import get_conn
-    if not get_secret("anthropic_api_key"):
+    if not use_campaign and not get_secret("anthropic_api_key"):
         log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
         return 0
     with get_conn() as conn:
@@ -619,16 +727,26 @@ def generate_drafts(limit=3, kanal="google"):
             "SELECT id, titel, url, volltext FROM themen t WHERE status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id AND e.kanal=?) "
             "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
-    return _create_drafts(rows, kanal)
+    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
 
-def generate_for_ids(ids, kanal="google"):
-    """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs (status 'ausgewaehlt', noch ohne
-    Entwurf in diesem Kanal). Rueckgabe: Anzahl erzeugter Entwuerfe."""
+def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False):
+    """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs.
+
+    Args:
+        ids: Liste von Thema-IDs
+        kanal: Ziel-Kanal (google, facebook, instagram)
+        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
+                      False = Anthropic Claude (bisheriger Workflow)
+        test_mode: True = low quality für Tests (nur bei use_campaign=True)
+
+    Returns:
+        Anzahl erzeugter Entwuerfe
+    """
     from db import get_conn
     ids = [int(i) for i in ids if str(i).strip().isdigit()]
     if not ids:
         return 0
-    if not get_secret("anthropic_api_key"):
+    if not use_campaign and not get_secret("anthropic_api_key"):
         log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
         return 0
     ph = ",".join("?" * len(ids))
@@ -637,7 +755,7 @@ def generate_for_ids(ids, kanal="google"):
             "SELECT id, titel, url, volltext FROM themen WHERE id IN (%s) AND status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id AND e.kanal=?)" % ph,
             ids + [kanal]).fetchall()
-    return _create_drafts(rows, kanal)
+    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
 
 
 def regenerate_open_drafts(kanal="google"):
