@@ -1,0 +1,81 @@
+Du bist Creative Director für HILO. Erstelle ein Social-Media-Bild (1:1, quadratisch) mit integriertem Text.
+
+1. BILDIDEE IN EINEM SATZ
+Formuliere die zentrale Bildidee in einem spannenden Satz.
+Beispiel: "Umzugskartons, Schlüssel und Steuerunterlagen auf einem Holztisch"
+Frage: Würde ein Magazin-Art-Director diese Idee wählen?
+
+2. BILDART
+Bevorzuge: Editorial Photography, Konzeptfoto, Symbolbild, Stillleben, Flat Lay
+Keine Infografiken! (außer bei Prozessen/Abläufen)
+Keine Personen! (nur inszenierte Objekte)
+
+3. TEXT-INTEGRATION
+
+ÜBERSCHRIFT IM BILD:
+Umzug? So holen Sie sich Geld zurück!
+
+BULLET-POINTS IM BILD:
+• Beruflicher Umzug absetzbar
+• Höchstbeträge jährlich angepasst
+• Belege sorgfältig aufbewahren
+
+TYPOGRAFIE-ANFORDERUNGEN:
+
+Überschrift:
+- Schriftart: Kräftig, serifenlos, modern (z.B. "Bold Sans-Serif")
+- Farbe: Navy (#0B2545) oder Weiß (je nach Hintergrund)
+- Größe: Groß, prominent (größer als Bullets)
+
+Bullets:
+- Schriftart: Serifenlos, gut lesbar (z.B. "Sans-Serif")
+- Farbe: Gleiche Farbe wie Überschrift oder leicht heller
+- Größe: Kleiner als Überschrift, aber gut lesbar
+- Format:
+  - Grünes Häkchen-Symbol (✓) oder grüner Punkt vor jedem Bullet
+  - Oder Nummerierung (1., 2., 3.)
+  - Jeder Bullet eine Zeile
+  - Max. 3-4 Bullets
+
+Allgemein:
+- Hintergrund:
+  - Bei dunklem Bild: Weißer Text mit leichtem Schatten
+  - Bei hellem Bild: Navy-Text mit leichtem Hintergrund-Overlay (halbtransparente Box)
+- Lesbarkeit:
+  - Hoher Kontrast zum Hintergrund
+  - Keine Überlappung mit wichtigen Bild-Elementen
+  - Klare, scharfe Buchstaben
+
+LAYOUT:
+
+- Text-Block (Überschrift + Bullets): Linke oder rechte Hälfte des Bildes
+- Bild-Elemente (Objekte): Andere Hälfte des Bildes
+- Alternative: Text-Block oben, Objekte unten (2/3 Aufteilung)
+- Text darf NICHT von Objekten verdeckt werden
+- Ruhiger, einfarbiger oder weicher Hintergrund hinter dem Text-Block
+
+4. QUALITÄTSTEST
+- Würde dieses Bild auf einer Magazin-Titelseite auffallen?
+- Ist die Überschrift sofort lesbar (3 Sekunden)?
+- Falls nein: Bildidee oder Text-Position verbessern
+
+5. REGELN
+- Keine Stockfoto-Posen
+- Keine Geldregen/Eurozeichen
+- Kein zusätzlicher Text außer Überschrift und Bullets
+- Modern, hochwertig, vertrauenswürdig
+
+6. FARBEN (dezent im Bild)
+- Navy #0B2545
+- Grün #4a8c5c
+- Lavendel #b8c8e8
+
+7. FORMAT
+- Quadratisch 1:1
+- Ultra High Quality
+- Für Social Media (Instagram, Facebook)
+
+ERWARTETES ERGEBNIS:
+- LINKS: Text-Block mit Überschrift "Umzug? So holen Sie sich Geld zurück!" (Navy, groß, kräftig) + 3 Bullets mit grünen Häkchen (kleiner, gut lesbar) + Halbtransparenter weißer Hintergrund hinter dem Text
+- RECHTS: Umzugskartons, Schlüssel, Steuerunterlagen auf Holztisch
+- Magazin-Qualität, warm, einladend, professionell
