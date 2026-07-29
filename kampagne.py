@@ -213,93 +213,169 @@ VERMEIDEN
 BILDPROMPT
 
 Formuliere abschließend einen vollständigen englischen Produktionsprompt
-für das Bildmodell.
+für GPT Image.
 
-CONCEPT LOCK
+Das Ergebnis ist eine fertige Social-Media-Anzeige, kein reines Foto und
+kein Hintergrundbild.
 
-Das zuvor ausgewählte Kreativkonzept ist verbindlich und darf im Bildprompt
-nicht verändert, uminterpretiert oder durch eine offensichtlichere Bildidee
-ersetzt werden.
+Motiv, Typografie und Werbebotschaft sind gleichrangige Pflichtbestandteile.
 
-Der Bildprompt muss:
+────────────────────────
+1. VISUAL CONCEPT LOCK
+────────────────────────
 
-- exakt das ausgewählte Hauptmotiv beschreiben
-- alle im Kreativkonzept genannten Kernelemente ausdrücklich aufführen
-- die festgelegte Bildart verbindlich nennen
-- unerwünschte Alternativmotive ausdrücklich ausschließen
-- deutlich zwischen dem visuellen Motiv und dem Inhalt des Anzeigentextes unterscheiden
+Das zuvor ausgewählte Kreativkonzept ist verbindlich.
 
-Der Steuertext darf ausschließlich die Typografie und die fachliche Botschaft
-bestimmen. Er darf nicht zu einer neuen oder abweichenden Bildidee führen.
+Es darf im finalen Bildprompt nicht verändert, uminterpretiert oder durch
+eine naheliegendere Bildidee ersetzt werden.
 
-Wenn beispielsweise ein Still-Life gewählt wurde:
+Der Steuertext bestimmt die fachliche Botschaft und den eingebauten Text.
 
-- dürfen keine Personen dargestellt werden
-- darf nicht zu Lifestyle-Fotografie gewechselt werden
-- darf keine Feier- oder Beratungsszene entstehen
-- muss das Still-Life das dominante und klar erkennbare Hauptmotiv bleiben
+Das ausgewählte Kreativkonzept bestimmt ausschließlich das Bildmotiv.
 
-Der englische Bildprompt muss mit diesem Block beginnen:
+Der Bildprompt muss beginnen mit:
 
 "MANDATORY VISUAL CONCEPT — DO NOT REINTERPRET:
+
 [präzise Beschreibung des ausgewählten Kreativkonzepts]
 
-The following visual concept is locked. Do not replace it with a different
-scene, a more literal interpretation of the copy, or a lifestyle photograph."
+This visual concept is locked. Do not replace it with a different scene,
+a more literal interpretation, a lifestyle photograph or another visual idea."
 
-Danach muss der Bildprompt getrennte Abschnitte enthalten:
+Alle zwingenden Objekte des Kreativkonzepts müssen unter
+"REQUIRED VISUAL ELEMENTS" einzeln aufgeführt werden.
 
-1. MANDATORY VISUAL CONCEPT
-2. REQUIRED OBJECTS
-3. FORBIDDEN VISUAL ALTERNATIVES
-4. COMPOSITION
-5. EXACT TEXT
-6. TYPOGRAPHY
-7. BRAND COLOURS
-8. CORNER SAFE ZONES
-9. FINAL VALIDATION
+Alle unerwünschten Alternativmotive müssen unter
+"FORBIDDEN VISUAL ALTERNATIVES" ausdrücklich ausgeschlossen werden.
 
-REQUIRED OBJECTS
+────────────────────────
+2. TYPOGRAPHY LOCK
+────────────────────────
 
-Führe alle zwingend sichtbaren Gegenstände als eindeutige Liste auf.
-Das Bild ist ungültig, wenn eines dieser Elemente fehlt.
+Der vollständige Text ist ebenso verbindlich wie das Bildmotiv.
 
-FORBIDDEN VISUAL ALTERNATIVES
+Der englische Bildprompt muss ausdrücklich enthalten:
 
-Nenne alle Motive, die nicht entstehen dürfen, insbesondere solche,
-die sich aus einer zu wörtlichen Interpretation des Steuertextes ergeben.
+"MANDATORY TYPOGRAPHY — EQUALLY IMPORTANT AS THE IMAGE:
 
-EXACT TEXT
+This is a finished advertising graphic, not an editorial photograph.
 
-Alle gelieferten Texte müssen exakt, vollständig und nur einmal erscheinen.
+The advertisement is invalid if the headline, supporting points or
+call-to-action are missing, incomplete, too small, low-contrast,
+misspelled or difficult to read."
+
+Der Bildprompt muss festlegen:
+
+- Die Headline ist das größte Textelement.
+- Die Headline muss auf einem Smartphone sofort lesbar sein.
+- Die Headline belegt ungefähr 20–30 % der gesamten Bildfläche.
+- Die Headline besteht aus höchstens drei gut lesbaren Zeilen.
+- Die Infopunkte sind deutlich kleiner als die Headline, aber vollständig lesbar.
+- Der Call-to-Action ist als klar erkennbare Schaltfläche oder Fläche gestaltet.
+- Kein Pflichttext darf als kleine dekorative Beschriftung erscheinen.
+- Kein Pflichttext darf auf einem Bilderrahmen, einer Notiz, einer Tafel,
+  einem Dokument oder einem Gegenstand versteckt werden.
+- Kein Pflichttext darf durch Objekte, Schatten oder geringe Kontraste beeinträchtigt werden.
+
+Alle gelieferten Texte müssen exakt, vollständig und jeweils nur einmal erscheinen.
+
 Keine zusätzlichen Wörter.
-Keine Umformulierungen.
-Keine erfundenen Texte.
-Deutsche Rechtschreibung muss exakt eingehalten werden.
+Keine Umschreibungen.
+Keine Übersetzungen.
+Keine erfundenen Markensätze.
+Keine verkürzten Texte.
 
-CORNER SAFE ZONES
+────────────────────────
+3. MESSAGE CLARITY
+────────────────────────
 
-Halte alle vier Ecken vollständig frei.
+Die Anzeige muss auch ohne Lesen des Begleittextes erkennen lassen,
+dass es sich um eine steuerliche Information handelt.
 
-Definiere in jeder Ecke eine leere Sicherheitszone von mindestens
-12 % der Bildbreite und 12 % der Bildhöhe.
+Ergänze deshalb mindestens einen glaubwürdigen steuerlichen Kontextanker,
+sofern er zum Motiv passt, zum Beispiel:
 
-In diesen Sicherheitszonen dürfen keinerlei Texte, Personen, Gegenstände,
-Dekorationen, Schatten, Muster oder andere wichtige Bildelemente erscheinen.
+- geordnete Steuerunterlagen
+- eine sachliche Dokumentenmappe
+- Belege oder Rechnungen
+- Taschenrechner
+- Stift und Steuerdokumente
+- ein neutral dargestelltes deutsches Steuerformular
 
-FINAL VALIDATION
+Der steuerliche Kontextanker darf das Hauptmotiv nicht verdrängen.
 
-Der Bildprompt muss das Bildmodell abschließend anweisen, vor der Ausgabe
-intern zu kontrollieren:
+Es dürfen keine erfundenen Zahlen, Paragraphen, Behördennamen oder
+zusätzlichen Texte auf Dokumenten erscheinen.
 
-- Entspricht das Bild exakt dem gesperrten Kreativkonzept?
-- Sind alle erforderlichen Gegenstände sichtbar?
-- Wurden sämtliche verbotenen Alternativmotive vermieden?
-- Sind alle Texte exakt geschrieben?
-- Sind alle vier Ecken vollständig frei?
+────────────────────────
+4. FIXED ADVERTISEMENT LAYOUT
+────────────────────────
+
+Wähle eine eindeutige Anzeigenkomposition.
+
+Bevorzuge:
+
+- Textblock links und Motiv rechts
+oder
+- Textblock oben und Motiv unten
+
+Vermeide frei schwebende oder zufällig verteilte Texte.
+
+Reserviere mindestens 40 % der Bildfläche für den vollständigen Text.
+
+Der Textbereich benötigt:
+
+- eine ruhige Fläche
+- hohen Kontrast
+- klare Ausrichtung
+- großzügige Abstände
+- keine bildwichtigen Elemente im Hintergrund
+
+Falls der fotografische Hintergrund nicht ausreichend ruhig ist,
+verwende eine deckende oder nahezu deckende Fläche in Weiß,
+Lavendelblau oder Navy hinter dem Text.
+
+Die Lesbarkeit hat Vorrang vor einer vollständig sichtbaren Fotografie.
+
+────────────────────────
+5. CORNER SAFE ZONES
+────────────────────────
+
+Halte alle vier Ecken frei für spätere Logo-Overlays.
+
+In jeder Ecke muss eine Sicherheitszone von mindestens 12 % der Bildbreite
+und 12 % der Bildhöhe frei bleiben.
+
+Die Sicherheitszonen dürfen keine Pflichttexte, Personen, Hero-Objekte
+oder wichtigen Bildinformationen enthalten.
+
+Dezente, gleichmäßige Hintergrundflächen sind dort erlaubt.
+
+Die Eckfreihaltung darf nicht dazu führen, dass der Text zu klein wird.
+
+────────────────────────
+6. FINAL VALIDATION
+────────────────────────
+
+Der englische Bildprompt muss das Bildmodell abschließend anweisen,
+das Ergebnis vor der Ausgabe intern zu kontrollieren.
+
+Das Bild ist ungültig, wenn eine der folgenden Bedingungen nicht erfüllt ist:
+
+- Das gesperrte Kreativkonzept wurde exakt umgesetzt.
+- Alle erforderlichen Objekte sind sichtbar.
+- Die Headline ist vollständig und sofort lesbar.
+- Alle Infopunkte sind vollständig und gut lesbar.
+- Der Call-to-Action ist klar erkennbar.
+- Kein Pflichttext wurde durch kleinere Ersatztexte ersetzt.
+- Es gibt keine zusätzlichen oder erfundenen Wörter.
+- Die deutsche Rechtschreibung ist korrekt.
+- Der steuerliche Zusammenhang ist erkennbar.
+- Die vier Ecken bleiben für Logo-Overlays frei.
+- Die Anzeige funktioniert als fertige Kampagnengrafik und nicht nur als Foto.
 
 Wenn eine Bedingung nicht erfüllt ist, muss die Komposition vor der Ausgabe
-korrigiert werden.
+vollständig korrigiert werden.
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
