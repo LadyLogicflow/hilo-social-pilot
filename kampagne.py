@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from config import DATA_DIR
 from secrets_store import get_secret
+from text_renderer import render_text_on_image
 
 log = logging.getLogger("hilo.kampagne")
 
@@ -56,6 +57,16 @@ def _get_client() -> OpenAI:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+class TextBox(BaseModel):
+    """Position und Ausrichtung eines Textblocks (normalisierte Koordinaten 0.0-1.0)."""
+    x: float = Field(ge=0.0, le=1.0, description="X-Position (0.0 = links, 1.0 = rechts)")
+    y: float = Field(ge=0.0, le=1.0, description="Y-Position (0.0 = oben, 1.0 = unten)")
+    width: float = Field(ge=0.0, le=1.0, description="Breite (0.0-1.0)")
+    height: float = Field(ge=0.0, le=1.0, description="Höhe (0.0-1.0)")
+    align: Literal["left", "center", "right"] = Field(description="Horizontale Ausrichtung")
+    vertical_align: Literal["top", "center", "bottom"] = Field(description="Vertikale Ausrichtung")
+
+
 class CampaignPlan(BaseModel):
     """Kampagnenplan von GPT-5.6 Terra (Stufe 1).
 
@@ -81,7 +92,22 @@ class CampaignPlan(BaseModel):
     text_contrast: str = Field(description="Farbkontrast für Text (z.B. 'Navy auf hell')")
     accent_usage: str = Field(description="Verwendung der Akzentfarben")
 
-    image_prompt: str = Field(description="Vollständiger englischer Prompt für GPT Image 2")
+    # NEU: Layout-Informationen für Pillow-Text-Rendering
+    layout_template: Literal[
+        "text_left_hero_right",
+        "text_right_hero_left",
+        "text_top_hero_bottom",
+        "hero_top_text_bottom",
+        "centered_headline_bottom_panel",
+        "editorial_split"
+    ] = Field(description="Gewählte Layout-Vorlage")
+
+    headline_box: TextBox = Field(description="Position für Headline")
+    supporting_box: TextBox = Field(description="Position für Bullets")
+    cta_box: TextBox = Field(description="Position für CTA")
+
+    # Für GPT Image 2: NUR Motiv-Prompt (OHNE Text!)
+    motiv_prompt: str = Field(description="Englischer Prompt NUR für das Motiv (OHNE Text-Rendering!)")
 
 
 class CaptionOnly(BaseModel):
@@ -92,18 +118,79 @@ class CaptionOnly(BaseModel):
 class QualityReview(BaseModel):
     """Qualitätsprüfung von GPT-5.6 Terra (Stufe 3).
 
-    Prüft das generierte Bild auf Korrektheit, Lesbarkeit und fachliche Übereinstimmung.
+    Prüft das generierte Bild auf Lesbarkeit, Motiv-Qualität und Layout
+    (Text-Korrektheit wird von Pillow garantiert!).
     """
     approved: bool = Field(description="True = Bild freigegeben, False = Neu generieren")
 
-    text_is_exact: bool = Field(description="Alle Texte exakt wie vorgegeben?")
-    spelling_is_correct: bool = Field(description="Deutsche Rechtschreibung korrekt?")
+    # Text-Checks ENTFERNT (wird von Pillow garantiert!)
+    # text_is_exact: bool  ❌ NICHT MEHR NÖTIG
+    # spelling_is_correct: bool  ❌ NICHT MEHR NÖTIG
+
     all_text_is_readable: bool = Field(description="Alle Texte gut lesbar?")
+    text_has_good_contrast: bool = Field(description="Text-Kontrast ausreichend?")
+    text_not_overlapping: bool = Field(description="Text überlappt nicht mit Motiv?")
     message_matches_article: bool = Field(description="Aussage entspricht dem Steuertext?")
     layout_is_professional: bool = Field(description="Layout professionell?")
+    motiv_is_high_quality: bool = Field(description="Motiv hochwertig und ansprechend?")
 
     problems: list[str] = Field(description="Liste gefundener Probleme")
     correction_instruction: str = Field(description="Anweisung zur Korrektur (falls approved=False)")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# LAYOUT-VORLAGEN (für Pillow Text-Rendering)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LAYOUT_TEMPLATES = {
+    "text_left_hero_right": {
+        "headline_box": TextBox(x=0.07, y=0.08, width=0.48, height=0.24, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.38, width=0.42, height=0.28, align="left", vertical_align="top"),
+        "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
+        "motiv_area": "right 50%",
+        "motiv_instruction": "Keep the left 45% visually calm. Place the hero subject on the right side."
+    },
+
+    "text_right_hero_left": {
+        "headline_box": TextBox(x=0.55, y=0.08, width=0.38, height=0.24, align="right", vertical_align="top"),
+        "supporting_box": TextBox(x=0.55, y=0.38, width=0.38, height=0.28, align="right", vertical_align="top"),
+        "cta_box": TextBox(x=0.55, y=0.76, width=0.38, height=0.11, align="center", vertical_align="center"),
+        "motiv_area": "left 50%",
+        "motiv_instruction": "Keep the right 40% visually calm. Place the hero subject on the left side."
+    },
+
+    "text_top_hero_bottom": {
+        "headline_box": TextBox(x=0.07, y=0.06, width=0.86, height=0.18, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.28, width=0.86, height=0.14, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.47, width=0.50, height=0.09, align="center", vertical_align="center"),
+        "motiv_area": "bottom 45%",
+        "motiv_instruction": "Keep the top 55% visually calm. Place the hero subject in the lower half."
+    },
+
+    "hero_top_text_bottom": {
+        "headline_box": TextBox(x=0.07, y=0.58, width=0.86, height=0.16, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.76, width=0.86, height=0.12, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.90, width=0.50, height=0.08, align="center", vertical_align="center"),
+        "motiv_area": "top 55%",
+        "motiv_instruction": "Keep the bottom 40% visually calm. Place the hero subject in the upper half."
+    },
+
+    "centered_headline_bottom_panel": {
+        "headline_box": TextBox(x=0.10, y=0.35, width=0.80, height=0.22, align="center", vertical_align="center"),
+        "supporting_box": TextBox(x=0.10, y=0.72, width=0.80, height=0.14, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.88, width=0.50, height=0.09, align="center", vertical_align="center"),
+        "motiv_area": "background",
+        "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 25% calm."
+    },
+
+    "editorial_split": {
+        "headline_box": TextBox(x=0.05, y=0.12, width=0.42, height=0.20, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.05, y=0.38, width=0.42, height=0.24, align="left", vertical_align="top"),
+        "cta_box": TextBox(x=0.05, y=0.68, width=0.42, height=0.10, align="left", vertical_align="center"),
+        "motiv_area": "right 48%",
+        "motiv_instruction": "Create an editorial split layout. Hero subject fills the right half completely."
+    }
+}
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -215,64 +302,70 @@ VERMEIDEN
 - Wasserzeichen
 - erfundene Texte
 
-BILDPROMPT (GPT Image 2 Production Briefing)
+LAYOUT-PLANUNG
 
-Formuliere abschließend einen vollständigen englischen Produktionsprompt
-für GPT Image 2 nach folgendem Muster:
+Wähle eine passende Layout-Vorlage aus den folgenden Optionen:
+
+- text_left_hero_right: Text links (45%), Motiv rechts (50%)
+- text_right_hero_left: Text rechts (40%), Motiv links (50%)
+- text_top_hero_bottom: Text oben (55%), Motiv unten (45%)
+- hero_top_text_bottom: Motiv oben (55%), Text unten (40%)
+- centered_headline_bottom_panel: Zentrale Headline, unteres Text-Panel
+- editorial_split: Editorial Split-Layout (Text links, Motiv rechts halbseitig)
+
+Wähle das Layout das am besten zum Thema, Motiv und zur Aussage passt.
+
+Fülle dann die TextBox-Felder (headline_box, supporting_box, cta_box) aus
+der gewählten Vorlage in deine Antwort ein.
+
+MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
+
+Formuliere einen englischen Produktionsprompt für GPT Image 2.
+
+WICHTIG - DIES IST ENTSCHEIDEND:
+- Der Prompt beschreibt NUR das visuelle Motiv
+- KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen!
+- Das Motiv muss eine ruhige, freie Fläche für späteren Text lassen
+- Verwende die Layout-spezifische Anweisung aus der gewählten Vorlage
+
+Beispiel für "text_left_hero_right":
 
 ────────────────────────────────────────────────────────────────
 
-Generate a square social media advertisement (1080x1080) with MANDATORY TEXT RENDERING.
+Generate a professional tax consultation scene with warm natural lighting.
 
-#1 PRIORITY: Text rendering is the PRIMARY success criterion.
-An image without the complete required text is invalid.
+COMPOSITION:
+Keep the left 45% of the image visually calm and free of important objects.
+Place the hero subject (tax consultant, documents, calculator) on the right side.
 
-REQUIRED TEXT (exact German, must appear verbatim):
-Headline: [füge hier die entwickelte Headline ein]
-• [Infopunkt 1]
-• [Infopunkt 2]
-• [Infopunkt 3, falls vorhanden]
-Call-to-Action: [füge hier den CTA ein]
+STYLE:
+Clean, modern aesthetic. High-quality photography.
+Warm, inviting atmosphere with professional credibility.
 
-TYPOGRAPHY REQUIREMENTS:
-- Headline: largest element, 20-30% of image area, 3 lines maximum, mobile-readable
-- Bullets: clearly smaller than headline, fully legible
-- CTA: recognizable button or panel
-- High contrast (light on dark OR dark on light)
-- All text sharp, readable at 6-inch screen size
-- No decorative placement on frames/objects/documents
-
-VISUAL CONCEPT:
-[füge hier die präzise Beschreibung des gewählten Kreativkonzepts ein]
-
-LAYOUT:
-[füge hier die Layout-Beschreibung ein]
-(Text block left/Motiv right OR Text top/Motiv bottom preferred)
-Reserve ≥40% area for text on clean, high-contrast background
-
-HILO BRAND COLORS:
-Navy #1a3a6b, Green #4a8c5c, Lavender #b8c8e8, White #ffffff
+COLORS:
+Use HILO brand colors as accents:
+- Navy #1a3a6b (background or supporting elements)
+- Green #4a8c5c (accent details)
+- Lavender #b8c8e8 (subtle highlights)
+- White #ffffff (clean surfaces)
 
 CORNER SAFE ZONES:
-Keep all four corners clear (12% width × 12% height per corner) for logo overlays
+Keep all four corners clear (12% width × 12% height per corner) for logo overlays.
 
-FINAL CHECK before output:
-☑ Visual concept executed
-☑ Headline complete, readable
-☑ All bullets complete, readable
-☑ CTA clear
-☑ No invented text
-☑ German spelling correct
-☑ Corners free
-☑ Advertisement, not photo
-
-If ANY check fails, correct BEFORE output.
+CRITICAL:
+DO NOT RENDER ANY TEXT, LETTERS, NUMBERS OR TYPOGRAPHY.
+The image must have clean, uncluttered areas for text overlay.
 
 ────────────────────────────────────────────────────────────────
 
-Fülle die Platzhalter [in eckigen Klammern] mit den zuvor entwickelten Inhalten.
-Übernimmt alle Texte exakt wie vorgegeben.
-Der finale Prompt muss vollständig in Englisch sein.
+Passe dieses Muster an:
+- Verwende die Layout-Anweisung aus der gewählten Vorlage
+- Beschreibe das Hero-Element präzise
+- Nutze HILO-Farben als Akzente
+- Stelle sicher dass der Textbereich RUHIG und FREI bleibt
+- Wiederhole am Ende: "DO NOT RENDER ANY TEXT"
+
+Der finale motiv_prompt muss vollständig in Englisch sein.
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
@@ -344,31 +437,31 @@ def create_campaign_plan(
 
 
 def generate_advertisement(
-    image_prompt: str,
+    motiv_prompt: str,
     output_path: Optional[str] = None,
-    size: Literal["1024x1024", "2048x2048"] = "2048x2048",
+    size: Literal["1024x1024", "2048x2048"] = "1024x1024",
     quality: Literal["low", "medium", "high", "auto"] = "high",
 ) -> Path:
-    """Stufe 2: Grafik-Generierung mit GPT Image 2.
+    """Stufe 2a: Motiv-Generierung mit GPT Image 2 (OHNE Text!).
 
     Args:
-        image_prompt: Vollständiger Prompt von create_campaign_plan()
+        motiv_prompt: Englischer Prompt NUR für das Motiv (OHNE Text!)
         output_path: Optional: Ziel-Pfad (Standard: auto-generiert)
-        size: Bildgröße (1024x1024 für Tests, 2048x2048 für Produktion)
+        size: Bildgröße (1024x1024 optimal für 1080x1080 Feed-Posts!)
         quality: Qualitätsstufe (low für Tests, high für Produktion)
 
     Returns:
-        Path zum gespeicherten PNG
+        Path zum gespeicherten PNG (NUR Motiv, Text wird später mit Pillow eingefügt!)
 
     Raises:
         RuntimeError: Wenn keine Bilddaten zurückkamen
     """
     client = _get_client()
-    log.info("Stufe 2: Grafik wird generiert (size=%s, quality=%s)...", size, quality)
+    log.info("Stufe 2a: Motiv wird generiert (OHNE Text, size=%s, quality=%s)...", size, quality)
 
     result = client.images.generate(
         model="gpt-image-2",
-        prompt=image_prompt,
+        prompt=motiv_prompt,
         size=size,
         quality=quality,
         output_format="png",
@@ -400,35 +493,39 @@ def generate_advertisement(
 
 QA_PROMPT = """Du bist Qualitätskontrolleur für HILO Social-Media-Werbeanzeigen.
 
+WICHTIG: Die Texte (Headline, Bullets, CTA) wurden bereits mit Pillow eingefügt
+und sind garantiert vorhanden und korrekt geschrieben!
+
 Prüfe das generierte Bild auf:
 
-1. TEXTGENAUIGKEIT: Sind alle Texte (Headline, Infopunkte, CTA) EXAKT wie vorgegeben?
-   Keine Tippfehler, keine fehlenden Buchstaben, keine zusätzlichen Wörter?
+1. LESBARKEIT: Sind alle Texte auf einem Smartphone (6 Zoll) SCHARF und KLAR LESBAR?
+   - Ausreichende Schriftgröße?
+   - Guter Kontrast zum Hintergrund?
+   - Keine Überlappung mit Motivelementen?
+   - Bei schlechtem Kontrast oder Überlappung: approved = False!
 
-2. RECHTSCHREIBUNG: Ist die deutsche Rechtschreibung perfekt?
+2. FACHLICHE ÜBEREINSTIMMUNG: Entspricht die Aussage dem Originaltext?
+   - Passt das Motiv zum Thema?
+   - Keine irreführenden visuellen Elemente?
 
-3. LESBARKEIT: Sind alle Texte auf einem Smartphone (6 Zoll) SCHARF und KLAR LESBAR?
-   - Schriftgröße NIEMALS unter 28pt
-   - ALLE Texte müssen DEUTLICH erkennbar sein
-   - Bei unscharfen oder zu kleinen Texten: approved = False!
+3. LAYOUT & KOMPOSITION: Wirkt das Layout professionell und hochwertig?
+   - Harmonieren Text und Motiv?
+   - Sind die Proportionen ausgewogen?
+   - Ist die Bildsprache passend für HILO?
 
-4. TEXT-KONTRAST: Ist der Text GEGEN DEN HINTERGRUND KLAR LESBAR?
-   - Text muss SCHARFEN Kontrast haben (hell auf dunkel ODER dunkel auf hell)
-   - KEINE grauen, blassen oder schlecht lesbaren Texte
-   - KEINE Texte über komplexen Mustern ohne Hintergrund-Box
-   - Bei schlechtem Kontrast: approved = False!
-
-5. FACHLICHE ÜBEREINSTIMMUNG: Entspricht die Aussage dem Originaltext?
-
-6. LAYOUT: Wirkt das Layout professionell und hochwertig?
+4. MOTIV-QUALITÄT: Ist das Motiv hochwertig und ansprechend?
+   - Keine störenden Elemente im Textbereich?
+   - Professionelle Bildqualität?
+   - Ansprechende visuelle Umsetzung?
 
 Bei JEDEM Problem: approved = False!
 
 Beispiele für Problems:
-- "Im zweiten Infopunkt steht 'sic' statt 'sich'"
-- "Das Wort 'HILO' erscheint im Bild (sollte nicht sein)"
-- "CTA-Text ist nicht vollständig"
-- "Headline hat einen Tippfehler"
+- "Text hat schlechten Kontrast zum Hintergrund (schwer lesbar)"
+- "Headline überlappt mit Motivelementen"
+- "Das Motiv passt nicht zum Thema Steuern/Beratung"
+- "Bildqualität wirkt unprofessionell oder verschwommen"
+- "Layout wirkt unausgewogen (zu viel leer, zu voll, schlechte Komposition)"
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
@@ -551,19 +648,36 @@ def run_campaign(
         log.info("━━━━ VERSUCH %d/%d ━━━━", attempt, max_retries)
 
         try:
-            # Stufe 2: Grafik generieren
-            temp_path = os.path.join(
-                kampagne_dir, f"attempt_{attempt}.png"
-            ) if not output_path else output_path
+            # Stufe 2a: Motiv generieren (OHNE Text!)
+            motiv_path = os.path.join(kampagne_dir, f"motiv_{attempt}.png")
 
-            image_path = generate_advertisement(
-                plan.image_prompt,
-                output_path=temp_path,
+            motiv_image_path = generate_advertisement(
+                plan.motiv_prompt,
+                output_path=motiv_path,
                 size=size,
                 quality=quality,
             )
 
-            # Stufe 3: QA
+            # Stufe 2b: Text mit Pillow hinzufügen
+            final_path = os.path.join(
+                kampagne_dir, f"final_{attempt}.png"
+            ) if not output_path else output_path
+
+            log.info("Stufe 2b: Text-Rendering mit Pillow (Layout: %s)...", plan.layout_template)
+            image_path = render_text_on_image(
+                motiv_image_path,
+                plan.headline,
+                plan.supporting_points,
+                plan.cta,
+                plan.headline_box,
+                plan.supporting_box,
+                plan.cta_box,
+                Path(final_path),
+                background_overlay=True,  # Halbtransparente Hintergründe hinter Text
+            )
+            log.info("Stufe 2b: Text gerendert und gespeichert unter %s", image_path)
+
+            # Stufe 3: QA (mit finalem Bild inkl. Text!)
             review = quality_check(image_path, plan, article)
 
             if review.approved:
