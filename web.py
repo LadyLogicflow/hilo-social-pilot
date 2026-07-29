@@ -2028,8 +2028,8 @@ def bild_aktion(eid):
         elif aktion == "foto_neu":
             # Neues Foto würfeln (Cache löschen + neu generieren)
 
-            # Prüfen ob Post mit 3-Stufen-Workflow erstellt wurde
-            use_campaign = "qa_approved" in data or "qa_problems" in data
+            # IMMER 3-Stufen-Workflow nutzen (auch für alte Posts)!
+            use_campaign = True
 
             if use_campaign:
                 # NEUER WORKFLOW: regenerate_image_with_qa (GPT Image 2 + QA)
