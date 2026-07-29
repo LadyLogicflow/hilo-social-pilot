@@ -102,9 +102,10 @@ class CampaignPlan(BaseModel):
         "editorial_split"
     ] = Field(description="Gewählte Layout-Vorlage")
 
-    headline_box: TextBox = Field(description="Position für Headline")
-    supporting_box: TextBox = Field(description="Position für Bullets")
-    cta_box: TextBox = Field(description="Position für CTA")
+    # TextBox-Felder werden automatisch aus LAYOUT_TEMPLATES gefüllt (nicht von GPT!)
+    headline_box: Optional[TextBox] = Field(default=None, description="Position für Headline (wird automatisch gefüllt)")
+    supporting_box: Optional[TextBox] = Field(default=None, description="Position für Bullets (wird automatisch gefüllt)")
+    cta_box: Optional[TextBox] = Field(default=None, description="Position für CTA (wird automatisch gefüllt)")
 
     # Für GPT Image 2: NUR Motiv-Prompt (OHNE Text!)
     motiv_prompt: str = Field(description="Englischer Prompt NUR für das Motiv (OHNE Text-Rendering!)")
@@ -315,8 +316,7 @@ Wähle eine passende Layout-Vorlage aus den folgenden Optionen:
 
 Wähle das Layout das am besten zum Thema, Motiv und zur Aussage passt.
 
-Fülle dann die TextBox-Felder (headline_box, supporting_box, cta_box) aus
-der gewählten Vorlage in deine Antwort ein.
+(Die Text-Positionen werden automatisch aus der Vorlage übernommen.)
 
 MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
 
@@ -427,7 +427,13 @@ def create_campaign_plan(
     if plan is None:
         raise RuntimeError("Es wurde kein Kampagnenplan erzeugt.")
 
-    log.info("Stufe 1: Kampagnenplan erstellt - Headline: %s", plan.headline)
+    # TextBox-Felder aus LAYOUT_TEMPLATES übernehmen
+    template = LAYOUT_TEMPLATES[plan.layout_template]
+    plan.headline_box = template["headline_box"]
+    plan.supporting_box = template["supporting_box"]
+    plan.cta_box = template["cta_box"]
+
+    log.info("Stufe 1: Kampagnenplan erstellt - Headline: %s, Layout: %s", plan.headline, plan.layout_template)
     return plan
 
 
