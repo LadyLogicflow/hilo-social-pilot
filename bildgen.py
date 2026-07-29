@@ -276,6 +276,26 @@ def _render_kreativ(fields, photo_path, slogan, out_path, portrait=None):
     base.save(out_path)
     return out_path
 
+def add_logo_circles(image_path, slogan, output_path, portrait=None):
+    """Fügt NUR die Logo-Kreise zu einem bestehenden Bild hinzu (für 3-Stufen-Workflow).
+
+    Args:
+        image_path: Pfad zum Eingangsbild (z.B. von GPT Image 2)
+        slogan: Slogan für den zweiten Kreis (oder None für Zufallsauswahl)
+        output_path: Pfad für das Ausgabebild
+        portrait: Optionales Portrait-Bild (für feste Position diagonal2)
+
+    Returns:
+        output_path
+    """
+    base = Image.open(image_path).convert("RGB")
+    pos = "diagonal2" if portrait else pick_circle_pos()
+    _draw_circles(base, slogan, pos, portrait)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    base.save(output_path)
+    return output_path
+
+
 def _render_comic(fields, photo_path, out_path, portrait=None):
     """Bild-Stil 'comic': Das von ensure_comic_bild erzeugte Comic-Bild (photo_path) IST bereits das
     fertige Bild (Illustration in HILO-Palette mit freiem Negativraum). Es wird nur noch

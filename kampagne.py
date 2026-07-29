@@ -434,11 +434,20 @@ Prüfe das generierte Bild auf:
 
 2. RECHTSCHREIBUNG: Ist die deutsche Rechtschreibung perfekt?
 
-3. LESBARKEIT: Sind alle Texte auf einem Smartphone gut lesbar?
+3. LESBARKEIT: Sind alle Texte auf einem Smartphone (6 Zoll) SCHARF und KLAR LESBAR?
+   - Schriftgröße NIEMALS unter 28pt
+   - ALLE Texte müssen DEUTLICH erkennbar sein
+   - Bei unscharfen oder zu kleinen Texten: approved = False!
 
-4. FACHLICHE ÜBEREINSTIMMUNG: Entspricht die Aussage dem Originaltext?
+4. TEXT-KONTRAST: Ist der Text GEGEN DEN HINTERGRUND KLAR LESBAR?
+   - Text muss SCHARFEN Kontrast haben (hell auf dunkel ODER dunkel auf hell)
+   - KEINE grauen, blassen oder schlecht lesbaren Texte
+   - KEINE Texte über komplexen Mustern ohne Hintergrund-Box
+   - Bei schlechtem Kontrast: approved = False!
 
-5. LAYOUT: Wirkt das Layout professionell und hochwertig?
+5. FACHLICHE ÜBEREINSTIMMUNG: Entspricht die Aussage dem Originaltext?
+
+6. LAYOUT: Wirkt das Layout professionell und hochwertig?
 
 Bei JEDEM Problem: approved = False!
 

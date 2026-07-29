@@ -617,10 +617,11 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
         max_retries=3,
     )
 
-    # Bild in das Standard-Verzeichnis kopieren (falls nötig)
+    # Bild in das Standard-Verzeichnis kopieren + Logo-Kreise drüberlegen
     import shutil
     import time
     import uuid
+    import bildgen
     from pathlib import Path
     final_image_dir = os.path.join(DATA_DIR, "bilder")
     os.makedirs(final_image_dir, exist_ok=True)
@@ -629,7 +630,10 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
     timestamp = int(time.time())
     unique_id = uuid.uuid4().hex[:12]
     final_image_path = os.path.join(final_image_dir, f"campaign_{timestamp}_{unique_id}.png")
-    shutil.copy(image_path, final_image_path)
+
+    # Logo-Kreise drüberlegen (wie bei bildgen.render() für v5.x Bilder)
+    slogan = bildgen.pick_slogan(None)
+    bildgen.add_logo_circles(image_path, slogan, final_image_path)
 
     # Fields zusammenstellen (kompatibel mit bestehendem Format)
     fields = {
