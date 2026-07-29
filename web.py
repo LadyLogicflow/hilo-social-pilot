@@ -2050,21 +2050,27 @@ def bild_aktion(eid):
                     # Neues Bild mit QA generieren
                     timestamp = int(__import__("time").time())
                     unique_id = uuid.uuid4().hex[:12]
-                    out = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
+                    temp_path = os.path.join(DATA_DIR, "bilder", f"regen_temp_{timestamp}_{unique_id}.png")
+                    final_path = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
 
                     image_path, review = kampagne.regenerate_image_with_qa(
                         image_prompt=image_prompt,
                         headline=headline,
                         supporting_points=bullets,
                         cta=cta,
-                        output_path=out,
+                        output_path=temp_path,
                         test_mode=False,  # High quality
                     )
+
+                    # Logo-Kreise drüberlegen (wie bei neuen Posts)
+                    import bildgen
+                    slogan = bildgen.pick_slogan(data.get("slogan"))
+                    bildgen.add_logo_circles(temp_path, slogan, final_path)
 
                     # QA-Status aktualisieren
                     data["qa_approved"] = review.approved
                     data["qa_problems"] = review.problems if not review.approved else []
-                    data["bild_pfad"] = str(image_path)
+                    data["bild_pfad"] = str(final_path)
 
                     flash_msg = "Neues Foto für Beitrag %d generiert (3-Stufen-Workflow, QA: %s)." % (
                         eid, "✅" if review.approved else "❌"
