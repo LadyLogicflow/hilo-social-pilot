@@ -224,8 +224,12 @@ def create_campaign_plan(
         CampaignPlan mit allen Kampagnen-Details inkl. image_prompt
 
     Raises:
+        ValueError: Wenn Artikel leer ist
         RuntimeError: Wenn kein Plan erzeugt wurde
     """
+    if not article or not article.strip():
+        raise ValueError("Artikel darf nicht leer sein!")
+
     client = _get_client()
     log.info("Stufe 1: Kampagnenplanung wird erstellt...")
 
@@ -461,31 +465,41 @@ def run_campaign(
     for attempt in range(1, max_retries + 1):
         log.info("━━━━ VERSUCH %d/%d ━━━━", attempt, max_retries)
 
-        # Stufe 2: Grafik generieren
-        temp_path = os.path.join(
-            kampagne_dir, f"attempt_{attempt}.png"
-        ) if not output_path else output_path
+        try:
+            # Stufe 2: Grafik generieren
+            temp_path = os.path.join(
+                kampagne_dir, f"attempt_{attempt}.png"
+            ) if not output_path else output_path
 
-        image_path = generate_advertisement(
-            plan.image_prompt,
-            output_path=temp_path,
-            size=size,
-            quality=quality,
-        )
+            image_path = generate_advertisement(
+                plan.image_prompt,
+                output_path=temp_path,
+                size=size,
+                quality=quality,
+            )
 
-        # Stufe 3: QA
-        review = quality_check(image_path, plan, article)
+            # Stufe 3: QA
+            review = quality_check(image_path, plan, article)
 
-        if review.approved:
-            log.info("━━━━ WORKFLOW ERFOLGREICH NACH %d VERSUCH(EN) ━━━━", attempt)
-            return plan, image_path, review
+            if review.approved:
+                log.info("━━━━ WORKFLOW ERFOLGREICH NACH %d VERSUCH(EN) ━━━━", attempt)
+                return plan, image_path, review
 
-        if attempt < max_retries:
-            log.warning("Versuch %d fehlgeschlagen - Neu generieren...", attempt)
-        else:
-            log.error("ALLE %d VERSUCHE FEHLGESCHLAGEN! Manuelle Kontrolle nötig!", max_retries)
-            # Bild trotzdem zurückgeben für manuelle Prüfung
-            return plan, image_path, review
+            if attempt < max_retries:
+                log.info("Versuch %d: Bild abgelehnt, neuer Versuch...", attempt)
+            else:
+                log.warning("Alle Versuche fehlgeschlagen! Probleme: %s", ", ".join(review.problems))
+                # Bild trotzdem zurückgeben für manuelle Prüfung
+                return plan, image_path, review
+
+        except Exception as e:
+            log.warning("Versuch %d fehlgeschlagen (Exception): %s", attempt, e)
+            if attempt < max_retries:
+                continue
+            else:
+                raise RuntimeError(
+                    f"Alle {max_retries} Versuche fehlgeschlagen! Letzte Exception: {e}"
+                ) from e
 
     # Sollte nie erreicht werden
     raise RuntimeError("Workflow-Logik-Fehler")

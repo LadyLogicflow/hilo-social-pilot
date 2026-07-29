@@ -619,14 +619,16 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
 
     # Bild in das Standard-Verzeichnis kopieren (falls nötig)
     import shutil
+    import time
+    import uuid
     from pathlib import Path
     final_image_dir = os.path.join(DATA_DIR, "bilder")
     os.makedirs(final_image_dir, exist_ok=True)
 
-    # Eindeutiger Dateiname
-    import time
+    # Eindeutiger Dateiname (timestamp + UUID gegen Race Condition)
     timestamp = int(time.time())
-    final_image_path = os.path.join(final_image_dir, f"campaign_{timestamp}.png")
+    unique_id = uuid.uuid4().hex[:12]
+    final_image_path = os.path.join(final_image_dir, f"campaign_{timestamp}_{unique_id}.png")
     shutil.copy(image_path, final_image_path)
 
     # Fields zusammenstellen (kompatibel mit bestehendem Format)
