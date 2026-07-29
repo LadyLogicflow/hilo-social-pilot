@@ -1995,7 +1995,7 @@ def bild_aktion(eid):
     motiv_neu = request.form.get("motiv", "").strip()
 
     with get_conn() as conn:
-        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        e = conn.execute("SELECT id, text, status, thema_id FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
     if e["status"] not in ("freigegeben", "entwurf"):
@@ -2067,13 +2067,34 @@ def bild_aktion(eid):
                     slogan = bildgen.pick_slogan(data.get("slogan"))
                     bildgen.add_logo_circles(temp_path, slogan, final_path)
 
+                    # Caption nachträglich generieren falls fehlt (Bestandsposts)
+                    if not data.get("caption") and e["thema_id"]:
+                        try:
+                            with get_conn() as conn:
+                                thema = conn.execute(
+                                    "SELECT titel, volltext FROM themen WHERE id=?",
+                                    (e["thema_id"],)
+                                ).fetchone()
+                            if thema:
+                                article = f"{thema['titel']}\n\n{thema['volltext']}"
+                                caption = kampagne.generate_caption_only(article)
+                                data["caption"] = caption
+                                flash_msg_extra = " + Caption nachträglich generiert"
+                            else:
+                                flash_msg_extra = ""
+                        except Exception as ex:
+                            log.warning("Caption-Generierung fehlgeschlagen: %s", ex)
+                            flash_msg_extra = ""
+                    else:
+                        flash_msg_extra = ""
+
                     # QA-Status aktualisieren
                     data["qa_approved"] = review.approved
                     data["qa_problems"] = review.problems if not review.approved else []
                     data["bild_pfad"] = str(final_path)
 
-                    flash_msg = "Neues Foto für Beitrag %d generiert (3-Stufen-Workflow, QA: %s)." % (
-                        eid, "✅" if review.approved else "❌"
+                    flash_msg = "Neues Foto für Beitrag %d generiert (3-Stufen-Workflow, QA: %s)%s." % (
+                        eid, "✅" if review.approved else "❌", flash_msg_extra
                     )
                     if not review.approved:
                         flash_msg += " Probleme: " + ", ".join(review.problems)

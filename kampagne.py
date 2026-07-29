@@ -84,6 +84,11 @@ class CampaignPlan(BaseModel):
     image_prompt: str = Field(description="Vollständiger englischer Prompt für GPT Image 2")
 
 
+class CaptionOnly(BaseModel):
+    """Nur Caption für Bestandsposts (ohne Bild-Generierung)."""
+    caption: str = Field(description="Begleittext für Social Media (150-200 Wörter, mit Hook und Interaktionsfrage)")
+
+
 class QualityReview(BaseModel):
     """Qualitätsprüfung von GPT-5.6 Terra (Stufe 3).
 
@@ -791,6 +796,81 @@ def regenerate_image_with_qa(
 
     # Sollte nie erreicht werden
     raise RuntimeError("Regenerierung-Logik-Fehler")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CAPTION-ONLY FÜR BESTANDSPOSTS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+CAPTION_ONLY_PROMPT = """Du bist Social-Media-Texter für HILO, einen deutschen Lohnsteuerhilfeverein.
+
+Erstelle einen deutschen Begleittext für Social Media (150-200 Wörter):
+
+AUFBAU:
+- HOOK (erster Satz, max. 10 Wörter): überraschend, direkt, neugierig machend
+- INHALT: Erkläre das Thema knapp, nutzenorientiert, ohne Fachchinesisch
+- INTERAKTIONSFRAGE: Stelle VOR dem Handlungsaufruf eine kurze Frage
+- HANDLUNGSAUFRUF: Weise auf HILO-Beratung hin
+
+STIL:
+- Durchgehend SIE-Form (gesiezt, nie geduzt)
+- Klar, direkt, menschlich (nicht belehrend)
+- Echte UTF-8 Umlaute (ä, ö, ü, ß)
+- KEINE Abkürzungen (z.B. → zum Beispiel)
+- Sparsam mit Emojis (max. 2)
+- 4-5 thematisch passende Hashtags, #HILO als letzten
+
+WICHTIG:
+- Nutze WENN MÖGLICH einen konkreten Fakt, Frist oder Urteil aus dem Eingabetext
+- Nenne Quellen als TEXT ("Laut Bundesfinanzhof..."), KEINE Links
+- Erfinde KEINE Fakten, Urteile, Beträge oder Fristen
+- KEINE URLs im Text (werden automatisch ergänzt)
+
+Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
+
+
+def generate_caption_only(article: str) -> str:
+    """Generiert NUR Caption für Bestandsposts (ohne Bild).
+
+    Args:
+        article: Vollständiger Steuertext oder Newslettertext
+
+    Returns:
+        Caption als String
+
+    Raises:
+        ValueError: Wenn Artikel leer ist
+        RuntimeError: Wenn keine Caption erzeugt wurde
+    """
+    if not article or not article.strip():
+        raise ValueError("Artikel darf nicht leer sein!")
+
+    client = _get_client()
+    log.info("Caption-only wird generiert...")
+
+    response = client.beta.chat.completions.parse(
+        model="gpt-5.6-terra",
+        messages=[
+            {
+                "role": "system",
+                "content": CAPTION_ONLY_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": f"STEUERTEXT:\n{article}",
+            },
+        ],
+        response_format=CaptionOnly,
+    )
+
+    result = response.choices[0].message.parsed
+
+    if result is None or not result.caption:
+        raise RuntimeError("Es wurde keine Caption erzeugt.")
+
+    log.info("Caption-only generiert: %s...", result.caption[:50])
+    return result.caption
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
