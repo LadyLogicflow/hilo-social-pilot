@@ -23,7 +23,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from config import DATA_DIR
-from secrets import get_secret
+from secrets_store import get_secret
 
 log = logging.getLogger("hilo.kampagne")
 
