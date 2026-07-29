@@ -637,6 +637,7 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
         "subline": plan.core_message,  # Kernaussage als Subline
         "bullets": plan.supporting_points,
         "cta": plan.cta,
+        "caption": plan.caption,  # Begleittext ✅
         "bild_motiv": plan.visual_concept,  # Für Dokumentation
         "bild_stil": "standard",  # v5.x wird automatisch erkannt
         "bild_pfad": final_image_path,  # Bild ist BEREITS erstellt!

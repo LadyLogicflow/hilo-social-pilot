@@ -71,6 +71,7 @@ class CampaignPlan(BaseModel):
         description="2-3 kurze Infopunkte (je max. 45 Zeichen)"
     )
     cta: str = Field(max_length=35, description="Call-to-Action (max. 35 Zeichen)")
+    caption: str = Field(description="Begleittext für Social Media (150-200 Wörter, mit Hook und Interaktionsfrage)")
 
     visual_strategy: str = Field(description="Gewählte Bildstrategie (z.B. Editorial Photography, Still Life)")
     visual_concept: str = Field(description="Beschreibung des visuellen Konzepts")
@@ -128,6 +129,30 @@ Erstelle:
 Alle Aussagen müssen fachlich vom Eingabetext gedeckt sein.
 Erfinde keine Beträge, Fristen, Voraussetzungen oder Rechtsfolgen.
 Nicht gendern.
+
+CAPTION (BEGLEITTEXT)
+
+Erstelle einen deutschen Begleittext für Social Media (150-200 Wörter):
+
+AUFBAU:
+- HOOK (erster Satz, max. 10 Wörter): überraschend, direkt, neugierig machend
+- INHALT: Erkläre das Thema knapp, nutzenorientiert, ohne Fachchinesisch
+- INTERAKTIONSFRAGE: Stelle VOR dem Handlungsaufruf eine kurze Frage
+- HANDLUNGSAUFRUF: Weise auf HILO-Beratung hin
+
+STIL:
+- Durchgehend SIE-Form (gesiezt, nie geduzt)
+- Klar, direkt, menschlich (nicht belehrend)
+- Echte UTF-8 Umlaute (ä, ö, ü, ß)
+- KEINE Abkürzungen (z.B. → zum Beispiel)
+- Sparsam mit Emojis (max. 2)
+- 4-5 thematisch passende Hashtags, #HILO als letzten
+
+WICHTIG:
+- Nutze WENN MÖGLICH einen konkreten Fakt, Frist oder Urteil aus dem Eingabetext
+- Nenne Quellen als TEXT ("Laut Bundesfinanzhof..."), KEINE Links
+- Erfinde KEINE Fakten, Urteile, Beträge oder Fristen
+- KEINE URLs im Text (werden automatisch ergänzt)
 
 KREATIVKONZEPT
 
