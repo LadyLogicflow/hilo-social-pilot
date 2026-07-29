@@ -229,9 +229,9 @@ def create_campaign_plan(
     client = _get_client()
     log.info("Stufe 1: Kampagnenplanung wird erstellt...")
 
-    response = client.responses.parse(
+    response = client.beta.chat.completions.parse(
         model="gpt-5.6-terra",  # Terra-Version wie von Catrin angewiesen!
-        input=[
+        messages=[
             {
                 "role": "system",
                 "content": CREATIVE_DIRECTOR_PROMPT,
@@ -246,10 +246,10 @@ def create_campaign_plan(
                 ),
             },
         ],
-        text_format=CampaignPlan,
+        response_format=CampaignPlan,
     )
 
-    plan = response.output_parsed
+    plan = response.choices[0].message.parsed
 
     if plan is None:
         raise RuntimeError("Es wurde kein Kampagnenplan erzeugt.")
@@ -382,9 +382,9 @@ CTA: {plan.cta}
 ORIGINALTEXT:
 {article[:500]}"""
 
-    response = client.responses.parse(
+    response = client.beta.chat.completions.parse(
         model="gpt-5.6-terra",  # Terra für multimodales QA
-        input=[
+        messages=[
             {
                 "role": "system",
                 "content": QA_PROMPT,
@@ -402,10 +402,10 @@ ORIGINALTEXT:
                 ],
             },
         ],
-        text_format=QualityReview,
+        response_format=QualityReview,
     )
 
-    review = response.output_parsed
+    review = response.choices[0].message.parsed
 
     if review is None:
         raise RuntimeError("Es wurde keine Qualitätsprüfung erzeugt.")
