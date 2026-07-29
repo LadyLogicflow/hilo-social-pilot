@@ -648,7 +648,7 @@ def run_campaign(
     plan = create_campaign_plan(article, cta=cta)
 
     # Stufe 2 + 3: Grafik + QA (mit Retry)
-    size = "1024x1024" if test_mode else "2048x2048"
+    size = "1024x1024"  # Immer 1024x1024 - optimal für 1080x1080 Feed-Posts!
     quality = "low" if test_mode else "high"
 
     # Kampagne-Verzeichnis erstellen (falls noch nicht vorhanden)
@@ -736,7 +736,7 @@ def regenerate_image_with_qa(
     os.makedirs(kampagne_dir, exist_ok=True)
 
     # Bildgröße und Qualität
-    size = "1024x1024" if test_mode else "2048x2048"
+    size = "1024x1024"  # Immer 1024x1024 - optimal für 1080x1080 Feed-Posts!
     quality = "low" if test_mode else "high"
 
     # Mini-Plan für QA (ohne vollständige Kampagnenplanung)
