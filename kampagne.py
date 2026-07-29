@@ -208,6 +208,7 @@ Der Prompt muss SEHR SPEZIFISCH sein und das Bildmodell ausdrücklich anweisen:
 - Wenn Still-Life: "NO people, NO faces, NO hands" explizit verbieten
 - Wenn kein Text gewünscht: "NO additional text, NO watermarks"
 - Generische Stockfoto-Elemente vermeiden
+- **CRITICAL:** "DO NOT include the word 'HILO' anywhere in the image - NO 'HILO' text, NO 'HILO' branding, NO 'HILO' typography"
 
 **TYPOGRAFIE & LAYOUT:**
 - eine fertige, veröffentlichungsreife Werbegrafik zu erstellen
@@ -216,7 +217,12 @@ Der Prompt muss SEHR SPEZIFISCH sein und das Bildmodell ausdrücklich anweisen:
 - deutsche Rechtschreibung exakt einzuhalten (ä, ö, ü, ß)
 - Bild und Typografie als eine integrierte Komposition zu gestalten
 - Lesbarkeit vor dekorativer Typografie zu priorisieren
-- **WICHTIG:** Alle vier Ecken KOMPLETT freizuhalten - mindestens 100x100px in JEDER Ecke müssen absolut leer sein (keine Texte, Grafiken, Dekoelemente) für Logo-Overlays. Texte und visuelle Elemente dürfen NUR im mittleren Bereich platziert werden.
+
+**CORNER CLEARANCE (ABSOLUTE REQUIREMENT):**
+- **CRITICAL:** "ALL FOUR CORNERS must be completely empty - minimum 100x100 pixels in EACH corner zone"
+- **CRITICAL:** "NO text, NO graphics, NO decorative elements, NO visual content in any corner"
+- **CRITICAL:** "Corner zones must show ONLY the background - text and visual elements are ONLY allowed in the center area"
+- Betone im Prompt dass dies HÖCHSTE PRIORITÄT hat für Logo-Overlays
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
