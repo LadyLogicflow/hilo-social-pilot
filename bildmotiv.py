@@ -24,8 +24,8 @@ MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
 # Prompt-Version: Wird in Cache-Key einbezogen - bei Änderung des Prompts erhöhen
 # damit neue Bilder generiert werden statt alte Cache-Einträge zu verwenden!
-# v3.1 = ChatGPT-optimierter Prompt (Bildidee in einem Satz, Magazin-Test, etc.)
-PROMPT_VERSION = "v3.1"
+# v5.0 = Werbe-Design-Prompt mit integrierter Typografie (ChatGPT-optimiert)
+PROMPT_VERSION = "v5.0"
 
 # Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
 # Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
@@ -68,219 +68,377 @@ def openai_image_model():
     return wert if wert in ("gpt-image-1", "gpt-image-2") else default
 
 def _prompt(fields_or_motiv):
-    """ChatGPT Masterprompt fuer HILO Newsletterbilder - Creative Director Ansatz.
+    """Masterprompt v5: Werbe-Design mit integrierter Typografie (ChatGPT-optimiert).
     Bekommt entweder die kompletten fields (dict) ODER ein Motiv (string) fuer Rueckwaertskompatibilitaet.
-    Mit fields: OpenAI agiert als Creative Director. Mit Motiv: Fallback auf einfachen Prompt."""
+    v5: OpenAI erstellt komplette Werbeanzeige mit Text."""
 
     # Rueckwaertskompatibilitaet: Wenn String statt dict, nutze einfachen Fallback-Prompt
     if not isinstance(fields_or_motiv, dict):
         motiv = str(fields_or_motiv or "").strip()
         return f"""Professional editorial photography for a financial consulting newsletter.
-
 Scene: {motiv}
-
 Style: Modern, friendly, trustworthy, high-quality editorial look.
 Colors: Incorporate navy blue, green, and lavender accents where natural (HILO brand colors).
 Composition: Square 1:1, leave center area mostly empty for text overlay, place main subjects at edges.
 Quality: Ultra high quality, magazine-worthy, professional lighting.
 No text, no logos, no watermarks in the image."""
 
-    # Newsletter-Text aus fields zusammenbauen
+    # Text-Komponenten aus fields extrahieren
     fields = fields_or_motiv
-    ueberschrift = (fields.get("ueberschrift") or "").strip()
-    subline = (fields.get("subline") or "").strip()
+    headline = (fields.get("ueberschrift") or "").strip()
     bullets = fields.get("bullets") or []
+    cta = (fields.get("cta") or "Jetzt Beratungsstelle in Ihrer Nähe finden").strip()
+
+    # Bullets als formatierter Text
     if isinstance(bullets, list):
-        bullets_text = "\n".join("• " + b for b in bullets if b)
+        body = "\n".join("• " + str(b).strip() for b in bullets if b)
     else:
-        bullets_text = ""
+        body = ""
 
-    newsletter_text = f"{ueberschrift}\n\n{subline}\n\n{bullets_text}".strip()
+    # Log dass v5 verwendet wird
+    log.info("Masterprompt v5.0 (Werbe-Design) wird verwendet für: %s", headline[:50] if headline else "")
 
-    # Masterprompt v3.1 (ChatGPT-optimiert):
-    # Verbesserungen gegenüber v3:
-    # 1. Bildstrategie und Bildart stärker getrennt (mehr kreativer Spielraum)
-    # 2. Positive Gewichtung statt negative ("bevorzuge" statt "letzte Wahl")
-    # 3. Überraschungseffekt-Regel ("Art Director-Frage")
-    # 4. ⭐ ZENTRALE BILDIDEE IN EINEM SATZ (größter Hebel!)
-    # 5. Magazin-Test am Ende ("Würde es auffallen?")
-    # 6. Neue Bildtypen: Flat Lay, Cinematic Detail Shot
-    # 7. Seriencharakter-Regel (Abwechslung über Zeit)
+    return f"""You are the Creative Director, Senior Art Director and Advertising Designer for HILO, a German tax advisory association (Lohnsteuerhilfeverein).
 
-    # Masterprompt v3.1 (Optimiert für kreative Qualität)
-    # Log dass v3.1 verwendet wird
-    log.info("Masterprompt v3.1 wird verwendet für: %s", (fields.get("ueberschrift") or motiv or "")[:50])
+Your task is to design ONE complete, publication-ready social media advertisement for the supplied German tax article.
 
-    return f"""Du bist gleichzeitig Creative Director, Art Director und Editorial Photographer für HILO.
+The final result must already contain:
 
-Deine Aufgabe: Entwickle aus dem Newslettertext ein Bild, das wie ein Titelbild eines hochwertigen Wirtschafts- oder Verbrauchermagazins wirkt.
+• the final layout
+• all typography
+• all imagery
+• all graphic elements
 
----
+No post-processing will be performed.
 
-SCHRITT 1: BILDSTRATEGIE WÄHLEN
+The advertisement must be immediately ready for publication.
 
-Analysiere den Text und wähle die Bildstrategie:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+MISSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• **Emotion erzeugen** – Gefühl transportieren (Hoffnung, Zuversicht, Erleichterung)
-• **Warnen** – Auf Risiken/Fallen hinweisen
-• **Symbol verwenden** – Abstrakte Metapher für das Thema
-• **Objekt in Szene setzen** – Konkreter Gegenstand als Fokus
-• **Geschichte erzählen** – Narrative Szene
-• **Menschen zeigen** – Emotionale Menschendarstellung
-• **Vergleich darstellen** – Vorher/Nachher, Mit/Ohne
-• **Erklärung visualisieren** – Prozess oder Zusammenhang zeigen
+Transform factual tax information into an engaging advertising campaign.
 
-Frage dich:
-"Welche Strategie transportiert die Kernaussage am stärksten?"
-"Welche Bildidee macht den Leser in 3 Sekunden neugierig?"
+Do not merely illustrate the article.
 
----
+Instead, communicate its core message emotionally, visually and clearly.
 
-SCHRITT 2: ZENTRALE BILDIDEE FORMULIEREN
+The viewer should understand the main benefit within three seconds and immediately want to continue reading.
 
-**Dies ist der wichtigste Schritt!**
+The advertisement must communicate:
 
-Formuliere die Bildidee intern in genau EINEM Satz.
+• competence
+• trust
+• clarity
+• professionalism
+• approachability
 
-Beispiele für gute Bildideen:
-- "Eine geöffnete Steuerakte, aus der ein Angelhaken ragt"
-- "Eine rote Warnlampe spiegelt sich auf einem Laptop"
-- "Ein Kalender mit rot markiertem Datum, daneben ein geöffneter Brief"
-- "Hände halten einen Steuerbescheid wie eine Schatzkarte"
+Never create fear-based advertising.
 
-**Wenn dieser Satz nicht spannend klingt, entwickle eine bessere Bildidee.**
+Never exaggerate.
 
-Frage dich zusätzlich:
-"Welche Bildidee würde ein Art Director eines hochwertigen Wirtschaftsmagazins wählen?"
+Never appear sensational.
 
-Wenn mehrere Lösungen funktionieren, bevorzuge die originellere.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+CREATIVE PROCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
----
+Before designing the advertisement internally determine:
 
-SCHRITT 3: BILDART WÄHLEN
+• What is the single most important message?
 
-Nachdem du die zentrale Bildidee formuliert hast, überlege **unabhängig davon**, welche Bildart diese Idee am stärksten transportiert.
+• What benefit does the reader receive?
 
-**Die folgenden Zuordnungen sind Orientierungshilfen und keine festen Regeln:**
+• Which emotion should dominate?
 
-Warnung vor Steuerfalle → Symbolbild oder Konzeptfotografie
-Emotionale Themen → Editorial Photography
-Steuererstattung → Menschen (authentisch) oder Stillleben
-Fristen, Termine → Objektfotografie oder Editorial Flat Lay
-Finanzwissen → Illustration oder Editorial Photography
-Vergleich → Infografik ODER Editorial Photography
-Prozess, Ablauf → Infografik
+Examples:
 
-**Bevorzuge grundsätzlich:**
-1. Editorial Photography
-2. Konzeptfotografie
-3. Symbolbild
-4. Editorial Flat Lay
-5. Cinematic Detail Shot
-6. Stillleben
-7. Objektfotografie
-8. Illustration
-9. Comic (Ligne-Claire)
-10. Papiercollage
+Trust
 
-**Nur wenn fotografische oder illustrative Motive die Aussage schlechter transportieren, verwende eine Infografik.**
+Relief
 
----
+Security
 
-FARBEN
+Curiosity
 
-Nutze die HILO-CI ausschließlich als dezente Akzente.
+Confidence
 
-Farben:
-• #1a3a6b (Navy)
-• #4a8c5c (Grün)
-• #b8c8e8 (Lavendel)
-• Weiß
+Motivation
 
----
+Optimism
 
-BILDSPRACHE
+Then develop three fundamentally different creative concepts.
+
+Evaluate them for:
+
+• originality
+
+• clarity
+
+• advertising impact
+
+• memorability
+
+• suitability for HILO
+
+Choose only the strongest concept.
+
+Avoid the first obvious solution.
+
+Think like an award-winning advertising agency.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISUAL STRATEGY
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Select the visual style that best communicates the message.
+
+Possible styles include:
+
+• Editorial Photography
+
+• Concept Photography
+
+• Still Life
+
+• Symbolic Photography
+
+• Flat Lay
+
+• Macro Photography
+
+• Lifestyle Photography
+
+• Editorial Illustration
+
+• Ligne Claire Comic
+
+• Paper Collage
+
+• Modern 3D Illustration
+
+• Isometric Illustration
+
+• Minimal Graphic Design
+
+Infographics should only be used when the topic cannot be communicated effectively through imagery.
+
+Photography or illustration should normally be preferred.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Design a premium advertising layout.
+
+Image and typography must feel like one integrated composition.
+
+Never place text randomly.
+
+Create a strong visual hierarchy.
+
+The viewer's eye should naturally move in this order:
+
+1. Hero visual
+
+2. Headline
+
+3. Supporting information
+
+4. Call to action
+
+The layout should feel calm, modern and premium.
+
+Use generous white space.
+
+Avoid visual clutter.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+TYPOGRAPHY
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Typography is part of the design.
+
+Not an overlay.
+
+Integrate all supplied text naturally into the composition.
+
+The supplied wording must be reproduced exactly.
+
+Do not rewrite.
+
+Do not shorten.
+
+Do not invent additional marketing copy.
+
+German spelling and grammar must be perfect.
+
+Typography must be:
 
 • modern
-• hochwertig
-• vertrauenswürdig
-• authentisch
-• professionell
-• emotional passend
-• ruhige Komposition
-• klare Blickführung
 
----
+• elegant
 
-MENSCHEN
+• highly readable
 
-Verwende Menschen nur, wenn sie die Aussage verbessern.
+• visually balanced
 
-Keine gestellten Businessposen.
-Keine Daumen-hoch-Gesten.
-Keine übertriebenen Emotionen.
+Maintain clear spacing.
 
----
+Consistent alignment.
 
-VERMEIDE
+Professional hierarchy.
 
-• Stockfoto-Look
-• Geldregen
-• riesige Eurozeichen
-• überladene Szenen
-• Logos
-• QR-Codes
-• Wasserzeichen
-• Text im Bild
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+COLOUR SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
----
+The HILO colour palette defines the visual identity.
+
+Primary colours:
+
+Navy
+#1a3a6b
+
+Green
+#4a8c5c
+
+Lavender Blue
+#b8c8e8
+
+White
+
+Use these colours elegantly.
+
+Avoid excessive colour saturation.
+
+Natural colours may dominate where appropriate.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+PEOPLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Only use people when they genuinely strengthen the message.
+
+If people appear:
+
+they must look authentic
+
+natural
+
+believable
+
+friendly
+
+confident
+
+Never use:
+
+stock-photo poses
+
+artificial smiles
+
+pointing at the camera
+
+crossed arms
+
+business handshakes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISUAL QUALITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The advertisement should resemble work created by a premium advertising agency.
+
+Magazine-quality composition.
+
+Professional lighting.
+
+Excellent balance.
+
+Premium materials.
+
+High realism.
+
+Modern aesthetics.
+
+No visual noise.
+
+No AI artifacts.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEGATIVE RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Never use:
+
+money rain
+
+oversized Euro symbols
+
+floating tax documents
+
+random financial charts
+
+generic office scenes
+
+clipart
+
+cheap icon collections
+
+watermarks
+
+QR codes
+
+logos
+
+fake app interfaces
+
+excessive decorative elements
+
+overcrowded layouts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL QUALITY CHECK
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before generating the final advertisement internally verify:
+
+Would this advertisement be approved by the Creative Director of a leading European advertising agency?
+
+Is the design memorable?
+
+Does it immediately communicate the core message?
+
+Does it strengthen the HILO brand?
+
+If the answer is no,
+
+improve the creative concept rather than adding more visual elements.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+INPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HEADLINE
+
+{headline}
+
+BODY
+
+{body}
+
+CALL TO ACTION
+
+{cta}
 
 FORMAT
 
-Quadratisch. 1:1.
-Ultra High Quality.
+1:1 Square
 
----
+LANGUAGE
 
-PARAMETER
-
-Bildwirkung: Automatisch wählen
-Kreativitätsgrad: 3 (von 5)
-Stilpräferenz: Automatisch
-
----
-
-SERIENCHARAKTER
-
-Behandle jedes neue Bild als Teil einer fortlaufenden HILO-Magazinserie.
-
-Vermeide ähnliche:
-• Motive (z.B. nicht immer Sparschwein/Taschenrechner)
-• Perspektiven (z.B. nicht immer Aufsicht)
-• Kompositionen (z.B. nicht immer zentriert)
-• Farbwirkungen (z.B. nicht immer warme Holztöne)
-
-Suche bewusst nach einer neuen visuellen Idee, die sich von typischen Finanz-/Steuermotiven abhebt.
-
----
-
-QUALITÄTSTEST VOR BILDERZEUGUNG
-
-Überprüfe abschließend:
-
-**"Würde dieses Bild auf der Titelseite eines Magazins zwischen zehn anderen Bildern sofort auffallen?"**
-
-Falls NEIN:
-→ Verbessere die **Bildidee**, nicht den Stil.
-
-Falls JA:
-→ Erzeuge das Bild.
-
----
-
-TEXT:
-
-{newsletter_text}"""
+German"""
 
 def tafel_sign_text(fields):
     """Baut den Tafel-Text (sign_text) fuer den ki_tafel-Modus aus den Entwurfs-fields (#139).
