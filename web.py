@@ -2026,24 +2026,79 @@ def bild_aktion(eid):
 
         elif aktion == "foto_neu":
             # Neues Foto würfeln (Cache löschen + neu generieren)
-            # Cache-Dateien für diesen Beitrag löschen um neues Foto zu erzwingen
-            cache_pfade = bildmotiv.cache_dateien_fuer_fields(data)
-            for pfad in cache_pfade:
-                if os.path.exists(pfad):
-                    try:
-                        os.remove(pfad)
-                    except Exception:
-                        pass
-            photo = bildmotiv.ensure_photo_fuer(data)  # Generiert neues Foto
-            slogan = bildgen.pick_slogan(data.get("slogan"))
-            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.render(data, photo, slogan, out)
+
+            # Prüfen ob Post mit 3-Stufen-Workflow erstellt wurde
+            use_campaign = "qa_approved" in data or "qa_problems" in data
+
+            if use_campaign:
+                # NEUER WORKFLOW: regenerate_image_with_qa (GPT Image 2 + QA)
+                import kampagne
+                import uuid
+
+                # Bild-Prompt aus data holen (falls vorhanden)
+                image_prompt = data.get("bild_motiv", "")
+                headline = data.get("ueberschrift", "")
+                bullets = data.get("bullets", [])
+                cta = data.get("cta", "")
+
+                # Falls kein image_prompt vorhanden, Fehler
+                if not image_prompt:
+                    flash("Kein Bild-Prompt vorhanden! Bitte Post neu erstellen.")
+                    return redirect(ziel)
+
+                try:
+                    # Neues Bild mit QA generieren
+                    timestamp = int(__import__("time").time())
+                    unique_id = uuid.uuid4().hex[:12]
+                    out = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
+
+                    image_path, review = kampagne.regenerate_image_with_qa(
+                        image_prompt=image_prompt,
+                        headline=headline,
+                        supporting_points=bullets,
+                        cta=cta,
+                        output_path=out,
+                        test_mode=False,  # High quality
+                    )
+
+                    # QA-Status aktualisieren
+                    data["qa_approved"] = review.approved
+                    data["qa_problems"] = review.problems if not review.approved else []
+                    data["bild_pfad"] = str(image_path)
+
+                    flash_msg = "Neues Foto für Beitrag %d generiert (3-Stufen-Workflow, QA: %s)." % (
+                        eid, "✅" if review.approved else "❌"
+                    )
+                    if not review.approved:
+                        flash_msg += " Probleme: " + ", ".join(review.problems)
+
+                except Exception as e:
+                    flash("Fehler bei Bild-Regenerierung: %s" % str(e))
+                    log.error("foto_neu mit Kampagne fehlgeschlagen: %s", e, exc_info=True)
+                    return redirect(ziel)
+
+            else:
+                # ALTER WORKFLOW: bildmotiv + bildgen (wie bisher)
+                cache_pfade = bildmotiv.cache_dateien_fuer_fields(data)
+                for pfad in cache_pfade:
+                    if os.path.exists(pfad):
+                        try:
+                            os.remove(pfad)
+                        except Exception:
+                            pass
+                photo = bildmotiv.ensure_photo_fuer(data)  # Generiert neues Foto
+                slogan = bildgen.pick_slogan(data.get("slogan"))
+                out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+                bildgen.render(data, photo, slogan, out)
+                flash_msg = "Neues Foto für Beitrag %d gewürfelt (KI-Call)." % eid
+
+            # In beiden Fällen: DB aktualisieren
             with get_conn() as conn:
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), out, eid))
                 audit_log(conn, session["user"], "foto_neu_gewuerfelt", eid)
                 conn.commit()
-            flash("Neues Foto für Beitrag %d gewürfelt (KI-Call)." % eid)
+            flash(flash_msg)
 
         elif aktion == "stil_wechseln":
             # Anderer Stil würfeln
