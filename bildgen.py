@@ -289,6 +289,12 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None):
         output_path
     """
     base = Image.open(image_path).convert("RGB")
+
+    # WICHTIG: Bild auf 1080x1080 skalieren falls nötig!
+    # GPT Image 2 generiert 2048x2048, aber unsere Kreise sind für 1080x1080 designed!
+    if base.size != (W, H):
+        base = base.resize((W, H), Image.LANCZOS)
+
     pos = "diagonal2" if portrait else pick_circle_pos()
     _draw_circles(base, slogan, pos, portrait)
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
