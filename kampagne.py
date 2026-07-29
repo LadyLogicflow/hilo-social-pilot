@@ -196,7 +196,7 @@ Der Prompt muss das Bildmodell ausdrücklich anweisen:
 - deutsche Rechtschreibung exakt einzuhalten
 - Bild und Typografie als eine integrierte Komposition zu gestalten
 - Lesbarkeit vor dekorativer Typografie zu priorisieren
-- alle vier Ecken freizuhalten (für Logo-Overlays)
+- **WICHTIG:** Alle vier Ecken KOMPLETT freizuhalten - mindestens 100x100px in JEDER Ecke müssen absolut leer sein (keine Texte, Grafiken, Dekoelemente) für Logo-Overlays. Texte und visuelle Elemente dürfen NUR im mittleren Bereich platziert werden.
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
