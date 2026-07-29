@@ -23,11 +23,32 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from config import DATA_DIR
+from secrets import get_secret
 
 log = logging.getLogger("hilo.kampagne")
 
-# OpenAI Client (verwendet OPENAI_API_KEY aus env)
-client = OpenAI()
+
+def _get_client() -> OpenAI:
+    """Erstellt OpenAI-Client mit API-Key aus secrets.json oder Umgebung.
+
+    Versucht zuerst secrets.json, dann OPENAI_API_KEY aus env.
+
+    Raises:
+        ValueError: Wenn kein API-Key verfügbar ist
+    """
+    api_key = get_secret("openai_api_key")
+    if not api_key:
+        # Fallback: Umgebungsvariable (für Container)
+        api_key = os.environ.get("OPENAI_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "Kein OpenAI API-Key verfügbar! "
+            "Bitte 'openai_api_key' in data/secrets.json hinterlegen "
+            "oder OPENAI_API_KEY als Umgebungsvariable setzen."
+        )
+
+    return OpenAI(api_key=api_key)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -205,6 +226,7 @@ def create_campaign_plan(
     Raises:
         RuntimeError: Wenn kein Plan erzeugt wurde
     """
+    client = _get_client()
     log.info("Stufe 1: Kampagnenplanung wird erstellt...")
 
     response = client.responses.parse(
@@ -261,6 +283,7 @@ def generate_advertisement(
     Raises:
         RuntimeError: Wenn keine Bilddaten zurückkamen
     """
+    client = _get_client()
     log.info("Stufe 2: Grafik wird generiert (size=%s, quality=%s)...", size, quality)
 
     result = client.images.generate(
@@ -339,6 +362,7 @@ def quality_check(
     Raises:
         RuntimeError: Wenn keine Review erzeugt wurde
     """
+    client = _get_client()
     log.info("Stufe 3: Qualitätskontrolle wird durchgeführt...")
 
     # Bild als Base64 laden
