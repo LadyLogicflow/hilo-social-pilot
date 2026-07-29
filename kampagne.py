@@ -187,42 +187,94 @@ VERMEIDEN
 
 BILDPROMPT
 
-**WICHTIG:** Übersetze dein gewähltes Visual Concept WÖRTLICH in einen englischen Prompt für GPT Image 2.
+Formuliere abschließend einen vollständigen englischen Produktionsprompt
+für das Bildmodell.
 
-Der image_prompt muss die GLEICHEN Objekte, Elemente und Details enthalten die du im visual_concept beschrieben hast.
-KEINE neuen Elemente erfinden, KEINE Objekte weglassen, KEINE Interpretation - nur DIREKTE Übersetzung!
+CONCEPT LOCK
 
-**Beispiel:**
-- Visual Concept: "geräumter Arbeitsplatz mit Umzugskarton, Blumen und zwei Gläsern"
-- Image Prompt: "Editorial still life photograph of a cleared office desk with a moving box, fresh flowers in a vase, and two glasses..."
+Das zuvor ausgewählte Kreativkonzept ist verbindlich und darf im Bildprompt
+nicht verändert, uminterpretiert oder durch eine offensichtlichere Bildidee
+ersetzt werden.
 
-Der Prompt muss SEHR SPEZIFISCH sein und das Bildmodell ausdrücklich anweisen:
+Der Bildprompt muss:
 
-**VISUELLE UMSETZUNG:**
-- Das gewählte Visual Concept EXAKT umsetzen (wenn Still-Life geplant → nur Objekte, keine Personen)
-- JEDES im visual_concept genannte Element MUSS im Prompt vorkommen
-- Stil präzise beschreiben (Editorial Photography, Still Life, Flat Lay, etc.)
-- Lichtstimmung und Farbpalette angeben
+- exakt das ausgewählte Hauptmotiv beschreiben
+- alle im Kreativkonzept genannten Kernelemente ausdrücklich aufführen
+- die festgelegte Bildart verbindlich nennen
+- unerwünschte Alternativmotive ausdrücklich ausschließen
+- deutlich zwischen dem visuellen Motiv und dem Inhalt des Anzeigentextes unterscheiden
 
-**NEGATIVE PROMPTS (was NICHT im Bild sein darf):**
-- Wenn Still-Life: "NO people, NO faces, NO hands" explizit verbieten
-- Wenn kein Text gewünscht: "NO additional text, NO watermarks"
-- Generische Stockfoto-Elemente vermeiden
-- **CRITICAL:** "DO NOT include the word 'HILO' anywhere in the image - NO 'HILO' text, NO 'HILO' branding, NO 'HILO' typography"
+Der Steuertext darf ausschließlich die Typografie und die fachliche Botschaft
+bestimmen. Er darf nicht zu einer neuen oder abweichenden Bildidee führen.
 
-**TYPOGRAFIE & LAYOUT:**
-- eine fertige, veröffentlichungsreife Werbegrafik zu erstellen
-- alle gelieferten Texte exakt und nur einmal wiederzugeben
-- keine zusätzlichen Wörter einzubauen
-- deutsche Rechtschreibung exakt einzuhalten (ä, ö, ü, ß)
-- Bild und Typografie als eine integrierte Komposition zu gestalten
-- Lesbarkeit vor dekorativer Typografie zu priorisieren
+Wenn beispielsweise ein Still-Life gewählt wurde:
 
-**CORNER CLEARANCE (ABSOLUTE REQUIREMENT):**
-- **CRITICAL:** "ALL FOUR CORNERS must be completely empty - minimum 100x100 pixels in EACH corner zone"
-- **CRITICAL:** "NO text, NO graphics, NO decorative elements, NO visual content in any corner"
-- **CRITICAL:** "Corner zones must show ONLY the background - text and visual elements are ONLY allowed in the center area"
-- Betone im Prompt dass dies HÖCHSTE PRIORITÄT hat für Logo-Overlays
+- dürfen keine Personen dargestellt werden
+- darf nicht zu Lifestyle-Fotografie gewechselt werden
+- darf keine Feier- oder Beratungsszene entstehen
+- muss das Still-Life das dominante und klar erkennbare Hauptmotiv bleiben
+
+Der englische Bildprompt muss mit diesem Block beginnen:
+
+"MANDATORY VISUAL CONCEPT — DO NOT REINTERPRET:
+[präzise Beschreibung des ausgewählten Kreativkonzepts]
+
+The following visual concept is locked. Do not replace it with a different
+scene, a more literal interpretation of the copy, or a lifestyle photograph."
+
+Danach muss der Bildprompt getrennte Abschnitte enthalten:
+
+1. MANDATORY VISUAL CONCEPT
+2. REQUIRED OBJECTS
+3. FORBIDDEN VISUAL ALTERNATIVES
+4. COMPOSITION
+5. EXACT TEXT
+6. TYPOGRAPHY
+7. BRAND COLOURS
+8. CORNER SAFE ZONES
+9. FINAL VALIDATION
+
+REQUIRED OBJECTS
+
+Führe alle zwingend sichtbaren Gegenstände als eindeutige Liste auf.
+Das Bild ist ungültig, wenn eines dieser Elemente fehlt.
+
+FORBIDDEN VISUAL ALTERNATIVES
+
+Nenne alle Motive, die nicht entstehen dürfen, insbesondere solche,
+die sich aus einer zu wörtlichen Interpretation des Steuertextes ergeben.
+
+EXACT TEXT
+
+Alle gelieferten Texte müssen exakt, vollständig und nur einmal erscheinen.
+Keine zusätzlichen Wörter.
+Keine Umformulierungen.
+Keine erfundenen Texte.
+Deutsche Rechtschreibung muss exakt eingehalten werden.
+
+CORNER SAFE ZONES
+
+Halte alle vier Ecken vollständig frei.
+
+Definiere in jeder Ecke eine leere Sicherheitszone von mindestens
+12 % der Bildbreite und 12 % der Bildhöhe.
+
+In diesen Sicherheitszonen dürfen keinerlei Texte, Personen, Gegenstände,
+Dekorationen, Schatten, Muster oder andere wichtige Bildelemente erscheinen.
+
+FINAL VALIDATION
+
+Der Bildprompt muss das Bildmodell abschließend anweisen, vor der Ausgabe
+intern zu kontrollieren:
+
+- Entspricht das Bild exakt dem gesperrten Kreativkonzept?
+- Sind alle erforderlichen Gegenstände sichtbar?
+- Wurden sämtliche verbotenen Alternativmotive vermieden?
+- Sind alle Texte exakt geschrieben?
+- Sind alle vier Ecken vollständig frei?
+
+Wenn eine Bedingung nicht erfüllt ist, muss die Komposition vor der Ausgabe
+korrigiert werden.
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
@@ -529,6 +581,106 @@ def run_campaign(
 
     # Sollte nie erreicht werden
     raise RuntimeError("Workflow-Logik-Fehler")
+
+
+def regenerate_image_with_qa(
+    image_prompt: str,
+    headline: str,
+    supporting_points: list[str],
+    cta: str,
+    article_excerpt: str = "",
+    output_path: Optional[str] = None,
+    max_retries: int = 3,
+    test_mode: bool = False,
+) -> tuple[Path, QualityReview]:
+    """Nur Stufe 2 + 3: Bild neu generieren mit QA (OHNE Kampagnenplanung).
+
+    Für "neues Foto würfeln" im Dashboard - verwendet bestehenden image_prompt
+    statt neue Kampagnenplanung zu machen.
+
+    Args:
+        image_prompt: Bestehender englischer Prompt für GPT Image 2
+        headline: Erwartete Headline (für QA)
+        supporting_points: Erwartete Infopunkte (für QA)
+        cta: Erwarteter CTA (für QA)
+        article_excerpt: Optionaler Artikel-Auszug (für QA-Kontext)
+        output_path: Optionaler Ausgabepfad für das Bild
+        max_retries: Maximale Anzahl Versuche bei QA-Ablehnung
+        test_mode: True = low quality für Tests
+
+    Returns:
+        Tuple von (image_path, review)
+
+    Raises:
+        RuntimeError: Wenn alle Versuche fehlschlagen
+    """
+    import time
+
+    # Kampagne-Verzeichnis erstellen (falls noch nicht vorhanden)
+    kampagne_dir = os.path.join(DATA_DIR, "kampagne")
+    os.makedirs(kampagne_dir, exist_ok=True)
+
+    # Bildgröße und Qualität
+    size = "1024x1024" if test_mode else "2048x2048"
+    quality = "low" if test_mode else "high"
+
+    # Mini-Plan für QA (ohne vollständige Kampagnenplanung)
+    from types import SimpleNamespace
+    mini_plan = SimpleNamespace(
+        headline=headline,
+        supporting_points=supporting_points,
+        cta=cta,
+        core_message="",  # Nicht verfügbar bei Regeneration
+    )
+
+    for attempt in range(1, max_retries + 1):
+        log.info("━━━━ BILD-REGENERIERUNG: VERSUCH %d/%d ━━━━", attempt, max_retries)
+
+        try:
+            # Stufe 2: Grafik generieren
+            temp_path = os.path.join(
+                kampagne_dir, f"regen_{int(time.time())}_{attempt}.png"
+            ) if not output_path else output_path
+
+            image_path = generate_advertisement(
+                image_prompt,
+                output_path=temp_path,
+                size=size,
+                quality=quality,
+            )
+
+            # Stufe 3: QA
+            review = quality_check(image_path, mini_plan, article_excerpt or headline)
+
+            if review.approved:
+                log.info("Bild-Regenerierung erfolgreich nach %d Versuch(en) ✅", attempt)
+                return image_path, review
+            else:
+                log.info(
+                    "Versuch %d: Bild abgelehnt - Probleme: %s",
+                    attempt,
+                    ", ".join(review.problems)
+                )
+                if attempt < max_retries:
+                    continue
+                else:
+                    log.warning(
+                        "Alle %d Versuche fehlgeschlagen! Letzte Probleme: %s",
+                        max_retries,
+                        ", ".join(review.problems)
+                    )
+                    # Gib das letzte Bild zurück, auch wenn nicht approved
+                    return image_path, review
+
+        except Exception as e:
+            log.warning("Versuch %d fehlgeschlagen (Exception): %s", attempt, e)
+            if attempt < max_retries:
+                continue
+            else:
+                raise RuntimeError(f"Alle {max_retries} Versuche fehlgeschlagen!") from e
+
+    # Sollte nie erreicht werden
+    raise RuntimeError("Regenerierung-Logik-Fehler")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
