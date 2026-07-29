@@ -187,13 +187,33 @@ VERMEIDEN
 
 BILDPROMPT
 
-Formuliere abschließend einen vollständigen englischen Prompt für GPT Image 2.
+**WICHTIG:** Übersetze dein gewähltes Visual Concept WÖRTLICH in einen englischen Prompt für GPT Image 2.
 
-Der Prompt muss das Bildmodell ausdrücklich anweisen:
+Der image_prompt muss die GLEICHEN Objekte, Elemente und Details enthalten die du im visual_concept beschrieben hast.
+KEINE neuen Elemente erfinden, KEINE Objekte weglassen, KEINE Interpretation - nur DIREKTE Übersetzung!
+
+**Beispiel:**
+- Visual Concept: "geräumter Arbeitsplatz mit Umzugskarton, Blumen und zwei Gläsern"
+- Image Prompt: "Editorial still life photograph of a cleared office desk with a moving box, fresh flowers in a vase, and two glasses..."
+
+Der Prompt muss SEHR SPEZIFISCH sein und das Bildmodell ausdrücklich anweisen:
+
+**VISUELLE UMSETZUNG:**
+- Das gewählte Visual Concept EXAKT umsetzen (wenn Still-Life geplant → nur Objekte, keine Personen)
+- JEDES im visual_concept genannte Element MUSS im Prompt vorkommen
+- Stil präzise beschreiben (Editorial Photography, Still Life, Flat Lay, etc.)
+- Lichtstimmung und Farbpalette angeben
+
+**NEGATIVE PROMPTS (was NICHT im Bild sein darf):**
+- Wenn Still-Life: "NO people, NO faces, NO hands" explizit verbieten
+- Wenn kein Text gewünscht: "NO additional text, NO watermarks"
+- Generische Stockfoto-Elemente vermeiden
+
+**TYPOGRAFIE & LAYOUT:**
 - eine fertige, veröffentlichungsreife Werbegrafik zu erstellen
 - alle gelieferten Texte exakt und nur einmal wiederzugeben
 - keine zusätzlichen Wörter einzubauen
-- deutsche Rechtschreibung exakt einzuhalten
+- deutsche Rechtschreibung exakt einzuhalten (ä, ö, ü, ß)
 - Bild und Typografie als eine integrierte Komposition zu gestalten
 - Lesbarkeit vor dekorativer Typografie zu priorisieren
 - **WICHTIG:** Alle vier Ecken KOMPLETT freizuhalten - mindestens 100x100px in JEDER Ecke müssen absolut leer sein (keine Texte, Grafiken, Dekoelemente) für Logo-Overlays. Texte und visuelle Elemente dürfen NUR im mittleren Bereich platziert werden.
