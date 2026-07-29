@@ -310,6 +310,11 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     # comic / comic_beratung -> reine Comic-Illustration (kein Overlay), da das Comic-Bild selbst
     # schon fertig ist (bei comic_beratung inkl. Berater vorne + Finanzamt hinten - die Szene IST
     # das Bild, KEINE weisse Textkarte drueber).
+    # v5.1+: Wenn Masterprompt v5.1 (Text-im-Bild) verwendet wurde, dann auch für "standard"
+    # nur Foto + Kreise rendern, da OpenAI den Text schon ins Bild integriert hat!
+    import bildmotiv
+    if bildmotiv.PROMPT_VERSION.startswith("v5") and stil == "standard":
+        return _render_kreativ(fields, photo_path, slogan, out_path, portrait)
     if stil in ("comic", "comic_beratung"):
         return _render_comic(fields, photo_path, out_path, portrait)
     if stil == "ki_tafel":

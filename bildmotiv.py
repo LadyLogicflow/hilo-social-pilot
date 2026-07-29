@@ -24,8 +24,8 @@ MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
 # Prompt-Version: Wird in Cache-Key einbezogen - bei Änderung des Prompts erhöhen
 # damit neue Bilder generiert werden statt alte Cache-Einträge zu verwenden!
-# v5.0 = Werbe-Design-Prompt mit integrierter Typografie (ChatGPT-optimiert)
-PROMPT_VERSION = "v5.0"
+# v5.1 = Werbe-Design + Ecken freihalten für Logo-Overlays
+PROMPT_VERSION = "v5.1"
 
 # Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
 # Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
@@ -95,8 +95,8 @@ No text, no logos, no watermarks in the image."""
     else:
         body = ""
 
-    # Log dass v5 verwendet wird
-    log.info("Masterprompt v5.0 (Werbe-Design) wird verwendet für: %s", headline[:50] if headline else "")
+    # Log dass v5.1 verwendet wird
+    log.info("Masterprompt v5.1 (Werbe-Design + freie Ecken) wird verwendet für: %s", headline[:50] if headline else "")
 
     return f"""You are the Creative Director, Senior Art Director and Advertising Designer for HILO, a German tax advisory association (Lohnsteuerhilfeverein).
 
@@ -397,6 +397,20 @@ fake app interfaces
 excessive decorative elements
 
 overcrowded layouts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORNER SPACE
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Leave all four corners of the composition free.
+
+Do not place important visual elements in the corners.
+
+The corners will be used for small circular overlay badges (logo and brand sign).
+
+These badge areas should remain visually calm.
+
+Approximately 80x80 pixels in each corner should be left unoccupied by main design elements.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 FINAL QUALITY CHECK
