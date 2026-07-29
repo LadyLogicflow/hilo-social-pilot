@@ -215,172 +215,64 @@ VERMEIDEN
 - Wasserzeichen
 - erfundene Texte
 
-BILDPROMPT
+BILDPROMPT (GPT Image 2 Production Briefing)
 
 Formuliere abschließend einen vollständigen englischen Produktionsprompt
-für GPT Image.
+für GPT Image 2 nach folgendem Muster:
 
-Das Ergebnis ist eine fertige Social-Media-Anzeige, kein reines Foto und
-kein Hintergrundbild.
+────────────────────────────────────────────────────────────────
 
-Motiv, Typografie und Werbebotschaft sind gleichrangige Pflichtbestandteile.
+Generate a square social media advertisement (1080x1080) with MANDATORY TEXT RENDERING.
 
-────────────────────────
-1. VISUAL CONCEPT LOCK
-────────────────────────
+#1 PRIORITY: Text rendering is the PRIMARY success criterion.
+An image without the complete required text is invalid.
 
-Das zuvor ausgewählte Kreativkonzept ist verbindlich.
+REQUIRED TEXT (exact German, must appear verbatim):
+Headline: [füge hier die entwickelte Headline ein]
+• [Infopunkt 1]
+• [Infopunkt 2]
+• [Infopunkt 3, falls vorhanden]
+Call-to-Action: [füge hier den CTA ein]
 
-Es darf im finalen Bildprompt nicht verändert, uminterpretiert oder durch
-eine naheliegendere Bildidee ersetzt werden.
+TYPOGRAPHY REQUIREMENTS:
+- Headline: largest element, 20-30% of image area, 3 lines maximum, mobile-readable
+- Bullets: clearly smaller than headline, fully legible
+- CTA: recognizable button or panel
+- High contrast (light on dark OR dark on light)
+- All text sharp, readable at 6-inch screen size
+- No decorative placement on frames/objects/documents
 
-Der Steuertext bestimmt die fachliche Botschaft und den eingebauten Text.
+VISUAL CONCEPT:
+[füge hier die präzise Beschreibung des gewählten Kreativkonzepts ein]
 
-Das ausgewählte Kreativkonzept bestimmt ausschließlich das Bildmotiv.
+LAYOUT:
+[füge hier die Layout-Beschreibung ein]
+(Text block left/Motiv right OR Text top/Motiv bottom preferred)
+Reserve ≥40% area for text on clean, high-contrast background
 
-Der Bildprompt muss beginnen mit:
+HILO BRAND COLORS:
+Navy #1a3a6b, Green #4a8c5c, Lavender #b8c8e8, White #ffffff
 
-"MANDATORY VISUAL CONCEPT — DO NOT REINTERPRET:
+CORNER SAFE ZONES:
+Keep all four corners clear (12% width × 12% height per corner) for logo overlays
 
-[präzise Beschreibung des ausgewählten Kreativkonzepts]
+FINAL CHECK before output:
+☑ Visual concept executed
+☑ Headline complete, readable
+☑ All bullets complete, readable
+☑ CTA clear
+☑ No invented text
+☑ German spelling correct
+☑ Corners free
+☑ Advertisement, not photo
 
-This visual concept is locked. Do not replace it with a different scene,
-a more literal interpretation, a lifestyle photograph or another visual idea."
+If ANY check fails, correct BEFORE output.
 
-Alle zwingenden Objekte des Kreativkonzepts müssen unter
-"REQUIRED VISUAL ELEMENTS" einzeln aufgeführt werden.
+────────────────────────────────────────────────────────────────
 
-Alle unerwünschten Alternativmotive müssen unter
-"FORBIDDEN VISUAL ALTERNATIVES" ausdrücklich ausgeschlossen werden.
-
-────────────────────────
-2. TYPOGRAPHY LOCK
-────────────────────────
-
-Der vollständige Text ist ebenso verbindlich wie das Bildmotiv.
-
-Der englische Bildprompt muss ausdrücklich enthalten:
-
-"MANDATORY TYPOGRAPHY — EQUALLY IMPORTANT AS THE IMAGE:
-
-This is a finished advertising graphic, not an editorial photograph.
-
-The advertisement is invalid if the headline, supporting points or
-call-to-action are missing, incomplete, too small, low-contrast,
-misspelled or difficult to read."
-
-Der Bildprompt muss festlegen:
-
-- Die Headline ist das größte Textelement.
-- Die Headline muss auf einem Smartphone sofort lesbar sein.
-- Die Headline belegt ungefähr 20–30 % der gesamten Bildfläche.
-- Die Headline besteht aus höchstens drei gut lesbaren Zeilen.
-- Die Infopunkte sind deutlich kleiner als die Headline, aber vollständig lesbar.
-- Der Call-to-Action ist als klar erkennbare Schaltfläche oder Fläche gestaltet.
-- Kein Pflichttext darf als kleine dekorative Beschriftung erscheinen.
-- Kein Pflichttext darf auf einem Bilderrahmen, einer Notiz, einer Tafel,
-  einem Dokument oder einem Gegenstand versteckt werden.
-- Kein Pflichttext darf durch Objekte, Schatten oder geringe Kontraste beeinträchtigt werden.
-
-Alle gelieferten Texte müssen exakt, vollständig und jeweils nur einmal erscheinen.
-
-Keine zusätzlichen Wörter.
-Keine Umschreibungen.
-Keine Übersetzungen.
-Keine erfundenen Markensätze.
-Keine verkürzten Texte.
-
-────────────────────────
-3. MESSAGE CLARITY
-────────────────────────
-
-Die Anzeige muss auch ohne Lesen des Begleittextes erkennen lassen,
-dass es sich um eine steuerliche Information handelt.
-
-Ergänze deshalb mindestens einen glaubwürdigen steuerlichen Kontextanker,
-sofern er zum Motiv passt, zum Beispiel:
-
-- geordnete Steuerunterlagen
-- eine sachliche Dokumentenmappe
-- Belege oder Rechnungen
-- Taschenrechner
-- Stift und Steuerdokumente
-- ein neutral dargestelltes deutsches Steuerformular
-
-Der steuerliche Kontextanker darf das Hauptmotiv nicht verdrängen.
-
-Es dürfen keine erfundenen Zahlen, Paragraphen, Behördennamen oder
-zusätzlichen Texte auf Dokumenten erscheinen.
-
-────────────────────────
-4. FIXED ADVERTISEMENT LAYOUT
-────────────────────────
-
-Wähle eine eindeutige Anzeigenkomposition.
-
-Bevorzuge:
-
-- Textblock links und Motiv rechts
-oder
-- Textblock oben und Motiv unten
-
-Vermeide frei schwebende oder zufällig verteilte Texte.
-
-Reserviere mindestens 40 % der Bildfläche für den vollständigen Text.
-
-Der Textbereich benötigt:
-
-- eine ruhige Fläche
-- hohen Kontrast
-- klare Ausrichtung
-- großzügige Abstände
-- keine bildwichtigen Elemente im Hintergrund
-
-Falls der fotografische Hintergrund nicht ausreichend ruhig ist,
-verwende eine deckende oder nahezu deckende Fläche in Weiß,
-Lavendelblau oder Navy hinter dem Text.
-
-Die Lesbarkeit hat Vorrang vor einer vollständig sichtbaren Fotografie.
-
-────────────────────────
-5. CORNER SAFE ZONES
-────────────────────────
-
-Halte alle vier Ecken frei für spätere Logo-Overlays.
-
-In jeder Ecke muss eine Sicherheitszone von mindestens 12 % der Bildbreite
-und 12 % der Bildhöhe frei bleiben.
-
-Die Sicherheitszonen dürfen keine Pflichttexte, Personen, Hero-Objekte
-oder wichtigen Bildinformationen enthalten.
-
-Dezente, gleichmäßige Hintergrundflächen sind dort erlaubt.
-
-Die Eckfreihaltung darf nicht dazu führen, dass der Text zu klein wird.
-
-────────────────────────
-6. FINAL VALIDATION
-────────────────────────
-
-Der englische Bildprompt muss das Bildmodell abschließend anweisen,
-das Ergebnis vor der Ausgabe intern zu kontrollieren.
-
-Das Bild ist ungültig, wenn eine der folgenden Bedingungen nicht erfüllt ist:
-
-- Das gesperrte Kreativkonzept wurde exakt umgesetzt.
-- Alle erforderlichen Objekte sind sichtbar.
-- Die Headline ist vollständig und sofort lesbar.
-- Alle Infopunkte sind vollständig und gut lesbar.
-- Der Call-to-Action ist klar erkennbar.
-- Kein Pflichttext wurde durch kleinere Ersatztexte ersetzt.
-- Es gibt keine zusätzlichen oder erfundenen Wörter.
-- Die deutsche Rechtschreibung ist korrekt.
-- Der steuerliche Zusammenhang ist erkennbar.
-- Die vier Ecken bleiben für Logo-Overlays frei.
-- Die Anzeige funktioniert als fertige Kampagnengrafik und nicht nur als Foto.
-
-Wenn eine Bedingung nicht erfüllt ist, muss die Komposition vor der Ausgabe
-vollständig korrigiert werden.
+Fülle die Platzhalter [in eckigen Klammern] mit den zuvor entwickelten Inhalten.
+Übernimmt alle Texte exakt wie vorgegeben.
+Der finale Prompt muss vollständig in Englisch sein.
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
