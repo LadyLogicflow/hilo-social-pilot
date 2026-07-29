@@ -753,7 +753,6 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% endif %}
     <form method=post action="/aktion/{{e.id}}">
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
-      {% if not e.f.qa_approved %}<button name=aktion value=kreise_hinzufuegen style="background:#4a8c5c">⚪ Kreise hinzufügen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
       <button class=ok name=aktion value=freigeben>Freigeben</button>
       <button class=re name=aktion value=ueberarbeiten>Überarbeiten</button>
@@ -848,7 +847,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
       <input type=hidden name=zurueck value=einplanung>
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
       <button style="background:#0B2545;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
-    {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button>{% if not e.f.qa_approved %}<button name=aktion value=kreise_hinzufuegen style="background:#4a8c5c;padding:6px 10px;margin-left:6px">⚪ Kreise hinzufügen</button>{% endif %}</form>{% endif %}
+    {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
     <p><a href="/beitrag/{{e.id}}" style="color:#0B2545;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:4px 0 10px" onsubmit="return confirm('Diesen zeitlosen Beitrag in den Zufalls-Pool aufnehmen?\n\nEr wird dann automatisch ausgespielt – je Beratungsstelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal. Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
       <button style="background:#4D7C0F" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
@@ -916,7 +915,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
 <div class=card>{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
-    {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button>{% if not e.f.qa_approved %}<button name=aktion value=kreise_hinzufuegen style="background:#4a8c5c;padding:6px 10px;margin-left:6px">⚪ Kreise hinzufügen</button>{% endif %}</form>{% endif %}
+    {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
     <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:8px;display:block">
@@ -2929,34 +2928,10 @@ def aktion(eid):
                     flash("Caption-Erstellung fehlgeschlagen: %s" % ex)
             else:
                 flash("Kein Thema verknüpft mit Entwurf %d." % eid)
-        elif aktion == "kreise_hinzufuegen":
-            # Logo-Kreise nachträglich hinzufügen für Bestandsposts
-            if e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
-                try:
-                    import bildgen
-                    data = json.loads(e["text"])
-                    slogan = bildgen.pick_slogan(data.get("slogan"))
-
-                    # Temporärer Pfad für Bild MIT Kreisen
-                    import time, uuid
-                    timestamp = int(time.time())
-                    unique_id = uuid.uuid4().hex[:12]
-                    final_path = os.path.join(DATA_DIR, "bilder", f"circles_{timestamp}_{unique_id}.png")
-
-                    # Kreise drüberlegen
-                    bildgen.add_logo_circles(e["bild_pfad"], slogan, final_path)
-
-                    # Altes Bild löschen (optional - könnte als Backup behalten werden)
-                    # os.remove(e["bild_pfad"])
-
-                    # Neuen Pfad speichern
-                    conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (final_path, eid))
-                    audit_log(conn, user, "kreise_hinzugefuegt", eid)
-                    flash("Logo-Kreise für Entwurf %d hinzugefügt." % eid)
-                except Exception as ex:
-                    flash("Kreise-Hinzufügen fehlgeschlagen: %s" % ex)
-            else:
-                flash("Kein Bild vorhanden für Entwurf %d." % eid)
+        # ENTFERNT: "kreise_hinzufuegen" Aktion
+        # Grund: Alte Posts haben SCHON Kreise (von bildgen.render)
+        # "Kreise hinzufügen" auf fertiges Bild → doppelte Kreise!
+        # Neue Posts bekommen Kreise automatisch (add_logo_circles in textgen.py)
         conn.commit()
     return redirect(url_for("entwuerfe"))
 
