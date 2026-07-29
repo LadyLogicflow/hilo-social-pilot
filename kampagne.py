@@ -454,12 +454,16 @@ def run_campaign(
     size = "1024x1024" if test_mode else "2048x2048"
     quality = "low" if test_mode else "high"
 
+    # Kampagne-Verzeichnis erstellen (falls noch nicht vorhanden)
+    kampagne_dir = os.path.join(DATA_DIR, "kampagne")
+    os.makedirs(kampagne_dir, exist_ok=True)
+
     for attempt in range(1, max_retries + 1):
         log.info("━━━━ VERSUCH %d/%d ━━━━", attempt, max_retries)
 
         # Stufe 2: Grafik generieren
         temp_path = os.path.join(
-            DATA_DIR, "kampagne", f"attempt_{attempt}.png"
+            kampagne_dir, f"attempt_{attempt}.png"
         ) if not output_path else output_path
 
         image_path = generate_advertisement(
