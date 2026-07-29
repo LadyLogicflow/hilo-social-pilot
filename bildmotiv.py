@@ -24,8 +24,8 @@ MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 
 # Prompt-Version: Wird in Cache-Key einbezogen - bei Änderung des Prompts erhöhen
 # damit neue Bilder generiert werden statt alte Cache-Einträge zu verwenden!
-# v5.1 = Werbe-Design + Ecken freihalten für Logo-Overlays
-PROMPT_VERSION = "v5.1"
+# v5.2 = Kein "HILO" Text in der Typografie (nur supplied text)
+PROMPT_VERSION = "v5.2"
 
 # Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
 # Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
@@ -288,6 +288,10 @@ Maintain clear spacing.
 Consistent alignment.
 
 Professional hierarchy.
+
+Do not include the word "HILO" in the typography.
+
+Only use the supplied headline, body points and call to action.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 COLOUR SYSTEM
