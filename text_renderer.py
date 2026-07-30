@@ -66,10 +66,18 @@ def render_text_on_image(
     # Schriften liegen im Repo unter fonts/ (absoluter Pfad via FONT_DIR, s.o.)
     try:
         font_headline = ImageFont.truetype(str(FONT_DIR / "ArchivoBlack-Regular.ttf"), 68)
-        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-SemiBold.ttf"), 32)
-        font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Bold.ttf"), 36)
-    except OSError:
-        # Fallback: Standard-Font
+        # Inter-Variable.ttf ist eine VARIABLE Font (ein File, alle Gewichte) - die vorher
+        # verwendeten 'Inter-SemiBold.ttf'/'Inter-Bold.ttf' waren defekt (enthielten faelschlich
+        # HTML-Seiten statt echter Font-Daten -> jeder Ladeversuch scheiterte, WESHALB ALLE DREI
+        # Schriften inkl. Headline auf die winzige Pillow-Standardschrift zurueckfielen - das war
+        # die eigentliche Ursache fuer 'Text viel zu klein').
+        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 32)
+        font_body.set_variation_by_name("SemiBold")
+        font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
+        font_cta.set_variation_by_name("Bold")
+    except Exception:
+        # Fallback: Standard-Font (OSError bei fehlender/kaputter Datei, aber auch andere Fehler
+        # bei set_variation_by_name abfangen - besser lesbare-aber-falsche Schrift als Crash)
         font_headline = ImageFont.load_default()
         font_body = ImageFont.load_default()
         font_cta = ImageFont.load_default()
