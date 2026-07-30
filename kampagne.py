@@ -198,13 +198,13 @@ LAYOUT_TEMPLATES = {
     },
 
     "text_top_hero_bottom": {
-        # Gleiche Text-Boxen wie text_left_hero_right (oben links, fett, nicht zentriert)!
-        # Nur Motiv ist unten statt rechts → CTA muss tiefer (y=0.76 statt 0.63)
-        "headline_box": TextBox(x=0.07, y=0.08, width=0.48, height=0.22, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.34, width=0.42, height=0.30, align="left", vertical_align="top"),
-        "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
+        # Wie text_left_hero_right (oben links, fett), aber BREITER weil mehr Platz (Motiv unten)
+        # → Headline kann 1-2 Zeilen statt 3, Bullets haben mehr Raum
+        "headline_box": TextBox(x=0.07, y=0.08, width=0.65, height=0.22, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.34, width=0.60, height=0.30, align="left", vertical_align="top"),
+        "cta_box": TextBox(x=0.07, y=0.76, width=0.50, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "bottom 45%",
-        "motiv_instruction": "Keep the top 55% and left 50% visually calm. Place the hero subject in the lower half."
+        "motiv_instruction": "Keep the top 55% and left 65% visually calm. Place the hero subject in the lower right area."
     },
 
     "hero_top_text_bottom": {
