@@ -757,7 +757,6 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
         <button class=ok name=aktion value=freigeben>Freigeben</button>
-        <button class=no name=aktion value=verwerfen>Verwerfen</button>
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
       </form>
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
@@ -2946,9 +2945,6 @@ def aktion(eid):
                 flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
             else:
                 flash("Entwurf %d freigegeben – Termin unter „4. Einplanung\" mit einem Klick bestätigen." % eid)
-        elif aktion == "verwerfen":
-            conn.execute("UPDATE entwuerfe SET status='verworfen' WHERE id=?", (eid,))
-            audit_log(conn, user, "verworfen", eid); flash("Entwurf %d verworfen." % eid)
         elif aktion == "loeschen":
             if e["bild_pfad"] and os.path.exists(e["bild_pfad"]):
                 try:
