@@ -401,17 +401,12 @@ def _draw_text_with_outline(
     outline_color: str = "#000000",
     outline_width: int = 3,
 ):
-    """Zeichnet Text mit Outline fuer Lesbarkeit OHNE Hintergrundflaeche (Text layert direkt
-    ueber das Motiv). Outline-Farbe ist die zu 'fill_color' PASSENDE Gegenfarbe (weiss bei
-    dunklem/Navy-Text, schwarz bei hellem/weissem Text - siehe _text_colors_for_region), NICHT
-    IMMER schwarz+weiss zugleich: ein erzwungener schwarzer Ring um dunklen (Navy-)Text
-    verschmolz mit der Fuellfarbe selbst und machte die Buchstaben klumpig/schwer lesbar statt
-    besser - genau umgekehrtes Ergebnis. Ein einzelner, zur Fuellfarbe komplementaerer Ring
-    reicht: er kontrastiert sowohl zum Text (immer) als auch zum ueblichen Hintergrund an dieser
-    Stelle (die Farbwahl basiert ja auf der gemessenen Helligkeit genau dort)."""
+    """Zeichnet Text OHNE Rand/Outline - reine Fuellfarbe (#Layout-Fix: der weisse/schwarze Rand
+    um die Buchstaben wirkte unschoen/klobig, auf Wunsch entfernt). 'outline_color' und
+    'outline_width' bleiben als Parameter erhalten (Kompatibilitaet mit bestehenden Aufrufern),
+    werden aber nicht mehr verwendet. Lesbarkeit kommt jetzt ausschliesslich aus der
+    Helligkeits-basierten Farbwahl (_text_colors_for_region: Navy auf hellem, Weiss auf dunklem
+    Bildbereich) und der fetten Schrift - kein Sicherheitsnetz mehr bei sehr unruhigen/gemischt
+    hell-dunklen Bildstellen (dafuer gibt's die QA-Pruefung als Auffangnetz)."""
     x, y = pos
-    for dx in range(-outline_width, outline_width + 1):
-        for dy in range(-outline_width, outline_width + 1):
-            if dx != 0 or dy != 0:
-                draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
     draw.text((x, y), text, font=font, fill=fill_color)
