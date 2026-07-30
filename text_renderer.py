@@ -77,7 +77,7 @@ def render_text_on_image(
         # Schriften inkl. Headline auf die winzige Pillow-Standardschrift zurueckfielen - das war
         # die eigentliche Ursache fuer 'Text viel zu klein').
         font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
-        font_body.set_variation_by_name("SemiBold")
+        font_body.set_variation_by_name("Bold")
         font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
         font_cta.set_variation_by_name("Bold")
     except Exception:
@@ -177,6 +177,11 @@ def _render_text_block(
     Rendering statt einem einzigen draw.text-Aufruf pro Zeile, da eine Zeile jetzt gemischte
     Farben enthalten kann.
 
+    Fortsetzungszeilen (2. Zeile eines umgebrochenen Bullet-Points) werden eingerueckt, damit sie
+    unter dem TEXT der 1. Zeile stehen statt unter dem Aufzaehlungszeichen - und zwischen den
+    Bullet-Punkten selbst (nicht zwischen den umgebrochenen Zeilen DESSELBEN Punkts) gibt es
+    zusaetzlichen Abstand, beides analog zum alten Bild-Design (#Layout-Fix).
+
     #Kollisionsschutz: lange Woerter (z.B. deutsche Komposita wie 'Entfernungspauschale')
     koennen in schmalen Spalten auf 2 Zeilen umbrechen und dadurch die Box-Hoehe sprengen -
     das reicht dann ggf. bis in die reservierte Logo-Kreis-Zone hinein, unabhaengig davon wie
@@ -192,12 +197,21 @@ def _render_text_block(
     w = int(box.width * img_width)
     h = int(box.height * img_height)
 
+    # Einzug fuer Fortsetzungszeilen = Breite von "• " in der aktuellen Schrift (misst sich
+    # selbst nach - passt automatisch, falls die Schrift unten schrumpft).
+    def _einzug(f):
+        return draw.textbbox((0, 0), "• ", font=f)[2]
+
+    extra_bullet_abstand_faktor = 0.4  # zusaetzlicher Abstand zwischen Bullet-Punkten
+
     # Text umbrechen; passt er nicht in die Box-Hoehe, Schrift schrittweise verkleinern.
     mindestgroesse = max(18, int(font.size * 0.55))
     for _ in range(8):
-        wrapped_lines = _wrap_text(text, font, w)
+        zeilen = _wrap_paragraphs(text, font, w - _einzug(font))
         line_height = _get_line_height(font)
-        total_text_height = len(wrapped_lines) * line_height
+        neue_absaetze = sum(1 for _, fortsetzung in zeilen if not fortsetzung)
+        extra_abstand = int(line_height * extra_bullet_abstand_faktor)
+        total_text_height = len(zeilen) * line_height + max(0, neue_absaetze - 1) * extra_abstand
         if total_text_height <= h or font.size <= mindestgroesse:
             break
         neue_groesse = max(mindestgroesse, font.size - 4)
@@ -213,14 +227,21 @@ def _render_text_block(
         text_y = y + h - total_text_height - 10
 
     space_width = draw.textbbox((0, 0), " ", font=font)[2]
+    einzug_px = _einzug(font)
 
     # Zeilen rendern - WORT FUER WORT (statt die ganze Zeile in einem Aufruf), damit einzelne
     # Woerter gruen hervorgehoben werden koennen.
-    for line in wrapped_lines:
+    ist_erste_zeile_gesamt = True
+    for line, ist_fortsetzung in zeilen:
+        if not ist_fortsetzung and not ist_erste_zeile_gesamt:
+            text_y += int(line_height * extra_bullet_abstand_faktor)  # Abstand vor neuem Bullet
+        ist_erste_zeile_gesamt = False
+
         bbox = draw.textbbox((0, 0), line, font=font)
         line_width = bbox[2] - bbox[0]
+        einzug_hier = einzug_px if (ist_fortsetzung and box.align == "left") else 0
         if box.align == "left":
-            cursor_x = x + 10
+            cursor_x = x + 10 + einzug_hier
         elif box.align == "center":
             cursor_x = x + (w - line_width) // 2
         else:  # right
@@ -318,6 +339,33 @@ def _render_cta_button(
 
 
 
+def _wrap_paragraphs(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[tuple[str, bool]]:
+    """Wie _wrap_text, markiert aber zusaetzlich pro Zeile, ob sie eine FORTSETZUNGSZEILE ist
+    (2. oder weitere Zeile desselben Absatzes/Bullet-Points) statt die erste Zeile eines neuen
+    Absatzes. Wird fuer den Einzug von Fortsetzungszeilen bei Bullet-Points gebraucht (#Layout-
+    Fix: die 2. Zeile eines umgebrochenen Bullets stand bisher unter dem Aufzaehlungszeichen
+    statt eingerueckt unter dem Text der 1. Zeile) sowie fuer extra Abstand zwischen Bullets."""
+    draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    result: list[tuple[str, bool]] = []
+    for absatz in text.split("\n"):
+        words = absatz.split()
+        current_line = ""
+        ist_erste_zeile = True
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
+            if bbox[2] - bbox[0] <= max_width - 20:  # 20px Margin
+                current_line = test_line
+            else:
+                if current_line:
+                    result.append((current_line, not ist_erste_zeile))
+                    ist_erste_zeile = False
+                current_line = word
+        if current_line:
+            result.append((current_line, not ist_erste_zeile))
+    return result
+
+
 def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
     """Bricht Text in Zeilen um, die in max_width passen.
 
@@ -328,23 +376,7 @@ def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[
     zusammen statt untereinander zu stehen. Jetzt wird pro Absatz (zwischen den '\\n') unabhaengig
     umgebrochen; ein Absatz kann bei Bedarf weiterhin ueber mehrere Zeilen laufen, startet aber nie
     im selben Zeilenrest wie der vorherige Absatz."""
-    draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    all_lines = []
-    for absatz in text.split("\n"):
-        words = absatz.split()
-        current_line = ""
-        for word in words:
-            test_line = f"{current_line} {word}".strip()
-            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
-            if bbox[2] - bbox[0] <= max_width - 20:  # 20px Margin
-                current_line = test_line
-            else:
-                if current_line:
-                    all_lines.append(current_line)
-                current_line = word
-        if current_line:
-            all_lines.append(current_line)
-    return all_lines
+    return [line for line, _ in _wrap_paragraphs(text, font, max_width)]
 
 
 def _get_line_height(font: ImageFont.FreeTypeFont) -> int:
