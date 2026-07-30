@@ -752,33 +752,41 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     </form>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
       <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
-    <form method=post action="/bild-aktion/{{e.id}}" style="margin-top:12px;display:block">
+    <form method=post action="/bild-aktion/{{e.id}}" style="margin-top:12px;display:inline-block">
       <input type=hidden name=zurueck value=entwuerfe>
-      <label style="display:block;margin-bottom:4px;color:#0B2545;font-weight:500;font-size:14px">Bild-Motiv (editierbar):</label>
-      <textarea name=motiv placeholder="Beschreibe die Szene (z.B. 'Wecker am Strand, Sonnenaufgang, ruhige Atmosphäre')" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin-bottom:8px;font-size:13px;min-height:60px">{{ e.f.szene_motiv or e.f.bild_motiv or '' }}</textarea>
-      <select name=bild_aktion style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px;width:auto" required>
-        <option value="" disabled selected>– Bild-Aktion wählen –</option>
-        <option value="layout_neu">&#x21BB; Layout neu rendern (kein KI-Call, kostenlos)</option>
-        <option value="foto_neu">&#x1F3B2; Neues Foto würfeln (KI-Call, Kosten)</option>
-        <option value="stil_wechseln">&#x1F3A8; Anderer Stil (KI-Call, Kosten)</option>
-      </select>
-      <button style="background:#0B2545;padding:8px 12px" title="Gewählte Bild-Aktion ausführen">Ausführen</button></form>
-    <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px;display:block">
-      <input type=hidden name=zurueck value=entwuerfe>
-      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
-      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
-        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
-        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-      </select>
-      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-        <option value="" disabled selected>– Stil wählen –</option>
-        <option value="comic">Comic</option>
-        <option value="comic_beratung">Comic Beratung</option>
-        <option value="comic_strip">Comic-Strip</option>
-        <option value="ki_tafel">Tafel</option>
-        <option value="kreativ">Kreativ</option></select>
-      <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+      <input type=hidden name=bild_aktion value=foto_neu>
+      <button style="background:#0B2545" title="Neues Bild erzeugen (Art Director + GPT Image 2 + QA)">&#x1F3B2; Neues Bild erzeugen</button></form>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
+      <div style="margin-top:8px">
+        <form method=post action="/bild-aktion/{{e.id}}" style="margin-bottom:6px">
+          <input type=hidden name=zurueck value=entwuerfe>
+          <label style="display:block;margin-bottom:4px;color:#0B2545;font-weight:500;font-size:14px">Bild-Motiv (nur für alte Stile unten relevant):</label>
+          <textarea name=motiv placeholder="Beschreibe die Szene (z.B. 'Wecker am Strand, Sonnenaufgang, ruhige Atmosphäre')" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin-bottom:8px;font-size:13px;min-height:60px">{{ e.f.szene_motiv or e.f.bild_motiv or '' }}</textarea>
+          <select name=bild_aktion style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px;width:auto" required>
+            <option value="" disabled selected>– Bild-Aktion wählen –</option>
+            <option value="layout_neu">&#x21BB; Layout neu rendern (kein KI-Call, kostenlos)</option>
+            <option value="stil_wechseln">&#x1F3A8; Anderer (alter) Stil (KI-Call, Kosten)</option>
+          </select>
+          <button style="background:#0B2545;padding:8px 12px" title="Gewählte Bild-Aktion ausführen">Ausführen</button></form>
+        <form method=post action="/bild-generieren/{{e.id}}">
+          <input type=hidden name=zurueck value=entwuerfe>
+          <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+          <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+            <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+            <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+            <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+          </select>
+          <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+            <option value="" disabled selected>– Stil wählen –</option>
+            <option value="comic">Comic</option>
+            <option value="comic_beratung">Comic Beratung</option>
+            <option value="comic_strip">Comic-Strip</option>
+            <option value="ki_tafel">Tafel</option>
+            <option value="kreativ">Kreativ</option></select>
+          <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+      </div>
+    </details>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
