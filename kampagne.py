@@ -288,7 +288,8 @@ Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren.
 Sie benötigt:
 - ein dominantes Hero-Element
 - eine klare Blickführung
-- einen ruhigen und gut lesbaren Textbereich
+- einen ruhigen UND kontrastreichen Textbereich (der Text liegt OHNE Farbfläche direkt
+  über dem Motiv - Kontrast muss vom Motiv selbst kommen, nicht von einer Hintergrundfläche)
 - eine eindeutige Hierarchie aus Headline, Infopunkten und CTA
 - hohe Lesbarkeit auf Smartphones
 - großzügige Abstände
@@ -337,7 +338,8 @@ Formuliere einen englischen Produktionsprompt für GPT Image 2.
 WICHTIG - DIES IST ENTSCHEIDEND:
 - Der Prompt beschreibt NUR das visuelle Motiv
 - KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen!
-- Das Motiv muss eine ruhige, freie Fläche für späteren Text lassen
+- Das Motiv muss eine ruhige, kontrastreiche Fläche für späteren Text-Overlay lassen (der
+  Text bekommt KEINE Hintergrundfläche - Kontrast muss vom Motiv selbst kommen)
 - Verwende die Layout-spezifische Anweisung aus der gewählten Vorlage
 
 Beispiel für "text_left_hero_right":
