@@ -2071,6 +2071,10 @@ def bild_aktion(eid):
                     data["qa_approved"] = review.approved
                     data["qa_problems"] = review.problems if not review.approved else []
                     data["bild_pfad"] = str(final_path)
+                    out = str(final_path)  # Bugfix: wurde bisher nur im alten Pipeline-Zweig gesetzt -
+                    # die DB-Aktualisierung unten (gemeinsam fuer beide Zweige) griff dadurch auf eine
+                    # undefinierte Variable zu (NameError, vom aeusseren except stumm verschluckt) -
+                    # das neu erzeugte Bild wurde nie in der DB verknuepft.
 
                     flash_msg = "Neues Foto für Beitrag %d generiert (3-Stufen-Workflow, QA: %s)%s." % (
                         eid, "✅" if review.approved else "❌", flash_msg_extra
