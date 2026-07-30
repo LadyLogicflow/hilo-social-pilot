@@ -156,26 +156,33 @@ class VisualOnlyPlan(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 LAYOUT_TEMPLATES = {
+    # WICHTIG (#Kollisionsschutz): Die Logo-Kreise (bildgen.add_logo_circles, pos="oben") sitzen
+    # IMMER oben-links (Logo) und oben-rechts (Slogan/Portrait) inkl. weichem Schlagschatten -
+    # grosszuegig bis x<0.28 bzw. x>0.70 und y<0.30 (Portrait-Kreise sind groesser als Standard-
+    # Kreise, der Schlagschatten reicht nochmal etwas darueber hinaus - daher die Reserve).
+    # KEINE Textbox darf in diese beiden Zonen hineinragen - deshalb starten Ueberschrift/Bullets
+    # in JEDER Vorlage erst bei y>=0.33 (Sicherheitsmarge). Der CTA-Button ignoriert diese Box
+    # ohnehin (siehe _render_cta_button - immer unten mittig, automatisch breit).
     "text_left_hero_right": {
-        "headline_box": TextBox(x=0.07, y=0.08, width=0.48, height=0.24, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.38, width=0.42, height=0.28, align="left", vertical_align="top"),
+        "headline_box": TextBox(x=0.07, y=0.33, width=0.48, height=0.20, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.52, width=0.42, height=0.24, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "right 50%",
         "motiv_instruction": "Keep the left 45% visually calm. Place the hero subject on the right side."
     },
 
     "text_right_hero_left": {
-        "headline_box": TextBox(x=0.55, y=0.08, width=0.38, height=0.24, align="right", vertical_align="top"),
-        "supporting_box": TextBox(x=0.55, y=0.38, width=0.38, height=0.28, align="right", vertical_align="top"),
+        "headline_box": TextBox(x=0.55, y=0.33, width=0.38, height=0.20, align="right", vertical_align="top"),
+        "supporting_box": TextBox(x=0.55, y=0.52, width=0.38, height=0.24, align="right", vertical_align="top"),
         "cta_box": TextBox(x=0.55, y=0.76, width=0.38, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "left 50%",
         "motiv_instruction": "Keep the right 40% visually calm. Place the hero subject on the left side."
     },
 
     "text_top_hero_bottom": {
-        "headline_box": TextBox(x=0.07, y=0.06, width=0.86, height=0.18, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.28, width=0.86, height=0.14, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.47, width=0.50, height=0.09, align="center", vertical_align="center"),
+        "headline_box": TextBox(x=0.07, y=0.33, width=0.86, height=0.14, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.46, width=0.86, height=0.10, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.63, width=0.50, height=0.09, align="center", vertical_align="center"),
         "motiv_area": "bottom 45%",
         "motiv_instruction": "Keep the top 55% visually calm. Place the hero subject in the lower half."
     },
@@ -197,9 +204,9 @@ LAYOUT_TEMPLATES = {
     },
 
     "editorial_split": {
-        "headline_box": TextBox(x=0.05, y=0.12, width=0.42, height=0.20, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.05, y=0.38, width=0.42, height=0.24, align="left", vertical_align="top"),
-        "cta_box": TextBox(x=0.05, y=0.68, width=0.42, height=0.10, align="left", vertical_align="center"),
+        "headline_box": TextBox(x=0.05, y=0.33, width=0.42, height=0.18, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.05, y=0.50, width=0.42, height=0.22, align="left", vertical_align="top"),
+        "cta_box": TextBox(x=0.05, y=0.74, width=0.42, height=0.10, align="left", vertical_align="center"),
         "motiv_area": "right 48%",
         "motiv_instruction": "Create an editorial split layout. Hero subject fills the right half completely."
     }

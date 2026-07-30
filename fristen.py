@@ -122,7 +122,7 @@ def erzeuge_countdowns(heute=None):
             )
             import bildgen
             final_path = str(image_path).replace(".png", "_ci.png")
-            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(fields.get("slogan")), final_path)
+            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(fields.get("slogan")), final_path, pos="oben")
             bild_pfad = final_path
             fields["qa_approved"] = review.approved
             fields["qa_problems"] = review.problems if not review.approved else []

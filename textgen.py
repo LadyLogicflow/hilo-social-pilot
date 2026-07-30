@@ -632,7 +632,7 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
 
     # Logo-Kreise drüberlegen (wie bei bildgen.render() für v5.x Bilder)
     slogan = bildgen.pick_slogan(None)
-    bildgen.add_logo_circles(image_path, slogan, final_image_path)
+    bildgen.add_logo_circles(image_path, slogan, final_image_path, pos="oben")
 
     # Fields zusammenstellen (kompatibel mit bestehendem Format)
     fields = {

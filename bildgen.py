@@ -276,7 +276,7 @@ def _render_kreativ(fields, photo_path, slogan, out_path, portrait=None):
     base.save(out_path)
     return out_path
 
-def add_logo_circles(image_path, slogan, output_path, portrait=None):
+def add_logo_circles(image_path, slogan, output_path, portrait=None, pos=None):
     """Fügt NUR die Logo-Kreise zu einem bestehenden Bild hinzu (für 3-Stufen-Workflow).
 
     Args:
@@ -284,6 +284,13 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None):
         slogan: Slogan für den zweiten Kreis (oder None für Zufallsauswahl)
         output_path: Pfad für das Ausgabebild
         portrait: Optionales Portrait-Bild (für feste Position diagonal2)
+        pos: Feste Kreis-Position erzwingen ('oben'/'unten'/'diagonal'/'diagonal2'). Wenn None:
+            altes Verhalten (Zufallsrotation bzw. 'diagonal2' bei Portrait). Der 3-Stufen-
+            Workflow uebergibt hier IMMER 'oben' (#Kollisionsschutz) - die Kreis-Position war
+            bisher zufaellig und unabhaengig von der Text-Layout-Vorlage, wodurch Ueberschrift
+            oder CTA je nach Zufall hinter einem Kreis verschwinden konnten. Die Layout-
+            Templates (LAYOUT_TEMPLATES in kampagne.py) reservieren dafuer bewusst die obere
+            linke/rechte Ecke frei von Text.
 
     Returns:
         output_path
@@ -295,7 +302,8 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None):
     if base.size != (W, H):
         base = base.resize((W, H), Image.LANCZOS)
 
-    pos = "diagonal2" if portrait else pick_circle_pos()
+    if pos is None:
+        pos = "diagonal2" if portrait else pick_circle_pos()
     _draw_circles(base, slogan, pos, portrait)
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     base.save(output_path)

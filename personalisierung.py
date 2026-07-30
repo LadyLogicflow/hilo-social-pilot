@@ -189,7 +189,7 @@ def render_fuer_stelle(fields, stelle, out_path):
             text_path, background_overlay=True,
         )
         slogan = bildgen.pick_slogan(f.get("slogan"))
-        bildgen.add_logo_circles(text_path, slogan, out_path, portrait=_portrait(stelle))
+        bildgen.add_logo_circles(text_path, slogan, out_path, portrait=_portrait(stelle), pos="oben")
         try:
             os.remove(text_path)
         except Exception:
