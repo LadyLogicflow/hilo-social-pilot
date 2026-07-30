@@ -491,13 +491,22 @@ passendes VISUELLES Konzept für ein Werbebild entwickeln, das zum gegebenen Tex
 1-3 Wörter/Zahlen-Ausdrücke WÖRTLICH aus diesem Text für eine grüne Hervorhebung auswählen
 (z.B. das Datum oder einen Betrag) - dabei NICHTS umformulieren, nur auswählen.
 
-KREATIVKONZEPT
+KREATIVKONZEPT (WICHTIG: MEHR PEP!)
 
-Entwickle intern drei unterschiedliche Bildideen passend zum Text. Wähle die staerkste nach:
-sofortiger Verständlichkeit, Originalität, Eignung für HILO.
+Entwickle intern drei DEUTLICH UNTERSCHIEDLICHE Bildideen passend zum Text.
+Wähle die stärkste nach: sofortiger Verständlichkeit, Originalität, VISUELLE IMPACT, Eignung für HILO.
+
+SEI KREATIV & MUTIG:
+- Interessante Perspektiven (nicht immer nur Draufsicht!)
+- Unerwartete Kompositionen (asymmetrisch, dynamisch, spannend)
+- Kontrastreiche Farbakzente (Navy + Grün bewusst einsetzen!)
+- Lebendige Szenen (nicht langweilig statisch)
+- Moderne, frische Bildsprache (nicht generisch!)
 
 Bevorzuge je nach Thema: Editorial Photography, Concept Photography, Still Life, Flat Lay,
 authentische Lifestyle-Fotografie, Editorial Illustration, moderne 3D-Illustration.
+
+VERMEIDE: Langweilige Standardmotive, immer gleiche Draufsichten, generische Stockfotos.
 
 GESTALTUNG
 
@@ -507,11 +516,27 @@ Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren:
   Motiv - der Bereich muss visuell ruhig UND kontrastreich genug für Text sein)
 - hohe Lesbarkeit auf Smartphones, hochwertige moderne Werbeästhetik
 
-HILO-Farben (NUR als kleine Akzent-Details, KEINE Grundfarbe/Farbwash des gesamten Fotos):
-Navy #1f428d, Grün #60a33c, Lavendelblau #b8c8e8, Weiß #ffffff
-Das Foto muss eine natuerliche, neutrale Farbgebung haben (wie echte redaktionelle Fotografie) -
-die Farben tauchen nur an 1-2 bewusst platzierten Objekten/Details auf, niemals als
-Hintergrundwash oder Gesamt-Farbstimmung.
+FARBGEBUNG (WICHTIG - STRIKT EINHALTEN!):
+
+Das Foto selbst soll eine NATÜRLICHE, NEUTRALE Farbgebung haben:
+- Natürliches Tageslicht (KEIN warmer Goldton, KEIN Sepia, KEIN warmer Filter!)
+- Realistische, kühle bis neutrale Materialien (Holz in natürlichem Braun, Papier in Weiß/Grau)
+- Echte Hauttöne (keine warmen/goldenen Übertöne)
+- Wie ein echtes redaktionelles Magazin-Foto mit professioneller Beleuchtung
+
+HILO-Farben (Navy #1f428d UND Grün #60a33c) müssen als OBJEKTE im Bild sichtbar sein:
+- MINDESTENS EIN Objekt in Navy (z.B. Ordner, Mappe, Notizbuch, Stift, Möbelstück)
+- MINDESTENS EIN Objekt in Grün (z.B. Pflanze, Notizbuch, Ordner, Dekoobjekt)
+- Diese Objekte MÜSSEN klar erkennbar sein (nicht nur winzige Details!)
+- Platziere sie bewusst im Bild (nicht nur am Rand)
+
+VERMEIDEN:
+- Warme Goldtöne / Sepia-Filter
+- Dominante Braun/Beige/Creme-Stimmung im ganzen Bild
+- Navy/Grün als Hintergrundfarbe oder Lichtstimmung (nur als konkrete Objekte!)
+- Übertrieben warme/sonnige Lichtstimmung
+
+Ziel: Professionelles, kühles/neutrales Foto MIT klar sichtbaren Navy- und Grün-Objekten.
 
 VERMEIDEN: generische Businesspersonen, gestellte Stockfoto-Posen, übertriebenes Lächeln,
 Geldregen, übergroße Eurozeichen, das Wort "HILO" in der Typografie, zusätzliche Logos,
@@ -524,11 +549,17 @@ unverändert in layout_template, wähle es NICHT selbst.
 
 MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
 
-Formuliere einen englischen Produktionsprompt für GPT Image 2:
-- NUR das visuelle Motiv, KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen
-- Das Motiv muss eine ruhige, kontrastreiche Fläche für spaeteren Text-Overlay lassen
-  (der Text bekommt KEINE Hintergrundflaeche - Kontrast muss vom Motiv selbst kommen)
-- Ende des Prompts immer mit: "DO NOT RENDER ANY TEXT"
+Formuliere einen englischen Produktionsprompt für GPT Image 2.
+
+WICHTIG - DIES IST ENTSCHEIDEND:
+- KEIN Text IN DEN TEXT-OVERLAY-BEREICHEN (wo Pillow Headline/Bullets/CTA einfügt)!
+- ABER: Dokumente/Formulare im Bild MÜSSEN beschriftet sein (z.B. "Steuererklärung",
+  "Antrag", Formularfelder, handschriftliche Notizen) - niemals leere weiße Blätter!
+- Das Motiv muss eine ruhige, kontrastreiche Fläche für späteren Text-Overlay lassen
+  (der Text bekommt KEINE Hintergrundfläche - Kontrast muss vom Motiv selbst kommen)
+- Verwende die Layout-spezifische Anweisung
+- Ende mit: "DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS. However, documents/forms
+  in the image must show relevant labels (e.g. 'Steuererklärung', form fields, notes)."
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
