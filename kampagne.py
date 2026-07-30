@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import random
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -234,6 +235,35 @@ LAYOUT_TEMPLATES = {
 }
 
 
+def _last_layout_path() -> str:
+    return os.path.join(DATA_DIR, "last_layout_template.txt")
+
+
+def pick_layout_template() -> str:
+    """Waehlt ein Layout-Template zufaellig (Abwechslung je Beitrag) - vermeidet eine
+    Wiederholung des zuletzt genutzten (analog zu bildgen.pick_circle_pos()).
+
+    #Layout-Fix: Die Layout-Wahl wurde bisher GPT ueberlassen (freies Feld im CampaignPlan/
+    VisualOnlyPlan) - in der Praxis wurde dabei fast immer dieselbe erste Option
+    ('text_left_hero_right') gewaehlt, ein bekannter LLM-Bias bei einer Liste gleichwertiger
+    Optionen ohne starkes inhaltliches Unterscheidungsmerkmal. Jetzt wird das Layout CODE-SEITIG
+    zufaellig vorgegeben (echte Abwechslung garantiert) und GPT bekommt es als bereits
+    feststehende Vorgabe mitgeteilt, entwickelt Motiv-Prompt/Text dann passend dazu."""
+    last = ""
+    try:
+        last = open(_last_layout_path(), encoding="utf-8").read().strip()
+    except Exception:
+        pass
+    opts = [name for name in LAYOUT_TEMPLATES if name != last] or list(LAYOUT_TEMPLATES)
+    chosen = random.choice(opts)
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        open(_last_layout_path(), "w", encoding="utf-8").write(chosen)
+    except Exception:
+        pass
+    return chosen
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # CREATIVE DIRECTOR SYSTEMPROMPT (Stufe 1)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -337,7 +367,12 @@ HILO-Farben:
 - Lavendelblau: #b8c8e8
 - Weiß: #ffffff
 
-Nutze die Farben kontrolliert und hochwertig.
+Diese Farben sind AKZENTE, KEINE Grundfarbe: Das Foto selbst soll eine natürliche, neutrale
+Farbgebung haben (Tageslicht, warme/neutrale Töne, realistische Materialien und Hauttöne) - wie
+ein echtes redaktionelles Foto, nicht wie durch einen Farbfilter/Farbwash in Navy oder Grün
+getaucht. Die HILO-Farben tauchen NUR an einzelnen, bewusst platzierten Details auf (z.B. ein
+Ordner, ein kleines Objekt, eine Pflanze, ein Möbelstück) - niemals als dominante Hintergrund-
+oder Lichtstimmung des gesamten Bildes.
 
 VERMEIDEN
 
@@ -354,7 +389,8 @@ VERMEIDEN
 
 LAYOUT-PLANUNG
 
-Wähle eine passende Layout-Vorlage aus den folgenden Optionen:
+Das Layout ist bereits vorgegeben (siehe Nutzernachricht, Feld "LAYOUT") - übernimm den Wert
+unverändert in layout_template, wähle es NICHT selbst. Die Optionen zur Orientierung:
 
 - text_left_hero_right: Text links (45%), Motiv rechts (50%)
 - text_right_hero_left: Text rechts (40%), Motiv links (50%)
@@ -363,7 +399,7 @@ Wähle eine passende Layout-Vorlage aus den folgenden Optionen:
 - centered_headline_bottom_panel: Zentrale Headline, unteres Text-Panel
 - editorial_split: Editorial Split-Layout (Text links, Motiv rechts halbseitig)
 
-Wähle das Layout das am besten zum Thema, Motiv und zur Aussage passt.
+Entwickle Text und Motiv-Prompt so, dass sie zum vorgegebenen Layout passen.
 
 (Die Text-Positionen werden automatisch aus der Vorlage übernommen.)
 
@@ -393,11 +429,15 @@ Clean, modern aesthetic. High-quality photography.
 Warm, inviting atmosphere with professional credibility.
 
 COLORS:
-Use HILO brand colors as accents:
-- Navy #1f428d (background or supporting elements)
-- Green #60a33c (accent details)
-- Lavender #b8c8e8 (subtle highlights)
+Natural, neutral photography color grading (daylight, warm/neutral tones, realistic materials
+and skin tones) - like authentic editorial photography, NOT color-washed or color-graded
+toward navy or green. Use HILO brand colors ONLY as small, deliberate accent objects/details:
+- Navy #1f428d (e.g. one folder, one small object - never the background or overall lighting)
+- Green #60a33c (e.g. a plant, a small accent detail)
+- Lavender #b8c8e8 (subtle highlight on one object)
 - White #ffffff (clean surfaces)
+The photo as a whole must NOT look navy-toned or green-toned - only 1-2 small accent
+details should carry these colors.
 
 CORNER SAFE ZONES:
 Keep all four corners clear (12% width × 12% height per corner) for logo overlays.
@@ -445,8 +485,11 @@ Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren:
   Motiv - der Bereich muss visuell ruhig UND kontrastreich genug für Text sein)
 - hohe Lesbarkeit auf Smartphones, hochwertige moderne Werbeästhetik
 
-HILO-Farben (kontrolliert als Akzente nutzen):
+HILO-Farben (NUR als kleine Akzent-Details, KEINE Grundfarbe/Farbwash des gesamten Fotos):
 Navy #1f428d, Grün #60a33c, Lavendelblau #b8c8e8, Weiß #ffffff
+Das Foto muss eine natuerliche, neutrale Farbgebung haben (wie echte redaktionelle Fotografie) -
+die Farben tauchen nur an 1-2 bewusst platzierten Objekten/Details auf, niemals als
+Hintergrundwash oder Gesamt-Farbstimmung.
 
 VERMEIDEN: generische Businesspersonen, gestellte Stockfoto-Posen, übertriebenes Lächeln,
 Geldregen, übergroße Eurozeichen, das Wort "HILO" in der Typografie, zusätzliche Logos,
@@ -454,13 +497,8 @@ QR-Codes, Wasserzeichen.
 
 LAYOUT-PLANUNG
 
-Wähle eine passende Layout-Vorlage:
-- text_left_hero_right: Text links (45%), Motiv rechts (50%)
-- text_right_hero_left: Text rechts (40%), Motiv links (50%)
-- text_top_hero_bottom: Text oben (55%), Motiv unten (45%)
-- hero_top_text_bottom: Motiv oben (55%), Text unten (40%)
-- centered_headline_bottom_panel: Zentrale Headline, unteres Text-Panel
-- editorial_split: Editorial Split-Layout (Text links, Motiv rechts halbseitig)
+Das Layout ist bereits vorgegeben (siehe Nutzernachricht, Feld "LAYOUT") - übernimm den Wert
+unverändert in layout_template, wähle es NICHT selbst.
 
 MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
 
@@ -487,12 +525,19 @@ def create_visual_plan(
     client = _get_client()
     log.info("Art-Director-Stufe (nur Bild, Text fest vorgegeben)...")
 
+    # Layout-Vorlage CODE-SEITIG vorgeben (#Layout-Fix, wie bei create_campaign_plan).
+    layout_template = pick_layout_template()
+    layout_hinweis = LAYOUT_TEMPLATES[layout_template]["motiv_instruction"]
+
     user_content = (
         f"VORGEGEBENER TEXT (nicht veraendern):\n"
         f"Headline: {headline}\n"
         f"Infopunkte: {', '.join(supporting_points)}\n"
         f"CTA: {cta}\n\n"
-        f"KONTEXT: {context}"
+        f"KONTEXT: {context}\n\n"
+        f"LAYOUT (bereits festgelegt, NICHT selbst wählen - trage diesen Wert unverändert in "
+        f"layout_template ein und gestalte den Motiv-Prompt passend dazu): {layout_template}\n"
+        f"Layout-Hinweis für das Motiv: {layout_hinweis}"
     )
 
     response = client.beta.chat.completions.parse(
@@ -506,6 +551,7 @@ def create_visual_plan(
     plan = response.choices[0].message.parsed
     if plan is None:
         raise RuntimeError("Es wurde kein Bildkonzept erzeugt.")
+    plan.layout_template = layout_template  # code-seitig erzwingen, s.o.
     log.info("Art-Director-Stufe: Layout %s gewählt.", plan.layout_template)
     return plan
 
@@ -589,6 +635,11 @@ def create_campaign_plan(
     client = _get_client()
     log.info("Stufe 1: Kampagnenplanung wird erstellt...")
 
+    # Layout-Vorlage CODE-SEITIG vorgeben (#Layout-Fix: garantierte Abwechslung statt GPT-Bias
+    # auf die erste Option) - GPT bekommt es als feststehende Vorgabe mitgeteilt.
+    layout_template = pick_layout_template()
+    layout_hinweis = LAYOUT_TEMPLATES[layout_template]["motiv_instruction"]
+
     response = client.beta.chat.completions.parse(
         model="gpt-5.6-terra",  # Terra-Version wie von Catrin angewiesen!
         messages=[
@@ -602,7 +653,11 @@ def create_campaign_plan(
                     f"STEUERTEXT:\n{article}\n\n"
                     f"GEWÜNSCHTER CTA:\n{cta}\n\n"
                     f"FORMAT: {format_size}, quadratisch\n"
-                    f"KANAL: {channel}"
+                    f"KANAL: {channel}\n\n"
+                    f"LAYOUT (bereits festgelegt, NICHT selbst wählen - trage diesen Wert "
+                    f"unverändert in layout_template ein und gestalte Text/Motiv-Prompt passend "
+                    f"dazu): {layout_template}\n"
+                    f"Layout-Hinweis für das Motiv: {layout_hinweis}"
                 ),
             },
         ],
@@ -613,6 +668,11 @@ def create_campaign_plan(
 
     if plan is None:
         raise RuntimeError("Es wurde kein Kampagnenplan erzeugt.")
+
+    # Layout-Template IMMER auf den code-seitig vorgegebenen Wert erzwingen (#Layout-Fix) -
+    # unabhaengig davon, was GPT im Feld zurueckgegeben hat (Instruktion oben, aber zur
+    # Sicherheit nicht auf GPTs Befolgung verlassen - garantiert echte Abwechslung).
+    plan.layout_template = layout_template
 
     # TextBox-Felder aus LAYOUT_TEMPLATES übernehmen
     template = LAYOUT_TEMPLATES[plan.layout_template]
