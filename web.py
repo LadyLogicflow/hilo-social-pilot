@@ -2010,41 +2010,39 @@ def bild_aktion(eid):
             use_campaign = True
 
             if use_campaign:
-                # NEUER WORKFLOW: regenerate_image_with_qa (GPT Image 2 + QA)
+                # NEUER WORKFLOW: Art Director plant frisch aus dem AKTUELLEN Text (Ueberschrift/
+                # Bullets/CTA) ein neues Bildkonzept - statt sich auf das alte 'bild_motiv'-Feld zu
+                # verlassen. Das war bisher fehleranfaellig bei Alt-Beitraegen: bei Fristen-Posts
+                # (vor der Umstellung auf den 3-Stufen-Workflow) stand dort nur ein Icon-Marker wie
+                # 'icon:kalender', der als woertlicher Bild-Prompt an GPT Image 2 ging und ein
+                # inhaltlich unpassendes Bild erzeugte. generate_image_for_fixed_text plant IMMER
+                # frisch aus dem echten, aktuellen Text - unabhaengig davon, was im alten
+                # 'bild_motiv'-Feld steht.
                 import kampagne
-                import uuid
 
-                # Bild-Prompt aus data holen (falls vorhanden)
-                image_prompt = data.get("bild_motiv", "")
                 headline = data.get("ueberschrift", "")
                 bullets = data.get("bullets", [])
                 cta = data.get("cta", "")
+                kontext = data.get("subline") or data.get("caption") or ""
 
-                # Falls kein image_prompt vorhanden, Fehler
-                if not image_prompt:
-                    flash("Kein Bild-Prompt vorhanden! Bitte Post neu erstellen.")
+                if not headline:
+                    flash("Kein Text vorhanden! Bitte Post neu erstellen.")
                     return redirect(ziel)
 
                 try:
-                    # Neues Bild mit QA generieren
+                    # Neues Bild mit Art-Director-Planung + QA generieren
                     timestamp = int(__import__("time").time())
                     unique_id = uuid.uuid4().hex[:12]
-                    temp_path = os.path.join(DATA_DIR, "bilder", f"regen_temp_{timestamp}_{unique_id}.png")
                     final_path = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
 
-                    image_path, review = kampagne.regenerate_image_with_qa(
-                        image_prompt=image_prompt,
-                        headline=headline,
-                        supporting_points=bullets,
-                        cta=cta,
-                        output_path=temp_path,
-                        test_mode=False,  # High quality
+                    image_path, review, motiv_path, layout_template = kampagne.generate_image_for_fixed_text(
+                        headline, bullets, cta, context=kontext,
                     )
 
                     # Logo-Kreise drüberlegen (wie bei neuen Posts)
                     import bildgen
                     slogan = bildgen.pick_slogan(data.get("slogan"))
-                    bildgen.add_logo_circles(temp_path, slogan, final_path)
+                    bildgen.add_logo_circles(str(image_path), slogan, final_path)
 
                     # Caption nachträglich generieren falls fehlt (Bestandsposts)
                     if not data.get("caption") and e["thema_id"]:
@@ -2071,6 +2069,11 @@ def bild_aktion(eid):
                     data["qa_approved"] = review.approved
                     data["qa_problems"] = review.problems if not review.approved else []
                     data["bild_pfad"] = str(final_path)
+                    # Rohes Motiv + Layout mit abspeichern (#Kostenschutz): personalisierung.
+                    # render_fuer_stelle kann damit spaeter den personalisierten CTA-Text neu
+                    # drauf rendern, OHNE nochmal GPT Image 2 aufzurufen.
+                    data["kampagne_motiv_pfad"] = str(motiv_path)
+                    data["kampagne_layout_template"] = layout_template
                     out = str(final_path)  # Bugfix: wurde bisher nur im alten Pipeline-Zweig gesetzt -
                     # die DB-Aktualisierung unten (gemeinsam fuer beide Zweige) griff dadurch auf eine
                     # undefinierte Variable zu (NameError, vom aeusseren except stumm verschluckt) -
