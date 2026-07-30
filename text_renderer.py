@@ -225,66 +225,72 @@ def _render_cta_button(
     text_color: str,
     bg_color: str,
 ):
-    """Rendert CTA als Pillen-Button - IMMER unten mittig, Breite passt sich automatisch an den
-    Text an (#Layout-Fix). 'box' (aus dem Layout-Template) wird bewusst NICHT fuer Position/
-    Breite verwendet: die Templates hatten unterschiedliche, teils schmale/versetzte CTA-Boxen
-    (mal links, mal mittig im Bild) - bei laengeren, insbesondere PERSONALISIERTEN CTA-Texten
-    (z.B. mit Ortsname) lief der Text seitlich aus der festen Box heraus und wurde abgeschnitten
-    bzw. ueberlappte andere Elemente wie den Logo-Kreis. Jetzt: Button-Breite = tatsaechliche
-    Textbreite + Innenabstand, horizontal zentriert, fester Abstand vom unteren Bildrand. Darf
-    dafuer bewusst einen Teil des Motivs ueberdecken (unwichtiger als abgeschnittener Text).
+    """Rendert CTA als Pillen-Button mit FESTER Breite - IMMER unten, zentriert in der
+    kollisionsfreien Zone (#Layout-Fix, #Kollisionsschutz). 'box' (aus dem Layout-Template)
+    wird bewusst NICHT fuer Position/Breite verwendet.
 
-    Kreis-Ausweichlogik (#Kollisionsschutz): der Logo-Kreis (bildgen.add_logo_circles,
-    pos="diagonal2") sitzt IMMER unten-links, genau dort wo der CTA-Button unten sitzt. Reine
-    Pillow-Geometrie, kein KI-Call noetig: faellt der zentrierte Button in die reservierte Zone
-    (x<0.30 der Bildbreite), wird er zunaechst nach rechts verschoben (so mittig wie moeglich,
-    aber kollisionsfrei). Ist der Text dafuer zu lang (verschobener Button wuerde ueber den
-    rechten Rand hinauslaufen), wird die CTA-SCHRIFTGROESSE schrittweise verkleinert, bis der
-    Button in die verfuegbare Breite passt - garantiert IMMER kollisionsfrei UND ohne
-    abgeschnittenen Text, unabhaengig von der Textlaenge."""
+    Anders als eine an den Text angepasste Breite (frueherer Ansatz - Button wurde bei langem
+    Text sehr breit und musste dann verschoben/verkleinert werden): die Button-BREITE ist jetzt
+    IMMER GLEICH (ein fester Anteil der sicheren Zone zwischen den beiden Logo-Kreisen), egal
+    wie lang der Text ist. Der Kreis (bildgen.add_logo_circles, pos="diagonal2", IMMER unten-
+    links) kann den fest positionierten Button dadurch prinzipbedingt nie beruehren - keine
+    Verschiebung noetig, der Button bleibt immer an der gleichen Stelle und gleich breit.
+
+    Der TEXT passt sich stattdessen der festen Breite an: passt er auf eine Zeile, einzeilig;
+    ist er zu lang, bricht er automatisch auf 2 Zeilen um (wie die Bullet-Punkte); nur wenn
+    selbst 2 Zeilen bei minimaler Schriftgroesse nicht reichen (extrem lange Texte), wird die
+    Schrift zusaetzlich schrittweise verkleinert - reiner Notfall-Fallback."""
     circle_safe_x = int(img_width * 0.30)
     rand_margin = int(img_width * 0.04)
-    verfuegbare_breite = img_width - rand_margin - circle_safe_x
+    safe_left = circle_safe_x
+    safe_right = img_width - rand_margin
+    safe_width = safe_right - safe_left
+
+    # Feste Button-Breite: 92% der sicheren Zone (etwas Luft an beiden Raendern), IMMER gleich -
+    # unabhaengig vom Text. Zentriert INNERHALB der sicheren Zone (nicht des Gesamtbilds, da die
+    # sichere Zone durch den Kreis unten-links asymmetrisch ist).
+    btn_w = int(safe_width * 0.92)
+    x = safe_left + (safe_width - btn_w) // 2
+
+    pad_x = 32
+    innenbreite = btn_w - 2 * pad_x
 
     aktuelle_font = font
-    for _ in range(10):  # max. 10 Verkleinerungsschritte (Sicherheitsgrenze gegen Endlosschleife)
+    zeilen = [text]
+    for _ in range(10):  # Sicherheitsgrenze gegen Endlosschleife
         bbox = draw.textbbox((0, 0), text, font=aktuelle_font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        pad_x = max(24, int(text_height * 1.1))
-        pad_y = max(16, int(text_height * 0.6))
-        btn_w = text_width + 2 * pad_x
-        btn_h = text_height + 2 * pad_y
-
-        max_w = int(img_width * 0.92)
-        passt_zentriert = btn_w <= max_w
-        # Passt der Button (zentriert ODER nach rechts verschoben) in die kollisionsfreie Zone?
-        passt_ohne_kollision = btn_w <= verfuegbare_breite
-        if passt_zentriert and (passt_ohne_kollision or aktuelle_font.size <= 20):
-            break  # entweder passt's, oder wir sind an der Mindestgroesse angekommen (Notfall)
-        neue_groesse = max(20, aktuelle_font.size - 2)
-        if neue_groesse == aktuelle_font.size:
+        einzeilig_breite = bbox[2] - bbox[0]
+        if einzeilig_breite <= innenbreite:
+            zeilen = [text]
             break
+        zeilen = _wrap_text(text, aktuelle_font, innenbreite + 20)  # +20: Marge von _wrap_text selbst
+        breiten = [draw.textbbox((0, 0), z, font=aktuelle_font)[2] for z in zeilen]
+        if len(zeilen) <= 2 and max(breiten) <= innenbreite:
+            break
+        neue_groesse = max(18, aktuelle_font.size - 2)
+        if neue_groesse == aktuelle_font.size:
+            break  # Mindestgroesse erreicht - Notfall, laesst 3+ Zeilen zu statt abzuschneiden
         aktuelle_font = aktuelle_font.font_variant(size=neue_groesse)
+    font = aktuelle_font
 
-    if btn_w > max_w:
-        btn_w = max_w  # Notfall (Mindestschriftgroesse erreicht, Text trotzdem noch zu lang)
+    zeilen_hoehe = _get_line_height(font)
+    text_gesamt_hoehe = len(zeilen) * zeilen_hoehe
+    pad_y = max(16, int(zeilen_hoehe * 0.35))
+    btn_h = text_gesamt_hoehe + 2 * pad_y
 
-    x = (img_width - btn_w) // 2
     bottom_margin = int(img_height * 0.06)
     y = img_height - bottom_margin - btn_h
 
-    if x < circle_safe_x:
-        x = circle_safe_x
-        if x + btn_w > img_width - rand_margin:
-            x = img_width - rand_margin - btn_w
-
     draw.rounded_rectangle([x, y, x + btn_w, y + btn_h], radius=btn_h // 2, fill=bg_color)
-    font = aktuelle_font
 
-    text_x = x + (btn_w - text_width) // 2
-    text_y = y + (btn_h - text_height) // 2
-    draw.text((text_x, text_y), text, font=font, fill=text_color)
+    text_y = y + pad_y
+    for zeile in zeilen:
+        bbox = draw.textbbox((0, 0), zeile, font=font)
+        zeile_breite = bbox[2] - bbox[0]
+        text_x = x + (btn_w - zeile_breite) // 2
+        draw.text((text_x, text_y), zeile, font=font, fill=text_color)
+        text_y += zeilen_hoehe
+
 
 
 def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
