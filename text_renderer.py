@@ -275,15 +275,29 @@ def _draw_text_with_outline(
     outline_color: str = "#000000",
     outline_width: int = 3,
 ):
-    """Zeichnet Text mit Outline fuer Lesbarkeit OHNE Hintergrundflaeche (Text layert direkt
-    ueber das Motiv). outline_width 3 statt 2 (#Layout-Update) - kompensiert den Wegfall der
-    Farbflaeche, die vorher automatisch Kontrast garantiert hat; ohne sie haengt die
-    Lesbarkeit staerker von einer kraeftigen Outline ab."""
+    """Zeichnet Text mit DOPPELTER Outline (weisser Halo aussen + schwarze Outline innen) fuer
+    Lesbarkeit OHNE Hintergrundflaeche (Text layert direkt ueber das Motiv).
+
+    Warum doppelt statt nur EINER Farbe (#QA-Fix): die pro-Box gemessene Durchschnitts-
+    helligkeit (siehe _text_colors_for_region) waehlt zwar Fuellfarbe+Outline fuer den
+    Durchschnitt der Box passend - versagt aber, wenn der Hintergrund INNERHALB derselben
+    Textbox gemischt hell/dunkel ist (z.B. helle Wand + dunkles Objekt nebeneinander): eine
+    einzelne Outline-Farbe kontrastiert dann nur gegen die HAELFTE des Hintergrunds. Der
+    weisse Aussen-Halo + schwarze Innen-Outline garantieren dagegen IMMER einen kontrastreichen
+    Rand, egal ob das Motiv an dieser Stelle hell oder dunkel ist - unabhaengig von der
+    gemessenen Durchschnittshelligkeit."""
     x, y = pos
-    # Outline (4 Richtungen)
+    halo_width = outline_width + 2
+    # 1. Weisser Halo (aussen, breiter) - kontrastiert gegen dunkle Motivbereiche.
+    for dx in range(-halo_width, halo_width + 1):
+        for dy in range(-halo_width, halo_width + 1):
+            if dx != 0 or dy != 0:
+                draw.text((x + dx, y + dy), text, font=font, fill="#ffffff")
+    # 2. Schwarze Outline (innen, schmaler) - kontrastiert gegen helle Motivbereiche; ueberdeckt
+    # den weissen Halo in der Mitte, laesst aussen einen weissen Rand stehen.
     for dx in range(-outline_width, outline_width + 1):
         for dy in range(-outline_width, outline_width + 1):
             if dx != 0 or dy != 0:
-                draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
-    # Vordergrund
+                draw.text((x + dx, y + dy), text, font=font, fill="#000000")
+    # 3. Vordergrund (die per Helligkeitsmessung gewaehlte Fuellfarbe)
     draw.text((x, y), text, font=font, fill=fill_color)
