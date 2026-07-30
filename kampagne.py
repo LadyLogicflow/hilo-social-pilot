@@ -296,8 +296,8 @@ Sie benötigt:
 - eine hochwertige, moderne Werbeästhetik
 
 HILO-Farben:
-- Navy: #1a3a6b
-- Grün: #4a8c5c
+- Navy: #1f428d
+- Grün: #60a33c
 - Lavendelblau: #b8c8e8
 - Weiß: #ffffff
 
@@ -358,8 +358,8 @@ Warm, inviting atmosphere with professional credibility.
 
 COLORS:
 Use HILO brand colors as accents:
-- Navy #1a3a6b (background or supporting elements)
-- Green #4a8c5c (accent details)
+- Navy #1f428d (background or supporting elements)
+- Green #60a33c (accent details)
 - Lavender #b8c8e8 (subtle highlights)
 - White #ffffff (clean surfaces)
 
@@ -408,7 +408,7 @@ Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren:
 - hohe Lesbarkeit auf Smartphones, hochwertige moderne Werbeästhetik
 
 HILO-Farben (kontrolliert als Akzente nutzen):
-Navy #1a3a6b, Grün #4a8c5c, Lavendelblau #b8c8e8, Weiß #ffffff
+Navy #1f428d, Grün #60a33c, Lavendelblau #b8c8e8, Weiß #ffffff
 
 VERMEIDEN: generische Businesspersonen, gestellte Stockfoto-Posen, übertriebenes Lächeln,
 Geldregen, übergroße Eurozeichen, das Wort "HILO" in der Typografie, zusätzliche Logos,

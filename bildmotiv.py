@@ -302,10 +302,10 @@ The HILO colour palette defines the visual identity.
 Primary colours:
 
 Navy
-#1a3a6b
+#1f428d
 
 Green
-#4a8c5c
+#60a33c
 
 Lavender Blue
 #b8c8e8

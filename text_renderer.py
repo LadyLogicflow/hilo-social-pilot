@@ -83,8 +83,8 @@ def render_text_on_image(
         font_cta = ImageFont.load_default()
 
     # HILO Farben
-    NAVY = "#1a3a6b"
-    GREEN = "#4a8c5c"
+    NAVY = "#1f428d"
+    GREEN = "#60a33c"
     LAVENDER = "#b8c8e8"
     WHITE = "#ffffff"
 
@@ -140,7 +140,7 @@ def _text_colors_for_region(
     region = region.resize((16, 16))
     avg = sum(region.getdata()) / (16 * 16)
     if avg > 150:
-        return "#1a3a6b", "#ffffff"  # helles Motiv -> Navy-Text, weisse Outline
+        return "#1f428d", "#ffffff"  # helles Motiv -> Navy-Text, weisse Outline
     return "#ffffff", "#000000"  # dunkles Motiv -> weisser Text, schwarze Outline
 
 
