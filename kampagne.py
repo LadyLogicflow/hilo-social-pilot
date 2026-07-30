@@ -638,9 +638,10 @@ def run_campaign(
 
     # Stufe 2 + 3: Grafik + QA (mit Retry)
     size = "1024x1024"  # Immer 1024x1024 - optimal für 1080x1080 Feed-Posts!
-    quality = "low" if test_mode else "high"
-
-    # Kampagne-Verzeichnis erstellen (falls noch nicht vorhanden)
+    # 'medium' statt 'high' (#Kostenschutz): ~75% guenstiger ($0.053 vs $0.211/Bild), Qualitaets-
+    # unterschied laut unabhaengigem Benchmark minimal (4.108 vs 4.155 von 5). 'low' faellt
+    # dagegen spuerbar ab (3.946) - deshalb bewusst NICHT low fuer Produktionsbilder.
+    quality = "low" if test_mode else "medium"
     kampagne_dir = os.path.join(DATA_DIR, "kampagne")
     os.makedirs(kampagne_dir, exist_ok=True)
 
@@ -747,7 +748,9 @@ def regenerate_image_with_qa(
 
     # Bildgröße und Qualität
     size = "1024x1024"  # Immer 1024x1024 - optimal für 1080x1080 Feed-Posts!
-    quality = "low" if test_mode else "high"
+    # 'medium' statt 'high' (#Kostenschutz, wie in run_campaign): ~75% guenstiger, minimaler
+    # Qualitaetsunterschied laut Benchmark.
+    quality = "low" if test_mode else "medium"
 
     # Mini-Plan für QA (ohne vollständige Kampagnenplanung)
     from types import SimpleNamespace
