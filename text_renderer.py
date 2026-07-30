@@ -13,6 +13,11 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, Field
 
+# Absoluter Pfad zum fonts/-Ordner (Repo-Root, gleiche Ebene wie diese Datei) - NICHT relativ
+# ("fonts/...") verwenden, das haengt vom Arbeitsverzeichnis beim Programmstart ab und schlug
+# fehl -> Pillow fiel auf die winzige Standard-Bitmap-Schrift zurueck (Text kaum lesbar).
+FONT_DIR = Path(__file__).resolve().parent / "fonts"
+
 
 class TextBox(BaseModel):
     """Position und Ausrichtung eines Textblocks."""
@@ -58,11 +63,11 @@ def render_text_on_image(
     draw = ImageDraw.Draw(img, "RGBA")
 
     # Schriften laden (HILO CI: Archivo Black für Headline, Inter für Body)
-    # TODO: Schriftdateien müssen im Repo liegen!
+    # Schriften liegen im Repo unter fonts/ (absoluter Pfad via FONT_DIR, s.o.)
     try:
-        font_headline = ImageFont.truetype("fonts/ArchivoBlack-Regular.ttf", 68)
-        font_body = ImageFont.truetype("fonts/Inter-SemiBold.ttf", 32)
-        font_cta = ImageFont.truetype("fonts/Inter-Bold.ttf", 36)
+        font_headline = ImageFont.truetype(str(FONT_DIR / "ArchivoBlack-Regular.ttf"), 68)
+        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-SemiBold.ttf"), 32)
+        font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Bold.ttf"), 36)
     except OSError:
         # Fallback: Standard-Font
         font_headline = ImageFont.load_default()
@@ -198,16 +203,18 @@ def _render_cta_button(
     text_color: str,
     bg_color: str,
 ):
-    """Rendert CTA als Button mit farbigem Hintergrund."""
+    """Rendert CTA als Button mit farbigem Hintergrund - echte Pillenform (Radius = halbe
+    Button-Hoehe), nicht nur leicht abgerundete Ecken."""
     x = int(box.x * img_width)
     y = int(box.y * img_height)
     w = int(box.width * img_width)
     h = int(box.height * img_height)
 
-    # Button-Rechteck (abgerundete Ecken)
+    # Button-Pille: Radius = halbe Hoehe -> Ecken sind Halbkreise (echtes "Pillen"-Design,
+    # HILO-CI), nicht nur ein Rechteck mit abgerundeten Ecken.
     draw.rounded_rectangle(
         [x, y, x + w, y + h],
-        radius=12,
+        radius=h // 2,
         fill=bg_color
     )
 
