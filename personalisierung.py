@@ -166,9 +166,35 @@ def _setze_berater_comic(f, stelle):
 
 def render_fuer_stelle(fields, stelle, out_path):
     """Rendert das Bild mit personalisiertem CTA (gleiches Foto/Design). Liefert (felder, pfad).
-    Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt."""
+    Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt.
+
+    Kampagnen-Bilder (3-Stufen-Workflow, 'kampagne_motiv_pfad' vorhanden): das rohe KI-Motiv
+    wird WIEDERVERWENDET - nur der personalisierte CTA-Text wird per Pillow neu draufgerendert,
+    KEIN neuer GPT-Image-Call (#Kostenschutz). Der CTA im Bild nennt dadurch weiterhin den Ort
+    der Stelle, genau wie bei der alten Pipeline, nur ohne die teure Neugenerierung.
+    Alte/Nicht-Kampagnen-Entwuerfe fallen weiter auf die bisherige Pipeline zurueck."""
     import bildgen, bildmotiv
     f = fuer_stelle(fields, stelle)
+    motiv_pfad = f.get("kampagne_motiv_pfad")
+    layout_template = f.get("kampagne_layout_template")
+    if motiv_pfad and layout_template and os.path.exists(motiv_pfad):
+        import kampagne
+        from text_renderer import render_text_on_image
+        template = kampagne.LAYOUT_TEMPLATES[layout_template]
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        text_path = out_path + ".tmp_text.png"
+        render_text_on_image(
+            motiv_pfad, f.get("ueberschrift", ""), f.get("bullets", []), f.get("cta", ""),
+            template["headline_box"], template["supporting_box"], template["cta_box"],
+            text_path, background_overlay=True,
+        )
+        slogan = bildgen.pick_slogan(f.get("slogan"))
+        bildgen.add_logo_circles(text_path, slogan, out_path, portrait=_portrait(stelle))
+        try:
+            os.remove(text_path)
+        except Exception:
+            pass
+        return f, out_path
     _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
     photo = bildmotiv.ensure_photo_fuer(f)
     slogan = bildgen.pick_slogan(f.get("slogan"))

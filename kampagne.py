@@ -479,11 +479,17 @@ def generate_image_for_fixed_text(
     context: str = "",
     output_path: Optional[str] = None,
     test_mode: bool = False,
-) -> tuple[Path, QualityReview]:
+) -> tuple[Path, QualityReview, Path, str]:
     """Kompletter Bild-Workflow bei FEST VORGEGEBENEM Text (#Fristen-Countdown): Art-Director
     plant NUR das visuelle Konzept (create_visual_plan), GPT Image 2 erzeugt das Motiv, Pillow
     rendert den vorgegebenen Text drueber, QA prueft (kein Auto-Retry, #Kostenschutz - siehe
-    run_campaign). Der Text selbst bleibt in JEDEM Fall unveraendert."""
+    run_campaign). Der Text selbst bleibt in JEDEM Fall unveraendert.
+
+    Returns:
+        (finale_image_path, QualityReview, motiv_image_path, layout_template)
+        motiv_image_path + layout_template werden fuer die Personalisierung je Beratungsstelle
+        gebraucht (personalisierung.render_fuer_stelle), damit dort NICHT nochmal GPT Image 2
+        aufgerufen werden muss."""
     vplan = create_visual_plan(headline, supporting_points, cta, context=context)
     template = LAYOUT_TEMPLATES[vplan.layout_template]
 
@@ -492,11 +498,12 @@ def generate_image_for_fixed_text(
     quality = "low" if test_mode else "medium"
 
     import time, uuid
-    motiv_path = os.path.join(kampagne_dir, f"frist_motiv_{int(time.time())}_{uuid.uuid4().hex[:8]}.png")
+    lauf_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    motiv_path = os.path.join(kampagne_dir, f"frist_motiv_{lauf_id}.png")
     motiv_image_path = generate_advertisement(vplan.motiv_prompt, output_path=motiv_path,
                                                size="1024x1024", quality=quality)
 
-    final_path = os.path.join(kampagne_dir, f"frist_final_{int(time.time())}_{uuid.uuid4().hex[:8]}.png") \
+    final_path = os.path.join(kampagne_dir, f"frist_final_{lauf_id}.png") \
         if not output_path else output_path
     image_path = render_text_on_image(
         motiv_image_path, headline, supporting_points, cta,
@@ -510,7 +517,7 @@ def generate_image_for_fixed_text(
     review = quality_check(image_path, mini_plan, context or headline)
     if not review.approved:
         log.warning("Fristen-Bild: QA-Probleme (kein Auto-Retry): %s", ", ".join(review.problems))
-    return image_path, review
+    return image_path, review, motiv_image_path, vplan.layout_template
 
 
 
@@ -751,7 +758,7 @@ def run_campaign(
     output_path: Optional[str] = None,
     max_retries: int = 1,
     test_mode: bool = False,
-) -> tuple[CampaignPlan, Path, QualityReview]:
+) -> tuple[CampaignPlan, Path, QualityReview, Path]:
     """Kompletter 3-Stufen-Workflow. Standardmaessig OHNE Neugenerierung bei QA-Ablehnung
     (max_retries=1, #Kostenschutz): das Motiv (teuerster Schritt, GPT Image 2) wird nur EINMAL
     erzeugt. Die QA laeuft trotzdem und markiert Probleme (review.approved=False,
@@ -767,7 +774,10 @@ def run_campaign(
         test_mode: True = low quality für Tests, False = high quality für Produktion
 
     Returns:
-        (CampaignPlan, finale_image_path, QualityReview)
+        (CampaignPlan, finale_image_path, QualityReview, motiv_image_path)
+        motiv_image_path ist das ROHE KI-Motiv OHNE Text - wird fuer die Personalisierung je
+        Beratungsstelle gebraucht (personalisierung.render_fuer_stelle rendert damit den
+        personalisierten CTA-Text neu drauf, OHNE nochmal GPT Image 2 aufzurufen).
 
     Raises:
         RuntimeError: Wenn nach max_retries immer noch Fehler
@@ -785,13 +795,18 @@ def run_campaign(
     quality = "low" if test_mode else "medium"
     kampagne_dir = os.path.join(DATA_DIR, "kampagne")
     os.makedirs(kampagne_dir, exist_ok=True)
+    # Eindeutiger Lauf-Praefix (#Kollisionsschutz): 'motiv_1.png'/'final_1.png' waeren bei jedem
+    # Aufruf gleich benannt gewesen und haetten sich gegenseitig ueberschrieben - insbesondere
+    # riskant jetzt, wo das rohe Motiv fuer spaetere Personalisierung dauerhaft erhalten bleiben muss.
+    import time, uuid
+    lauf_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
     for attempt in range(1, max_retries + 1):
         log.info("━━━━ VERSUCH %d/%d ━━━━", attempt, max_retries)
 
         try:
             # Stufe 2a: Motiv generieren (OHNE Text!)
-            motiv_path = os.path.join(kampagne_dir, f"motiv_{attempt}.png")
+            motiv_path = os.path.join(kampagne_dir, f"motiv_{lauf_id}_{attempt}.png")
 
             motiv_image_path = generate_advertisement(
                 plan.motiv_prompt,
@@ -802,7 +817,7 @@ def run_campaign(
 
             # Stufe 2b: Text mit Pillow hinzufügen
             final_path = os.path.join(
-                kampagne_dir, f"final_{attempt}.png"
+                kampagne_dir, f"final_{lauf_id}_{attempt}.png"
             ) if not output_path else output_path
 
             log.info("Stufe 2b: Text-Rendering mit Pillow (Layout: %s)...", plan.layout_template)
@@ -824,14 +839,14 @@ def run_campaign(
 
             if review.approved:
                 log.info("━━━━ WORKFLOW ERFOLGREICH NACH %d VERSUCH(EN) ━━━━", attempt)
-                return plan, image_path, review
+                return plan, image_path, review, motiv_image_path
 
             if attempt < max_retries:
                 log.info("Versuch %d: Bild abgelehnt, neuer Versuch...", attempt)
             else:
                 log.warning("Alle Versuche fehlgeschlagen! Probleme: %s", ", ".join(review.problems))
                 # Bild trotzdem zurückgeben für manuelle Prüfung
-                return plan, image_path, review
+                return plan, image_path, review, motiv_image_path
 
         except Exception as e:
             log.warning("Versuch %d fehlgeschlagen (Exception): %s", attempt, e)
@@ -1053,7 +1068,7 @@ if __name__ == "__main__":
     print("="*80 + "\n")
 
     try:
-        plan, image_path, review = run_campaign(
+        plan, image_path, review, motiv_path = run_campaign(
             test_article,
             cta="Jetzt Beratungsstelle finden",
             test_mode=True,  # Low-Quality für Tests

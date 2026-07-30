@@ -610,11 +610,10 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
 
     # 3-Stufen-Workflow ausführen
     log.info("3-Stufen-Workflow wird ausgeführt (test_mode=%s)...", test_mode)
-    plan, image_path, review = kampagne.run_campaign(
+    plan, image_path, review, motiv_path = kampagne.run_campaign(
         article=article,
         cta=cta,
         test_mode=test_mode,
-        max_retries=3,
     )
 
     # Bild in das Standard-Verzeichnis kopieren + Logo-Kreise drüberlegen
@@ -647,6 +646,11 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
         "bild_pfad": final_image_path,  # Bild ist BEREITS erstellt!
         "qa_approved": review.approved,  # QA-Status
         "qa_problems": review.problems if not review.approved else [],
+        # NEU: rohes Motiv + Layout fuer personalisierung.render_fuer_stelle - damit die
+        # Personalisierung je Beratungsstelle (anderer CTA-Text IM Bild) den Text per Pillow
+        # neu drauf rendern kann, OHNE nochmal GPT Image 2 aufzurufen (#Kostenschutz).
+        "kampagne_motiv_pfad": str(motiv_path),
+        "kampagne_layout_template": plan.layout_template,
     }
 
     log.info("3-Stufen-Workflow abgeschlossen: %s (QA: %s)",
