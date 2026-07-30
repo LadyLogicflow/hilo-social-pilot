@@ -198,30 +198,33 @@ LAYOUT_TEMPLATES = {
     },
 
     "text_top_hero_bottom": {
-        "headline_box": TextBox(x=0.07, y=0.33, width=0.86, height=0.14, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.46, width=0.86, height=0.10, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.63, width=0.50, height=0.09, align="center", vertical_align="center"),
+        # Wie text_left_hero_right (oben links, fett), aber BREITER weil mehr Platz (Motiv unten)
+        # → Headline kann 1-2 Zeilen statt 3, Bullets haben mehr Raum
+        "headline_box": TextBox(x=0.07, y=0.08, width=0.65, height=0.22, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.34, width=0.60, height=0.30, align="left", vertical_align="top"),
+        "cta_box": TextBox(x=0.07, y=0.76, width=0.50, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "bottom 45%",
-        "motiv_instruction": "Keep the top 55% visually calm. Place the hero subject in the lower half."
+        "motiv_instruction": "Keep the top 55% and left 65% visually calm. Place the hero subject in the lower right area."
     },
 
     "hero_top_text_bottom": {
         # Volle Breite wuerde in die unten-links-Zone hineinragen (Textblock liegt hier tief im
         # Bild) - daher x eingerueckt (0.30 statt 0.07), schmaler als die anderen Vorlagen.
-        "headline_box": TextBox(x=0.30, y=0.58, width=0.63, height=0.16, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.30, y=0.76, width=0.63, height=0.10, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.90, width=0.50, height=0.08, align="center", vertical_align="center"),
+        # WICHTIG: Text unten war zu klein → Boxen größer gemacht + höher gerückt (2026-07-30)
+        "headline_box": TextBox(x=0.30, y=0.54, width=0.63, height=0.18, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.89, width=0.50, height=0.09, align="center", vertical_align="center"),
         "motiv_area": "top 55%",
-        "motiv_instruction": "Keep the bottom 40% visually calm. Place the hero subject in the upper half."
+        "motiv_instruction": "Keep the bottom 45% visually calm and high-contrast. Place the hero subject in the upper half."
     },
 
     "centered_headline_bottom_panel": {
         "headline_box": TextBox(x=0.10, y=0.35, width=0.80, height=0.22, align="center", vertical_align="center"),
-        # Gleicher Grund wie oben: Panel liegt tief (y=0.72) -> eingerueckt statt volle Breite.
-        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.12, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.88, width=0.50, height=0.09, align="center", vertical_align="center"),
+        # Panel liegt tief (y=0.69) -> eingerueckt + größer gemacht für bessere Lesbarkeit (2026-07-30)
+        "supporting_box": TextBox(x=0.30, y=0.69, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.87, width=0.50, height=0.10, align="center", vertical_align="center"),
         "motiv_area": "background",
-        "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 25% calm."
+        "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 30% calm and high-contrast."
     },
 
     "editorial_split": {
@@ -367,12 +370,27 @@ HILO-Farben:
 - Lavendelblau: #b8c8e8
 - Weiß: #ffffff
 
-Diese Farben sind AKZENTE, KEINE Grundfarbe: Das Foto selbst soll eine natürliche, neutrale
-Farbgebung haben (Tageslicht, warme/neutrale Töne, realistische Materialien und Hauttöne) - wie
-ein echtes redaktionelles Foto, nicht wie durch einen Farbfilter/Farbwash in Navy oder Grün
-getaucht. Die HILO-Farben tauchen NUR an einzelnen, bewusst platzierten Details auf (z.B. ein
-Ordner, ein kleines Objekt, eine Pflanze, ein Möbelstück) - niemals als dominante Hintergrund-
-oder Lichtstimmung des gesamten Bildes.
+FARBGEBUNG (WICHTIG - STRIKT EINHALTEN!):
+
+Das Foto selbst soll eine NATÜRLICHE, NEUTRALE Farbgebung haben:
+- Natürliches Tageslicht (KEIN warmer Goldton, KEIN Sepia, KEIN warmer Filter!)
+- Realistische, kühle bis neutrale Materialien (Holz in natürlichem Braun, Papier in Weiß/Grau)
+- Echte Hauttöne (keine warmen/goldenen Übertöne)
+- Wie ein echtes redaktionelles Magazin-Foto mit professioneller Beleuchtung
+
+HILO-Farben (Navy #1f428d UND Grün #60a33c) müssen als OBJEKTE im Bild sichtbar sein:
+- MINDESTENS EIN Objekt in Navy (z.B. Ordner, Mappe, Notizbuch, Stift, Möbelstück)
+- MINDESTENS EIN Objekt in Grün (z.B. Pflanze, Notizbuch, Ordner, Dekoobjekt)
+- Diese Objekte MÜSSEN klar erkennbar sein (nicht nur winzige Details!)
+- Platziere sie bewusst im Bild (nicht nur am Rand)
+
+VERMEIDEN:
+- Warme Goldtöne / Sepia-Filter
+- Dominante Braun/Beige/Creme-Stimmung im ganzen Bild
+- Navy/Grün als Hintergrundfarbe oder Lichtstimmung (nur als konkrete Objekte!)
+- Übertrieben warme/sonnige Lichtstimmung
+
+Ziel: Professionelles, kühles/neutrales Foto MIT klar sichtbaren Navy- und Grün-Objekten.
 
 VERMEIDEN
 
@@ -409,7 +427,9 @@ Formuliere einen englischen Produktionsprompt für GPT Image 2.
 
 WICHTIG - DIES IST ENTSCHEIDEND:
 - Der Prompt beschreibt NUR das visuelle Motiv
-- KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen!
+- KEIN Text IN DEN TEXT-OVERLAY-BEREICHEN (wo Pillow Headline/Bullets/CTA einfügt)!
+- ABER: Dokumente/Formulare im Bild MÜSSEN beschriftet sein (z.B. "Steuererklärung",
+  "Antrag", Formularfelder, handschriftliche Notizen) - niemals leere weiße Blätter!
 - Das Motiv muss eine ruhige, kontrastreiche Fläche für späteren Text-Overlay lassen (der
   Text bekommt KEINE Hintergrundfläche - Kontrast muss vom Motiv selbst kommen)
 - Verwende die Layout-spezifische Anweisung aus der gewählten Vorlage
@@ -442,9 +462,20 @@ details should carry these colors.
 CORNER SAFE ZONES:
 Keep all four corners clear (12% width × 12% height per corner) for logo overlays.
 
-CRITICAL:
-DO NOT RENDER ANY TEXT, LETTERS, NUMBERS OR TYPOGRAPHY.
-The image must have clean, uncluttered areas for text overlay.
+CRITICAL - TEXT-OVERLAY AREAS MUST BE FREE:
+DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS (where Pillow will add the headline/bullets/CTA).
+HOWEVER: If documents, forms, or papers appear in the image, they MUST show relevant text/labels
+(e.g. "Steuererklärung", "Antrag", form fields, handwritten notes) - never blank white sheets!
+
+CRITICAL - KEEP TEXT AREAS VISUALLY CALM & EMPTY:
+The text-overlay areas MUST be completely free of distracting objects, complex patterns, or busy details.
+Follow the layout instruction STRICTLY (e.g. "Keep the top 55% visually calm" means NO objects reaching
+into that area - not even hands, papers, or decorative elements). The text area must be SIMPLE, CLEAN,
+and HIGH-CONTRAST for perfect readability.
+
+CRITICAL - REALISTIC ANATOMY & PROPORTIONS:
+If people or body parts (hands, arms) appear, they MUST be anatomically correct and realistic.
+NO elongated limbs, NO strange proportions, NO distorted fingers. Keep it natural and believable.
 
 ────────────────────────────────────────────────────────────────
 
@@ -469,13 +500,22 @@ passendes VISUELLES Konzept für ein Werbebild entwickeln, das zum gegebenen Tex
 1-3 Wörter/Zahlen-Ausdrücke WÖRTLICH aus diesem Text für eine grüne Hervorhebung auswählen
 (z.B. das Datum oder einen Betrag) - dabei NICHTS umformulieren, nur auswählen.
 
-KREATIVKONZEPT
+KREATIVKONZEPT (WICHTIG: MEHR PEP!)
 
-Entwickle intern drei unterschiedliche Bildideen passend zum Text. Wähle die staerkste nach:
-sofortiger Verständlichkeit, Originalität, Eignung für HILO.
+Entwickle intern drei DEUTLICH UNTERSCHIEDLICHE Bildideen passend zum Text.
+Wähle die stärkste nach: sofortiger Verständlichkeit, Originalität, VISUELLE IMPACT, Eignung für HILO.
+
+SEI KREATIV & MUTIG:
+- Interessante Perspektiven (nicht immer nur Draufsicht!)
+- Unerwartete Kompositionen (asymmetrisch, dynamisch, spannend)
+- Kontrastreiche Farbakzente (Navy + Grün bewusst einsetzen!)
+- Lebendige Szenen (nicht langweilig statisch)
+- Moderne, frische Bildsprache (nicht generisch!)
 
 Bevorzuge je nach Thema: Editorial Photography, Concept Photography, Still Life, Flat Lay,
 authentische Lifestyle-Fotografie, Editorial Illustration, moderne 3D-Illustration.
+
+VERMEIDE: Langweilige Standardmotive, immer gleiche Draufsichten, generische Stockfotos.
 
 GESTALTUNG
 
@@ -485,11 +525,27 @@ Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren:
   Motiv - der Bereich muss visuell ruhig UND kontrastreich genug für Text sein)
 - hohe Lesbarkeit auf Smartphones, hochwertige moderne Werbeästhetik
 
-HILO-Farben (NUR als kleine Akzent-Details, KEINE Grundfarbe/Farbwash des gesamten Fotos):
-Navy #1f428d, Grün #60a33c, Lavendelblau #b8c8e8, Weiß #ffffff
-Das Foto muss eine natuerliche, neutrale Farbgebung haben (wie echte redaktionelle Fotografie) -
-die Farben tauchen nur an 1-2 bewusst platzierten Objekten/Details auf, niemals als
-Hintergrundwash oder Gesamt-Farbstimmung.
+FARBGEBUNG (WICHTIG - STRIKT EINHALTEN!):
+
+Das Foto selbst soll eine NATÜRLICHE, NEUTRALE Farbgebung haben:
+- Natürliches Tageslicht (KEIN warmer Goldton, KEIN Sepia, KEIN warmer Filter!)
+- Realistische, kühle bis neutrale Materialien (Holz in natürlichem Braun, Papier in Weiß/Grau)
+- Echte Hauttöne (keine warmen/goldenen Übertöne)
+- Wie ein echtes redaktionelles Magazin-Foto mit professioneller Beleuchtung
+
+HILO-Farben (Navy #1f428d UND Grün #60a33c) müssen als OBJEKTE im Bild sichtbar sein:
+- MINDESTENS EIN Objekt in Navy (z.B. Ordner, Mappe, Notizbuch, Stift, Möbelstück)
+- MINDESTENS EIN Objekt in Grün (z.B. Pflanze, Notizbuch, Ordner, Dekoobjekt)
+- Diese Objekte MÜSSEN klar erkennbar sein (nicht nur winzige Details!)
+- Platziere sie bewusst im Bild (nicht nur am Rand)
+
+VERMEIDEN:
+- Warme Goldtöne / Sepia-Filter
+- Dominante Braun/Beige/Creme-Stimmung im ganzen Bild
+- Navy/Grün als Hintergrundfarbe oder Lichtstimmung (nur als konkrete Objekte!)
+- Übertrieben warme/sonnige Lichtstimmung
+
+Ziel: Professionelles, kühles/neutrales Foto MIT klar sichtbaren Navy- und Grün-Objekten.
 
 VERMEIDEN: generische Businesspersonen, gestellte Stockfoto-Posen, übertriebenes Lächeln,
 Geldregen, übergroße Eurozeichen, das Wort "HILO" in der Typografie, zusätzliche Logos,
@@ -502,11 +558,26 @@ unverändert in layout_template, wähle es NICHT selbst.
 
 MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
 
-Formuliere einen englischen Produktionsprompt für GPT Image 2:
-- NUR das visuelle Motiv, KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen
-- Das Motiv muss eine ruhige, kontrastreiche Fläche für spaeteren Text-Overlay lassen
-  (der Text bekommt KEINE Hintergrundflaeche - Kontrast muss vom Motiv selbst kommen)
-- Ende des Prompts immer mit: "DO NOT RENDER ANY TEXT"
+Formuliere einen englischen Produktionsprompt für GPT Image 2.
+
+WICHTIG - DIES IST ENTSCHEIDEND:
+
+KEIN Text IN DEN TEXT-OVERLAY-BEREICHEN (wo Pillow Headline/Bullets/CTA einfügt)!
+ABER: Dokumente/Formulare im Bild MÜSSEN beschriftet sein (z.B. "Steuererklärung",
+"Antrag", Formularfelder, handschriftliche Notizen) - niemals leere weiße Blätter!
+
+STRIKTE FREIFLÄCHE FÜR TEXT:
+Die Text-Overlay-Bereiche MÜSSEN komplett FREI sein von störenden Objekten, Mustern oder Details.
+Befolge die Layout-Anweisung STRIKT (z.B. "Keep the top 55% calm" = KEINE Objekte in diesem Bereich -
+auch nicht Hände, Papiere oder Deko). Der Textbereich muss EINFACH, SAUBER und KONTRASTREICH sein.
+
+REALISTISCHE ANATOMIE:
+Wenn Personen oder Körperteile (Hände, Arme) erscheinen, MÜSSEN sie anatomisch korrekt sein.
+KEINE verlängerten Gliedmaßen, KEINE seltsamen Proportionen, KEINE verzerrten Finger.
+
+Verwende die Layout-spezifische Anweisung.
+Ende mit: "DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS. However, documents/forms must show
+relevant labels. KEEP TEXT AREAS COMPLETELY FREE AND VISUALLY CALM. Realistic anatomy only."
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
