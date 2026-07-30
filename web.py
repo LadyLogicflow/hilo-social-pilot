@@ -825,7 +825,10 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
          <button style="background:#4D7C0F;padding:6px 10px" title="Text und Bild nach aktuellen Vorgaben neu erzeugen">&#x21BB; Neu erzeugen</button></form>
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
          <input type=hidden name=zurueck value=einplanung>
-         <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
+         <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
+       <form method=post action="/aktion/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag wirklich löschen? Das kann nicht rückgängig gemacht werden.')">
+         <input type=hidden name=zurueck value=einplanung>
+         <button name=aktion value=loeschen style="background:#b00020;padding:6px 10px" title="Beitrag endgültig löschen">Löschen</button></form></p>
     <details style="margin:0 0 8px">
       <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
       <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
@@ -2919,6 +2922,8 @@ def strip_panel(eid, idx):
 def aktion(eid):
     aktion = request.form.get("aktion")
     feedback = request.form.get("feedback", "").strip()
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("einplanung") if zurueck == "einplanung" else url_for("entwuerfe")
     user = session["user"]
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -2947,7 +2952,7 @@ def aktion(eid):
             audit_log(conn, user, "entwurf_geloescht", eid); flash("Entwurf %d gelöscht." % eid)
         elif aktion == "ueberarbeiten":
             if not feedback:
-                flash("Bitte einen Änderungswunsch angeben."); return redirect(url_for("entwuerfe"))
+                flash("Bitte einen Änderungswunsch angeben."); return redirect(ziel)
             t = conn.execute("SELECT titel, volltext FROM themen WHERE id=?", (e["thema_id"],)).fetchone()
             thema = {"titel": t["titel"] if t else "", "volltext": (t["volltext"] if t else "") or ""}
             try:
@@ -2992,7 +2997,7 @@ def aktion(eid):
         # "Kreise hinzufügen" auf fertiges Bild → doppelte Kreise!
         # Neue Posts bekommen Kreise automatisch (add_logo_circles in textgen.py)
         conn.commit()
-    return redirect(url_for("entwuerfe"))
+    return redirect(ziel)
 
 def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id, location_id=None):
     """Instagram-Veroeffentlichung: Bild(er) oeffentlich hochladen (IONOS) -> https-URL(s),
