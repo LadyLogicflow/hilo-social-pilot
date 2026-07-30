@@ -27,7 +27,9 @@ def faellige(heute):
 
 def erzeuge_anlass_posts(heute=None):
     """Legt fuer heute faellige Anlass-Beitraege als Entwurf an (auf den Tag geplant).
-    Idempotent (Dublettenschutz via hash). Benoetigt anthropic_api_key (sonst uebersprungen)."""
+    Idempotent (Dublettenschutz via hash). Nutzt den 3-Stufen-Workflow (GPT-5.6 Terra + GPT
+    Image 2 + Pillow-Text), daher 'openai_api_key' statt 'anthropic_api_key' (Claude wird hier
+    nicht mehr verwendet - #Comic-Ablösung)."""
     from db import get_conn
     from secrets_store import get_secret
     import textgen
@@ -35,8 +37,8 @@ def erzeuge_anlass_posts(heute=None):
     posten = faellige(heute)
     if not posten:
         return 0
-    if not get_secret("anthropic_api_key"):
-        log.info("Anlass-Tage uebersprungen: kein 'anthropic_api_key' hinterlegt.")
+    if not get_secret("openai_api_key"):
+        log.info("Anlass-Tage uebersprungen: kein 'openai_api_key' hinterlegt.")
         return 0
     created = 0
     for a in posten:
@@ -48,37 +50,18 @@ def erzeuge_anlass_posts(heute=None):
         thema = {"titel": a["anlass"],
                  "volltext": "Anlass: %s. Steuerlicher Aufhaenger: %s" % (a["anlass"], a["steuer_hook"] or "")}
         try:
-            fields = textgen.generate(thema, "facebook")
+            fields = textgen.generate_with_campaign(thema, "facebook")
         except Exception as ex:
-            log.warning("Anlass-Text fehlgeschlagen (%s): %s", a["anlass"], ex)
+            log.warning("Anlass-Text/Bild fehlgeschlagen (%s): %s", a["anlass"], ex)
             continue
         with get_conn() as conn:
             cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                                "VALUES('anlass', ?, 'erledigt', ?, ?)", (a["anlass"], a["steuer_hook"], h))
-            # #140: Schauplatz EINMAL waehlen. Anlass-Datum (MM-DD) mitgeben -> ziel_jahreszeit kann
-            # einen saisonalen Anlass (z.B. 12-24 Heiligabend) auf die Winter-Schauplaetze lenken.
-            import schauplatz
             fields["anlass_datum"] = a["datum"]
-            # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
-            # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
-            # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
-            try:
-                import stilwahl
-                stilwahl.zuweisen_stil_falls_fehlt(conn, fields)
-                textgen.art_director_motiv(fields)
-            except Exception as ex:
-                log.warning("Stil-Zuweisung uebersprungen: %s", ex)
-            schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
-            # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
-            # Robust: fehlt die Tabelle (alte DB) -> No-Op.
-            try:
-                import traeger
-                traeger.zuweisen_traeger_falls_fehlt(conn, fields, datum=heute)
-            except Exception as ex:
-                log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
-            conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
-                         "VALUES (?, 'facebook', ?, 'entwurf', ?)",
-                         (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat()))
+            conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer, bild_pfad) "
+                         "VALUES (?, 'facebook', ?, 'entwurf', ?, ?)",
+                         (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat(),
+                          fields.get("bild_pfad")))
             conn.commit()
         created += 1
         log.info("Anlass-Beitrag erzeugt: %s (geplant fuer %s).", a["anlass"], heute.isoformat())

@@ -93,8 +93,14 @@ def _post_fields(frist, rest, heute):
 
 def erzeuge_countdowns(heute=None):
     """Legt fuer heute faellige Countdown-Beitraege als Entwurf an (Stufe 2, auf den Tag geplant).
-    Maximal 1 pro Tag (die dringlichste Frist). Idempotent (Dublettenschutz via hash)."""
+    Maximal 1 pro Tag (die dringlichste Frist). Idempotent (Dublettenschutz via hash).
+
+    Bild: KI-generiertes Motiv statt statischem Icon (Art-Director-Stufe, kampagne.py) - der
+    Text selbst bleibt UNVERAENDERT hart vorformuliert (_post_fields), nur das visuelle Konzept
+    kommt von GPT-5.6 Terra + GPT Image 2. Rechtlich relevante Daten/Betraege werden dadurch
+    NICHT von der KI angefasst."""
     from db import get_conn
+    from secrets_store import get_secret
     heute = heute or datetime.date.today()
     faellig = [(rest, f) for f in FRISTEN for ok, rest in [faellig_heute(f, heute)] if ok]
     if not faellig:
@@ -105,33 +111,32 @@ def erzeuge_countdowns(heute=None):
     with get_conn() as conn:
         if conn.execute("SELECT 1 FROM themen WHERE hash=?", (h,)).fetchone():
             return 0   # heute schon erzeugt
+    fields = _post_fields(frist, rest, heute)
+    bild_pfad = None
+    if get_secret("openai_api_key"):
+        try:
+            import kampagne
+            image_path, review = kampagne.generate_image_for_fixed_text(
+                fields["ueberschrift"], fields["bullets"], fields["cta"],
+                context=fields.get("subline", ""),
+            )
+            import bildgen
+            final_path = str(image_path).replace(".png", "_ci.png")
+            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(fields.get("slogan")), final_path)
+            bild_pfad = final_path
+            fields["qa_approved"] = review.approved
+            fields["qa_problems"] = review.problems if not review.approved else []
+        except Exception as ex:
+            log.warning("Fristen-Bild fehlgeschlagen (%s): %s - Beitrag ohne Bild.", frist["name"], ex)
+    else:
+        log.info("Fristen-Bild uebersprungen: kein 'openai_api_key' hinterlegt (Beitrag ohne Bild).")
+    with get_conn() as conn:
         cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                            "VALUES('frist', ?, 'erledigt', ?, ?)",
                            (frist["name"], "Fristen-Countdown", h))
-        fields = _post_fields(frist, rest, heute)
-        # #140: Schauplatz EINMAL bei der Erzeugung waehlen (heute = Kalender-Jahreszeit, sofern
-        # kein saisonaler Themenbezug im Frist-Text steckt).
-        import schauplatz
-        # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
-        # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
-        # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
-        try:
-            import stilwahl, textgen
-            stilwahl.zuweisen_stil_falls_fehlt(conn, fields)
-            textgen.art_director_motiv(fields)
-        except Exception as ex:
-            log.warning("Stil-Zuweisung uebersprungen: %s", ex)
-        schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
-        # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
-        # Robust: fehlt die Tabelle (alte DB) -> No-Op.
-        try:
-            import traeger
-            traeger.zuweisen_traeger_falls_fehlt(conn, fields, datum=heute)
-        except Exception as ex:
-            log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
-        conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer) "
-                     "VALUES (?, 'facebook', ?, 'entwurf', ?)",
-                     (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat()))
+        conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, geplant_fuer, bild_pfad) "
+                     "VALUES (?, 'facebook', ?, 'entwurf', ?, ?)",
+                     (cur.lastrowid, json.dumps(fields, ensure_ascii=False), heute.isoformat(), bild_pfad))
         conn.commit()
     log.info("Fristen-Countdown erzeugt: %s (%d Tage), geplant fuer %s.",
              frist["name"], rest, heute.isoformat())

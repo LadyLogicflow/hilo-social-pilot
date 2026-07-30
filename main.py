@@ -12,10 +12,12 @@ def daily_run():
     anzahl = radar.run()
     log.info("Tageslauf: %s neue Themen aus dem Radar.", anzahl)
     limit = int(os.environ.get("HILO_GENERATE_LIMIT", "3"))
-    erzeugt = textgen.generate_drafts(limit=limit, kanal="google")
+    erzeugt = textgen.generate_drafts(limit=limit, kanal="google", use_campaign=True)
     log.info("Tageslauf: %s neue Textentwuerfe erzeugt.", erzeugt)
+    # bildgen.render_drafts() bleibt als Fallback bestehen, ist aber i.d.R. ein No-Op:
+    # use_campaign=True erzeugt das Bild schon direkt (bild_pfad wird beim INSERT gesetzt).
     bilder = bildgen.render_drafts()
-    log.info("Tageslauf: %s Bilder erzeugt.", bilder)
+    log.info("Tageslauf: %s Bilder ueber Fallback-Pipeline erzeugt (normalerweise 0).", bilder)
     log.info("HILO-Pilot Tageslauf beendet.")
 
 def add_user(name):
@@ -173,11 +175,12 @@ def main():
     if args.add_url:
         import ingest; ingest.add_url(args.add_url)
     if args.generate is not None:
-        log.info("%s Textentwuerfe erzeugt.", textgen.generate_drafts(limit=args.generate, kanal="google"))
+        log.info("%s Textentwuerfe erzeugt.",
+                 textgen.generate_drafts(limit=args.generate, kanal="google", use_campaign=True))
     if args.generate_ids is not None:
         ids = [x.strip() for x in args.generate_ids.split(",") if x.strip()]
         log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen).",
-                 textgen.generate_for_ids(ids, kanal="google"), len(ids))
+                 textgen.generate_for_ids(ids, kanal="google", use_campaign=True), len(ids))
     if args.regenerate_drafts:
         log.info("%s Entwuerfe nach aktuellen Vorgaben neu erzeugt.", textgen.regenerate_open_drafts())
     if args.render:

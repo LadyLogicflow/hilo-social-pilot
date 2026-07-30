@@ -139,6 +139,18 @@ class QualityReview(BaseModel):
     correction_instruction: str = Field(description="Anweisung zur Korrektur (falls approved=False)")
 
 
+class VisualOnlyPlan(BaseModel):
+    """Reiner Bild-/Layout-Plan von GPT-5.6 Terra (Art Director), OHNE eigenen Text - fuer
+    Faelle mit vorgegebenem, fest formuliertem Text (#Fristen-Countdown: rechtlich relevante
+    Betraege/Daten sollen NICHT von der KI umformuliert werden koennen)."""
+    visual_concept: str = Field(description="Beschreibung des visuellen Konzepts")
+    layout_template: Literal[
+        "text_left_hero_right", "text_right_hero_left", "text_top_hero_bottom",
+        "hero_top_text_bottom", "centered_headline_bottom_panel", "editorial_split"
+    ] = Field(description="Gewählte Layout-Vorlage")
+    motiv_prompt: str = Field(description="Englischer Prompt NUR für das Motiv (OHNE Text-Rendering!)")
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # LAYOUT-VORLAGEN (für Pillow Text-Rendering)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -370,9 +382,136 @@ Der finale motiv_prompt muss vollständig in Englisch sein.
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# STUFE 1: KAMPAGNENPLANUNG
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ART_DIRECTOR_ONLY_PROMPT = """Du bist Senior Art Director für HILO, einen deutschen
+Lohnsteuerhilfeverein.
+
+Der Text (Headline, Infopunkte, CTA) steht bereits FEST und darf NICHT verändert oder neu
+formuliert werden - er enthält rechtlich relevante Fristen/Beträge. Deine einzige Aufgabe:
+ein passendes VISUELLES Konzept für ein Werbebild entwickeln, das zum gegebenen Text passt.
+
+KREATIVKONZEPT
+
+Entwickle intern drei unterschiedliche Bildideen passend zum Text. Wähle die staerkste nach:
+sofortiger Verständlichkeit, Originalität, Eignung für HILO.
+
+Bevorzuge je nach Thema: Editorial Photography, Concept Photography, Still Life, Flat Lay,
+authentische Lifestyle-Fotografie, Editorial Illustration, moderne 3D-Illustration.
+
+GESTALTUNG
+
+Die Anzeige muss als vollständige quadratische Werbegrafik funktionieren:
+- ein dominantes Hero-Element, klare Blickführung
+- ein ruhiger, gut lesbarer Textbereich (der Text liegt OHNE Farbfläche direkt über dem
+  Motiv - der Bereich muss visuell ruhig UND kontrastreich genug für Text sein)
+- hohe Lesbarkeit auf Smartphones, hochwertige moderne Werbeästhetik
+
+HILO-Farben (kontrolliert als Akzente nutzen):
+Navy #1a3a6b, Grün #4a8c5c, Lavendelblau #b8c8e8, Weiß #ffffff
+
+VERMEIDEN: generische Businesspersonen, gestellte Stockfoto-Posen, übertriebenes Lächeln,
+Geldregen, übergroße Eurozeichen, das Wort "HILO" in der Typografie, zusätzliche Logos,
+QR-Codes, Wasserzeichen.
+
+LAYOUT-PLANUNG
+
+Wähle eine passende Layout-Vorlage:
+- text_left_hero_right: Text links (45%), Motiv rechts (50%)
+- text_right_hero_left: Text rechts (40%), Motiv links (50%)
+- text_top_hero_bottom: Text oben (55%), Motiv unten (45%)
+- hero_top_text_bottom: Motiv oben (55%), Text unten (40%)
+- centered_headline_bottom_panel: Zentrale Headline, unteres Text-Panel
+- editorial_split: Editorial Split-Layout (Text links, Motiv rechts halbseitig)
+
+MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
+
+Formuliere einen englischen Produktionsprompt für GPT Image 2:
+- NUR das visuelle Motiv, KEIN Text, KEINE Typografie, KEINE Buchstaben, KEINE Zahlen
+- Das Motiv muss eine ruhige, kontrastreiche Fläche für spaeteren Text-Overlay lassen
+  (der Text bekommt KEINE Hintergrundflaeche - Kontrast muss vom Motiv selbst kommen)
+- Ende des Prompts immer mit: "DO NOT RENDER ANY TEXT"
+
+Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
+
+
+def create_visual_plan(
+    headline: str,
+    supporting_points: list[str],
+    cta: str,
+    context: str = "",
+) -> VisualOnlyPlan:
+    """Art-Director-Stufe OHNE Texterstellung: GPT-5.6 Terra bekommt den fertigen, fest
+    vorgegebenen Text und entwickelt dazu NUR ein visuelles Konzept + Motiv-Prompt + Layout.
+    Fuer Faelle wie den Fristen-Countdown, wo der Text bewusst nicht von der KI veraendert
+    werden soll (rechtlich relevante Daten/Betraege), aber trotzdem ein passendes, individuelles
+    KI-Bild statt eines statischen Icons gewuenscht ist."""
+    client = _get_client()
+    log.info("Art-Director-Stufe (nur Bild, Text fest vorgegeben)...")
+
+    user_content = (
+        f"VORGEGEBENER TEXT (nicht veraendern):\n"
+        f"Headline: {headline}\n"
+        f"Infopunkte: {', '.join(supporting_points)}\n"
+        f"CTA: {cta}\n\n"
+        f"KONTEXT: {context}"
+    )
+
+    response = client.beta.chat.completions.parse(
+        model="gpt-5.6-terra",
+        messages=[
+            {"role": "system", "content": ART_DIRECTOR_ONLY_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        response_format=VisualOnlyPlan,
+    )
+    plan = response.choices[0].message.parsed
+    if plan is None:
+        raise RuntimeError("Es wurde kein Bildkonzept erzeugt.")
+    log.info("Art-Director-Stufe: Layout %s gewählt.", plan.layout_template)
+    return plan
+
+
+def generate_image_for_fixed_text(
+    headline: str,
+    supporting_points: list[str],
+    cta: str,
+    context: str = "",
+    output_path: Optional[str] = None,
+    test_mode: bool = False,
+) -> tuple[Path, QualityReview]:
+    """Kompletter Bild-Workflow bei FEST VORGEGEBENEM Text (#Fristen-Countdown): Art-Director
+    plant NUR das visuelle Konzept (create_visual_plan), GPT Image 2 erzeugt das Motiv, Pillow
+    rendert den vorgegebenen Text drueber, QA prueft (kein Auto-Retry, #Kostenschutz - siehe
+    run_campaign). Der Text selbst bleibt in JEDEM Fall unveraendert."""
+    vplan = create_visual_plan(headline, supporting_points, cta, context=context)
+    template = LAYOUT_TEMPLATES[vplan.layout_template]
+
+    kampagne_dir = os.path.join(DATA_DIR, "kampagne")
+    os.makedirs(kampagne_dir, exist_ok=True)
+    quality = "low" if test_mode else "medium"
+
+    import time, uuid
+    motiv_path = os.path.join(kampagne_dir, f"frist_motiv_{int(time.time())}_{uuid.uuid4().hex[:8]}.png")
+    motiv_image_path = generate_advertisement(vplan.motiv_prompt, output_path=motiv_path,
+                                               size="1024x1024", quality=quality)
+
+    final_path = os.path.join(kampagne_dir, f"frist_final_{int(time.time())}_{uuid.uuid4().hex[:8]}.png") \
+        if not output_path else output_path
+    image_path = render_text_on_image(
+        motiv_image_path, headline, supporting_points, cta,
+        template["headline_box"], template["supporting_box"], template["cta_box"],
+        Path(final_path), background_overlay=True,
+    )
+
+    from types import SimpleNamespace
+    mini_plan = SimpleNamespace(headline=headline, supporting_points=supporting_points,
+                                 cta=cta, core_message="")
+    review = quality_check(image_path, mini_plan, context or headline)
+    if not review.approved:
+        log.warning("Fristen-Bild: QA-Probleme (kein Auto-Retry): %s", ", ".join(review.problems))
+    return image_path, review
+
+
+
 
 
 def create_campaign_plan(

@@ -10,7 +10,9 @@ log = logging.getLogger("hilo.wissen")
 
 def auffuellen(heute=None, min_buffer=3):
     """Erzeugt bis zu 1 Evergreen-Beitrag, wenn weniger als min_buffer offene Beitraege
-    (Entwurf oder freigegeben) vorhanden sind. Rueckgabe: Anzahl erzeugt (0 oder 1)."""
+    (Entwurf oder freigegeben) vorhanden sind. Rueckgabe: Anzahl erzeugt (0 oder 1).
+    Nutzt den 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + Pillow-Text), daher
+    'openai_api_key' statt 'anthropic_api_key' (Claude wird hier nicht mehr verwendet)."""
     from db import get_conn
     from secrets_store import get_secret
     import textgen
@@ -19,8 +21,8 @@ def auffuellen(heute=None, min_buffer=3):
         offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status IN ('entwurf','freigegeben')").fetchone()[0]
     if offen >= min_buffer:
         return 0
-    if not get_secret("anthropic_api_key"):
-        log.info("Wissens-Serie uebersprungen: kein 'anthropic_api_key' hinterlegt.")
+    if not get_secret("openai_api_key"):
+        log.info("Wissens-Serie uebersprungen: kein 'openai_api_key' hinterlegt.")
         return 0
     with get_conn() as conn:
         # am laengsten nicht genutztes aktives Thema (nie genutzte zuerst)
@@ -30,36 +32,17 @@ def auffuellen(heute=None, min_buffer=3):
         return 0
     thema = {"titel": topic["titel"], "volltext": topic["hook"] or ""}
     try:
-        fields = textgen.generate(thema, "facebook")
+        fields = textgen.generate_with_campaign(thema, "facebook")
     except Exception as ex:
-        log.warning("Wissens-Text fehlgeschlagen (%s): %s", topic["titel"], ex)
+        log.warning("Wissens-Text/Bild fehlgeschlagen (%s): %s", topic["titel"], ex)
         return 0
     h = hashlib.sha256(("wissen|%s|%s" % (topic["titel"], heute.isoformat())).encode("utf-8")).hexdigest()
     with get_conn() as conn:
         cur = conn.execute("INSERT INTO themen(quelle, titel, status, volltext, hash) "
                            "VALUES('wissen', ?, 'erledigt', ?, ?)", (topic["titel"], topic["hook"], h))
-        # #140: Schauplatz EINMAL bei der Erzeugung waehlen (Evergreen -> Kalender-Jahreszeit,
-        # sofern kein saisonales Schlagwort im Thema steckt).
-        import schauplatz
-        # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen (stabil in
-        # fields['bild_stil']); danach im kreativ-Fall das Art-Director-Motiv erzeugen
-        # (No-Op ausserhalb kreativ / ohne Key). Robust gegen Fehler.
-        try:
-            import stilwahl
-            stilwahl.zuweisen_stil_falls_fehlt(conn, fields)
-            textgen.art_director_motiv(fields)
-        except Exception as ex:
-            log.warning("Stil-Zuweisung uebersprungen: %s", ex)
-        schauplatz.zuweisen_falls_fehlt(conn, fields, datum=heute)
-        # #142: Traeger (Device der Botschaft) EINMAL waehlen, stabil in fields['traeger'].
-        # Robust: fehlt die Tabelle (alte DB) -> No-Op.
-        try:
-            import traeger
-            traeger.zuweisen_traeger_falls_fehlt(conn, fields, datum=heute)
-        except Exception as ex:
-            log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
-        conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status) "
-                     "VALUES (?, 'facebook', ?, 'entwurf')", (cur.lastrowid, json.dumps(fields, ensure_ascii=False)))
+        conn.execute("INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) "
+                     "VALUES (?, 'facebook', ?, 'entwurf', ?)",
+                     (cur.lastrowid, json.dumps(fields, ensure_ascii=False), fields.get("bild_pfad")))
         conn.execute("UPDATE wissensthemen SET zuletzt=? WHERE id=?", (heute.isoformat(), topic["id"]))
         conn.commit()
     log.info("Wissens-Beitrag erzeugt: %s", topic["titel"])

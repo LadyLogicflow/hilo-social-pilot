@@ -704,8 +704,8 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
                 except Exception as ex:
                     log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
                 conn.execute(
-                    "INSERT INTO entwuerfe(thema_id, kanal, text, status) VALUES (?,?,?, 'entwurf')",
-                    (r["id"], kanal, json.dumps(data, ensure_ascii=False)))
+                    "INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) VALUES (?,?,?, 'entwurf', ?)",
+                    (r["id"], kanal, json.dumps(data, ensure_ascii=False), data.get("bild_pfad")))
             created += 1
             log.info("Entwurf erzeugt: Thema %s - %s", r["id"], (r["titel"] or "")[:60])
         except Exception as ex:
