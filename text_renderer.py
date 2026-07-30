@@ -344,7 +344,13 @@ def _wrap_paragraphs(text: str, font: ImageFont.FreeTypeFont, max_width: int) ->
     (2. oder weitere Zeile desselben Absatzes/Bullet-Points) statt die erste Zeile eines neuen
     Absatzes. Wird fuer den Einzug von Fortsetzungszeilen bei Bullet-Points gebraucht (#Layout-
     Fix: die 2. Zeile eines umgebrochenen Bullets stand bisher unter dem Aufzaehlungszeichen
-    statt eingerueckt unter dem Text der 1. Zeile) sowie fuer extra Abstand zwischen Bullets."""
+    statt eingerueckt unter dem Text der 1. Zeile) sowie fuer extra Abstand zwischen Bullets.
+
+    #Bugfix: das Aufzaehlungszeichen '•' darf NIE allein in einer Zeile stehen (loeste sich bei
+    einem langen ersten Wort - z.B. 'Entfernungspauschale' - vom Text ab: '•' stand dann allein
+    ueber dem eingerueckten Text, wirkte wie eine 'falsche Reihenfolge'). Es bleibt deshalb immer
+    mit dem folgenden Wort zusammen, auch wenn das die Zeile geringfuegig ueberlaufen laesst -
+    das ist optisch unauffaelliger als ein alleinstehender Punkt."""
     draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     result: list[tuple[str, bool]] = []
     for absatz in text.split("\n"):
@@ -354,7 +360,9 @@ def _wrap_paragraphs(text: str, font: ImageFont.FreeTypeFont, max_width: int) ->
         for word in words:
             test_line = f"{current_line} {word}".strip()
             bbox = draw_temp.textbbox((0, 0), test_line, font=font)
-            if bbox[2] - bbox[0] <= max_width - 20:  # 20px Margin
+            passt = bbox[2] - bbox[0] <= max_width - 20  # 20px Margin
+            alleiniges_bullet = current_line == "•"
+            if passt or alleiniges_bullet:
                 current_line = test_line
             else:
                 if current_line:
