@@ -19,7 +19,7 @@ from secrets_store import get_secret, set_secret
 
 log = logging.getLogger("hilo.publish")
 
-GRAPH = "https://graph.facebook.com/v21.0"
+GRAPH = "https://graph.facebook.com/v26.0"
 
 
 # ---------------------------------------------------------------------------
