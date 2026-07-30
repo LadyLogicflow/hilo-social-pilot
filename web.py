@@ -1074,17 +1074,25 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 {% if status in ('entwurf','freigegeben') %}
 <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:10px 0;background:#f7f9fc">
-  <b style="color:#15191F">Bildtyp:</b>
-  {% if e.f.bild_typ=='thema' %}Themenbild (Gegenstände){% else %}Personenbild (Beratungsszene){% endif %}
+  <form method=post action="/bild-aktion/{{e.id}}" style="margin:0;display:inline-block">
+    <input type=hidden name=zurueck value=beitrag>
+    <input type=hidden name=bild_aktion value=foto_neu>
+    <button style="background:#0B2545" title="Neues Bild erzeugen (Art Director + GPT Image 2 + QA)">&#x1F3B2; Neues Bild erzeugen</button>
+  </form>
   {% if e.f.bild_motiv_thema %}
-    <form method=post action="/bild-typ/{{e.id}}" style="display:inline;margin-left:8px"
-          onsubmit="return confirm({% if e.f.bild_typ=='thema' %}'Zur Personenszene zurückwechseln? Das Bild wird neu zusammengesetzt.'{% else %}'Auf ein Themenbild (ohne Personen) umstellen? Beim ersten Mal wird dafür ein neues Bild erzeugt (kostet ein paar Cent bei der Bild-KI).'{% endif %})">
-      <input type=hidden name=zurueck value=beitrag>
-      <input type=hidden name=typ value="{% if e.f.bild_typ=='thema' %}person{% else %}thema{% endif %}">
-      <button>{% if e.f.bild_typ=='thema' %}&#x21BA; Personenbild verwenden{% else %}&#x1F33F; Themenbild verwenden{% endif %}</button>
-    </form>
-  {% else %}
-    <span class=hint style="margin-left:8px">Kein Themenbild hinterlegt &ndash; über „Neu erzeugen" wird eines miterstellt.</span>
+  <details style="margin-top:8px">
+    <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Option: Bildtyp umschalten</summary>
+    <div style="margin-top:6px">
+      <b style="color:#15191F">Bildtyp:</b>
+      {% if e.f.bild_typ=='thema' %}Themenbild (Gegenstände){% else %}Personenbild (Beratungsszene){% endif %}
+      <form method=post action="/bild-typ/{{e.id}}" style="display:inline;margin-left:8px"
+            onsubmit="return confirm({% if e.f.bild_typ=='thema' %}'Zur Personenszene zurückwechseln? Das Bild wird neu zusammengesetzt.'{% else %}'Auf ein Themenbild (ohne Personen) umstellen? Beim ersten Mal wird dafür ein neues Bild erzeugt (kostet ein paar Cent bei der Bild-KI).'{% endif %})">
+        <input type=hidden name=zurueck value=beitrag>
+        <input type=hidden name=typ value="{% if e.f.bild_typ=='thema' %}person{% else %}thema{% endif %}">
+        <button>{% if e.f.bild_typ=='thema' %}&#x21BA; Personenbild verwenden{% else %}&#x1F33F; Themenbild verwenden{% endif %}</button>
+      </form>
+    </div>
+  </details>
   {% endif %}
 </div>
 {% endif %}
@@ -1796,11 +1804,44 @@ def umplanen(eid):
             conn.commit()
     return redirect(url_for("einplanung"))
 
+def _kampagne_pillow_rerender(data, eid):
+    """Rendert bei einem Kampagnen-Entwurf (kampagne_motiv_pfad vorhanden) den AKTUELLEN Text
+    (Ueberschrift/Bullets/CTA aus 'data') per Pillow neu auf das vorhandene KI-Motiv - OHNE
+    neuen GPT-Image-Call (#Kostenschutz). Fuer 'Nur Bild neu'/'Ueberarbeiten', damit diese
+    Aktionen bei Kampagnen-Entwuerfen tatsaechlich kostenlos bleiben (statt wie zuvor ueber die
+    alte Pipeline zu laufen, was fuer Kampagnen-Entwuerfe unbemerkt einen neuen, kostenpflichtigen
+    KI-Bild-Call ausgeloest haette - 'ensure_photo_fuer' kennt kein echtes Cache-Foto fuer sie).
+    Liefert den neuen Bildpfad, oder None wenn kein Kampagnen-Motiv vorhanden ist (Alt-Entwurf -
+    der Aufrufer faellt dann auf die alte Pipeline zurueck)."""
+    motiv_pfad = data.get("kampagne_motiv_pfad")
+    layout_template = data.get("kampagne_layout_template")
+    if not (motiv_pfad and layout_template and os.path.exists(motiv_pfad)):
+        return None
+    import kampagne
+    from text_renderer import render_text_on_image
+    template = kampagne.LAYOUT_TEMPLATES[layout_template]
+    out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+    text_path = out + ".tmp_text.png"
+    render_text_on_image(
+        motiv_pfad, data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
+        template["headline_box"], template["supporting_box"], template["cta_box"],
+        text_path, background_overlay=True,
+    )
+    slogan = bildgen.pick_slogan(data.get("slogan"))
+    bildgen.add_logo_circles(text_path, slogan, out)
+    try:
+        os.remove(text_path)
+    except Exception:
+        pass
+    return out
+
+
 @app.route("/beitrag-neu/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def beitrag_neu(eid):
-    """Erzeugt einen (auch bereits freigegebenen) Beitrag nach aktuellen Vorgaben neu - Text + Bild.
-    Status und geplanter Termin bleiben erhalten (render_drafts() nimmt nur Entwuerfe, daher hier direkt)."""
+    """Erzeugt einen (auch bereits freigegebenen) Beitrag nach aktuellen Vorgaben neu - Text + Bild
+    ueber den 3-Stufen-Workflow. Status und geplanter Termin bleiben erhalten (render_drafts()
+    nimmt nur Entwuerfe, daher hier direkt)."""
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
@@ -1811,26 +1852,33 @@ def beitrag_neu(eid):
         thema = conn.execute("SELECT titel, url, volltext FROM themen WHERE id=?",
                              (e["thema_id"],)).fetchone() if e["thema_id"] else None
         kanal = e["kanal"] or "google"
-    # Text neu (falls ein Thema hinterlegt ist), sonst bestehenden Text beibehalten
-    try:
-        if thema:
-            data = textgen.generate({"titel": thema["titel"], "volltext": thema["volltext"],
-                                     "url": thema["url"]}, kanal)
-        else:
-            data = json.loads(e["text"])
-    except Exception as ex:
-        flash("Neu-Erzeugung fehlgeschlagen (Text): %s" % ex); return redirect(url_for("einplanung"))
-    # Bild direkt neu rendern (unabhaengig vom Status)
+    import kampagne
     out = None
     try:
-        import bildmotiv
-        photo = bildmotiv.ensure_photo_fuer(data)
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(data, photo, slogan, out)
+        if thema:
+            # Volles Thema vorhanden -> kompletter 3-Stufen-Workflow (Text + Bild neu geplant).
+            data = textgen.generate_with_campaign(
+                {"titel": thema["titel"], "volltext": thema["volltext"], "url": thema["url"]}, kanal)
+            out = data.get("bild_pfad")
+        else:
+            # Kein Thema hinterlegt (z.B. manuell erstellter Beitrag) -> bestehenden Text
+            # behalten, nur ein frisches Bildkonzept vom Art Director planen lassen.
+            data = json.loads(e["text"])
+            image_path, review, motiv_path, layout_template = kampagne.generate_image_for_fixed_text(
+                data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
+                context=data.get("subline") or data.get("caption") or "",
+            )
+            final_path = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(data.get("slogan")), final_path)
+            data["bild_pfad"] = final_path
+            data["kampagne_motiv_pfad"] = str(motiv_path)
+            data["kampagne_layout_template"] = layout_template
+            data["qa_approved"] = review.approved
+            data["qa_problems"] = review.problems if not review.approved else []
+            out = final_path
     except Exception as ex:
-        out = None
-        flash("Hinweis: Bild konnte nicht neu erzeugt werden (%s) - der Text wurde aktualisiert." % ex)
+        flash("Neu-Erzeugung fehlgeschlagen: %s" % ex)
+        return redirect(url_for("einplanung"))
     with get_conn() as conn:
         if out:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
@@ -1843,7 +1891,8 @@ def beitrag_neu(eid):
         audit_log(conn, session["user"], "beitrag_neu_erzeugt", eid)
         conn.commit()
     if out:
-        flash("Beitrag %d nach den aktuellen Vorgaben neu erzeugt - bitte vor dem Veröffentlichen prüfen." % eid)
+        flash("Beitrag %d nach den aktuellen Vorgaben neu erzeugt (3-Stufen-Workflow) - bitte vor "
+              "dem Veröffentlichen prüfen." % eid)
     else:
         flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
               "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
@@ -1877,19 +1926,26 @@ def text_neu(eid):
         th = {"titel": thema["titel"] if thema else "", "volltext": (thema["volltext"] if thema else "") or ""}
         neu = textgen.regenerate(th, prev, feedback, kanal)
         # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
-        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
+        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person"),
+                        ("kampagne_motiv_pfad", ""), ("kampagne_layout_template", "")):
             neu.setdefault(k, prev.get(k, dflt))
-        import bildmotiv
-        photo = bildmotiv.ensure_photo_fuer(neu)   # Motiv aus Cache -> keine Bild-KI-Kosten
-        slogan = bildgen.pick_slogan(neu.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(neu, photo, slogan, out)
+        # Bild an den ueberarbeiteten Text anpassen: bei Kampagnen-Entwuerfen kostenlos per Pillow
+        # auf das vorhandene Motiv neu rendern (KEIN neuer GPT-Image-Call); nur Alt-Entwuerfe ohne
+        # Kampagnen-Motiv fallen auf die alte Pipeline zurueck (dort echt aus dem Cache, ebenfalls
+        # kostenlos).
+        out = _kampagne_pillow_rerender(neu, eid)
+        if out is None:
+            import bildmotiv
+            photo = bildmotiv.ensure_photo_fuer(neu)   # Motiv aus Cache -> keine Bild-KI-Kosten
+            slogan = bildgen.pick_slogan(neu.get("slogan"))
+            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.render(neu, photo, slogan, out)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(neu, ensure_ascii=False), out, eid))
             audit_log(conn, session["user"], "text_ueberarbeitet", eid, feedback)
             conn.commit()
-        flash("Text von Beitrag %d überarbeitet (Bild an den neuen Text angepasst) - bitte prüfen." % eid)
+        flash("Text von Beitrag %d überarbeitet (Bild an den neuen Text angepasst, kostenlos) - bitte prüfen." % eid)
     except Exception as ex:
         flash("Text-Überarbeitung fehlgeschlagen: %s" % ex)
     return redirect(ziel)
@@ -1909,17 +1965,19 @@ def bild_neu(eid):
         flash("Bild von Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
-        import bildmotiv
         data = json.loads(e["text"])
-        photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(data, photo, slogan, out)
+        out = _kampagne_pillow_rerender(data, eid)
+        if out is None:
+            import bildmotiv
+            photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
+            slogan = bildgen.pick_slogan(data.get("slogan"))
+            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+            bildgen.render(data, photo, slogan, out)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, eid))
             audit_log(conn, session["user"], "bild_neu_erzeugt", eid)
             conn.commit()
-        flash("Bild von Beitrag %d neu erzeugt (Text unverändert)." % eid)
+        flash("Bild von Beitrag %d neu erzeugt (Text unverändert, kostenlos)." % eid)
     except Exception as ex:
         flash("Bild konnte nicht neu erzeugt werden: %s" % ex)
     return redirect(ziel)
@@ -1977,7 +2035,9 @@ def bild_aktion(eid):
     mit gleichem/editiertem Motiv), stil_wechseln (anderer Stil). Optionales Motiv-Feld erlaubt
     manuelle Motiv-Anpassung."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    ziel = (url_for("entwuerfe") if zurueck == "entwuerfe"
+            else url_for("beitrag", eid=eid) if zurueck == "beitrag"
+            else url_for("einplanung"))
     aktion = request.form.get("bild_aktion", "").strip()
     motiv_neu = request.form.get("motiv", "").strip()
 
