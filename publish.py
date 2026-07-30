@@ -218,7 +218,13 @@ def publish_facebook_story(page_id, image_path):
 def publish_instagram(ig_user_id, image_url, caption, location_id=None):
     """Veroeffentlicht ein Bild auf einem Instagram-Business-Konto.
     image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!).
-    location_id = optionale Facebook-Orts-ID fuer den Geotag (Standort-Markierung)."""
+    location_id = optionale Facebook-Orts-ID fuer den Geotag (Standort-Markierung).
+
+    #Bugfix 'Media ID is not available': Instagram laedt das Bild von image_url ASYNCHRON
+    herunter, nachdem der Container erstellt wurde - media_publish schlug bisher fehl, wenn der
+    Container noch nicht fertig verarbeitet war (kein Warten vor dem Publish-Aufruf, anders als
+    bei publish_instagram_story/publish_instagram_carousel, die _wait_ig_container schon immer
+    genutzt haben). Jetzt wird wie dort auf status_code=FINISHED gewartet."""
     token = _user_token()
     data = {"image_url": image_url, "caption": caption or "", "access_token": token}
     if location_id:
@@ -227,6 +233,11 @@ def publish_instagram(ig_user_id, image_url, caption, location_id=None):
     if c.status_code != 200:
         return False, _err(c)
     creation_id = c.json().get("id")
+    if not creation_id:
+        return False, "Instagram lieferte keine Container-ID."
+    ok, err = _wait_ig_container(creation_id, token)
+    if not ok:
+        return False, err
     pub = requests.post(GRAPH + "/%s/media_publish" % ig_user_id, timeout=60,
                         data={"creation_id": creation_id, "access_token": token})
     if pub.status_code == 200:
