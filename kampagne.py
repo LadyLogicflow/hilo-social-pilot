@@ -462,11 +462,20 @@ details should carry these colors.
 CORNER SAFE ZONES:
 Keep all four corners clear (12% width × 12% height per corner) for logo overlays.
 
-CRITICAL:
+CRITICAL - TEXT-OVERLAY AREAS MUST BE FREE:
 DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS (where Pillow will add the headline/bullets/CTA).
 HOWEVER: If documents, forms, or papers appear in the image, they MUST show relevant text/labels
 (e.g. "Steuererklärung", "Antrag", form fields, handwritten notes) - never blank white sheets!
-The image must have clean, uncluttered areas for the main text overlay.
+
+CRITICAL - KEEP TEXT AREAS VISUALLY CALM & EMPTY:
+The text-overlay areas MUST be completely free of distracting objects, complex patterns, or busy details.
+Follow the layout instruction STRICTLY (e.g. "Keep the top 55% visually calm" means NO objects reaching
+into that area - not even hands, papers, or decorative elements). The text area must be SIMPLE, CLEAN,
+and HIGH-CONTRAST for perfect readability.
+
+CRITICAL - REALISTIC ANATOMY & PROPORTIONS:
+If people or body parts (hands, arms) appear, they MUST be anatomically correct and realistic.
+NO elongated limbs, NO strange proportions, NO distorted fingers. Keep it natural and believable.
 
 ────────────────────────────────────────────────────────────────
 
@@ -552,14 +561,23 @@ MOTIV-PROMPT (NUR FÜR DAS BILD, OHNE TEXT!)
 Formuliere einen englischen Produktionsprompt für GPT Image 2.
 
 WICHTIG - DIES IST ENTSCHEIDEND:
-- KEIN Text IN DEN TEXT-OVERLAY-BEREICHEN (wo Pillow Headline/Bullets/CTA einfügt)!
-- ABER: Dokumente/Formulare im Bild MÜSSEN beschriftet sein (z.B. "Steuererklärung",
-  "Antrag", Formularfelder, handschriftliche Notizen) - niemals leere weiße Blätter!
-- Das Motiv muss eine ruhige, kontrastreiche Fläche für späteren Text-Overlay lassen
-  (der Text bekommt KEINE Hintergrundfläche - Kontrast muss vom Motiv selbst kommen)
-- Verwende die Layout-spezifische Anweisung
-- Ende mit: "DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS. However, documents/forms
-  in the image must show relevant labels (e.g. 'Steuererklärung', form fields, notes)."
+
+KEIN Text IN DEN TEXT-OVERLAY-BEREICHEN (wo Pillow Headline/Bullets/CTA einfügt)!
+ABER: Dokumente/Formulare im Bild MÜSSEN beschriftet sein (z.B. "Steuererklärung",
+"Antrag", Formularfelder, handschriftliche Notizen) - niemals leere weiße Blätter!
+
+STRIKTE FREIFLÄCHE FÜR TEXT:
+Die Text-Overlay-Bereiche MÜSSEN komplett FREI sein von störenden Objekten, Mustern oder Details.
+Befolge die Layout-Anweisung STRIKT (z.B. "Keep the top 55% calm" = KEINE Objekte in diesem Bereich -
+auch nicht Hände, Papiere oder Deko). Der Textbereich muss EINFACH, SAUBER und KONTRASTREICH sein.
+
+REALISTISCHE ANATOMIE:
+Wenn Personen oder Körperteile (Hände, Arme) erscheinen, MÜSSEN sie anatomisch korrekt sein.
+KEINE verlängerten Gliedmaßen, KEINE seltsamen Proportionen, KEINE verzerrten Finger.
+
+Verwende die Layout-spezifische Anweisung.
+Ende mit: "DO NOT RENDER ANY TEXT IN THE TEXT-OVERLAY AREAS. However, documents/forms must show
+relevant labels. KEEP TEXT AREAS COMPLETELY FREE AND VISUALLY CALM. Realistic anatomy only."
 
 Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
 
