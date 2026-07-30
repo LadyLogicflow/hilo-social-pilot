@@ -826,22 +826,25 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
        <form method=post action="/bild-neu/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Nur das Bild neu erzeugen? Text und Termin bleiben unverändert.')">
          <input type=hidden name=zurueck value=einplanung>
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form></p>
-    <form method=post action="/bild-generieren/{{e.id}}" style="margin:0 0 8px;display:block">
-      <input type=hidden name=zurueck value=einplanung>
-      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
-      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
-        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
-        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-      </select>
-      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-        <option value="" disabled selected>– Stil wählen –</option>
-        <option value="comic">Comic</option>
-        <option value="comic_beratung">Comic Beratung</option>
-        <option value="comic_strip">Comic-Strip</option>
-        <option value="ki_tafel">Tafel</option>
-        <option value="kreativ">Kreativ</option></select>
-      <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+    <details style="margin:0 0 8px">
+      <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
+      <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
+        <input type=hidden name=zurueck value=einplanung>
+        <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+        <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+          <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+          <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+          <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+        </select>
+        <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+          <option value="" disabled selected>– Stil wählen –</option>
+          <option value="comic">Comic</option>
+          <option value="comic_beratung">Comic Beratung</option>
+          <option value="comic_strip">Comic-Strip</option>
+          <option value="ki_tafel">Tafel</option>
+          <option value="kreativ">Kreativ</option></select>
+        <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+    </details>
     <form method=post action="/text-neu/{{e.id}}" style="margin:4px 0 8px" onsubmit="if(!this.feedback.value.trim()){alert('Bitte kurz angeben, was am Text geändert werden soll.');return false}return confirm('Nur den Text mit Ihrem Hinweis überarbeiten? Das nutzt die Text-KI; das Bild wird kostenlos an den neuen Text angepasst. Termin bleibt.')">
       <input type=hidden name=zurueck value=einplanung>
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
@@ -917,22 +920,25 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
-    <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:8px;display:block">
-      <input type=hidden name=zurueck value=pool>
-      <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
-      <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
-        <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
-        <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-        <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-      </select>
-      <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-        <option value="" disabled selected>– Stil wählen –</option>
-        <option value="comic">Comic</option>
-        <option value="comic_beratung">Comic Beratung</option>
-        <option value="comic_strip">Comic-Strip</option>
-        <option value="ki_tafel">Tafel</option>
-        <option value="kreativ">Kreativ</option></select>
-      <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+    <details style="margin-top:8px">
+      <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
+      <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
+        <input type=hidden name=zurueck value=pool>
+        <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
+        <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
+          <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
+          <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+          <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
+        </select>
+        <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
+          <option value="" disabled selected>– Stil wählen –</option>
+          <option value="comic">Comic</option>
+          <option value="comic_beratung">Comic Beratung</option>
+          <option value="comic_strip">Comic-Strip</option>
+          <option value="ki_tafel">Tafel</option>
+          <option value="kreativ">Kreativ</option></select>
+        <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+    </details>
   </div></div>
 {% endmacro %}
 <div class=sec>&#x267B;&#xFE0F; Aktiv im Umlauf ({{aktiv|length}})</div>
