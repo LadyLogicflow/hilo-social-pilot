@@ -40,8 +40,6 @@ def main():
     p.add_argument("--generate", type=int, metavar="N", help="Bis zu N Textentwuerfe erzeugen")
     p.add_argument("--generate-ids", metavar="IDS", dest="generate_ids",
                    help="Textentwuerfe nur fuer diese Thema-IDs erzeugen (kommagetrennt, z.B. 12,15,17)")
-    p.add_argument("--regenerate-drafts", action="store_true", dest="regenerate_drafts",
-                   help="Alle noch nicht freigegebenen Entwuerfe nach aktuellen Vorgaben neu erzeugen")
     p.add_argument("--render", action="store_true", help="Fehlende Bilder fuer Entwuerfe erzeugen")
     p.add_argument("--serve", action="store_true", help="Freigabe-Dashboard starten (Webserver)")
     p.add_argument("--port", type=int, help="Port fuer das Dashboard (Standard 8530)")
@@ -146,7 +144,7 @@ def main():
         return
 
     if (args.init_db or args.once or args.generate is not None or args.generate_ids is not None
-            or args.regenerate_drafts or args.render or args.add_pdf or args.add_url or args.add_user
+            or args.render or args.add_pdf or args.add_url or args.add_user
             or args.serve or args.radar or args.daily or args.countdowns):
         init_db()
     if args.radar:
@@ -181,8 +179,6 @@ def main():
         ids = [x.strip() for x in args.generate_ids.split(",") if x.strip()]
         log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen).",
                  textgen.generate_for_ids(ids, kanal="google", use_campaign=True), len(ids))
-    if args.regenerate_drafts:
-        log.info("%s Entwuerfe nach aktuellen Vorgaben neu erzeugt.", textgen.regenerate_open_drafts())
     if args.render:
         log.info("%s Bilder erzeugt.", bildgen.render_drafts())
     if args.once:

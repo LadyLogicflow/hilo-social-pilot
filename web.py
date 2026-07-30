@@ -231,14 +231,6 @@ def _start_generation_ids(ids):
          "--generate-ids", ",".join(str(i) for i in ids)],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
-def _start_regenerate():
-    """Hintergrund: alle offenen Entwuerfe nach aktuellen Vorgaben neu erzeugen. Entkoppelt: NUR
-    Text (kein '--render') - das Bild wird spaeter je Beitrag per Klick erzeugt."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-    logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
-    _gen["proc"] = subprocess.Popen(
-        [sys.executable, os.path.join(BASE_DIR, "main.py"), "--regenerate-drafts"],
-        cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
 # --- Taeglicher Radar-Lauf (7 Uhr), als Subprozess -------------------------
 def _daily_scheduler():
@@ -739,13 +731,10 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
 <div class=top><h2 style="margin:0;color:#0B2545">Freigabe: Texte &amp; Bilder (Stufe 2)</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 {% if entwuerfe %}<div style="max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-  <span style="color:#6b7280;font-size:13px">Tipp: Nach geänderten Vorgaben (Bildstil, keine Abkürzungen …) kannst du alle offenen Entwürfe neu erzeugen lassen.</span>
+  <span style="color:#6b7280;font-size:13px">Tipp: Einzelne Beiträge kannst du direkt beim jeweiligen Entwurf neu erzeugen lassen.</span>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
   <form method=post action="/pool-aufnehmen-alle" onsubmit="return confirm('Alle {{entwuerfe|length}} offenen Entwürfe in den Zufalls-Pool aufnehmen?\n\nDas gilt als Freigabe. Es wird nichts sofort gepostet – die Veröffentlichung läuft erst über die tägliche Pool-Ziehung. Einzelne Beiträge kannst du auf der Pool-Seite jederzeit wieder entfernen.')">
     <button class=ok title="Alle offenen Entwürfe auf einen Schlag in den Pool legen">&#x267B;&#xFE0F; Alle in den Pool</button>
-  </form>
-  <form method=post action="/entwuerfe-neu" onsubmit="return confirm('Alle offenen Entwürfe nach den neuen Vorgaben NEU erzeugen? Das ersetzt die aktuellen Text- und Bildvorschläge und kostet KI-Tokens.')">
-    <button class=re{% if gen_running %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>&#x21BB; Alle nach neuen Vorgaben neu erzeugen</button>
   </form></div></div>{% endif %}
 {% for e in entwuerfe %}
 <div class=card>{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
@@ -1594,20 +1583,6 @@ def entwuerfe():
             rows.append(_parse(e))
     return render_template_string(ENTWUERFE, **_ctx(entwuerfe=rows, gen_running=_generation_running()))
 
-@app.route("/entwuerfe-neu", methods=["POST"])
-@rolle_required("freigeber")
-def entwuerfe_neu():
-    """Erzeugt alle noch nicht freigegebenen Entwuerfe nach aktuellen Vorgaben neu (Hintergrund)."""
-    with _gen_lock:
-        if _generation_running():
-            flash("Es läuft bereits eine Erzeugung - einen Moment, dann die Seite neu laden.")
-        else:
-            try:
-                _start_regenerate()
-                flash("Alle offenen Entwürfe werden nach den neuen Vorgaben neu erzeugt - läuft im "
-                      "Hintergrund. In ein bis zwei Minuten die Seite neu laden.")
-            except Exception as ex:
-                flash("Neu-Erzeugung konnte nicht gestartet werden: %s" % ex)
     return redirect(url_for("entwuerfe"))
 
 @app.route("/einplanung")
