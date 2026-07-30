@@ -536,9 +536,16 @@ def quality_check(
     client = _get_client()
     log.info("Stufe 3: Qualitätskontrolle wird durchgeführt...")
 
-    # Bild als Base64 laden
-    image_data = image_path.read_bytes()
-    image_base64 = base64.b64encode(image_data).decode("utf-8")
+    # Bild verkleinert als Base64 laden (#Kostenschutz): 512x512 reicht fuer Layout-/Kontrast-
+    # Check locker aus und spart Bild-Tokens beim Vision-Call gegenueber dem vollen 1024x1024-PNG.
+    import io
+    from PIL import Image
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        img.thumbnail((512, 512), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        image_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
     # Erwartete Texte zusammenstellen
     expected_texts = f"""ERWARTETE TEXTE:
@@ -554,7 +561,10 @@ ORIGINALTEXT:
 {article[:500]}"""
 
     response = client.beta.chat.completions.parse(
-        model="gpt-5.6-terra",  # Terra für multimodales QA
+        model="gpt-5-nano",  # QA ist reine Klassifikation (Ja/Nein + kurze Problemliste) - dafuer
+        # reicht das guenstigste Vision-Modell (~50x billiger als Terra). Kein Auto-Retry mehr
+        # (siehe run_campaign/regenerate_image_with_qa), daher geringes Risiko bei ungenauerer QA -
+        # das Bild geht ohnehin zur manuellen Pruefung. Bei Bedarf hochstufen auf 'gpt-5.6-luna'.
         messages=[
             {
                 "role": "system",
