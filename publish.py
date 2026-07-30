@@ -81,14 +81,21 @@ def list_pages():
 
 
 def _page_token(page_id):
-    """Holt das Seiten-Token fuer eine bestimmte Seite (intern, nie ausgeben)."""
-    r = requests.get(GRAPH + "/me/accounts", timeout=30, params={
-        "fields": "id,access_token", "limit": 100, "access_token": _user_token(),
-    })
-    r.raise_for_status()
-    for p in r.json().get("data", []):
-        if p["id"] == str(page_id):
-            return p.get("access_token")
+    """Holt das Seiten-Token fuer eine bestimmte Seite (intern, nie ausgeben).
+    Fallback: Wenn /me/accounts fehlschlaegt (z.B. fehlende Permissions), wird
+    der User-Token als Fallback verwendet (funktioniert fuer Basic-Posts)."""
+    user_tok = _user_token()
+    try:
+        r = requests.get(GRAPH + "/me/accounts", timeout=30, params={
+            "fields": "id,access_token", "limit": 100, "access_token": user_tok,
+        })
+        r.raise_for_status()
+        for p in r.json().get("data", []):
+            if p["id"] == str(page_id):
+                return p.get("access_token")
+    except Exception as ex:
+        log.warning("Page-Token konnte nicht geholt werden (%s), verwende User-Token als Fallback.", ex)
+        return user_tok
     raise RuntimeError("Keine Berechtigung fuer Seite %s (nicht in /me/accounts)." % page_id)
 
 
