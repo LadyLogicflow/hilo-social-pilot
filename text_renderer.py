@@ -246,27 +246,32 @@ def _render_cta_button(
 
 
 def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
-    """Bricht Text in Zeilen um die in max_width passen."""
-    lines = []
-    words = text.split()
-    current_line = ""
+    """Bricht Text in Zeilen um, die in max_width passen.
 
+    Respektiert bestehende Zeilenumbrueche in 'text' als ERZWUNGENE Absatzgrenzen (z.B. zwischen
+    einzelnen Bullet-Points, die mit '\\n' getrennt uebergeben werden - siehe render_text_on_image).
+    Vorher wurde per text.split() der GESAMTE Text inkl. Zeilenumbruechen in eine flache Wortliste
+    zerlegt und komplett neu umgebrochen - dadurch liefen mehrere Bullet-Points in derselben Zeile
+    zusammen statt untereinander zu stehen. Jetzt wird pro Absatz (zwischen den '\\n') unabhaengig
+    umgebrochen; ein Absatz kann bei Bedarf weiterhin ueber mehrere Zeilen laufen, startet aber nie
+    im selben Zeilenrest wie der vorherige Absatz."""
     draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-
-    for word in words:
-        test_line = f"{current_line} {word}".strip()
-        bbox = draw_temp.textbbox((0, 0), test_line, font=font)
-        if bbox[2] - bbox[0] <= max_width - 20:  # 20px Margin
-            current_line = test_line
-        else:
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-
-    if current_line:
-        lines.append(current_line)
-
-    return lines
+    all_lines = []
+    for absatz in text.split("\n"):
+        words = absatz.split()
+        current_line = ""
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
+            if bbox[2] - bbox[0] <= max_width - 20:  # 20px Margin
+                current_line = test_line
+            else:
+                if current_line:
+                    all_lines.append(current_line)
+                current_line = word
+        if current_line:
+            all_lines.append(current_line)
+    return all_lines
 
 
 def _get_line_height(font: ImageFont.FreeTypeFont) -> int:
