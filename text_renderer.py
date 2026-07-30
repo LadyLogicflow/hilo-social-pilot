@@ -160,18 +160,32 @@ def _render_text_block(
     von einer kraeftigeren Outline/Schlagschatten (_draw_text_with_outline), deren Farbe
     hier durchgereicht wird (per Helligkeitsmessung gewaehlt, siehe _text_colors_for_region).
     'add_background' bleibt als Parameter erhalten (Kompatibilitaet, ungenutzt), damit
-    Aufrufer nicht angepasst werden muessen - es wird nie mehr eine Flaeche gezeichnet."""
+    Aufrufer nicht angepasst werden muessen - es wird nie mehr eine Flaeche gezeichnet.
+
+    #Kollisionsschutz: lange Woerter (z.B. deutsche Komposita wie 'Entfernungspauschale')
+    koennen in schmalen Spalten auf 2 Zeilen umbrechen und dadurch die Box-Hoehe sprengen -
+    das reicht dann ggf. bis in die reservierte Logo-Kreis-Zone hinein, unabhaengig davon wie
+    die Box selbst dimensioniert ist. Deshalb: passt der umgebrochene Text nicht in die Box-
+    Hoehe, wird die Schrift schrittweise verkleinert (font_variant, funktioniert bei jeder TTF),
+    bis er passt oder eine Mindestgroesse erreicht ist."""
     # Pixel-Koordinaten berechnen
     x = int(box.x * img_width)
     y = int(box.y * img_height)
     w = int(box.width * img_width)
     h = int(box.height * img_height)
 
-    # Text mehrzeilig umbrechen
-    wrapped_lines = _wrap_text(text, font, w)
-
-    # Vertikale Position berechnen
-    total_text_height = len(wrapped_lines) * _get_line_height(font)
+    # Text umbrechen; passt er nicht in die Box-Hoehe, Schrift schrittweise verkleinern.
+    mindestgroesse = max(18, int(font.size * 0.55))
+    for _ in range(8):
+        wrapped_lines = _wrap_text(text, font, w)
+        line_height = _get_line_height(font)
+        total_text_height = len(wrapped_lines) * line_height
+        if total_text_height <= h or font.size <= mindestgroesse:
+            break
+        neue_groesse = max(mindestgroesse, font.size - 4)
+        if neue_groesse == font.size:
+            break
+        font = font.font_variant(size=neue_groesse)
 
     if box.vertical_align == "top":
         text_y = y + 10
@@ -198,7 +212,7 @@ def _render_text_block(
         _draw_text_with_outline(draw, (text_x, text_y), line, font, text_color,
                                  outline_color=outline_color)
 
-        text_y += _get_line_height(font)
+        text_y += line_height
 
 
 def _render_cta_button(
@@ -218,27 +232,55 @@ def _render_cta_button(
     (z.B. mit Ortsname) lief der Text seitlich aus der festen Box heraus und wurde abgeschnitten
     bzw. ueberlappte andere Elemente wie den Logo-Kreis. Jetzt: Button-Breite = tatsaechliche
     Textbreite + Innenabstand, horizontal zentriert, fester Abstand vom unteren Bildrand. Darf
-    dafuer bewusst einen Teil des Motivs ueberdecken (unwichtiger als abgeschnittener Text)."""
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    dafuer bewusst einen Teil des Motivs ueberdecken (unwichtiger als abgeschnittener Text).
 
-    pad_x = max(24, int(text_height * 1.1))
-    pad_y = max(16, int(text_height * 0.6))
-    btn_w = text_width + 2 * pad_x
-    btn_h = text_height + 2 * pad_y
+    Kreis-Ausweichlogik (#Kollisionsschutz): der Logo-Kreis (bildgen.add_logo_circles,
+    pos="diagonal2") sitzt IMMER unten-links, genau dort wo der CTA-Button unten sitzt. Reine
+    Pillow-Geometrie, kein KI-Call noetig: faellt der zentrierte Button in die reservierte Zone
+    (x<0.30 der Bildbreite), wird er zunaechst nach rechts verschoben (so mittig wie moeglich,
+    aber kollisionsfrei). Ist der Text dafuer zu lang (verschobener Button wuerde ueber den
+    rechten Rand hinauslaufen), wird die CTA-SCHRIFTGROESSE schrittweise verkleinert, bis der
+    Button in die verfuegbare Breite passt - garantiert IMMER kollisionsfrei UND ohne
+    abgeschnittenen Text, unabhaengig von der Textlaenge."""
+    circle_safe_x = int(img_width * 0.30)
+    rand_margin = int(img_width * 0.04)
+    verfuegbare_breite = img_width - rand_margin - circle_safe_x
 
-    # Sehr lange Texte (z.B. lange Ortsnamen bei der Personalisierung): Breite auf einen
-    # sinnvollen Maximalwert deckeln, statt fast bildbreit zu werden.
-    max_w = int(img_width * 0.92)
+    aktuelle_font = font
+    for _ in range(10):  # max. 10 Verkleinerungsschritte (Sicherheitsgrenze gegen Endlosschleife)
+        bbox = draw.textbbox((0, 0), text, font=aktuelle_font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        pad_x = max(24, int(text_height * 1.1))
+        pad_y = max(16, int(text_height * 0.6))
+        btn_w = text_width + 2 * pad_x
+        btn_h = text_height + 2 * pad_y
+
+        max_w = int(img_width * 0.92)
+        passt_zentriert = btn_w <= max_w
+        # Passt der Button (zentriert ODER nach rechts verschoben) in die kollisionsfreie Zone?
+        passt_ohne_kollision = btn_w <= verfuegbare_breite
+        if passt_zentriert and (passt_ohne_kollision or aktuelle_font.size <= 20):
+            break  # entweder passt's, oder wir sind an der Mindestgroesse angekommen (Notfall)
+        neue_groesse = max(20, aktuelle_font.size - 2)
+        if neue_groesse == aktuelle_font.size:
+            break
+        aktuelle_font = aktuelle_font.font_variant(size=neue_groesse)
+
     if btn_w > max_w:
-        btn_w = max_w
+        btn_w = max_w  # Notfall (Mindestschriftgroesse erreicht, Text trotzdem noch zu lang)
 
     x = (img_width - btn_w) // 2
     bottom_margin = int(img_height * 0.06)
     y = img_height - bottom_margin - btn_h
 
+    if x < circle_safe_x:
+        x = circle_safe_x
+        if x + btn_w > img_width - rand_margin:
+            x = img_width - rand_margin - btn_w
+
     draw.rounded_rectangle([x, y, x + btn_w, y + btn_h], radius=btn_h // 2, fill=bg_color)
+    font = aktuelle_font
 
     text_x = x + (btn_w - text_width) // 2
     text_y = y + (btn_h - text_height) // 2

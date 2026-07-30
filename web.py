@@ -1837,7 +1837,7 @@ def _kampagne_pillow_rerender(data, eid):
         text_path, background_overlay=True,
     )
     slogan = bildgen.pick_slogan(data.get("slogan"))
-    bildgen.add_logo_circles(text_path, slogan, out, pos="oben")
+    bildgen.add_logo_circles(text_path, slogan, out, pos="diagonal2")
     try:
         os.remove(text_path)
     except Exception:
@@ -1878,7 +1878,7 @@ def beitrag_neu(eid):
                 context=data.get("subline") or data.get("caption") or "",
             )
             final_path = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(data.get("slogan")), final_path, pos="oben")
+            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(data.get("slogan")), final_path, pos="diagonal2")
             data["bild_pfad"] = final_path
             data["kampagne_motiv_pfad"] = str(motiv_path)
             data["kampagne_layout_template"] = layout_template
@@ -2119,7 +2119,7 @@ def bild_aktion(eid):
                     # Logo-Kreise drüberlegen (wie bei neuen Posts)
                     import bildgen
                     slogan = bildgen.pick_slogan(data.get("slogan"))
-                    bildgen.add_logo_circles(str(image_path), slogan, final_path, pos="oben")
+                    bildgen.add_logo_circles(str(image_path), slogan, final_path, pos="diagonal2")
 
                     # Caption nachträglich generieren falls fehlt (Bestandsposts)
                     if not data.get("caption") and e["thema_id"]:

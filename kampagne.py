@@ -156,16 +156,19 @@ class VisualOnlyPlan(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 LAYOUT_TEMPLATES = {
-    # WICHTIG (#Kollisionsschutz): Die Logo-Kreise (bildgen.add_logo_circles, pos="oben") sitzen
-    # IMMER oben-links (Logo) und oben-rechts (Slogan/Portrait) inkl. weichem Schlagschatten -
-    # grosszuegig bis x<0.28 bzw. x>0.70 und y<0.30 (Portrait-Kreise sind groesser als Standard-
-    # Kreise, der Schlagschatten reicht nochmal etwas darueber hinaus - daher die Reserve).
-    # KEINE Textbox darf in diese beiden Zonen hineinragen - deshalb starten Ueberschrift/Bullets
-    # in JEDER Vorlage erst bei y>=0.33 (Sicherheitsmarge). Der CTA-Button ignoriert diese Box
-    # ohnehin (siehe _render_cta_button - immer unten mittig, automatisch breit).
+    # WICHTIG (#Kollisionsschutz): Die Logo-Kreise (bildgen.add_logo_circles, pos="diagonal2")
+    # sitzen IMMER unten-links (Logo) und oben-rechts (Slogan/Portrait) inkl. weichem
+    # Schlagschatten - grosszuegig bis x<0.30 UND (y<0.30 ODER y>0.68). Oben-links ist bei
+    # dieser Position frei nutzbar. KEINE Textbox darf in die reservierten Zonen hineinragen:
+    # Ueberschrift/Bullets starten in JEDER Vorlage bei y>=0.33 (oben-rechts-Schutz); Boxen, die
+    # von der linken Bildkante starten (motiv-bedingt, z.B. text_left_hero_right/editorial_split),
+    # enden vor y=0.66 (unten-links-Schutz). Bei den zentrierten/vollbreiten Vorlagen wird
+    # stattdessen die linke Spalte (x<0.30) ausgespart. Der CTA-Button ignoriert diese Box fuer
+    # seine EIGENE Groesse/Position (siehe _render_cta_button - immer unten mittig, automatisch
+    # breit), weicht der unten-links-Zone aber ebenfalls automatisch aus.
     "text_left_hero_right": {
         "headline_box": TextBox(x=0.07, y=0.33, width=0.48, height=0.20, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.52, width=0.42, height=0.24, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.52, width=0.42, height=0.14, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "right 50%",
         "motiv_instruction": "Keep the left 45% visually calm. Place the hero subject on the right side."
@@ -188,8 +191,10 @@ LAYOUT_TEMPLATES = {
     },
 
     "hero_top_text_bottom": {
-        "headline_box": TextBox(x=0.07, y=0.58, width=0.86, height=0.16, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.76, width=0.86, height=0.12, align="center", vertical_align="top"),
+        # Volle Breite wuerde in die unten-links-Zone hineinragen (Textblock liegt hier tief im
+        # Bild) - daher x eingerueckt (0.30 statt 0.07), schmaler als die anderen Vorlagen.
+        "headline_box": TextBox(x=0.30, y=0.58, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.30, y=0.76, width=0.63, height=0.10, align="center", vertical_align="top"),
         "cta_box": TextBox(x=0.25, y=0.90, width=0.50, height=0.08, align="center", vertical_align="center"),
         "motiv_area": "top 55%",
         "motiv_instruction": "Keep the bottom 40% visually calm. Place the hero subject in the upper half."
@@ -197,7 +202,8 @@ LAYOUT_TEMPLATES = {
 
     "centered_headline_bottom_panel": {
         "headline_box": TextBox(x=0.10, y=0.35, width=0.80, height=0.22, align="center", vertical_align="center"),
-        "supporting_box": TextBox(x=0.10, y=0.72, width=0.80, height=0.14, align="center", vertical_align="top"),
+        # Gleicher Grund wie oben: Panel liegt tief (y=0.72) -> eingerueckt statt volle Breite.
+        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.12, align="center", vertical_align="top"),
         "cta_box": TextBox(x=0.25, y=0.88, width=0.50, height=0.09, align="center", vertical_align="center"),
         "motiv_area": "background",
         "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 25% calm."
@@ -205,7 +211,7 @@ LAYOUT_TEMPLATES = {
 
     "editorial_split": {
         "headline_box": TextBox(x=0.05, y=0.33, width=0.42, height=0.18, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.05, y=0.50, width=0.42, height=0.22, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.05, y=0.50, width=0.42, height=0.16, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.05, y=0.74, width=0.42, height=0.10, align="left", vertical_align="center"),
         "motiv_area": "right 48%",
         "motiv_instruction": "Create an editorial split layout. Hero subject fills the right half completely."
