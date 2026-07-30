@@ -71,7 +71,7 @@ def render_text_on_image(
         # HTML-Seiten statt echter Font-Daten -> jeder Ladeversuch scheiterte, WESHALB ALLE DREI
         # Schriften inkl. Headline auf die winzige Pillow-Standardschrift zurueckfielen - das war
         # die eigentliche Ursache fuer 'Text viel zu klein').
-        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 32)
+        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
         font_body.set_variation_by_name("SemiBold")
         font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
         font_cta.set_variation_by_name("Bold")

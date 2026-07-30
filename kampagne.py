@@ -158,17 +158,17 @@ class VisualOnlyPlan(BaseModel):
 LAYOUT_TEMPLATES = {
     # WICHTIG (#Kollisionsschutz): Die Logo-Kreise (bildgen.add_logo_circles, pos="diagonal2")
     # sitzen IMMER unten-links (Logo) und oben-rechts (Slogan/Portrait) inkl. weichem
-    # Schlagschatten - grosszuegig bis x<0.30 UND (y<0.30 ODER y>0.68). Oben-links ist bei
-    # dieser Position frei nutzbar. KEINE Textbox darf in die reservierten Zonen hineinragen:
-    # Ueberschrift/Bullets starten in JEDER Vorlage bei y>=0.33 (oben-rechts-Schutz); Boxen, die
-    # von der linken Bildkante starten (motiv-bedingt, z.B. text_left_hero_right/editorial_split),
-    # enden vor y=0.66 (unten-links-Schutz). Bei den zentrierten/vollbreiten Vorlagen wird
-    # stattdessen die linke Spalte (x<0.30) ausgespart. Der CTA-Button ignoriert diese Box fuer
-    # seine EIGENE Groesse/Position (siehe _render_cta_button - immer unten mittig, automatisch
-    # breit), weicht der unten-links-Zone aber ebenfalls automatisch aus.
+    # Schlagschatten - grosszuegig bis x<0.30 UND (y<0.30 ODER y>0.68). Bei rein linksbuendigen
+    # Textboxen (x-Bereich bleibt < 0.55) ist oben-links dagegen FREI nutzbar - nur Boxen, die
+    # in die obere RECHTE Ecke hineinreichen (x>0.68 UND y<0.30) oder in die untere LINKE Ecke
+    # (x<0.30 UND y>0.68), muessen ausweichen. Der CTA-Button ignoriert diese Box fuer seine
+    # EIGENE Groesse/Position (siehe _render_cta_button - feste Breite, zentriert in der
+    # sicheren Zone, weicht der unten-links-Zone automatisch aus).
     "text_left_hero_right": {
-        "headline_box": TextBox(x=0.07, y=0.33, width=0.48, height=0.20, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.07, y=0.52, width=0.42, height=0.14, align="left", vertical_align="top"),
+        # Oben-links ist bei diagonal2 (Logo unten-links, Slogan/Portrait oben-rechts) FREI -
+        # Ueberschrift darf wieder nach oben, nur unten-links (Bullets/CTA) bleibt reserviert.
+        "headline_box": TextBox(x=0.07, y=0.08, width=0.48, height=0.22, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.07, y=0.34, width=0.42, height=0.30, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "right 50%",
         "motiv_instruction": "Keep the left 45% visually calm. Place the hero subject on the right side."
@@ -210,8 +210,9 @@ LAYOUT_TEMPLATES = {
     },
 
     "editorial_split": {
-        "headline_box": TextBox(x=0.05, y=0.33, width=0.42, height=0.18, align="left", vertical_align="top"),
-        "supporting_box": TextBox(x=0.05, y=0.50, width=0.42, height=0.16, align="left", vertical_align="top"),
+        # Oben-links ist bei diagonal2 frei - siehe text_left_hero_right.
+        "headline_box": TextBox(x=0.05, y=0.08, width=0.42, height=0.20, align="left", vertical_align="top"),
+        "supporting_box": TextBox(x=0.05, y=0.32, width=0.42, height=0.32, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.05, y=0.74, width=0.42, height=0.10, align="left", vertical_align="center"),
         "motiv_area": "right 48%",
         "motiv_instruction": "Create an editorial split layout. Hero subject fills the right half completely."
