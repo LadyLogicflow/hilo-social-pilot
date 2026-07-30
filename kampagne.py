@@ -208,20 +208,21 @@ LAYOUT_TEMPLATES = {
     "hero_top_text_bottom": {
         # Volle Breite wuerde in die unten-links-Zone hineinragen (Textblock liegt hier tief im
         # Bild) - daher x eingerueckt (0.30 statt 0.07), schmaler als die anderen Vorlagen.
-        "headline_box": TextBox(x=0.30, y=0.58, width=0.63, height=0.16, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.30, y=0.76, width=0.63, height=0.10, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.90, width=0.50, height=0.08, align="center", vertical_align="center"),
+        # WICHTIG: Text unten war zu klein → Boxen größer gemacht + höher gerückt (2026-07-30)
+        "headline_box": TextBox(x=0.30, y=0.54, width=0.63, height=0.18, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.89, width=0.50, height=0.09, align="center", vertical_align="center"),
         "motiv_area": "top 55%",
-        "motiv_instruction": "Keep the bottom 40% visually calm. Place the hero subject in the upper half."
+        "motiv_instruction": "Keep the bottom 45% visually calm and high-contrast. Place the hero subject in the upper half."
     },
 
     "centered_headline_bottom_panel": {
         "headline_box": TextBox(x=0.10, y=0.35, width=0.80, height=0.22, align="center", vertical_align="center"),
-        # Gleicher Grund wie oben: Panel liegt tief (y=0.72) -> eingerueckt statt volle Breite.
-        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.12, align="center", vertical_align="top"),
-        "cta_box": TextBox(x=0.25, y=0.88, width=0.50, height=0.09, align="center", vertical_align="center"),
+        # Panel liegt tief (y=0.69) -> eingerueckt + größer gemacht für bessere Lesbarkeit (2026-07-30)
+        "supporting_box": TextBox(x=0.30, y=0.69, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "cta_box": TextBox(x=0.25, y=0.87, width=0.50, height=0.10, align="center", vertical_align="center"),
         "motiv_area": "background",
-        "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 25% calm."
+        "motiv_instruction": "Create a full-frame background. Leave vertical center and bottom 30% calm and high-contrast."
     },
 
     "editorial_split": {
@@ -367,12 +368,27 @@ HILO-Farben:
 - Lavendelblau: #b8c8e8
 - Weiß: #ffffff
 
-Diese Farben sind AKZENTE, KEINE Grundfarbe: Das Foto selbst soll eine natürliche, neutrale
-Farbgebung haben (Tageslicht, warme/neutrale Töne, realistische Materialien und Hauttöne) - wie
-ein echtes redaktionelles Foto, nicht wie durch einen Farbfilter/Farbwash in Navy oder Grün
-getaucht. Die HILO-Farben tauchen NUR an einzelnen, bewusst platzierten Details auf (z.B. ein
-Ordner, ein kleines Objekt, eine Pflanze, ein Möbelstück) - niemals als dominante Hintergrund-
-oder Lichtstimmung des gesamten Bildes.
+FARBGEBUNG (WICHTIG - STRIKT EINHALTEN!):
+
+Das Foto selbst soll eine NATÜRLICHE, NEUTRALE Farbgebung haben:
+- Natürliches Tageslicht (KEIN warmer Goldton, KEIN Sepia, KEIN warmer Filter!)
+- Realistische, kühle bis neutrale Materialien (Holz in natürlichem Braun, Papier in Weiß/Grau)
+- Echte Hauttöne (keine warmen/goldenen Übertöne)
+- Wie ein echtes redaktionelles Magazin-Foto mit professioneller Beleuchtung
+
+HILO-Farben (Navy #1f428d UND Grün #60a33c) müssen als OBJEKTE im Bild sichtbar sein:
+- MINDESTENS EIN Objekt in Navy (z.B. Ordner, Mappe, Notizbuch, Stift, Möbelstück)
+- MINDESTENS EIN Objekt in Grün (z.B. Pflanze, Notizbuch, Ordner, Dekoobjekt)
+- Diese Objekte MÜSSEN klar erkennbar sein (nicht nur winzige Details!)
+- Platziere sie bewusst im Bild (nicht nur am Rand)
+
+VERMEIDEN:
+- Warme Goldtöne / Sepia-Filter
+- Dominante Braun/Beige/Creme-Stimmung im ganzen Bild
+- Navy/Grün als Hintergrundfarbe oder Lichtstimmung (nur als konkrete Objekte!)
+- Übertrieben warme/sonnige Lichtstimmung
+
+Ziel: Professionelles, kühles/neutrales Foto MIT klar sichtbaren Navy- und Grün-Objekten.
 
 VERMEIDEN
 
