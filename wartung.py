@@ -18,8 +18,11 @@ import os
 
 import bildmotiv
 from bildmotiv import MOTIV_DIR
+from config import DATA_DIR
 
 log = logging.getLogger("hilo.wartung")
+
+KAMPAGNE_DIR = os.path.join(DATA_DIR, "kampagne")
 
 # Aktive Entwurfs-Status: deren Cache-Fotos werden NIE geloescht (auch 'pool' = dauerhaft aktiv).
 AKTIVE_ENTWURF_STATUS = ("entwurf", "freigegeben", "pool")
@@ -117,6 +120,101 @@ def motive_ordner_groesse():
     gesamt = 0
     for name in os.listdir(MOTIV_DIR):
         pfad = os.path.join(MOTIV_DIR, name)
+        try:
+            if os.path.isfile(pfad):
+                gesamt += os.path.getsize(pfad)
+        except OSError:
+            continue
+    return gesamt
+
+
+def _kampagne_in_benutzung_pfade(conn):
+    """Analog zu _in_benutzung_pfade, aber fuer den 3-Stufen-Workflow: schuetzt sowohl das rohe
+    Motiv (fields['kampagne_motiv_pfad'], gebraucht fuer die Personalisierung je
+    Beratungsstelle - render_fuer_stelle) als auch entwuerfe.bild_pfad (falls es ausnahmsweise
+    im kampagne/-Ordner liegt, z.B. bei einem expliziten output_path)."""
+    in_benutzung = set()
+    ph_status = ",".join("?" for _ in AKTIVE_ENTWURF_STATUS)
+    ph_geplant = ",".join("?" for _ in AKTIVE_GEPLANT_STATUS)
+    sql = (
+        "SELECT id, text, bild_pfad FROM entwuerfe WHERE status IN (%s) "
+        "OR id IN (SELECT entwurf_id FROM geplante_posts WHERE status IN (%s))"
+        % (ph_status, ph_geplant)
+    )
+    params = tuple(AKTIVE_ENTWURF_STATUS) + tuple(AKTIVE_GEPLANT_STATUS)
+    for row in conn.execute(sql, params):
+        if row["bild_pfad"]:
+            in_benutzung.add(row["bild_pfad"])
+        try:
+            fields = json.loads(row["text"]) if row["text"] else {}
+        except Exception:
+            log.warning("aufraeumen_kampagne: Entwurf %s nicht parsebar, uebersprungen.", row["id"])
+            continue
+        motiv = fields.get("kampagne_motiv_pfad")
+        if motiv:
+            in_benutzung.add(motiv)
+    return in_benutzung
+
+
+def aufraeumen_kampagne(conn, schonfrist_tage=14):
+    """Raeumt verwaiste Dateien aus DATA_DIR/kampagne/ auf (rohe Motive + Text-Zwischenbilder
+    des 3-Stufen-Workflows, VOR den finalen CI-Kreisen - die fertigen Bilder liegen unter
+    DATA_DIR/bilder/ und werden hier NIE angefasst, siehe entwuerfe.bild_pfad-Schutz).
+
+    Gleiche Sicherheitslogik wie aufraeumen_motive: geloescht wird nur, was kein aktiver
+    Entwurf mehr referenziert UND aelter als die Schonfrist ist. Die rohen Motive muessen so
+    lange erhalten bleiben, wie der Entwurf noch personalisiert werden koennte (#Kostenschutz -
+    ohne sie wuerde die Personalisierung je Beratungsstelle wieder einen neuen, kostenpflichtigen
+    GPT-Image-Call brauchen).
+
+    Args:
+        conn: offene SQLite-Verbindung.
+        schonfrist_tage (int): Mindestalter (Tage), bevor eine verwaiste Datei loeschbar ist.
+
+    Returns:
+        tuple[int, int]: (Anzahl geloeschter Dateien, freigegebene Bytes).
+    """
+    import time
+
+    if not os.path.isdir(KAMPAGNE_DIR):
+        return (0, 0)
+    in_benutzung = _kampagne_in_benutzung_pfade(conn)
+    schwelle = time.time() - max(0, schonfrist_tage) * 86400
+    geloescht = 0
+    bytes_frei = 0
+    for name in os.listdir(KAMPAGNE_DIR):
+        if not name.lower().endswith(".png"):
+            continue
+        pfad = os.path.join(KAMPAGNE_DIR, name)
+        if pfad in in_benutzung:
+            continue  # wird von einem aktiven Entwurf gebraucht (Motiv ODER Bild)
+        try:
+            st = os.stat(pfad)
+        except OSError:
+            continue
+        if not os.path.isfile(pfad):
+            continue
+        if st.st_mtime >= schwelle:
+            continue  # innerhalb der Schonfrist -> bleibt
+        try:
+            groesse = st.st_size
+            os.remove(pfad)
+            geloescht += 1
+            bytes_frei += groesse
+        except OSError as ex:
+            log.warning("aufraeumen_kampagne: konnte %s nicht loeschen: %s", name, ex)
+    log.info("aufraeumen_kampagne: %d Datei(en) geloescht, %.1f MB frei.",
+             geloescht, bytes_frei / (1024 * 1024))
+    return (geloescht, bytes_frei)
+
+
+def kampagne_ordner_groesse():
+    """Summe der Dateigroessen im kampagne/-Ordner in Bytes (0, wenn der Ordner fehlt)."""
+    if not os.path.isdir(KAMPAGNE_DIR):
+        return 0
+    gesamt = 0
+    for name in os.listdir(KAMPAGNE_DIR):
+        pfad = os.path.join(KAMPAGNE_DIR, name)
         try:
             if os.path.isfile(pfad):
                 gesamt += os.path.getsize(pfad)

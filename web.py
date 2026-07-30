@@ -540,10 +540,12 @@ def _cache_cleanup_scheduler():
             if now.hour >= 7 and last != heute:
                 with get_conn() as conn:
                     n, frei = wartung.aufraeumen_motive(conn)
+                    n2, frei2 = wartung.aufraeumen_kampagne(conn)
                 os.makedirs(DATA_DIR, exist_ok=True)
                 open(marker, "w", encoding="utf-8").write(heute)
-                log.info("Cache-Aufraeumung: %d Foto(s) geloescht, %.1f MB frei (%s)",
-                         n, frei / (1024 * 1024), heute)
+                log.info("Cache-Aufraeumung: %d Foto(s) geloescht, %.1f MB frei + "
+                         "%d Kampagnen-Datei(en) geloescht, %.1f MB frei (%s)",
+                         n, frei / (1024 * 1024), n2, frei2 / (1024 * 1024), heute)
         except Exception:
             log.exception("Cache-Aufraeumung: Scheduler-Fehler")
         time.sleep(120)
@@ -1477,6 +1479,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 {% if speicher_warnung %}<p class=hint style="color:#b00020"><b>Achtung:</b> Es sind nur noch {{frei_lesbar}} frei. Bitte Speicher pr&uuml;fen.</p>{% endif %}
 <table style="max-width:560px">
   <tr><th style="text-align:left">Foto-Cache (motive/)</th><td>{{motive_lesbar}}</td></tr>
+  <tr><th style="text-align:left">Kampagnen-Cache (kampagne/)</th><td>{{kampagne_lesbar}}</td></tr>
   <tr><th style="text-align:left">Frei auf der Platte</th><td>{{frei_lesbar}} von {{gesamt_lesbar}}</td></tr>
 </table>
 <form method=post style="margin-top:14px"><input type=hidden name=formular value=cache_aufraeumen>
@@ -3892,9 +3895,11 @@ def verwaltung():
                 import wartung
                 try:
                     n, frei = wartung.aufraeumen_motive(conn)
+                    n2, frei2 = wartung.aufraeumen_kampagne(conn)
                     audit_log(conn, session["user"], "cache_aufgeraeumt", None,
-                              "%d Foto(s), %d Bytes" % (n, frei))
-                    flash("%d Foto(s) geloescht, %s frei." % (n, wartung.menschlich(frei)))
+                              "%d Foto(s) + %d Kampagnen-Datei(en), %d Bytes" % (n, n2, frei + frei2))
+                    flash("%d Foto(s) + %d Kampagnen-Datei(en) geloescht, %s frei." %
+                          (n, n2, wartung.menschlich(frei + frei2)))
                 except Exception as ex:
                     log.exception("Cache-Aufraeumung (manuell) fehlgeschlagen")
                     flash("Aufraeumen fehlgeschlagen: %s" % ex)
@@ -3979,14 +3984,15 @@ def verwaltung():
             stellen_mit_wa.append(b)
         stellen = stellen_mit_wa
     # Speicher-Status (#134): Foto-Cache-Groesse + freier Plattenplatz, menschenlesbar.
-    speicher = {"schonfrist_tage": 14, "motive_lesbar": "", "frei_lesbar": "",
-                "gesamt_lesbar": "", "speicher_warnung": False}
+    speicher = {"schonfrist_tage": 14, "motive_lesbar": "", "kampagne_lesbar": "",
+                "frei_lesbar": "", "gesamt_lesbar": "", "speicher_warnung": False}
     if bereich == "speicher":
         import wartung
         frei, gesamt = wartung.freier_speicher(DATA_DIR)
         speicher = {
             "schonfrist_tage": 14,
             "motive_lesbar": wartung.menschlich(wartung.motive_ordner_groesse()),
+            "kampagne_lesbar": wartung.menschlich(wartung.kampagne_ordner_groesse()),
             "frei_lesbar": wartung.menschlich(frei),
             "gesamt_lesbar": wartung.menschlich(gesamt),
             "speicher_warnung": bool(frei and frei < 1024 * 1024 * 1024),  # < 1 GB
