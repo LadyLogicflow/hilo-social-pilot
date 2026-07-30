@@ -651,6 +651,7 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
         # neu drauf rendern kann, OHNE nochmal GPT Image 2 aufzurufen (#Kostenschutz).
         "kampagne_motiv_pfad": str(motiv_path),
         "kampagne_layout_template": plan.layout_template,
+        "highlight_words": plan.highlight_words,
     }
 
     log.info("3-Stufen-Workflow abgeschlossen: %s (QA: %s)",

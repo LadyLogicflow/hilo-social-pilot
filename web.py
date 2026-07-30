@@ -1840,7 +1840,7 @@ def _kampagne_pillow_rerender(data, eid):
     render_text_on_image(
         motiv_pfad, data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
         template["headline_box"], template["supporting_box"], template["cta_box"],
-        text_path, background_overlay=True,
+        text_path, background_overlay=True, highlight_words=data.get("highlight_words"),
     )
     slogan = bildgen.pick_slogan(data.get("slogan"))
     bildgen.add_logo_circles(text_path, slogan, out, pos="diagonal2")
@@ -1879,7 +1879,7 @@ def beitrag_neu(eid):
             # Kein Thema hinterlegt (z.B. manuell erstellter Beitrag) -> bestehenden Text
             # behalten, nur ein frisches Bildkonzept vom Art Director planen lassen.
             data = json.loads(e["text"])
-            image_path, review, motiv_path, layout_template = kampagne.generate_image_for_fixed_text(
+            image_path, review, motiv_path, layout_template, highlight_words = kampagne.generate_image_for_fixed_text(
                 data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
                 context=data.get("subline") or data.get("caption") or "",
             )
@@ -1888,6 +1888,7 @@ def beitrag_neu(eid):
             data["bild_pfad"] = final_path
             data["kampagne_motiv_pfad"] = str(motiv_path)
             data["kampagne_layout_template"] = layout_template
+            data["highlight_words"] = highlight_words
             data["qa_approved"] = review.approved
             data["qa_problems"] = review.problems if not review.approved else []
             out = final_path
@@ -2118,7 +2119,7 @@ def bild_aktion(eid):
                     unique_id = uuid.uuid4().hex[:12]
                     final_path = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
 
-                    image_path, review, motiv_path, layout_template = kampagne.generate_image_for_fixed_text(
+                    image_path, review, motiv_path, layout_template, highlight_words = kampagne.generate_image_for_fixed_text(
                         headline, bullets, cta, context=kontext,
                     )
 
@@ -2157,6 +2158,7 @@ def bild_aktion(eid):
                     # drauf rendern, OHNE nochmal GPT Image 2 aufzurufen.
                     data["kampagne_motiv_pfad"] = str(motiv_path)
                     data["kampagne_layout_template"] = layout_template
+                    data["highlight_words"] = highlight_words
                     out = str(final_path)  # Bugfix: wurde bisher nur im alten Pipeline-Zweig gesetzt -
                     # die DB-Aktualisierung unten (gemeinsam fuer beide Zweige) griff dadurch auf eine
                     # undefinierte Variable zu (NameError, vom aeusseren except stumm verschluckt) -

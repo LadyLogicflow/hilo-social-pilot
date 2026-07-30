@@ -186,7 +186,7 @@ def render_fuer_stelle(fields, stelle, out_path):
         render_text_on_image(
             motiv_pfad, f.get("ueberschrift", ""), f.get("bullets", []), f.get("cta", ""),
             template["headline_box"], template["supporting_box"], template["cta_box"],
-            text_path, background_overlay=True,
+            text_path, background_overlay=True, highlight_words=f.get("highlight_words"),
         )
         slogan = bildgen.pick_slogan(f.get("slogan"))
         bildgen.add_logo_circles(text_path, slogan, out_path, portrait=_portrait(stelle), pos="diagonal2")

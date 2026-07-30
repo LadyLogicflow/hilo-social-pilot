@@ -39,6 +39,7 @@ def render_text_on_image(
     cta_box: TextBox,
     output_path: Path,
     background_overlay: bool = False,
+    highlight_words: list[str] | None = None,
 ) -> Path:
     """Rendert Texte auf ein Bild.
 
@@ -52,6 +53,10 @@ def render_text_on_image(
         cta_box: Position für CTA
         output_path: Ausgabe-Pfad
         background_overlay: Falls True, halbtransparente Hintergründe hinter Text
+        highlight_words: Optionale Liste von Wörtern/Zahlen (aus headline/supporting_points),
+            die GRÜN statt in der Standardfarbe hervorgehoben werden (z.B. von GPT gewählt,
+            siehe kampagne.CampaignPlan.highlight_words). Nur in Headline/Bullets wirksam,
+            nicht im CTA (der hat bereits eine eigene, klare Signalfarbe als Button).
 
     Returns:
         Path zum finalen Bild
@@ -88,6 +93,9 @@ def render_text_on_image(
     LAVENDER = "#b8c8e8"
     WHITE = "#ffffff"
 
+    # Hervorhebungs-Woerter normalisieren (einmalig, case-insensitive Vergleich beim Rendern)
+    highlight_set = {w.strip().lower().rstrip(".,!?:;") for w in (highlight_words or []) if w.strip()}
+
     # Textfarbe automatisch je nach Bildhelligkeit hinter der jeweiligen Box waehlen
     # (kein Hintergrund-Rechteck mehr -> muss zur tatsaechlichen Motiv-Helligkeit passen,
     # nicht nur zur geplanten 'text_contrast'-Beschreibung, die nicht immer zutrifft).
@@ -99,7 +107,7 @@ def render_text_on_image(
         draw, headline,
         headline_box, W, H,
         font_headline, headline_color, headline_outline,
-        background_overlay
+        background_overlay, highlight_set
     )
 
     # 2. Supporting Points rendern
@@ -108,7 +116,7 @@ def render_text_on_image(
         draw, bullets_text,
         supporting_box, W, H,
         font_body, supporting_color, supporting_outline,
-        background_overlay
+        background_overlay, highlight_set
     )
 
     # 3. CTA rendern (auf grüner/navy Fläche)
@@ -154,6 +162,7 @@ def _render_text_block(
     text_color: str,
     outline_color: str,
     add_background: bool,
+    highlight_words: set[str] | None = None,
 ):
     """Rendert einen Textblock OHNE Farbflaeche dahinter - der Text layert harmonisch
     ueber das Motiv (sonst sieht man vom Bild nichts mehr). Lesbarkeit kommt stattdessen
@@ -162,12 +171,21 @@ def _render_text_block(
     'add_background' bleibt als Parameter erhalten (Kompatibilitaet, ungenutzt), damit
     Aufrufer nicht angepasst werden muessen - es wird nie mehr eine Flaeche gezeichnet.
 
+    'highlight_words' (normalisiert, kleingeschrieben, ohne Satzzeichen): einzelne Woerter aus
+    diesem Textblock, die GRUEN statt in 'text_color' gezeichnet werden (#Hervorhebung, von GPT
+    ausgewaehlt - siehe kampagne.CampaignPlan.highlight_words). Erfordert Wort-fuer-Wort-
+    Rendering statt einem einzigen draw.text-Aufruf pro Zeile, da eine Zeile jetzt gemischte
+    Farben enthalten kann.
+
     #Kollisionsschutz: lange Woerter (z.B. deutsche Komposita wie 'Entfernungspauschale')
     koennen in schmalen Spalten auf 2 Zeilen umbrechen und dadurch die Box-Hoehe sprengen -
     das reicht dann ggf. bis in die reservierte Logo-Kreis-Zone hinein, unabhaengig davon wie
     die Box selbst dimensioniert ist. Deshalb: passt der umgebrochene Text nicht in die Box-
     Hoehe, wird die Schrift schrittweise verkleinert (font_variant, funktioniert bei jeder TTF),
     bis er passt oder eine Mindestgroesse erreicht ist."""
+    highlight_words = highlight_words or set()
+    HIGHLIGHT_GRUEN = "#60a33c"
+
     # Pixel-Koordinaten berechnen
     x = int(box.x * img_width)
     y = int(box.y * img_height)
@@ -194,23 +212,30 @@ def _render_text_block(
     else:  # bottom
         text_y = y + h - total_text_height - 10
 
-    # Zeilen rendern
-    for line in wrapped_lines:
-        # Horizontale Position
-        if box.align == "left":
-            text_x = x + 10
-        elif box.align == "center":
-            bbox = draw.textbbox((0, 0), line, font=font)
-            line_width = bbox[2] - bbox[0]
-            text_x = x + (w - line_width) // 2
-        else:  # right
-            bbox = draw.textbbox((0, 0), line, font=font)
-            line_width = bbox[2] - bbox[0]
-            text_x = x + w - line_width - 10
+    space_width = draw.textbbox((0, 0), " ", font=font)[2]
 
-        # Zeile zeichnen (mit Outline für bessere Lesbarkeit, Farbe je nach Bildhelligkeit)
-        _draw_text_with_outline(draw, (text_x, text_y), line, font, text_color,
-                                 outline_color=outline_color)
+    # Zeilen rendern - WORT FUER WORT (statt die ganze Zeile in einem Aufruf), damit einzelne
+    # Woerter gruen hervorgehoben werden koennen.
+    for line in wrapped_lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = bbox[2] - bbox[0]
+        if box.align == "left":
+            cursor_x = x + 10
+        elif box.align == "center":
+            cursor_x = x + (w - line_width) // 2
+        else:  # right
+            cursor_x = x + w - line_width - 10
+
+        for word in line.split(" "):
+            if not word:
+                cursor_x += space_width
+                continue
+            normalisiert = word.strip().lower().rstrip(".,!?:;")
+            farbe = HIGHLIGHT_GRUEN if normalisiert in highlight_words else text_color
+            _draw_text_with_outline(draw, (cursor_x, text_y), word, font, farbe,
+                                     outline_color=outline_color)
+            wort_bbox = draw.textbbox((0, 0), word, font=font)
+            cursor_x += (wort_bbox[2] - wort_bbox[0]) + space_width
 
         text_y += line_height
 

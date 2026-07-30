@@ -83,6 +83,13 @@ class CampaignPlan(BaseModel):
     )
     cta: str = Field(max_length=35, description="Call-to-Action (max. 35 Zeichen)")
     caption: str = Field(description="Begleittext für Social Media (150-200 Wörter, mit Hook und Interaktionsfrage)")
+    highlight_words: list[str] = Field(
+        default_factory=list, max_length=3,
+        description="1-3 einzelne Wörter ODER kurze Zahlen-Ausdrücke WÖRTLICH aus headline/"
+                     "supporting_points (z.B. eine Zahl, ein Betrag, ein Schlüsselbegriff wie "
+                     "'kostenlos'), die im Bild grün statt in der Standardfarbe hervorgehoben "
+                     "werden sollen. Sparsam einsetzen (Wirkung durch Kontrast, nicht durch Menge)."
+    )
 
     visual_strategy: str = Field(description="Gewählte Bildstrategie (z.B. Editorial Photography, Still Life)")
     visual_concept: str = Field(description="Beschreibung des visuellen Konzepts")
@@ -144,6 +151,13 @@ class VisualOnlyPlan(BaseModel):
     Faelle mit vorgegebenem, fest formuliertem Text (#Fristen-Countdown: rechtlich relevante
     Betraege/Daten sollen NICHT von der KI umformuliert werden koennen)."""
     visual_concept: str = Field(description="Beschreibung des visuellen Konzepts")
+    highlight_words: list[str] = Field(
+        default_factory=list, max_length=3,
+        description="1-3 einzelne Wörter ODER kurze Zahlen-Ausdrücke WÖRTLICH aus dem "
+                     "vorgegebenen Text (z.B. das Datum, ein Betrag), die im Bild grün statt in "
+                     "der Standardfarbe hervorgehoben werden sollen. NUR aus dem gegebenen Text "
+                     "auswählen, NICHTS umformulieren. Sparsam einsetzen."
+    )
     layout_template: Literal[
         "text_left_hero_right", "text_right_hero_left", "text_top_hero_bottom",
         "hero_top_text_bottom", "centered_headline_bottom_panel", "editorial_split"
@@ -248,6 +262,14 @@ Erstelle:
 Alle Aussagen müssen fachlich vom Eingabetext gedeckt sein.
 Erfinde keine Beträge, Fristen, Voraussetzungen oder Rechtsfolgen.
 Nicht gendern.
+
+HERVORHEBUNG (highlight_words)
+
+Wähle 1-3 einzelne Wörter oder kurze Zahlen-Ausdrücke WÖRTLICH aus der Headline oder den
+Infopunkten (z.B. eine Zahl, ein Betrag, ein starkes Schlüsselwort wie "kostenlos" oder
+"sofort") - diese werden im Bild grün statt in der Standardfarbe hervorgehoben. Sparsam
+einsetzen: die Wirkung kommt vom Kontrast, nicht von der Menge. Auch leer lassen ist erlaubt,
+wenn kein Wort eine echte Hervorhebung verdient.
 
 CAPTION (BEGLEITTEXT)
 
@@ -402,8 +424,10 @@ ART_DIRECTOR_ONLY_PROMPT = """Du bist Senior Art Director für HILO, einen deuts
 Lohnsteuerhilfeverein.
 
 Der Text (Headline, Infopunkte, CTA) steht bereits FEST und darf NICHT verändert oder neu
-formuliert werden - er enthält rechtlich relevante Fristen/Beträge. Deine einzige Aufgabe:
-ein passendes VISUELLES Konzept für ein Werbebild entwickeln, das zum gegebenen Text passt.
+formuliert werden - er enthält rechtlich relevante Fristen/Beträge. Deine Aufgabe: ein
+passendes VISUELLES Konzept für ein Werbebild entwickeln, das zum gegebenen Text passt, sowie
+1-3 Wörter/Zahlen-Ausdrücke WÖRTLICH aus diesem Text für eine grüne Hervorhebung auswählen
+(z.B. das Datum oder einen Betrag) - dabei NICHTS umformulieren, nur auswählen.
 
 KREATIVKONZEPT
 
@@ -493,17 +517,18 @@ def generate_image_for_fixed_text(
     context: str = "",
     output_path: Optional[str] = None,
     test_mode: bool = False,
-) -> tuple[Path, QualityReview, Path, str]:
+) -> tuple[Path, QualityReview, Path, str, list[str]]:
     """Kompletter Bild-Workflow bei FEST VORGEGEBENEM Text (#Fristen-Countdown): Art-Director
     plant NUR das visuelle Konzept (create_visual_plan), GPT Image 2 erzeugt das Motiv, Pillow
     rendert den vorgegebenen Text drueber, QA prueft (kein Auto-Retry, #Kostenschutz - siehe
     run_campaign). Der Text selbst bleibt in JEDEM Fall unveraendert.
 
     Returns:
-        (finale_image_path, QualityReview, motiv_image_path, layout_template)
+        (finale_image_path, QualityReview, motiv_image_path, layout_template, highlight_words)
         motiv_image_path + layout_template werden fuer die Personalisierung je Beratungsstelle
         gebraucht (personalisierung.render_fuer_stelle), damit dort NICHT nochmal GPT Image 2
-        aufgerufen werden muss."""
+        aufgerufen werden muss. highlight_words ebenso, damit die gruene Hervorhebung bei der
+        kostenlosen Wiederverwendung (Personalisierung/'Text im Bild neu') erhalten bleibt."""
     vplan = create_visual_plan(headline, supporting_points, cta, context=context)
     template = LAYOUT_TEMPLATES[vplan.layout_template]
 
@@ -522,7 +547,7 @@ def generate_image_for_fixed_text(
     image_path = render_text_on_image(
         motiv_image_path, headline, supporting_points, cta,
         template["headline_box"], template["supporting_box"], template["cta_box"],
-        Path(final_path), background_overlay=True,
+        Path(final_path), background_overlay=True, highlight_words=vplan.highlight_words,
     )
 
     from types import SimpleNamespace
@@ -531,7 +556,7 @@ def generate_image_for_fixed_text(
     review = quality_check(image_path, mini_plan, context or headline)
     if not review.approved:
         log.warning("Fristen-Bild: QA-Probleme (kein Auto-Retry): %s", ", ".join(review.problems))
-    return image_path, review, motiv_image_path, vplan.layout_template
+    return image_path, review, motiv_image_path, vplan.layout_template, vplan.highlight_words
 
 
 
@@ -845,6 +870,7 @@ def run_campaign(
                 plan.cta_box,
                 Path(final_path),
                 background_overlay=True,  # Halbtransparente Hintergründe hinter Text
+                highlight_words=plan.highlight_words,
             )
             log.info("Stufe 2b: Text gerendert und gespeichert unter %s", image_path)
 

@@ -116,7 +116,7 @@ def erzeuge_countdowns(heute=None):
     if get_secret("openai_api_key"):
         try:
             import kampagne
-            image_path, review, motiv_path, layout_template = kampagne.generate_image_for_fixed_text(
+            image_path, review, motiv_path, layout_template, highlight_words = kampagne.generate_image_for_fixed_text(
                 fields["ueberschrift"], fields["bullets"], fields["cta"],
                 context=fields.get("subline", ""),
             )
@@ -126,6 +126,7 @@ def erzeuge_countdowns(heute=None):
             bild_pfad = final_path
             fields["qa_approved"] = review.approved
             fields["qa_problems"] = review.problems if not review.approved else []
+            fields["highlight_words"] = highlight_words
             fields["kampagne_motiv_pfad"] = str(motiv_path)
             fields["kampagne_layout_template"] = layout_template
         except Exception as ex:
