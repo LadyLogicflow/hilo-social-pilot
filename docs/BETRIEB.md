@@ -36,10 +36,18 @@ Geheime Zugänge kommen **nie** ins Repo, sondern in eine geschützte `secrets.j
 (chmod 600). Setzen jeweils verdeckt:
 
 ```bash
-.venv/bin/python main.py --set-secret anthropic_api_key   # Claude (Texte)
-.venv/bin/python main.py --set-secret openai_api_key      # optionale Foto-Motive
+.venv/bin/python main.py --set-secret openai_api_key      # PFLICHT: Text + Bild (3-Stufen-Workflow)
+.venv/bin/python main.py --set-secret anthropic_api_key   # optional: nur Themen-Extraktion aus PDFs/Links
 .venv/bin/python main.py --set-secret meta_user_token     # Facebook-Veröffentlichung
 ```
+
+> **Wichtig (Stand 2026-07-30):** `openai_api_key` ist jetzt der zentrale Schlüssel - alle
+> vier Content-Ströme (Aktuelles/Fristen/Anlass/Wissen) erzeugen Text UND Bild über den
+> 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2), siehe
+> [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Ohne `openai_api_key` werden **keine neuen
+> Beiträge** erzeugt (Log: "uebersprungen: kein 'openai_api_key' hinterlegt"). `anthropic_api_key`
+> wird nur noch für die Themen-Extraktion aus hochgeladenen PDFs/Links gebraucht
+> (`textgen.extract_topics`) - ohne ihn funktioniert alles andere normal weiter.
 
 Optional für ein Langzeit-Token (60 Tage): `meta_app_id` und `meta_app_secret` setzen –
 HISOME tauscht das Token dann automatisch (`publish.ensure_long_lived`).
