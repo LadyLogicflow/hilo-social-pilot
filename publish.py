@@ -63,13 +63,19 @@ def ensure_long_lived():
 # ---------------------------------------------------------------------------
 def list_pages():
     """Liefert die Facebook-Seiten des Nutzers samt verknuepftem IG-Konto.
-    Rueckgabe: Liste von Dicts {id, name, ig_id, ig_username}. OHNE Tokens."""
+    Rueckgabe: Liste von Dicts {id, name, ig_id, ig_username}. OHNE Tokens.
+
+    Wirft RuntimeError mit der ECHTEN Facebook-Fehlermeldung (nicht nur Status-Code + URL) bei
+    Fehlern - r.raise_for_status() allein zeigt nur 'HTTP 400: Bad Request fuer <URL>', ohne den
+    eigentlichen Grund (z.B. 'Invalid OAuth access token', 'Application does not have permission
+    for this action', etc.), den Facebook im JSON-Body mitschickt (#Diagnose-Fix)."""
     r = requests.get(GRAPH + "/me/accounts", timeout=30, params={
         "fields": "id,name,instagram_business_account{id,username}",
         "limit": 100,
         "access_token": _user_token(),
     })
-    r.raise_for_status()
+    if r.status_code != 200:
+        raise RuntimeError(_err(r))
     out = []
     for p in r.json().get("data", []):
         ig = p.get("instagram_business_account") or {}
