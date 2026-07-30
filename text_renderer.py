@@ -211,29 +211,37 @@ def _render_cta_button(
     text_color: str,
     bg_color: str,
 ):
-    """Rendert CTA als Button mit farbigem Hintergrund - echte Pillenform (Radius = halbe
-    Button-Hoehe), nicht nur leicht abgerundete Ecken."""
-    x = int(box.x * img_width)
-    y = int(box.y * img_height)
-    w = int(box.width * img_width)
-    h = int(box.height * img_height)
-
-    # Button-Pille: Radius = halbe Hoehe -> Ecken sind Halbkreise (echtes "Pillen"-Design,
-    # HILO-CI), nicht nur ein Rechteck mit abgerundeten Ecken.
-    draw.rounded_rectangle(
-        [x, y, x + w, y + h],
-        radius=h // 2,
-        fill=bg_color
-    )
-
-    # Text zentriert
+    """Rendert CTA als Pillen-Button - IMMER unten mittig, Breite passt sich automatisch an den
+    Text an (#Layout-Fix). 'box' (aus dem Layout-Template) wird bewusst NICHT fuer Position/
+    Breite verwendet: die Templates hatten unterschiedliche, teils schmale/versetzte CTA-Boxen
+    (mal links, mal mittig im Bild) - bei laengeren, insbesondere PERSONALISIERTEN CTA-Texten
+    (z.B. mit Ortsname) lief der Text seitlich aus der festen Box heraus und wurde abgeschnitten
+    bzw. ueberlappte andere Elemente wie den Logo-Kreis. Jetzt: Button-Breite = tatsaechliche
+    Textbreite + Innenabstand, horizontal zentriert, fester Abstand vom unteren Bildrand. Darf
+    dafuer bewusst einen Teil des Motivs ueberdecken (unwichtiger als abgeschnittener Text)."""
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    text_x = x + (w - text_width) // 2
-    text_y = y + (h - text_height) // 2
+    pad_x = max(24, int(text_height * 1.1))
+    pad_y = max(16, int(text_height * 0.6))
+    btn_w = text_width + 2 * pad_x
+    btn_h = text_height + 2 * pad_y
 
+    # Sehr lange Texte (z.B. lange Ortsnamen bei der Personalisierung): Breite auf einen
+    # sinnvollen Maximalwert deckeln, statt fast bildbreit zu werden.
+    max_w = int(img_width * 0.92)
+    if btn_w > max_w:
+        btn_w = max_w
+
+    x = (img_width - btn_w) // 2
+    bottom_margin = int(img_height * 0.06)
+    y = img_height - bottom_margin - btn_h
+
+    draw.rounded_rectangle([x, y, x + btn_w, y + btn_h], radius=btn_h // 2, fill=bg_color)
+
+    text_x = x + (btn_w - text_width) // 2
+    text_y = y + (btn_h - text_height) // 2
     draw.text((text_x, text_y), text, font=font, fill=text_color)
 
 
@@ -283,29 +291,17 @@ def _draw_text_with_outline(
     outline_color: str = "#000000",
     outline_width: int = 3,
 ):
-    """Zeichnet Text mit DOPPELTER Outline (weisser Halo aussen + schwarze Outline innen) fuer
-    Lesbarkeit OHNE Hintergrundflaeche (Text layert direkt ueber das Motiv).
-
-    Warum doppelt statt nur EINER Farbe (#QA-Fix): die pro-Box gemessene Durchschnitts-
-    helligkeit (siehe _text_colors_for_region) waehlt zwar Fuellfarbe+Outline fuer den
-    Durchschnitt der Box passend - versagt aber, wenn der Hintergrund INNERHALB derselben
-    Textbox gemischt hell/dunkel ist (z.B. helle Wand + dunkles Objekt nebeneinander): eine
-    einzelne Outline-Farbe kontrastiert dann nur gegen die HAELFTE des Hintergrunds. Der
-    weisse Aussen-Halo + schwarze Innen-Outline garantieren dagegen IMMER einen kontrastreichen
-    Rand, egal ob das Motiv an dieser Stelle hell oder dunkel ist - unabhaengig von der
-    gemessenen Durchschnittshelligkeit."""
+    """Zeichnet Text mit Outline fuer Lesbarkeit OHNE Hintergrundflaeche (Text layert direkt
+    ueber das Motiv). Outline-Farbe ist die zu 'fill_color' PASSENDE Gegenfarbe (weiss bei
+    dunklem/Navy-Text, schwarz bei hellem/weissem Text - siehe _text_colors_for_region), NICHT
+    IMMER schwarz+weiss zugleich: ein erzwungener schwarzer Ring um dunklen (Navy-)Text
+    verschmolz mit der Fuellfarbe selbst und machte die Buchstaben klumpig/schwer lesbar statt
+    besser - genau umgekehrtes Ergebnis. Ein einzelner, zur Fuellfarbe komplementaerer Ring
+    reicht: er kontrastiert sowohl zum Text (immer) als auch zum ueblichen Hintergrund an dieser
+    Stelle (die Farbwahl basiert ja auf der gemessenen Helligkeit genau dort)."""
     x, y = pos
-    halo_width = outline_width + 2
-    # 1. Weisser Halo (aussen, breiter) - kontrastiert gegen dunkle Motivbereiche.
-    for dx in range(-halo_width, halo_width + 1):
-        for dy in range(-halo_width, halo_width + 1):
-            if dx != 0 or dy != 0:
-                draw.text((x + dx, y + dy), text, font=font, fill="#ffffff")
-    # 2. Schwarze Outline (innen, schmaler) - kontrastiert gegen helle Motivbereiche; ueberdeckt
-    # den weissen Halo in der Mitte, laesst aussen einen weissen Rand stehen.
     for dx in range(-outline_width, outline_width + 1):
         for dy in range(-outline_width, outline_width + 1):
             if dx != 0 or dy != 0:
-                draw.text((x + dx, y + dy), text, font=font, fill="#000000")
-    # 3. Vordergrund (die per Helligkeitsmessung gewaehlte Fuellfarbe)
+                draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
     draw.text((x, y), text, font=font, fill=fill_color)
