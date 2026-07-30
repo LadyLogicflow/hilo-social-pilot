@@ -1219,7 +1219,11 @@ def erzeuge_comic_bild_ref(prompt, refs, modell=None):
     if modell is None:
         modell = openai_image_model()
     fidelity = _input_fidelity()
-    versuche = _comic_edits_versuche(modell, fidelity == "high")
+    # gpt-image-2 kennt 'input_fidelity' nicht (API lehnt jeden Call sofort mit 400 ab -
+    # Referenzbilder werden dort immer mit voller Fidelity verarbeitet, kein Parameter noetig).
+    # Nur bei gpt-image-1 (wo der Parameter existiert) tatsaechlich mitschicken.
+    sende_fidelity = fidelity == "high" and modell == "gpt-image-1"
+    versuche = _comic_edits_versuche(modell, sende_fidelity)
     letzter = len(versuche) - 1
     for i, (versuch_modell, mit_fidelity) in enumerate(versuche):
         handles = []
