@@ -2027,7 +2027,7 @@ def bild_aktion(eid):
                 # frisch aus dem echten, aktuellen Text - unabhaengig davon, was im alten
                 # 'bild_motiv'-Feld steht.
                 import kampagne
-
+                import uuid
                 headline = data.get("ueberschrift", "")
                 bullets = data.get("bullets", [])
                 cta = data.get("cta", "")
