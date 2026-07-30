@@ -1,5 +1,19 @@
 # 3-Stufen-Workflow: Automatisierte Kampagnen-Generierung
 
+> **Stand-Hinweis (2026-07-30):** Dieses Dokument beschreibt den ursprünglichen Entwurf des
+> Workflows. Seitdem geändert, siehe [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) für den
+> aktuellen Stand:
+> - Kein Auto-Retry mehr bei QA-Ablehnung (#Kostenschutz) - Bild geht zur manuellen Prüfung
+> - QA läuft auf `gpt-5-nano` statt `gpt-5.6-terra` (~50x günstiger), Bild vor dem QA-Call verkleinert
+> - Bild-Qualität `medium` statt `high` (~75% günstiger, kaum sichtbarer Unterschied)
+> - Text liegt ohne Hintergrundfläche direkt über dem Motiv (adaptive Textfarbe je nach Bildhelligkeit)
+> - Ist jetzt die **aktive Bild-Pipeline für alle vier Content-Ströme** (Aktuelles/Fristen/
+>   Anlass/Wissen), nicht mehr nur ein Einzel-Feature - siehe `textgen.generate_with_campaign`
+>   und `kampagne.generate_image_for_fixed_text` (Fristen: Text bleibt fest, nur das Bild kommt
+>   von der KI)
+> - Personalisierung je Beratungsstelle nutzt das rohe Motiv wieder statt neu zu generieren
+>   (`personalisierung.render_fuer_stelle`)
+
 Vollautomatischer Workflow für die Erstellung von Social-Media-Werbeanzeigen mit integrierter Qualitätskontrolle.
 
 ---

@@ -28,13 +28,15 @@ Wissens-Serie ───┘
 | `relevance.py` | Schlagwort-Klassifizierung (relevant / verworfen / neutral) |
 | `sources.py` | Aktive Quellen aus der Konfiguration |
 | `ingest.py` | Eigene Quellen: PDF/Link → Text → **Mehr-Themen-Extraktion** |
-| `textgen.py` | Texterstellung via Claude (`generate`, `regenerate`, `extract_topics`) |
-| `bildgen.py` | Bild-Layout: 3 Stile (Standard / KI-Tafel / Kreativ), Textkarte bzw. Tafel-/Träger-Device + CI-Kreise |
-| `bildmotiv.py` | Foto-Erzeugung via OpenAI (gpt-image-2) **oder** Ideogram; Szene-/Tafel-/Kreativ-Prompts + Cache, `icon:`-Motive |
-| `stilwahl.py` | Bild-Stil zufällig pro Beitrag aus den aktiven Stilen (`aktiver_stil`, „Anderes Bild") |
-| `schauplatz.py` | Schauplätze: saisonale/themen-passende Umgebung je Beitrag (Rotation, nie doppelt) |
-| `traeger.py` | Botschafts-Träger (Tafel/Rahmen/Holzschild …): Hybrid-Auswahl (Zufall + nie doppelt + Themen) |
-| `wartung.py` | Cache-Aufräumung: löscht nur ungenutzte KI-Fotos (orphan-basiert, Pool/aktiv geschützt) |
+| `textgen.py` | Text/Bild-Orchestrierung: `generate_with_campaign` (aktiver Pfad, ruft `kampagne.run_campaign`) sowie `generate`/`extract_topics` (Claude, nur noch für Themen-Extraktion aus PDFs/Links genutzt) |
+| `kampagne.py` | **Aktive Bild-Pipeline**: 3-Stufen-Workflow (GPT-5.6 Terra Planung → GPT Image 2 Motiv → GPT-5.6 Terra/nano QA), `run_campaign` (textet + gestaltet selbst) und `generate_image_for_fixed_text`/`create_visual_plan` (Art-Director-only, Text bleibt fest vorgegeben - genutzt vom Fristen-Countdown) |
+| `text_renderer.py` | Pillow-Text-Rendering: zeichnet Headline/Bullets/CTA deterministisch aufs KI-Motiv (kein Hintergrund-Rechteck - Textfarbe wird automatisch aus der gemessenen Bildhelligkeit gewählt) |
+| `bildgen.py` | **Nur noch Fallback + CI-Kreise**: `add_logo_circles` (Logo/Portrait-Kreis, wird von allen Streams genutzt) läuft weiter aktiv; `render_drafts`/die 3 alten Stile (Standard/KI-Tafel/Kreativ) sind nur Absicherung für Altfälle, im Normalbetrieb ungenutzt |
+| `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) - bleibt im Repo für spätere Wiederverwendung, wird aktuell von keinem der vier Content-Ströme mehr automatisch aufgerufen |
+| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline - nur noch relevant für Altfälle ohne `kampagne_motiv_pfad` |
+| `schauplatz.py` | Schauplätze der alten Pipeline (nur noch für Altfälle) |
+| `traeger.py` | Botschafts-Träger der alten Pipeline (nur noch für Altfälle) |
+| `wartung.py` | Cache-Aufräumung für **beide** Bild-Pipelines: `aufraeumen_motive` (alt, `DATA_DIR/motive/`) und `aufraeumen_kampagne` (3-Stufen-Workflow, `DATA_DIR/kampagne/` - schützt insbesondere das rohe Motiv für die Personalisierung je Stelle) |
 | `countdown_motive.py` | Gezeichnete Icons (Kalender, Wecker, Sanduhr) |
 | `fristen.py` | Fristen-Countdown (gestaffelte Erinnerungen) |
 | `anlass.py` | Anlass-Tage (besondere Tage mit Steuer-Aufhänger) |
@@ -46,17 +48,25 @@ Wissens-Serie ───┘
 
 ## Die vier Content-Streams
 
-Alle Streams münden in dieselbe Freigabe und denselben Kalender:
+Alle Streams münden in dieselbe Freigabe und denselben Kalender. Text UND Bild kommen bei
+allen vier Strömen aus dem **3-Stufen-Workflow** (`kampagne.py`, GPT-5.6 Terra + GPT Image 2) -
+**außer** beim Fristen-Countdown, wo der Text bewusst hart vorformuliert bleibt (rechtlich
+relevante Fristen/Beträge) und nur das Bild von der KI kommt (Art-Director-only, siehe unten):
 
 1. **Aktuelles (News)** – `radar.py` wertet täglich die Quellen aus. Relevante externe
    News (Haufe, BFH) gehen in **Stufe 1** (Themenauswahl). HILO-eigene Steuertipps und
-   BVL überspringen Stufe 1 und gehen direkt in die Texterstellung.
+   BVL überspringen Stufe 1 und gehen direkt in die Texterstellung
+   (`textgen.generate_with_campaign`).
 2. **Fristen-Countdown** – `fristen.py` erzeugt gestaffelte Erinnerungen vor den
    Abgabefristen (ab 3 Monaten 1×/Woche, letzte 4 Wochen 2×/Woche, letzte Woche täglich).
+   Text fest vorformuliert (kein KI-Token für den Text), Bild via
+   `kampagne.generate_image_for_fixed_text` (nur Motiv/Layout von der KI).
 3. **Anlass-Tage** – `anlass.py` erzeugt zu besonderen Tagen (Tabelle `anlasstage`) einen
-   Beitrag mit Steuer-Bezug; Wochenend-Tage erscheinen am Freitag davor.
+   Beitrag mit Steuer-Bezug (`generate_with_campaign`); Wochenend-Tage erscheinen am
+   Freitag davor.
 4. **Wissens-Serie** – `wissen.py` füllt leere Kalendertage mit zeitlosen Themen
-   (Tabelle `wissensthemen`), sobald der Vorrat offener Beiträge unter eine Schwelle fällt.
+   (Tabelle `wissensthemen`, `generate_with_campaign`), sobald der Vorrat offener Beiträge
+   unter eine Schwelle fällt.
 
 ## Datenbank (Tabellen)
 
@@ -110,35 +120,47 @@ Die `entwuerfe.text`-JSON trägt pro Beitrag u.a. `bild_stil`, `schauplatz`, `tr
     WhatsApp-Dienstes (`whatsapp/server.mjs`, eine globale Baileys-Session) mit personalisiertem
     Text und – für Status – personalisiertem 9:16-Bild. Dienst-Fehler → `status='fehler'`, kein
     Status-Flip. Der FB/IG-Pfad (`_veroeffentliche_ziel`) bleibt unberührt.
-- **Cache-Aufräumung** (`web.py._cache_cleanup_scheduler` → `wartung.aufraeumen_motive`): Thread,
-  einmal täglich (Marker `last_cache_cleanup.txt`), löscht aus `DATA_DIR/motive/` nur KI-Fotos,
-  die **kein aktiver Beitrag** mehr braucht (orphan-basiert, 14-Tage-Schonfrist; Pool-/aktive Fotos
-  und `icon_*` werden NIE gelöscht). Verwaltung zeigt Cache-Größe + freien Speicher + Knopf.
+- **Cache-Aufräumung** (`web.py._cache_cleanup_scheduler`): Thread, einmal täglich (Marker
+  `last_cache_cleanup.txt`), räumt BEIDE Bild-Pipelines auf - `wartung.aufraeumen_motive`
+  (`DATA_DIR/motive/`, alte Pipeline) UND `wartung.aufraeumen_kampagne` (`DATA_DIR/kampagne/`,
+  3-Stufen-Workflow: rohe Motive + Text-Zwischenbilder). Beide orphan-basiert, 14-Tage-Schonfrist;
+  was ein aktiver Beitrag noch braucht (inkl. `kampagne_motiv_pfad` für die Personalisierung je
+  Stelle) wird NIE gelöscht. Verwaltung zeigt Cache-Größe beider Ordner + freien Speicher + Knopf.
 
 ## Bild-Design
 
-Das Beitragsbild (1080×1080, `bildgen.py`) entsteht in **drei Stilen**, die **zufällig je Beitrag**
-gemischt werden (`stilwahl.aktiver_stil`; in der Verwaltung je Stil an/aus, „Anderes Bild" in der
-Freigabe würfelt neu):
+Das Beitragsbild (1080×1080) entsteht im **3-Stufen-Workflow** (`kampagne.py`):
 
-1. **Standard** – Foto-Vollbild-Hintergrund (cover-Crop; Creme-Fallback `_creme_bg` ohne Foto) +
-   integriertes weißes Textfeld (`_card`, Scrim, Rand an allen vier Seiten, wächst mit dem Text –
-   kein Überlauf, #131) mit Saison-Pille, Überschrift, **optionaler Hero-Zahl** oder größerer
-   Überschrift + Hook, Symbol-Bullets und **grüner CTA-Pille** (HILO-CI, #135).
-2. **KI-Tafel** – die Bild-KI schreibt **Überschrift + Stichpunkte** selbst auf einen **Träger**
-   (Tafel/Rahmen/Holzschild/… aus `traeger`), der in einer schönen **Umgebung** (`schauplaetze`,
-   saisonal/themen-passend) steht; CTA + CI-Kreise kommen weiter per Code-Overlay (#132/#139/#140/#142).
-3. **Kreativ** – ein **kinoreifes, fotorealistisches Foto OHNE Text** (Art-Director-Schritt:
-   `textgen.art_director_motiv` lässt Claude die Szene aus dem Beitrag entwerfen), Botschaft + CI
-   kommen wie im Standard-Stil per Code-Overlay (#143).
+1. **Planung** (GPT-5.6 Terra) – entwickelt aus dem Steuertext Headline, Infopunkte, CTA,
+   Begleittext, ein visuelles Konzept, ein Layout (6 Vorlagen: Text links/rechts/oben/unten
+   vom Motiv, zentrale Headline, editorial split) und einen englischen Motiv-Prompt (NUR
+   Bildbeschreibung, kein Text). Beim Fristen-Countdown steht der Text bereits fest (rechtlich
+   relevante Fristen/Beträge) - hier plant GPT-5.6 Terra NUR das visuelle Konzept
+   (`create_visual_plan`/`generate_image_for_fixed_text`), der Text bleibt unverändert.
+2. **Motiv** (GPT Image 2, Qualität `medium` - kaum Unterschied zu `high`, ~75% günstiger) –
+   erzeugt ein Foto/Illustration OHNE Text, mit bewusst freigehaltener, kontrastreicher Fläche
+   für den späteren Text.
+3. **QA** (`gpt-5-nano`, günstigstes Vision-Modell) – prüft Lesbarkeit/Kontrast, Themenbezug,
+   Layout. Kein Auto-Retry bei Ablehnung (#Kostenschutz): das Bild geht bei Problemen zur
+   manuellen Prüfung statt automatisch (kostenpflichtig) neu erzeugt zu werden.
 
-- **CI-Kreise** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, Position rotiert je
-  Beitrag (`pick_circle_pos`); ein Stellen-Porträt (`portrait`) ersetzt optional einen Kreis.
-- **Foto-Erzeugung** (`bildmotiv.py`): je nach `bild_tool` via **OpenAI** (`gpt-image-2`,
-  env `HILO_OPENAI_IMAGE_MODEL`) **oder Ideogram** (`ideogram_api_key`, bessere Text-im-Bild-Genauigkeit);
-  `background=opaque`, 1024×1024, je Stil/Tool getrennt gecacht. Stil-Prompts: authentische/
-  dokumentarische Optik, natürliche Farben, themenpassende Stimmung (#135/#136/#138).
-- **Faktentreue:** Auf KI-Tafeln kann die Bild-KI sich verschreiben → Tafel-Texte vor dem Posten
-  in der Freigabe gegenlesen.
+Der Text (Headline, Bullets, CTA) wird per **Pillow** (`text_renderer.py`) direkt aufs Motiv
+gerendert - OHNE Hintergrundfläche, layert also harmonisch über das Bild. Die Textfarbe
+(Navy oder Weiß) wird automatisch aus der gemessenen Helligkeit des Bildbereichs hinter der
+jeweiligen Textbox gewählt, nicht fest vorgegeben. CTA bleibt bewusst ein solider grüner Button.
+
+- **CI-Kreise** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, per Code-Overlay
+  (`bildgen.add_logo_circles`) nach dem Pillow-Text-Rendering aufgesetzt - läuft unabhängig vom
+  Bild-Workflow und wird von allen vier Content-Strömen genutzt. Ein Stellen-Porträt (`portrait`)
+  ersetzt optional einen Kreis.
+- **Personalisierung je Beratungsstelle** (`personalisierung.render_fuer_stelle`): das rohe
+  KI-Motiv (`kampagne_motiv_pfad`, vor dem Text-Overlay) wird wiederverwendet - nur der
+  personalisierte CTA-Text (nennt den Ort) wird per Pillow neu draufgerendert + der
+  Stellen-Portrait-Kreis gesetzt. KEIN neuer GPT-Image-Call nötig.
+- **Alte Pipeline** (`bildgen.py`/`bildmotiv.py`/`stilwahl.py`, drei Stile Standard/KI-Tafel/
+  Kreativ + Comic-Varianten): bleibt im Repo, wird aber von keinem der vier Content-Ströme mehr
+  automatisch aufgerufen - nur noch Fallback für Alt-Entwürfe ohne `kampagne_motiv_pfad`. Die
+  Comic-Stile (inkl. personalisiertem Berater-Comic je Stelle) sind für einen späteren,
+  gezielten Einsatz vorgesehen, aktuell aber nicht aktiv.
 
 Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.

@@ -39,15 +39,19 @@ automatisch in einzelne Themen.
 
 ## 3. Beitragserstellung
 
-- **Text:** Claude erzeugt strukturierte Beiträge (Überschrift, Stichpunkte, Call-to-Action,
-  Begleittext) im HILO-Stil, faktentreu (keine erfundenen Zahlen/Fristen/Adressen).
-- **Bild:** 1080×1080, **drei Stile zufällig pro Beitrag gemischt** (in der Verwaltung je an/aus):
-  **Standard** (Foto + Textfeld), **KI-Tafel** (Botschaft auf einer Tafel/einem Rahmen – aus einer
-  pflegbaren **Träger**-Liste – in einer schönen, saisonalen **Umgebung** aus der **Schauplätze**-Liste)
-  und **Kreativ** (kinoreifes Foto ohne Text). Die blau-weißen **CI-Kreise** und der CTA kommen stets
-  vom Code (CI garantiert). Das Foto erzeugt wahlweise **OpenAI (GPT Image 2)** oder **Ideogram**.
-  Über den 🎲-Knopf in der Freigabe lässt sich je Beitrag ein anderes Bild würfeln. Ein **Cache**
-  speichert Fotos (gleiches Motiv = kein neues KI-Bild) und räumt ungenutzte automatisch auf.
+- **Text:** GPT-5.6 Terra erzeugt strukturierte Beiträge (Überschrift, Stichpunkte, Call-to-
+  Action, Begleittext) im HILO-Stil, faktentreu (keine erfundenen Zahlen/Fristen/Adressen).
+  Ausnahme Fristen-Countdown: Text bleibt bewusst fest vorformuliert (rechtlich relevante
+  Fristen/Beträge), nur das Bild kommt von der KI.
+- **Bild:** 1080×1080, **3-Stufen-Workflow** (Planung → GPT Image 2 Motiv → QA, siehe
+  [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design)): der Text (Headline/Bullets/CTA) liegt ohne
+  Hintergrundfläche direkt über dem KI-Motiv, Textfarbe automatisch je nach Bildhelligkeit
+  gewählt. Die blau-weißen **CI-Kreise** kommen stets vom Code (CI garantiert). Über den
+  🎲-Knopf in der Freigabe lässt sich je Beitrag ein neues Bild erzeugen (kein Auto-Retry -
+  kostet bei jedem Klick). Ein **Cache** speichert Motive (u.a. für die Personalisierung je
+  Beratungsstelle wiederverwendet, kein neuer KI-Call nötig) und räumt ungenutzte automatisch
+  auf. *(Die alten drei Stile Standard/KI-Tafel/Kreativ + Ideogram-Option existieren als
+  Fallback für Alt-Entwürfe weiter, sind für neue Beiträge aber nicht mehr aktiv.)*
 - **Überarbeiten:** auf Knopfdruck mit Änderungswunsch („Bild freundlicher") neu erzeugen.
 
 ## 4. Freigabe-Workflow (Dashboard)

@@ -81,10 +81,14 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Anlass-Tage** – besondere Tage mit Steuer-Aufhänger (Datum als MM-TT). Fällt der Tag
   aufs Wochenende, erscheint der Beitrag am Freitag davor.
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
-- **Bild-Stil** – legt fest, welche der **drei Stile** im Zufalls-Topf sind (je an/aus):
-  **Standard** (Foto + Textfeld), **KI-Tafel** (Botschaft auf einer Tafel/einem Rahmen in einer
-  Umgebung) und **Kreativ** (kinoreifes Foto ohne Text). Das Tool **mischt automatisch pro Beitrag** –
-  du musst nicht umschalten. (Mindestens ein Stil muss aktiv bleiben.)
+- **Bild-Stil** – *(Stand-Hinweis: Diese Einstellung stammt aus der alten Bild-Pipeline und
+  wirkt sich auf neue Beiträge aktuell NICHT mehr aus - alle vier Content-Ströme nutzen jetzt
+  den 3-Stufen-Workflow, siehe [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Bleibt als
+  Fallback für Alt-Entwürfe erhalten.)* Legt fest, welche der **drei Stile** im Zufalls-Topf
+  sind (je an/aus): **Standard** (Foto + Textfeld), **KI-Tafel** (Botschaft auf einer Tafel/
+  einem Rahmen in einer Umgebung) und **Kreativ** (kinoreifes Foto ohne Text). Das Tool
+  **mischt automatisch pro Beitrag** – du musst nicht umschalten. (Mindestens ein Stil muss
+  aktiv bleiben.)
 - **Schauplätze** – die schönen Umgebungen (z.B. „Terrasse am Meer", „Biergarten in München"),
   in denen Tafel/Rahmen stehen. Pflegbar wie die Anlass-Tage; je Eintrag eine Jahreszeit.
 - **Träger** – wie die Botschaft präsentiert wird (Tafel, Bilderrahmen, Holzschild, Postkarte …).
@@ -94,9 +98,9 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Speicher** – Größe des Foto-Cache + freier Platz auf dem Pi, mit Knopf „Jetzt aufräumen"
   (löscht nur Fotos, die kein aktiver Beitrag mehr braucht).
 
-> **In der Freigabe (Stufe 3)** hat jeder Beitrag den 🎲-Knopf **„Anderes Bild"** – damit
-> würfelst du für genau diesen Beitrag einen anderen Stil und erzeugst das Bild neu. **Wichtig:**
-> Bei KI-Tafeln den Text vor dem Posten kurz gegenlesen (die Bild-KI kann sich verschreiben).
+> **In der Freigabe (Stufe 3)** hat jeder Beitrag den 🎲-Knopf **„Anderes Bild"** – erzeugt für
+> genau diesen Beitrag ein neues Bild über den 3-Stufen-Workflow (inkl. QA-Check, ohne
+> Auto-Retry - bei Problemen bitte manuell prüfen statt erneut zu würfeln, das kostet jedes Mal).
 
 ## Automatik
 
