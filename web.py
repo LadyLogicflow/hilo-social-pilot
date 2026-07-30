@@ -874,8 +874,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
         <option value="einzelbild" selected>Einzelbild</option>
         <option value="karussell">Karussell</option></select></span>
       <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
-        <option value="einzelbild">Einzelbild</option>
-        <option value="karussell" selected>Karussell</option></select></span>
+        <option value="einzelbild" selected>Einzelbild</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
@@ -894,8 +893,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
         <option value="einzelbild" selected>Einzelbild</option>
         <option value="karussell">Karussell</option></select></span>
       <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
-        <option value="einzelbild">Einzelbild</option>
-        <option value="karussell" selected>Karussell</option></select></span>
+        <option value="einzelbild" selected>Einzelbild</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_fb value="1"> Bei Facebook zusätzlich als Story posten</label>
       <button>Vorschau ansehen</button>
