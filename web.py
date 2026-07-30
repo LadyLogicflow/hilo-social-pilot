@@ -742,20 +742,27 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% endif %}
-    <form method=post action="/aktion/{{e.id}}">
+    <form method=post action="/aktion/{{e.id}}" id="feedback-form-{{e.id}}">
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
-      <button class=ok name=aktion value=freigeben>Freigeben</button>
-      <button class=re name=aktion value=ueberarbeiten>Überarbeiten</button>
-      <button class=no name=aktion value=verwerfen>Verwerfen</button>
-      <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
     </form>
-    <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
-      <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
-    <form method=post action="/bild-aktion/{{e.id}}" style="margin-top:12px;display:inline-block">
+    <form method=post action="/bild-aktion/{{e.id}}" style="display:inline-block;margin-right:6px">
       <input type=hidden name=zurueck value=entwuerfe>
       <input type=hidden name=bild_aktion value=foto_neu>
       <button style="background:#0B2545" title="Neues Bild erzeugen (Art Director + GPT Image 2 + QA)">&#x1F3B2; Neues Bild erzeugen</button></form>
+    <form method=post action="/bild-neu/{{e.id}}" style="display:inline-block;margin-right:6px" onsubmit="return confirm('Nur den Text im Bild neu rendern? Text und Termin bleiben unveraendert, kein neues Foto, kostenlos.')">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <button style="background:#6b7280" title="Nur den Text-Layer im Bild neu zeichnen (kostenlos), Foto bleibt gleich">&#x21BB; Text im Bild neu</button></form>
+    <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
+    <div style="margin-top:12px">
+      <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
+        <button class=ok name=aktion value=freigeben>Freigeben</button>
+        <button class=no name=aktion value=verwerfen>Verwerfen</button>
+        <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
+      </form>
+      <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
+        <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
+    </div>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
       <div style="margin-top:8px">
