@@ -204,7 +204,10 @@ def _render_text_block(
 
     extra_bullet_abstand_faktor = 0.4  # zusaetzlicher Abstand zwischen Bullet-Punkten
 
-    # Text umbrechen; passt er nicht in die Box-Hoehe, Schrift schrittweise verkleinern.
+    # Text umbrechen; passt er nicht in die Box-Hoehe ODER ist eine Zeile breiter als die Box
+    # (z.B. ein einzelnes langes Kompositum wie 'Behindertenpauschale', das nicht umgebrochen
+    # werden kann - lief bisher seitlich aus der Box heraus, z.B. in die Kreis-Zone hinein, ohne
+    # dass die bisherige NUR-Hoehen-Pruefung das erkannt haette), Schrift schrittweise verkleinern.
     mindestgroesse = max(18, int(font.size * 0.55))
     for _ in range(8):
         zeilen = _wrap_paragraphs(text, font, w - _einzug(font))
@@ -212,7 +215,11 @@ def _render_text_block(
         neue_absaetze = sum(1 for _, fortsetzung in zeilen if not fortsetzung)
         extra_abstand = int(line_height * extra_bullet_abstand_faktor)
         total_text_height = len(zeilen) * line_height + max(0, neue_absaetze - 1) * extra_abstand
-        if total_text_height <= h or font.size <= mindestgroesse:
+        max_zeilen_breite = max(
+            (draw.textbbox((0, 0), z, font=font)[2] for z, _ in zeilen), default=0
+        )
+        passt_breite = max_zeilen_breite <= w
+        if (total_text_height <= h and passt_breite) or font.size <= mindestgroesse:
             break
         neue_groesse = max(mindestgroesse, font.size - 4)
         if neue_groesse == font.size:
