@@ -499,41 +499,20 @@ def generate_advertisement(
 
 QA_PROMPT = """Du bist Qualitätskontrolleur für HILO Social-Media-Werbeanzeigen.
 
-WICHTIG: Die Texte (Headline, Bullets, CTA) wurden bereits mit Pillow eingefügt
-und sind garantiert vorhanden und korrekt geschrieben!
+WICHTIG: Der Text (Headline, Bullets, CTA) wurde bereits mit Pillow eingefügt und ist
+garantiert korrekt geschrieben - prüfe NICHT die Rechtschreibung. Der Text liegt OHNE
+Hintergrundfläche direkt über dem Motiv (bewusstes Design), daher ist Kontrast/Lesbarkeit
+der wichtigste Check - hier hängt alles vom Motiv darunter ab.
 
-Prüfe das generierte Bild auf:
+1. LESBARKEIT (wichtigstes Kriterium): Auf Smartphone (6 Zoll) scharf lesbar?
+   - Ausreichender Kontrast zum darunterliegenden Motiv an JEDER Textstelle?
+   - Keine visuell unruhigen/hellen Motivbereiche direkt hinter dem Text?
+   - approved=False bei JEDER Stelle mit schwachem Kontrast.
 
-1. LESBARKEIT: Sind alle Texte auf einem Smartphone (6 Zoll) SCHARF und KLAR LESBAR?
-   - Ausreichende Schriftgröße?
-   - Guter Kontrast zum Hintergrund?
-   - Keine Überlappung mit Motivelementen?
-   - Bei schlechtem Kontrast oder Überlappung: approved = False!
+2. ÜBRIGE PUNKTE (kompakt prüfen): Motiv passt zum Thema, Layout wirkt professionell,
+   Motiv-Qualität hochwertig. approved=False bei jedem klaren Mangel.
 
-2. FACHLICHE ÜBEREINSTIMMUNG: Entspricht die Aussage dem Originaltext?
-   - Passt das Motiv zum Thema?
-   - Keine irreführenden visuellen Elemente?
-
-3. LAYOUT & KOMPOSITION: Wirkt das Layout professionell und hochwertig?
-   - Harmonieren Text und Motiv?
-   - Sind die Proportionen ausgewogen?
-   - Ist die Bildsprache passend für HILO?
-
-4. MOTIV-QUALITÄT: Ist das Motiv hochwertig und ansprechend?
-   - Keine störenden Elemente im Textbereich?
-   - Professionelle Bildqualität?
-   - Ansprechende visuelle Umsetzung?
-
-Bei JEDEM Problem: approved = False!
-
-Beispiele für Problems:
-- "Text hat schlechten Kontrast zum Hintergrund (schwer lesbar)"
-- "Headline überlappt mit Motivelementen"
-- "Das Motiv passt nicht zum Thema Steuern/Beratung"
-- "Bildqualität wirkt unprofessionell oder verschwommen"
-- "Layout wirkt unausgewogen (zu viel leer, zu voll, schlechte Komposition)"
-
-Gib ausschließlich die verlangte strukturierte Ausgabe zurück."""
+Gib ausschließlich die verlangte strukturierte Ausgabe zurück, problems knapp (Stichpunkte)."""
 
 
 def quality_check(
