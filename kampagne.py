@@ -619,16 +619,21 @@ def run_campaign(
     article: str,
     cta: str = "Jetzt Termin vereinbaren",
     output_path: Optional[str] = None,
-    max_retries: int = 3,
+    max_retries: int = 1,
     test_mode: bool = False,
 ) -> tuple[CampaignPlan, Path, QualityReview]:
-    """Kompletter 3-Stufen-Workflow mit automatischer Retry-Logik.
+    """Kompletter 3-Stufen-Workflow. Standardmaessig OHNE Neugenerierung bei QA-Ablehnung
+    (max_retries=1, #Kostenschutz): das Motiv (teuerster Schritt, GPT Image 2) wird nur EINMAL
+    erzeugt. Die QA laeuft trotzdem und markiert Probleme (review.approved=False,
+    review.problems) - das Bild geht dann zur manuellen Pruefung raus statt automatisch neu
+    (und erneut kostenpflichtig) generiert zu werden. Hoeheren Wert nur bewusst setzen, wenn
+    die Mehrkosten pro Ablehnung in Kauf genommen werden.
 
     Args:
         article: Vollständiger Steuertext
         cta: Call-to-Action
         output_path: Optional: Ziel-Pfad für finale Grafik
-        max_retries: Maximale Anzahl Neugenerierungen bei QA-Fehlern
+        max_retries: Maximale Anzahl Neugenerierungen bei QA-Fehlern (Default 1 = kein Retry)
         test_mode: True = low quality für Tests, False = high quality für Produktion
 
     Returns:
@@ -717,13 +722,17 @@ def regenerate_image_with_qa(
     cta: str,
     article_excerpt: str = "",
     output_path: Optional[str] = None,
-    max_retries: int = 3,
+    max_retries: int = 1,
     test_mode: bool = False,
 ) -> tuple[Path, QualityReview]:
     """Nur Stufe 2 + 3: Bild neu generieren mit QA (OHNE Kampagnenplanung).
 
     Für "neues Foto würfeln" im Dashboard - verwendet bestehenden image_prompt
     statt neue Kampagnenplanung zu machen.
+
+    Standardmaessig OHNE automatischen Retry bei QA-Ablehnung (max_retries=1,
+    #Kostenschutz) - das Motiv wird nur einmal (kostenpflichtig) erzeugt; die QA
+    markiert Probleme fuer die manuelle Pruefung statt automatisch neu zu generieren.
 
     Args:
         image_prompt: Bestehender englischer Prompt für GPT Image 2
