@@ -2962,12 +2962,19 @@ def aktion(eid):
             try:
                 neu = textgen.regenerate(thema, prev, feedback, e["kanal"])
                 # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
-                neu.setdefault("slogan", prev.get("slogan", ""))
-                neu.setdefault("bild_motiv", prev.get("bild_motiv", ""))
-                neu.setdefault("bild_motiv_thema", prev.get("bild_motiv_thema", ""))
-                neu.setdefault("bild_typ", prev.get("bild_typ", "person"))
-                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=NULL WHERE id=?", (json.dumps(neu, ensure_ascii=False), eid))
-                conn.commit(); bildgen.render_drafts()
+                for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person"),
+                                ("kampagne_motiv_pfad", ""), ("kampagne_layout_template", "")):
+                    neu.setdefault(k, prev.get(k, dflt))
+                # Bild an den ueberarbeiteten Text anpassen: bei Kampagnen-Entwuerfen kostenlos per
+                # Pillow auf das vorhandene Motiv neu rendern (KEIN neuer GPT-Image-Call) - statt wie
+                # zuvor bild_pfad=NULL zu setzen und ueber die alte Pipeline (bildgen.render_drafts)
+                # komplett neu zu erzeugen, was das gute Kampagnen-Bild verworfen haette.
+                out = _kampagne_pillow_rerender(neu, eid)
+                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                             (json.dumps(neu, ensure_ascii=False), out, eid))
+                conn.commit()
+                if out is None:
+                    bildgen.render_drafts()  # Alt-Entwurf ohne Kampagnen-Motiv: alte Pipeline als Fallback
                 audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
                 flash("Entwurf %d überarbeitet (neuer Vorschlag erstellt)." % eid)
             except Exception as ex:
