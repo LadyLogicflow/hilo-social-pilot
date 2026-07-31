@@ -126,8 +126,6 @@ def render_text_on_image(
     highlight_set = {w.strip().lower().rstrip(".,!?:;") for w in (highlight_words or []) if w.strip()}
 
     # DEBUG: Log highlight_words für Debugging
-    import logging
-    log = logging.getLogger("hilo.text_renderer")
     if highlight_words:
         log.info("🟢 HIGHLIGHT_WORDS gesetzt: %s → normalisiert: %s", highlight_words, highlight_set)
     else:
