@@ -211,8 +211,9 @@ LAYOUT_TEMPLATES = {
         # Volle Breite wuerde in die unten-links-Zone hineinragen (Textblock liegt hier tief im
         # Bild) - daher x eingerueckt (0.30 statt 0.07), schmaler als die anderen Vorlagen.
         # WICHTIG: Text unten war zu klein → Boxen größer gemacht + höher gerückt (2026-07-30)
-        "headline_box": TextBox(x=0.30, y=0.54, width=0.63, height=0.18, align="center", vertical_align="top"),
-        "supporting_box": TextBox(x=0.30, y=0.72, width=0.63, height=0.16, align="center", vertical_align="top"),
+        # WICHTIG: Header weiter nach unten + Bullets mittiger (2026-07-31)
+        "headline_box": TextBox(x=0.30, y=0.60, width=0.63, height=0.16, align="center", vertical_align="top"),
+        "supporting_box": TextBox(x=0.30, y=0.76, width=0.63, height=0.13, align="center", vertical_align="top"),
         "cta_box": TextBox(x=0.25, y=0.89, width=0.50, height=0.09, align="center", vertical_align="center"),
         "motiv_area": "top 55%",
         "motiv_instruction": "Keep the bottom 45% visually calm and high-contrast. Place the hero subject in the upper half."
