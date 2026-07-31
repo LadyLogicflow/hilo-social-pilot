@@ -33,4 +33,5 @@ SOURCES = {
 SCRAPE_SOURCES = {
     "bvl_pm":  os.environ.get("HILO_SOURCES_BVL_PM",  "https://www.bvl-verband.de/presse/pressemeldungen"),
     "bvl_dpa": os.environ.get("HILO_SOURCES_BVL_DPA", "https://www.bvl-verband.de/presse/dpa-presseinformationen"),
+    "steuerrat24": os.environ.get("HILO_SOURCES_STEUERRAT24", "https://www.steuerrat24.de/steuerrat-aktuell/steuertipp-der-woche.html"),
 }

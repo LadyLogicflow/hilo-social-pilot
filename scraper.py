@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""HTML-Scraper fuer BVL-Presseseiten (kein RSS). Detail-Links + PDF-Pressemeldungen (Titel aus Umfeld)."""
+"""HTML-Scraper fuer BVL-Presseseiten und Steuerrat24 (kein RSS).
+BVL: Detail-Links + PDF-Pressemeldungen (Titel aus Umfeld).
+Steuerrat24: Steuertipp der Woche mit vollständigem Text."""
 import logging
 from urllib.parse import urljoin
 log = logging.getLogger("hilo.scraper")
@@ -9,6 +11,21 @@ def _slug_title(href):
     return (slug[:1].upper() + slug[1:]) if slug else ""
 
 def scrape(url):
+    """Scrapt HTML-Seiten ohne RSS-Feed.
+
+    Erkennt automatisch die Quelle und verwendet den passenden Scraper:
+    - Steuerrat24: scraper_steuerrat24.scrape()
+    - BVL (Default): scrape_bvl()
+    """
+    # Steuerrat24 Detection
+    if "steuerrat24.de" in url.lower():
+        import scraper_steuerrat24
+        return scraper_steuerrat24.scrape(url)
+
+    # BVL (Default)
+    return scrape_bvl(url)
+
+def scrape_bvl(url):
     import requests
     from bs4 import BeautifulSoup
     r = requests.get(url, timeout=20, headers={"User-Agent": "HILO-Pilot/1.0"})
