@@ -182,7 +182,8 @@ LAYOUT_TEMPLATES = {
     "text_left_hero_right": {
         # Oben-links ist bei diagonal2 (Logo unten-links, Slogan/Portrait oben-rechts) FREI -
         # Ueberschrift darf wieder nach oben, nur unten-links (Bullets/CTA) bleibt reserviert.
-        "headline_box": TextBox(x=0.07, y=0.08, width=0.48, height=0.22, align="left", vertical_align="top"),
+        # WICHTIG: Text maximal bis 50% (x + width <= 0.50) wegen Hero rechts (2026-07-31)
+        "headline_box": TextBox(x=0.07, y=0.08, width=0.43, height=0.22, align="left", vertical_align="top"),
         "supporting_box": TextBox(x=0.07, y=0.34, width=0.42, height=0.30, align="left", vertical_align="top"),
         "cta_box": TextBox(x=0.07, y=0.76, width=0.46, height=0.11, align="center", vertical_align="center"),
         "motiv_area": "right 50%",
