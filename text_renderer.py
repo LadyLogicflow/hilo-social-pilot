@@ -7,6 +7,7 @@ Rendert Headline, Bullets und CTA deterministisch auf Basis
 von Layout-Vorlagen und TextBox-Koordinaten.
 """
 
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -83,25 +84,37 @@ def render_text_on_image(
     # WICHTIG: Variable Fonts - beide Achsen setzen (Optical size + Weight)!
     # Inter hat 2 Achsen: [Optical size (14-32), Weight (100-900)]
     # Bold = Weight 700, Optical size 14 (default)
+    log = logging.getLogger("hilo.text_renderer")
+
     try:
         font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
         font_body.set_variation_by_axes([14, 700])  # optical_size=14, weight=700 (Bold)
-    except Exception:
+        log.info("✅ Font-Body Bold geladen: set_variation_by_axes([14, 700])")
+    except Exception as e:
+        log.error("❌ FEHLER beim Laden von Font-Body Bold: %s", e, exc_info=True)
         # Fallback: Normale Inter OHNE Bold (besser lesbar als Default-Font)
         try:
             font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
-        except Exception:
+            log.warning("⚠️  Fallback: Font-Body OHNE Bold geladen")
+        except Exception as e2:
+            log.error("❌ FEHLER beim Laden von Font-Body Fallback: %s", e2, exc_info=True)
             font_body = ImageFont.load_default()
+            log.warning("⚠️  Fallback: Pillow-Default-Font geladen")
 
     try:
         font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
         font_cta.set_variation_by_axes([14, 700])  # optical_size=14, weight=700 (Bold)
-    except Exception:
+        log.info("✅ Font-CTA Bold geladen: set_variation_by_axes([14, 700])")
+    except Exception as e:
+        log.error("❌ FEHLER beim Laden von Font-CTA Bold: %s", e, exc_info=True)
         # Fallback: Normale Inter OHNE Bold
         try:
             font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
-        except Exception:
+            log.warning("⚠️  Fallback: Font-CTA OHNE Bold geladen")
+        except Exception as e2:
+            log.error("❌ FEHLER beim Laden von Font-CTA Fallback: %s", e2, exc_info=True)
             font_cta = ImageFont.load_default()
+            log.warning("⚠️  Fallback: Pillow-Default-Font geladen")
 
     # HILO Farben
     NAVY = "#1f428d"
