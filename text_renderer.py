@@ -112,6 +112,14 @@ def render_text_on_image(
     # Hervorhebungs-Woerter normalisieren (einmalig, case-insensitive Vergleich beim Rendern)
     highlight_set = {w.strip().lower().rstrip(".,!?:;") for w in (highlight_words or []) if w.strip()}
 
+    # DEBUG: Log highlight_words für Debugging
+    import logging
+    log = logging.getLogger("hilo.text_renderer")
+    if highlight_words:
+        log.info("🟢 HIGHLIGHT_WORDS gesetzt: %s → normalisiert: %s", highlight_words, highlight_set)
+    else:
+        log.warning("⚠️  KEINE HIGHLIGHT_WORDS gesetzt (leer oder None)!")
+
     # Textfarbe automatisch je nach Bildhelligkeit hinter der jeweiligen Box waehlen
     # (kein Hintergrund-Rechteck mehr -> muss zur tatsaechlichen Motiv-Helligkeit passen,
     # nicht nur zur geplanten 'text_contrast'-Beschreibung, die nicht immer zutrifft).
