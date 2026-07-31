@@ -71,21 +71,37 @@ def render_text_on_image(
     # Schriften liegen im Repo unter fonts/ (absoluter Pfad via FONT_DIR, s.o.)
     try:
         font_headline = ImageFont.truetype(str(FONT_DIR / "ArchivoBlack-Regular.ttf"), 68)
-        # Inter-Variable.ttf ist eine VARIABLE Font (ein File, alle Gewichte) - die vorher
-        # verwendeten 'Inter-SemiBold.ttf'/'Inter-Bold.ttf' waren defekt (enthielten faelschlich
-        # HTML-Seiten statt echter Font-Daten -> jeder Ladeversuch scheiterte, WESHALB ALLE DREI
-        # Schriften inkl. Headline auf die winzige Pillow-Standardschrift zurueckfielen - das war
-        # die eigentliche Ursache fuer 'Text viel zu klein').
-        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
-        font_body.set_variation_by_name("Bold")
-        font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
-        font_cta.set_variation_by_name("Bold")
     except Exception:
-        # Fallback: Standard-Font (OSError bei fehlender/kaputter Datei, aber auch andere Fehler
-        # bei set_variation_by_name abfangen - besser lesbare-aber-falsche Schrift als Crash)
         font_headline = ImageFont.load_default()
-        font_body = ImageFont.load_default()
-        font_cta = ImageFont.load_default()
+
+    # Inter-Variable.ttf ist eine VARIABLE Font (ein File, alle Gewichte) - die vorher
+    # verwendeten 'Inter-SemiBold.ttf'/'Inter-Bold.ttf' waren defekt (enthielten faelschlich
+    # HTML-Seiten statt echter Font-Daten -> jeder Ladeversuch scheiterte, WESHALB ALLE DREI
+    # Schriften inkl. Headline auf die winzige Pillow-Standardschrift zurueckfielen - das war
+    # die eigentliche Ursache fuer 'Text viel zu klein').
+    #
+    # WICHTIG: Variable Fonts - beide Achsen setzen (Optical size + Weight)!
+    # Inter hat 2 Achsen: [Optical size (14-32), Weight (100-900)]
+    # Bold = Weight 700, Optical size 14 (default)
+    try:
+        font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
+        font_body.set_variation_by_axes([14, 700])  # optical_size=14, weight=700 (Bold)
+    except Exception:
+        # Fallback: Normale Inter OHNE Bold (besser lesbar als Default-Font)
+        try:
+            font_body = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 38)
+        except Exception:
+            font_body = ImageFont.load_default()
+
+    try:
+        font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
+        font_cta.set_variation_by_axes([14, 700])  # optical_size=14, weight=700 (Bold)
+    except Exception:
+        # Fallback: Normale Inter OHNE Bold
+        try:
+            font_cta = ImageFont.truetype(str(FONT_DIR / "Inter-Variable.ttf"), 36)
+        except Exception:
+            font_cta = ImageFont.load_default()
 
     # HILO Farben
     NAVY = "#1f428d"
