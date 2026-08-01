@@ -26,6 +26,10 @@ from prompt_builder import build_prompt
 
 logger = logging.getLogger(__name__)
 
+# Named constants für Konsistenz
+MAX_CONTENT_LENGTH_SIMPLE = 200  # Für hilo_simple Template
+MAX_CONTEXT_LENGTH_TEMPLATES = 300  # Für spezifische Templates
+
 
 def generate_optimized_image_prompt(
     text: str,
@@ -49,9 +53,29 @@ def generate_optimized_image_prompt(
         Optimierter Prompt-String
 
     Raises:
-        ValueError: Bei ungültigen Inputs
+        ValueError: Bei ungültigen Inputs (text zu kurz, theme leer, ungültiger content_type)
     """
-    logger.info(f"Generating optimized prompt for theme='{theme}', type='{content_type}'")
+    # Validate inputs at integration boundary
+    if not text or len(text.strip()) < 10:
+        raise ValueError("text must be at least 10 characters")
+
+    if not theme or len(theme.strip()) == 0:
+        raise ValueError("theme cannot be empty")
+
+    # Validate content_type
+    try:
+        ContentType(content_type)
+    except ValueError:
+        valid_types = [t.value for t in ContentType]
+        raise ValueError(
+            f"Invalid content_type '{content_type}'. "
+            f"Must be one of: {valid_types}"
+        )
+
+    logger.info(
+        f"Generating optimized prompt: theme='{theme}', type='{content_type}', "
+        f"use_pipeline={use_pipeline}, text_length={len(text)}"
+    )
 
     if use_pipeline:
         # Nutze Multi-Stage Pipeline für strategische Optimierung
@@ -85,6 +109,11 @@ def _generate_with_pipeline(text: str, theme: str, content_type: str) -> str:
 
 def _generate_with_prompt_builder(text: str, theme: str, content_type: str) -> str:
     """Generiert Prompt direkt mit Prompt-Builder"""
+    # Validate content_type explicitly (defensive)
+    valid_types = {'deadline', 'knowledge', 'anlass', 'radar'}
+    if content_type not in valid_types:
+        raise ValueError(f"Invalid content_type: {content_type}")
+
     # Mappe content_type zu passenden Template-Parametern
     if content_type == 'deadline':
         visual_strategy = 'Objektfotografie'
@@ -95,7 +124,7 @@ def _generate_with_prompt_builder(text: str, theme: str, content_type: str) -> s
     elif content_type == 'anlass':
         visual_strategy = 'Editorial Photography'
         mood = 'emotional, ansprechend'
-    else:  # radar
+    else:  # radar (only valid option left after validation)
         visual_strategy = 'Editorial Photography'
         mood = 'professional, trustworthy'
 
@@ -105,7 +134,7 @@ def _generate_with_prompt_builder(text: str, theme: str, content_type: str) -> s
         theme=theme,
         visual_strategy=visual_strategy,
         mood=mood,
-        content=text[:200]  # Erste 200 Zeichen
+        content=text[:MAX_CONTENT_LENGTH_SIMPLE]
     )
 
     return prompt
@@ -152,16 +181,20 @@ def generate_deadline_prompt(text: str, deadline_date: str, topic: str) -> str:
             "deadline_countdown",
             deadline_date=deadline_date,
             topic=topic,
-            context=text[:300]
+            context=text[:MAX_CONTEXT_LENGTH_TEMPLATES]
         )
-    except Exception as e:
-        logger.warning(f"deadline_countdown template failed, using pipeline: {e}")
-        # Fallback auf Pipeline
+    except KeyError as e:
+        # Template parameter fehlt - legitimer Fallback
+        logger.warning(f"deadline_countdown template parameter missing, using pipeline: {e}")
         return generate_optimized_image_prompt(
             text=f"{topic}: {deadline_date}. {text}",
             theme=topic,
             content_type='deadline'
         )
+    except ValueError as e:
+        # Ungültige Parameter - Fehler durchreichen
+        logger.error(f"Invalid deadline_prompt parameters: {e}")
+        raise ValueError(f"Invalid deadline_prompt parameters: {e}") from e
 
 
 def generate_knowledge_prompt(text: str, topic: str, knowledge_level: str = 'Einsteiger') -> str:
@@ -172,16 +205,20 @@ def generate_knowledge_prompt(text: str, topic: str, knowledge_level: str = 'Ein
             "knowledge_series",
             topic=topic,
             knowledge_level=knowledge_level,
-            content=text[:300]
+            content=text[:MAX_CONTEXT_LENGTH_TEMPLATES]
         )
-    except Exception as e:
-        logger.warning(f"knowledge_series template failed, using pipeline: {e}")
-        # Fallback auf Pipeline
+    except KeyError as e:
+        # Template parameter fehlt - legitimer Fallback
+        logger.warning(f"knowledge_series template parameter missing, using pipeline: {e}")
         return generate_optimized_image_prompt(
             text=text,
             theme=topic,
             content_type='knowledge'
         )
+    except ValueError as e:
+        # Ungültige Parameter - Fehler durchreichen
+        logger.error(f"Invalid knowledge_prompt parameters: {e}")
+        raise ValueError(f"Invalid knowledge_prompt parameters: {e}") from e
 
 
 # Beispiel-Nutzung
