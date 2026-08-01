@@ -10,8 +10,13 @@ Kernfunktion:
 - Konsistente Bild-Qualität durch wiederverwendbare Templates
 """
 
-from typing import Dict, Optional
+import re
+import logging
+import threading
+from typing import Dict, Optional, Any
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PromptTemplate:
@@ -22,19 +27,63 @@ class PromptTemplate:
         self.template = template
         self.description = description
 
-    def render(self, **params: str) -> str:
-        """Rendert das Template mit den gegebenen Parametern"""
+    def _sanitize_content(self, content: str, max_length: int = 10000) -> str:
+        """Sanitisiert User-Input für AI-Prompts"""
+        if not content:
+            return ""
+
+        # Längen-Limit
+        content = content[:max_length]
+
+        # Entferne potenzielle Prompt-Injection-Marker
+        dangerous_patterns = [
+            r'IGNORE\s+ALL\s+PREVIOUS\s+INSTRUCTIONS',
+            r'SYSTEM\s*:',
+            r'ASSISTANT\s*:',
+            r'USER\s*:',
+        ]
+
+        for pattern in dangerous_patterns:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE)
+
+        # Normalisiere Whitespace
+        content = re.sub(r'\s+', ' ', content).strip()
+
+        return content
+
+    def render(self, **params: Any) -> str:
+        """Rendert das Template mit den gegebenen Parametern (mit Security-Validierung)"""
+        # Validate parameter values - keine special format strings erlaubt
+        forbidden_pattern = re.compile(r'\{[_\w]+\}')
+        sanitized_params = {}
+
+        for key, value in params.items():
+            if value is None:
+                raise ValueError(f"Parameter '{key}' cannot be None")
+
+            if isinstance(value, str):
+                # Check for format string injection
+                if forbidden_pattern.search(value):
+                    raise ValueError(
+                        f"Parameter '{key}' contains forbidden format string syntax"
+                    )
+                # Sanitize content
+                sanitized_params[key] = self._sanitize_content(value)
+            else:
+                sanitized_params[key] = value
+
         try:
-            return self.template.format(**params)
+            return self.template.format(**sanitized_params)
         except KeyError as e:
             raise ValueError(f"Missing parameter {e} for template '{self.name}'")
 
 
 class PromptBuilder:
-    """Haupt-Builder für Bild-Prompts"""
+    """Haupt-Builder für Bild-Prompts (thread-safe)"""
 
     def __init__(self):
         self.templates: Dict[str, PromptTemplate] = {}
+        self._lock = threading.RLock()
         self._load_default_templates()
 
     def _load_default_templates(self):
@@ -210,16 +259,36 @@ CONTENT:
         )
 
     def register_template(self, name: str, template: str, description: str = ""):
-        """Registriert ein neues Template"""
-        self.templates[name] = PromptTemplate(name, template, description)
+        """Registriert ein neues Template (thread-safe)"""
+        with self._lock:
+            self.templates[name] = PromptTemplate(name, template, description)
+            logger.debug(f"Registered template '{name}'")
 
     def build(self, template_name: str, **params) -> str:
-        """Baut einen Prompt aus einem Template"""
-        if template_name not in self.templates:
-            raise ValueError(f"Template '{template_name}' not found")
+        """Baut einen Prompt aus einem Template (thread-safe mit Validierung)"""
+        logger.info(f"Building prompt with template '{template_name}'")
+        logger.debug(f"Parameters: {list(params.keys())}")
 
-        template = self.templates[template_name]
-        return template.render(**params)
+        # Validate all parameters
+        for key, value in params.items():
+            if value is None:
+                raise ValueError(f"Parameter '{key}' cannot be None")
+            if isinstance(value, str):
+                if not value.strip():
+                    raise ValueError(f"Parameter '{key}' cannot be empty")
+                if len(value) > 50000:
+                    raise ValueError(f"Parameter '{key}' exceeds maximum length (50000 chars)")
+
+        with self._lock:
+            if template_name not in self.templates:
+                raise ValueError(f"Template '{template_name}' not found")
+
+            template = self.templates[template_name]
+
+        # Render outside lock (doesn't modify state)
+        prompt = template.render(**params)
+        logger.debug(f"Generated prompt length: {len(prompt)} chars")
+        return prompt
 
     def list_templates(self) -> Dict[str, str]:
         """Listet alle verfügbaren Templates"""
