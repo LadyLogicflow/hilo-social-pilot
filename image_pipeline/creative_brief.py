@@ -5,6 +5,7 @@ Analysiert Content und erstellt einen strategischen Creative Brief.
 """
 
 import logging
+import re
 from .models import ContentInput, CreativeBrief
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 class CreativeBriefGenerator:
     """Generiert Creative Briefs aus Content"""
+
+    # Regex-Pattern vorab kompiliert (Performance + ReDoS-Schutz)
+    SENTENCE_PATTERN = re.compile(r'^[^.]+\.(?:\s|$)')
 
     # Mapping von Content-Typen zu Bildstrategien
     CONTENT_TYPE_STRATEGIES = {
@@ -43,10 +47,13 @@ class CreativeBriefGenerator:
         logger.info(f"Generating creative brief for content type: {content.content_type}")
 
         # Bildstrategie basierend auf Content-Typ
-        bildstrategie = self.CONTENT_TYPE_STRATEGIES.get(
-            content.content_type,
-            'Emotion erzeugen'
-        )
+        content_type_value = content.content_type.value if hasattr(content.content_type, 'value') else content.content_type
+
+        if content_type_value not in self.CONTENT_TYPE_STRATEGIES:
+            logger.warning(f"Unknown content_type '{content_type_value}', using default strategy")
+            bildstrategie = 'Emotion erzeugen'
+        else:
+            bildstrategie = self.CONTENT_TYPE_STRATEGIES[content_type_value]
 
         # Visuelle Strategie und Mood basierend auf Thema
         visual_strategy, mood = self._determine_visual_strategy(content.theme)
@@ -100,9 +107,11 @@ class CreativeBriefGenerator:
         """Extrahiert die Kernbotschaft aus dem Text (vereinfacht)"""
         text = text.strip()
 
-        # Versuche ersten Satz zu extrahieren
-        import re
-        sentence_match = re.search(r'^[^.]+\.(?:\s|$)', text)
+        # Limitiere Input-Länge (ReDoS-Schutz)
+        text = text[:5000]
+
+        # Versuche ersten Satz zu extrahieren (mit vorab kompiliertem Pattern)
+        sentence_match = self.SENTENCE_PATTERN.search(text)
 
         if sentence_match:
             sentence = sentence_match.group(0).strip()

@@ -32,7 +32,7 @@ class TestContentInput:
     def test_content_input_with_metadata(self):
         """ContentInput mit Metadata"""
         content = ContentInput(
-            text="Test",
+            text="Test text with sufficient length",
             theme="Test",
             content_type="radar",
             metadata={"foo": "bar"}
@@ -199,7 +199,7 @@ class TestImagePipeline:
         pipeline = ImagePipeline()
 
         content = ContentInput(
-            text="Test",
+            text="Test text with sufficient length for validation",
             theme="Test",
             content_type="radar"
         )

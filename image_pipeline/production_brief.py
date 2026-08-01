@@ -5,6 +5,7 @@ Konvertiert Creative Brief in technische Produktionsspezifikation.
 """
 
 import logging
+import re
 from .models import CreativeBrief, ProductionBrief
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,42 @@ except ImportError:
 
 class ProductionBriefGenerator:
     """Generiert Production Briefs aus Creative Briefs"""
+
+    @staticmethod
+    def _sanitize_for_prompt(text: str, max_length: int = 500) -> str:
+        """
+        Sanitisiert Text für sichere Verwendung in AI-Prompts
+
+        Args:
+            text: Zu sanitisierender Text
+            max_length: Maximale Länge
+
+        Returns:
+            Sicherer Text ohne Injection-Risiken
+        """
+        if not text:
+            return ""
+
+        # Entferne Control-Characters
+        text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+
+        # Verhindere Prompt-Breaking durch doppelte Newlines
+        text = text.replace('\n\n', ' ')
+
+        # Entferne potenzielle Injection-Patterns
+        injection_patterns = [
+            r'IGNORE\s+(?:ALL\s+)?PREVIOUS\s+INSTRUCTIONS',
+            r'SYSTEM\s*:',
+            r'ASSISTANT\s*:',
+            r'USER\s*:',
+        ]
+        for pattern in injection_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # Limitiere Länge
+        text = text[:max_length]
+
+        return text.strip()
 
     def generate(self, creative_brief: CreativeBrief, content_text: str = "") -> ProductionBrief:
         """
@@ -83,11 +120,16 @@ class ProductionBriefGenerator:
 
     def _fallback_prompt(self, brief: CreativeBrief, content_text: str) -> str:
         """Fallback-Prompt wenn Prompt-Builder nicht funktioniert"""
+        # Sanitize alle User-Inputs
+        safe_strategy = self._sanitize_for_prompt(brief.visual_strategy, 100)
+        safe_mood = self._sanitize_for_prompt(brief.mood, 100)
+        safe_message = self._sanitize_for_prompt(brief.key_message, 200)
+
         return f"""Create a premium editorial photograph for a social media post.
 
-VISUAL STRATEGY: {brief.visual_strategy}
-MOOD: {brief.mood}
-KEY MESSAGE: {brief.key_message}
+VISUAL STRATEGY: {safe_strategy}
+MOOD: {safe_mood}
+KEY MESSAGE: {safe_message}
 
 STYLE:
 - Modern, professional, trustworthy
