@@ -762,37 +762,6 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     </div>
-    <details style="margin-top:10px">
-      <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
-      <div style="margin-top:8px">
-        <form method=post action="/bild-aktion/{{e.id}}" style="margin-bottom:6px">
-          <input type=hidden name=zurueck value=entwuerfe>
-          <label style="display:block;margin-bottom:4px;color:#0B2545;font-weight:500;font-size:14px">Bild-Motiv (nur für alte Stile unten relevant):</label>
-          <textarea name=motiv placeholder="Beschreibe die Szene (z.B. 'Wecker am Strand, Sonnenaufgang, ruhige Atmosphäre')" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin-bottom:8px;font-size:13px;min-height:60px">{{ e.f.szene_motiv or e.f.bild_motiv or '' }}</textarea>
-          <select name=bild_aktion style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px;width:auto" required>
-            <option value="" disabled selected>– Bild-Aktion wählen –</option>
-            <option value="layout_neu">&#x21BB; Layout neu rendern (kein KI-Call, kostenlos)</option>
-            <option value="stil_wechseln">&#x1F3A8; Anderer (alter) Stil (KI-Call, Kosten)</option>
-          </select>
-          <button style="background:#0B2545;padding:8px 12px" title="Gewählte Bild-Aktion ausführen">Ausführen</button></form>
-        <form method=post action="/bild-generieren/{{e.id}}">
-          <input type=hidden name=zurueck value=entwuerfe>
-          <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
-          <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
-            <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
-            <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-            <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-          </select>
-          <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-            <option value="" disabled selected>– Stil wählen –</option>
-            <option value="comic">Comic</option>
-            <option value="comic_beratung">Comic Beratung</option>
-            <option value="comic_strip">Comic-Strip</option>
-            <option value="ki_tafel">Tafel</option>
-            <option value="kreativ">Kreativ</option></select>
-          <button style="background:#0B2545" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
-      </div>
-    </details>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
 
@@ -835,25 +804,6 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
        <form method=post action="/aktion/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag wirklich löschen? Das kann nicht rückgängig gemacht werden.')">
          <input type=hidden name=zurueck value=einplanung>
          <button name=aktion value=loeschen style="background:#b00020;padding:6px 10px" title="Beitrag endgültig löschen">Löschen</button></form></p>
-    <details style="margin:0 0 8px">
-      <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
-      <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
-        <input type=hidden name=zurueck value=einplanung>
-        <input name=strip_zeile1 value="{{ e.f.strip_zeile1 or '' }}" placeholder="Comic-Strip: Text Feld 1 (optional – überschreibt die Überschrift)" title="Nur für Comic-Strip: eigener Satz für die Sprechblase in Feld 1 (leer = Überschrift)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;margin:0 0 6px">
-        <select name=strip_zeile2 title="Nur für Comic-Strip: Aussage im Bild 2 (Ärmelschoner). Automatisch = die KI wählt passend zum Thema und bestimmt damit die Story-Variante." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccd3df;border-radius:8px;color:#15191F;background:#fff;margin:0 0 6px">
-          <option value="" {% if not e.f.strip_zeile2 %}selected{% endif %}>Comic-Strip Bild 2: Automatisch (KI wählt passend zum Thema)</option>
-          <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-          <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
-        </select>
-        <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-          <option value="" disabled selected>– Stil wählen –</option>
-          <option value="comic">Comic</option>
-          <option value="comic_beratung">Comic Beratung</option>
-          <option value="comic_strip">Comic-Strip</option>
-          <option value="ki_tafel">Tafel</option>
-          <option value="kreativ">Kreativ</option></select>
-        <button style="background:#0B2545;color:#fff;padding:8px 12px" title="Bild im gewählten Stil neu erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
-    </details>
     <form method=post action="/text-neu/{{e.id}}" style="margin:4px 0 8px" onsubmit="if(!this.feedback.value.trim()){alert('Bitte kurz angeben, was am Text geändert werden soll.');return false}return confirm('Nur den Text mit Ihrem Hinweis überarbeiten? Das nutzt die Text-KI; das Bild wird kostenlos an den neuen Text angepasst. Termin bleibt.')">
       <input type=hidden name=zurueck value=einplanung>
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
@@ -937,14 +887,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
           <optgroup label="Jemand war bei HILO (traurig)">{% for v in strip_varianten.get('vorteil', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
           <optgroup label="Jemand war NICHT bei HILO (schadenfroh)">{% for v in strip_varianten.get('warnung', []) %}<option value="{{v}}" {% if e.f.strip_zeile2==v %}selected{% endif %}>{{v}}</option>{% endfor %}</optgroup>
         </select>
-        <select name=bild_stil style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;margin-right:6px" title="Bild-Stil für diesen Beitrag wählen">
-          <option value="" disabled selected>– Stil wählen –</option>
-          <option value="comic">Comic</option>
-          <option value="comic_beratung">Comic Beratung</option>
-          <option value="comic_strip">Comic-Strip</option>
-          <option value="ki_tafel">Tafel</option>
-          <option value="kreativ">Kreativ</option></select>
-        <button style="background:#0B2545;color:#fff" title="Bild in diesem Stil erzeugen (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
+        <button style="background:#0B2545;color:#fff" title="Bild neu generieren (kostet ein KI-Bild). Text bleibt">&#x1F5BC;&#xFE0F; Bild generieren</button></form>
     </details>
   </div></div>
 {% endmacro %}
@@ -1429,20 +1372,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 {% endif %}
 
 {% if bereich=='bildstil' %}
-<p class=hint>Der Bild-Stil wird jetzt <b>automatisch und zufällig pro Beitrag</b> aus den hier <b>aktivierten</b> Stilen gewählt – kein manuelles Umschalten mehr. Haken Sie die Stile an, die in den Zufalls-Topf sollen. In der Freigabe (Schritt&nbsp;3) lässt sich für einen einzelnen Beitrag mit „Anderes Bild“ ein anderer aktiver Stil würfeln. <b>Mindestens ein Stil</b> muss aktiv bleiben.</p>
-<form method=post><input type=hidden name=formular value=bildstil_save>
-<div style="max-width:560px">
-  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=checkbox name=stil_standard value="1"{% if stil_standard %} checked{% endif %}>
-    <span><b>Standard (v11)</b><br><span class=hint>Bewährtes Layout: Foto + weißes Textfeld mit Überschrift, Bullets und CTA. (Empfohlen)</span></span></label>
-  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=checkbox name=stil_ki_tafel value="1"{% if stil_ki_tafel %} checked{% endif %}>
-    <span><b>KI-Tafel (Testmodus)</b><br><span class=hint>Die KI schreibt den Text selbst auf eine Tafel – Testmodus. Nur die Überschrift steht auf der Tafel; CTA und HILO-Kreise kommen exakt per Code.</span></span></label>
-  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
-    <input type=checkbox name=stil_kreativ value="1"{% if stil_kreativ %} checked{% endif %}>
-    <span><b>Kreativ</b><br><span class=hint>Kinoreifes Foto ohne Text – die Bild-KI entwirft (über einen Art-Director-Schritt) eine fotorealistische Szene zur überraschendsten Erkenntnis des Beitrags. Überschrift, Bullets, CTA und HILO-Kreise kommen wie im Standard-Look exakt per Code als Overlay.</span></span></label>
-  <button>Auswahl speichern</button>
-</div></form>
+<p class=hint>Alle Bilder werden im klassischen HILO-Stil gerendert: Foto als Hintergrund, Text programmatisch darüber (Überschrift, Bullets, CTA).</p>
 
 <h3 style="margin-top:26px">Bild-Tool</h3>
 <p class=hint>Legt fest, <b>welche KI</b> das Foto erzeugt (unabhängig vom Bild-Stil oben). <b>OpenAI</b> ist die bewährte Standard-Wahl. <b>Ideogram</b> ist ein Text-Spezialist – die Schrift im Bild (z.&nbsp;B. auf der KI-Tafel) wird deutlich genauer; benötigt aber einen <b>eigenen API-Schlüssel</b> (in den Secrets als <code>ideogram_api_key</code> hinterlegen). So lassen sich beide am selben Beitrag vergleichen.</p>
@@ -3853,30 +3783,6 @@ def verwaltung():
                     conn.execute("DELETE FROM traeger WHERE id=?", (int(tid),))
                     audit_log(conn, session["user"], "traeger_geloescht", None, tid)
                     flash("Träger gelöscht.")
-            elif formular == "bildstil_save":
-                # #144: Bild-Stil-Topf (Mehrfach-Aktivierung). Je Stil ein An/Aus-Flag in den
-                # Einstellungen (bild_stil_standard/_ki_tafel/_kreativ = '1'/'0'). Bei der
-                # Beitrags-Erzeugung wird zufaellig aus den AKTIVEN Stilen gewaehlt (stilwahl).
-                # Mindestens EINER muss aktiv bleiben: ist keiner angehakt, wird 'standard'
-                # erzwungen (server-seitiger Fallback, nie ein leerer Topf).
-                flags = {
-                    "standard": "1" if request.form.get("stil_standard") else "0",
-                    "ki_tafel": "1" if request.form.get("stil_ki_tafel") else "0",
-                    "kreativ": "1" if request.form.get("stil_kreativ") else "0",
-                }
-                if "1" not in flags.values():
-                    flags["standard"] = "1"   # Fallback: nie alle aus
-                for stil, wert in flags.items():
-                    conn.execute(
-                        "INSERT INTO einstellungen(schluessel, wert) VALUES (?, ?) "
-                        "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert",
-                        ("bild_stil_%s" % stil, wert))
-                _stil_label = {"standard": "Standard (v11)", "ki_tafel": "KI-Tafel (Testmodus)",
-                               "kreativ": "Kreativ (kinoreifes Foto ohne Text)"}
-                aktiv_namen = [_stil_label[s] for s in ("standard", "ki_tafel", "kreativ")
-                               if flags[s] == "1"]
-                audit_log(conn, session["user"], "bild_stil_topf_gesetzt", None, ", ".join(aktiv_namen))
-                flash("Aktive Bild-Stile (Zufalls-Topf): %s." % ", ".join(aktiv_namen))
             elif formular == "bildtool_save":
                 # Globales Bild-Tool (#137): 'openai' (Default) oder 'ideogram' (Text-Spezialist).
                 # Orthogonal zum Bild-Stil; bestimmt nur, welche KI das Foto erzeugt.
@@ -3991,15 +3897,6 @@ def verwaltung():
                 "SELECT id, name, prompt_snippet, aktiv FROM traeger ORDER BY id").fetchall()
         except Exception:
             traeger = []
-        # #144: Drei An/Aus-Flags fuer den Bild-Stil-Topf (Default aktiv: fehlt der Schluessel oder
-        # steht nicht auf '0', ist der Stil im Topf). Steuern die Zufallswahl pro Beitrag.
-        def _stil_aktiv(stil):
-            r = conn.execute("SELECT wert FROM einstellungen WHERE schluessel=?",
-                             ("bild_stil_%s" % stil,)).fetchone()
-            return (r is None) or (str(r["wert"]).strip() != "0")
-        stil_standard = _stil_aktiv("standard")
-        stil_ki_tafel = _stil_aktiv("ki_tafel")
-        stil_kreativ = _stil_aktiv("kreativ")
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
         # OpenAI-Bild-Modell (#161): aktueller Stand fuers Dropdown. Unbekannt/leer -> Standard.
@@ -4060,9 +3957,6 @@ def verwaltung():
                                                      bereich=bereich, bereich_titel=bereich_titel,
                                                      pages=pages, pages_err=pages_err, page_id_set=page_id_set,
                                                      fb_name=fb_name,
-                                                     stil_standard=stil_standard,
-                                                     stil_ki_tafel=stil_ki_tafel,
-                                                     stil_kreativ=stil_kreativ,
                                                      wa_dienst_err=wa_dienst_err,
                                                      any_wa_pending=any_wa_pending,
                                                      bild_tool=bild_tool,
