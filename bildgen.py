@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""M4 - Bild im aufgefrischten HILO-Magazin-Stil (1080x1080): vollflaechiges Foto als Hintergrund,
-darueber ein integriertes weisses Textfeld (Saison-Pille, Ueberschrift, optionale Hero-Zahl,
-gezeichnete Symbol-Bullets, warme CTA-Pille). Die beiden CI-Kreise (Logo + Slogan 'Wir sind HILO')
-bleiben als Erkennungszeichen und rotieren je Beitrag. Ohne Foto: warmer cremefarbener Fallback."""
+"""HILO Social-Media-Bild (1080x1080): Vollflaechiges Foto als Hintergrund, darueber Text
+programmatisch gerendert (Saison-Pille, Ueberschrift, optionale Hero-Zahl, gezeichnete
+Symbol-Bullets, CTA-Pille). Die beiden CI-Kreise (Logo + Slogan 'Wir sind HILO') rotieren
+je Beitrag. Ohne Foto: warmer cremefarbener Fallback."""
 import math, os, json, logging, random, re
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from config import BASE_DIR, DATA_DIR
@@ -220,61 +220,6 @@ def _pille_text(fields):
             return v[:32]
     return "HILO Steuertipp"
 
-def _cta_scrim(base, cy0):
-    """Dezenter dunkler Verlauf-Scrim ab cy0 bis zur Bildunterkante - hebt die Gold-CTA-Pille im
-    ki_tafel-Modus vom KI-Foto ab, ohne das Foto zu ueberdecken (Lesbarkeit)."""
-    band = H - cy0
-    if band <= 0:
-        return
-    scrim = Image.new("L", (1, band), 0); sp = scrim.load()
-    for yy in range(band):
-        sp[0, yy] = int(150 * (yy / max(1, band - 1)) ** 1.3)   # nach unten dunkler
-    scrim = scrim.resize((W, band))
-    dark = Image.new("RGB", (W, band), (10, 22, 44))
-    base.paste(dark, (0, cy0), scrim)
-
-def _render_ki_tafel(fields, photo_path, slogan, out_path, portrait=None):
-    """Bild-Stil 'ki_tafel' (#132, Testmodus): Das KI-Foto traegt die Ueberschrift selbst auf einer
-    Tafel in der Szene. Hier wird das Foto VOLLFLAECHIG (cover) gezeigt; per CODE-Overlay kommen NUR
-    (1) die Gold-CTA-Pille unten (exakter, personalisierbarer CTA-Text mit dezentem Scrim) und
-    (2) die blau-weissen CI-Kreise (Logo + Slogan, rotierend) + optionales Portraet.
-    KEINE Text-Karte, KEINE Code-Ueberschrift, KEINE Bullets. Fallback ohne Foto: Creme-Hintergrund."""
-    base = _background(photo_path).convert("RGB")
-    # #136-C: Im ki_tafel-Modus stehen BEIDE CI-Kreise OBEN ('oben'), damit die untere CTA-Pille
-    # frei und voll lesbar bleibt - ein unten stehender CI-Kreis hatte die CTA-Pille ueberlappt
-    # und den Text verdeckt. Die Kreis-Rotation des Standard-Modus bleibt davon unberuehrt
-    # (pick_circle_pos wird hier bewusst NICHT mehr aufgerufen). Gilt auch mit Portraet, sonst
-    # saesse der Logo-Kreis (diagonal2: unten-links) weiter unten und kollidierte mit der Pille.
-    pos = "oben"
-
-    # Gold-CTA-Pille unten - selbe Quelle/Default wie der Standard-CTA (fields['cta']).
-    cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
-    fcta = _font(_BOLD, 34)
-    h_cta = fcta.size + 2*15
-    cy_cta = H - 132                          # Pillen-Mitte: unten, jetzt frei (Kreise oben)
-    _cta_scrim(base, cy_cta - h_cta//2 - 26)  # dezenter Schatten/Scrim hinter der Pille
-    _pill(base, W//2, cy_cta, cta_txt, fcta, ACCENT, WHITE, padx=36, pady=15)
-
-    _draw_circles(base, slogan, pos, portrait)   # blau-weisse CI-Kreise OBEN (Grafik, kein Text)
-
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    base.save(out_path)
-    return out_path
-
-def _render_kreativ(fields, photo_path, slogan, out_path, portrait=None):
-    """Bild-Stil 'kreativ' (#145): EINFACH NUR das kinoreife KI-Foto (vollflaechig, cover) -
-    KEIN Textfeld/Card, KEINE Ueberschrift/Bullets/Hero, KEINE CTA-Pille, KEINE Saison-Pille,
-    keine Tafel. Per Code-Overlay kommen NUR die blau-weissen CI-Kreise (Logo + Slogan) +
-    optionales Portraet, damit die Marke erkennbar bleibt und das Foto voll wirkt. Die Botschaft
-    (Ueberschrift/CTA/Buchungslink) traegt der Begleittext (Caption). Fallback ohne Foto: Creme."""
-    base = _background(photo_path).convert("RGB")
-    # Kreis-Position rotiert je Beitrag wie im Standard-Modus; mit Portraet feste Position
-    # (diagonal2: Logo unten-links, Portraet oben-rechts).
-    pos = "diagonal2" if portrait else pick_circle_pos()
-    _draw_circles(base, slogan, pos, portrait)   # NUR die CI-Kreise (Grafik) - kein Text/CTA
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    base.save(out_path)
-    return out_path
 
 def add_logo_circles(image_path, slogan, output_path, portrait=None, pos=None):
     """Fügt NUR die Logo-Kreise zu einem bestehenden Bild hinzu (für 3-Stufen-Workflow).
@@ -310,51 +255,11 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None, pos=None):
     return output_path
 
 
-def _render_comic(fields, photo_path, out_path, portrait=None):
-    """Bild-Stil 'comic': Das von ensure_comic_bild erzeugte Comic-Bild (photo_path) IST bereits das
-    fertige Bild (Illustration in HILO-Palette mit freiem Negativraum). Es wird nur noch
-    formatfuellend (cover) auf die Zielleinwand skaliert/eingepasst und gespeichert.
-    KEINE weisse Textkarte, KEINE Bullet-Overlays, KEINE CTA-Pille. Fallback ohne Foto: Creme."""
-    base = _background(photo_path).convert("RGB")
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    base.save(out_path)
-    return out_path
-
-
 def render(fields, photo_path, slogan, out_path, portrait=None):
-    """Rendert das Magazin-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber das
-    weisse Textfeld (Pille, Ueberschrift, optionale Hero-Zahl ODER groessere Ueberschrift + Hook,
-    Symbol-Bullets, Gold-CTA) und die beiden CI-Kreise. Signatur unveraendert (rueckwaertskompatibel:
-    die Felder ueberschrift/subline/bullets/cta/ort werden weiter genutzt).
-
-    Bild-Stil 'ki_tafel' (#132): Modus wird intern aus der Einstellung gelesen (kein neuer Pflicht-
-    Parameter). Default 'standard' -> unveraendertes v11-Layout unten.
-
-    Bild-Stil 'kreativ' (#145): EINFACH NUR das KI-Foto + die CI-Kreise (kein Textfeld/CTA) ->
-    eigener _render_kreativ-Zweig. 'standard' nutzt das v11-Layout unten; nur 'ki_tafel' geht in
-    den _render_ki_tafel-Zweig."""
+    """Rendert das HILO-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber
+    Text programmatisch gerendert (Pille, Ueberschrift, optionale Hero-Zahl, Bullets, CTA)
+    und die beiden CI-Kreise (Logo + Slogan)."""
     fields = _safe_fields(fields); slogan = _safe(slogan)
-    try:
-        # Stil PRO BEITRAG (#144): aus fields['bild_stil'] (stabil) ODER global ODER 'standard'.
-        import stilwahl
-        stil = stilwahl.aktiver_stil(fields)
-    except Exception:
-        stil = "standard"
-    # #143/#145: ki_tafel -> Tafel-Layout; kreativ -> reines Foto + Kreise; standard -> v11 unten.
-    # comic / comic_beratung -> reine Comic-Illustration (kein Overlay), da das Comic-Bild selbst
-    # schon fertig ist (bei comic_beratung inkl. Berater vorne + Finanzamt hinten - die Szene IST
-    # das Bild, KEINE weisse Textkarte drueber).
-    # v5.1+: Wenn Masterprompt v5.1 (Text-im-Bild) verwendet wurde, dann auch für "standard"
-    # nur Foto + Kreise rendern, da OpenAI den Text schon ins Bild integriert hat!
-    import bildmotiv
-    if bildmotiv.PROMPT_VERSION.startswith("v5") and stil == "standard":
-        return _render_kreativ(fields, photo_path, slogan, out_path, portrait)
-    if stil in ("comic", "comic_beratung"):
-        return _render_comic(fields, photo_path, out_path, portrait)
-    if stil == "ki_tafel":
-        return _render_ki_tafel(fields, photo_path, slogan, out_path, portrait)
-    if stil == "kreativ":
-        return _render_kreativ(fields, photo_path, slogan, out_path, portrait)
     base = _background(photo_path).convert("RGB")
 
     # Mit Portraet feste Position (Logo unten-links, Portraet oben-rechts = 'diagonal2');
