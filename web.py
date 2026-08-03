@@ -4413,9 +4413,34 @@ def sharenext():
                     size="1024x1024",
                     quality="medium"
                 )
-                buffered = BytesIO()
-                premium_result.image.save(buffered, format="PNG")
-                premium_b64 = base64.b64encode(buffered.getvalue()).decode()
+
+                # Text über Premium-Rohmotiv rendern
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_raw:
+                    premium_result.image.save(tmp_raw.name, "PNG")
+
+                    # Fields für bildgen.render
+                    fake_entwurf = {
+                        "ueberschrift": thema,
+                        "subline": "",
+                        "bullets": [text],
+                        "cta": "Jetzt informieren"
+                    }
+
+                    # Text-Rendering mit bildgen
+                    slogan = bildgen.pick_slogan()
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_final:
+                        bildgen.render(fake_entwurf, tmp_raw.name, slogan, tmp_final.name)
+                        premium_final = Image.open(tmp_final.name)
+
+                        # Als Base64
+                        buffered = BytesIO()
+                        premium_final.save(buffered, format="PNG")
+                        premium_b64 = base64.b64encode(buffered.getvalue()).decode()
+
+                        # Cleanup
+                        os.unlink(tmp_raw.name)
+                        os.unlink(tmp_final.name)
 
             return render_template_string(SHARENEXT_RESULT, **_ctx(
                 modus=modus,
