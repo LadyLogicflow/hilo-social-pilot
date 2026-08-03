@@ -850,7 +850,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
          <button style="background:#6b7280;padding:6px 10px" title="Nur das Bild neu rendern (kostenlos), Text bleibt">&#x21BB; Nur Bild neu</button></form>
        <form method=post action="/bild-aktion/{{e.id}}" style="display:inline;margin-left:6px">
          <input type=hidden name=zurueck value=einplanung>
-         <input type=hidden name=bild_aktion value=foto_neu>
+         <input type=hidden name=bild_aktion value=premium_neu>
          <button type=submit style="background:#0B2545;padding:6px 10px" title="Neues Premium-Bild erzeugen (ShareNext Pipeline: Art Director + GPT Image 2 + QA)">&#x1F3B2; Premium-Bild neu</button></form>
        <form method=post action="/aktion/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag wirklich löschen? Das kann nicht rückgängig gemacht werden.')">
          <input type=hidden name=zurueck value=einplanung>
@@ -2261,6 +2261,81 @@ def _foto_neu_hintergrund(eid, user):
             pass
 
 
+def _premium_foto_hintergrund(eid, user):
+    """Erzeugt Premium-Bild via ShareNext Pipeline im Hintergrund-Thread.
+
+    ShareNext Pipeline: Message Brief → Creative Director → Concept Jury →
+    Art Director → Image Producer (GPT Image 2) → Visual QA
+    """
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        log.warning("premium_foto_neu (Hintergrund): Entwurf %d existiert nicht mehr.", eid)
+        return
+    try:
+        data = json.loads(e["text"]) if e["text"] else {}
+    except Exception:
+        data = {}
+
+    try:
+        from sharenext_pipeline import run_sharenext_pipeline
+        import uuid
+
+        # ShareNext Pipeline aufrufen
+        headline = data.get("ueberschrift", "")
+        bullets = data.get("bullets", [])
+        text = "\n".join(bullets) if bullets else ""
+        kanal = data.get("kanal", "Facebook")
+
+        result = run_sharenext_pipeline(
+            stream="radar",  # Default stream
+            thema=headline,
+            text=text,
+            kanal=kanal,
+            headline=headline,
+            size="1024x1024",
+            quality="medium"
+        )
+
+        # Bild speichern
+        timestamp = int(time.time())
+        unique_id = uuid.uuid4().hex[:12]
+        final_path = os.path.join(DATA_DIR, "bilder", f"premium_{timestamp}_{unique_id}.png")
+        result.image.save(final_path)
+
+        # Logo-Kreise hinzufügen
+        slogan = bildgen.pick_slogan(data.get("slogan", ""))
+        temp_with_logos = os.path.join(DATA_DIR, "bilder", f"premium_{timestamp}_{unique_id}_logos.png")
+        bildgen.add_logo_circles(final_path, slogan, temp_with_logos, pos="diagonal2")
+        os.replace(temp_with_logos, final_path)
+
+        # Daten aktualisieren
+        data["qa_approved"] = result.approved
+        data["qa_problems"] = [] if result.approved else ["ShareNext QA"]
+        data["bild_pfad"] = str(final_path)
+        data["bild_wird_erstellt"] = False
+        data["sharenext_used"] = True
+
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), str(final_path), eid))
+            audit_log(conn, user, "premium_foto_neu", eid)
+            conn.commit()
+        log.info("premium_foto_neu (Hintergrund) fertig für Entwurf %d (QA: %s)",
+                  eid, "OK" if result.approved else "Probleme")
+    except Exception as ex:
+        log.error("premium_foto_neu (Hintergrund) fehlgeschlagen für Entwurf %d: %s", eid, ex, exc_info=True)
+        try:
+            data["bild_wird_erstellt"] = False
+            data["bild_fehler"] = str(ex)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
+
 @app.route("/bild-aktion/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def bild_aktion(eid):
@@ -2321,6 +2396,22 @@ def bild_aktion(eid):
                               daemon=True).start()
             flash("Neues Bild für Beitrag %d wird im Hintergrund erstellt (dauert ca. 1-2 "
                   "Minuten) - Seite gleich neu laden, um das Ergebnis zu sehen." % eid)
+
+        elif aktion == "premium_neu":
+            # Premium-Bild via ShareNext Pipeline - LÄUFT IM HINTERGRUND
+            if not data.get("ueberschrift"):
+                flash("Kein Text vorhanden! Bitte Post neu erstellen.")
+                return redirect(ziel)
+            data["bild_wird_erstellt"] = True
+            data.pop("bild_fehler", None)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), eid))
+                conn.commit()
+            threading.Thread(target=_premium_foto_hintergrund, args=(eid, session["user"]),
+                              daemon=True).start()
+            flash("Neues PREMIUM-Bild für Beitrag %d wird im Hintergrund erstellt (ShareNext "
+                  "Pipeline: dauert ca. 1-2 Minuten) - Seite gleich neu laden!" % eid)
 
         elif aktion == "stil_wechseln":
             # Anderer Stil würfeln
