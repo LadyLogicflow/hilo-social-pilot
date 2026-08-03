@@ -736,7 +736,7 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_ima
                         # Nur Logo-Kreise hinzufügen (kein Text-Overlay)
                         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_raw:
                             result.image.save(tmp_raw.name, "PNG")
-                            slogan = _bildgen.pick_slogan()
+                            slogan = _bildgen.pick_slogan("")  # Leerer String → zufälliger Standard-Slogan
 
                             from config import DATA_DIR as _DATA_DIR
                             _os.makedirs(_DATA_DIR, exist_ok=True)
