@@ -227,14 +227,16 @@ def _start_generation_ids(ids, bild_modus="standard"):
 
     Args:
         ids: Liste der Thema-IDs
-        bild_modus: 'standard' oder 'premium' (ShareNext)
+        bild_modus: 'standard', 'premium' (ShareNext) oder 'beides'
     """
     os.makedirs(DATA_DIR, exist_ok=True)
     logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
     cmd = [sys.executable, os.path.join(BASE_DIR, "main.py"),
            "--generate-ids", ",".join(str(i) for i in ids)]
-    if bild_modus == "premium":
+    if bild_modus in ["premium", "beides"]:
         cmd.append("--premium-images")
+    if bild_modus == "beides":
+        cmd.append("--both-images")
     _gen["proc"] = subprocess.Popen(
         cmd, cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
@@ -679,6 +681,23 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 {% if themen %}
 <p class=hint>Hake die Themen an, für die jetzt Texte &amp; Bilder erzeugt werden sollen. Für jedes angehakte Thema entsteht ein Entwurf, den du danach unter „3. Freigabe: Texte &amp; Bilder" prüfst.</p>
 <form method=post onsubmit="return chk(this)">
+  <div style="margin-bottom:20px;padding:16px;background:#e6eef6;border-radius:8px;border:2px solid #0B2545">
+    <label style="font-weight:bold;color:#0B2545;margin-bottom:8px;display:block;font-size:15px">🎨 Bildgenerierung</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=bild_modus value="standard" checked>
+        <span><b>Standard</b> <small style="color:#6b7280">(kostenlos, schnell)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=bild_modus value="premium">
+        <span><b>Premium</b> <small style="color:#6b7280">(ShareNext, ~$0.10/Bild)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=bild_modus value="beides">
+        <span><b>Beides</b> <small style="color:#6b7280">(Vergleich, ~$0.10/Bild)</small></span>
+      </label>
+    </div>
+  </div>
   <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
   {% for g in gruppen %}{% set gi = loop.index %}
   <div class=qgroup>
@@ -688,19 +707,6 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
       <button type=button class=delbtn onclick="event.preventDefault();event.stopPropagation();loeschThema({{t.id}},'erzeugen')">Löschen</button></label>{% endfor %}
   </div>
   {% endfor %}
-  <div style="margin-top:20px;padding:16px;background:#f9fafb;border-radius:8px">
-    <label style="font-weight:bold;color:#15191F;margin-bottom:8px;display:block">Bildgenerierung</label>
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type=radio name=bild_modus value="standard" checked>
-        <span><b>Standard</b> <small style="color:#6b7280">(kostenlos, Pillow)</small></span>
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type=radio name=bild_modus value="premium">
-        <span><b>Premium</b> <small style="color:#6b7280">(ShareNext, ~$0.10/Bild)</small></span>
-      </label>
-    </div>
-  </div>
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
     <button{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
@@ -2884,7 +2890,7 @@ def generieren():
 def erzeugen():
     if request.method == "POST":
         ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
-        bild_modus = request.form.get("bild_modus", "standard")  # standard oder premium
+        bild_modus = request.form.get("bild_modus", "standard")  # standard, premium oder beides
         if not ids:
             flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
         with _gen_lock:   # Pruefen+Starten atomar, sonst koennten zwei Klicks zwei Prozesse starten
@@ -2893,7 +2899,7 @@ def erzeugen():
                 return redirect(url_for("index"))
             try:
                 _start_generation_ids(ids, bild_modus=bild_modus)
-                modus_text = "Premium (ShareNext)" if bild_modus == "premium" else "Standard"
+                modus_text = {"standard": "Standard", "premium": "Premium (ShareNext)", "beides": "Standard + Premium"}.get(bild_modus, "Standard")
                 flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (%s) - läuft im Hintergrund. "
                       "In ein bis zwei Minuten die Startseite neu laden." % (len(ids), modus_text))
             except Exception as ex:

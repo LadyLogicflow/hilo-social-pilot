@@ -41,6 +41,7 @@ def main():
     p.add_argument("--generate-ids", metavar="IDS", dest="generate_ids",
                    help="Textentwuerfe nur fuer diese Thema-IDs erzeugen (kommagetrennt, z.B. 12,15,17)")
     p.add_argument("--premium-images", action="store_true", help="Premium-Bilder mit ShareNext generieren (statt Standard)")
+    p.add_argument("--both-images", action="store_true", help="Beide Bild-Varianten generieren (Standard + Premium)")
     p.add_argument("--render", action="store_true", help="Fehlende Bilder fuer Entwuerfe erzeugen")
     p.add_argument("--serve", action="store_true", help="Freigabe-Dashboard starten (Webserver)")
     p.add_argument("--port", type=int, help="Port fuer das Dashboard (Standard 8530)")
@@ -179,9 +180,11 @@ def main():
     if args.generate_ids is not None:
         ids = [x.strip() for x in args.generate_ids.split(",") if x.strip()]
         premium = args.premium_images if hasattr(args, 'premium_images') else False
+        both = args.both_images if hasattr(args, 'both_images') else False
+        modus_text = "Standard + Premium" if both else ("Premium-Bilder" if premium else "Standard-Bilder")
         log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen, %s).",
-                 textgen.generate_for_ids(ids, kanal="google", use_campaign=True, premium_images=premium),
-                 len(ids), "Premium-Bilder" if premium else "Standard-Bilder")
+                 textgen.generate_for_ids(ids, kanal="google", use_campaign=True, premium_images=premium, both_images=both),
+                 len(ids), modus_text)
     if args.render:
         log.info("%s Bilder erzeugt.", bildgen.render_drafts())
     if args.once:
