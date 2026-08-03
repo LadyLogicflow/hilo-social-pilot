@@ -851,7 +851,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
        <form method=post action="/bild-aktion/{{e.id}}" style="display:inline;margin-left:6px">
          <input type=hidden name=zurueck value=einplanung>
          <input type=hidden name=bild_aktion value=foto_neu>
-         <button style="background:#0B2545;padding:6px 10px" title="Neues Premium-Bild erzeugen (ShareNext Pipeline: Art Director + GPT Image 2 + QA)">&#x1F3B2; Premium-Bild neu</button></form>
+         <button type=submit style="background:#0B2545;padding:6px 10px" title="Neues Premium-Bild erzeugen (ShareNext Pipeline: Art Director + GPT Image 2 + QA)">&#x1F3B2; Premium-Bild neu</button></form>
        <form method=post action="/aktion/{{e.id}}" style="display:inline;margin-left:6px" onsubmit="return confirm('Diesen Beitrag wirklich löschen? Das kann nicht rückgängig gemacht werden.')">
          <input type=hidden name=zurueck value=einplanung>
          <button name=aktion value=loeschen style="background:#b00020;padding:6px 10px" title="Beitrag endgültig löschen">Löschen</button></form></p>
