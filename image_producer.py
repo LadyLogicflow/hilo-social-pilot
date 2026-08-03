@@ -145,7 +145,7 @@ Negatives (vermeiden):
 - "watermark", "logo" (außer explizit gewünscht)
 
 HILO Brand:
-- Farben: Navy/Blau + Limette-Akzent
+- Farben: Navy (#1e3a5f), Blue (#4a7ba7), Green (#8fbc3f) - gleichwertig
 - Stil: Professionell aber warm, nicht steril
 - Authentisch, nicht Stock-Klischee
 """
