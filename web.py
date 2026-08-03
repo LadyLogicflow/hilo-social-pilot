@@ -4414,23 +4414,15 @@ def sharenext():
                     quality="medium"
                 )
 
-                # Text über Premium-Rohmotiv rendern
+                # Nur Logo-Kreise über Premium-Rohmotiv
                 import tempfile
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_raw:
                     premium_result.image.save(tmp_raw.name, "PNG")
 
-                    # Fields für bildgen.render
-                    fake_entwurf = {
-                        "ueberschrift": thema,
-                        "subline": "",
-                        "bullets": [text],
-                        "cta": "Jetzt informieren"
-                    }
-
-                    # Text-Rendering mit bildgen
+                    # Nur Logo-Kreise hinzufügen (kein Text!)
                     slogan = bildgen.pick_slogan()
                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_final:
-                        bildgen.render(fake_entwurf, tmp_raw.name, slogan, tmp_final.name)
+                        bildgen.add_logo_circles(tmp_raw.name, slogan, tmp_final.name, pos="unten")
                         premium_final = Image.open(tmp_final.name)
 
                         # Als Base64
