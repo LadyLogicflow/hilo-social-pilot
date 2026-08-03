@@ -143,11 +143,13 @@ Prompt-Tipps:
 - DALL-E 3 versteht komplexe Prompts - nutze das!
 
 Text-Regeln (WICHTIG!):
-- **Text ist erlaubt** - Eine Überschrift IM Bild ist erwünscht
+- **ÜBERSCHRIFT = KERNAUSSAGE** - Verwende die Kernaussage aus dem Message Brief als Überschrift im Bild!
 - **NUR DEUTSCHE SPRACHE** - Absolutely NO English words!
 - **EURO (€) verwenden** - NEVER use Dollar ($) or other currencies
 - Text soll natürlich ins Bild integriert sein (auf Schildern, Anzeigen, etc.)
+- **KEINE geometrischen Formen um Text** - Kein Sechseck, Diamant, Rahmen um Text!
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen
+- **KEINE ERFUNDENEN ÜBERSCHRIFTEN** - Nur die vorgegebene Kernaussage verwenden!
 
 Negatives (vermeiden):
 - "English text", "Dollar sign $", "USD"
@@ -212,6 +214,8 @@ Erstelle:
 3. Negative Prompt Hints (was vermeiden?)
 
 WICHTIG:
+- **ÜBERSCHRIFT = KERNAUSSAGE:** Verwende GENAU die Kernaussage "{brief.kernaussage}" als Überschrift im Bild!
+- **KEINE ERFUNDENEN ÜBERSCHRIFTEN!** Nur die vorgegebene Kernaussage verwenden!
 - Text AUF DEUTSCH ins Bild integrieren (Überschrift natürlich platziert)
 - NIEMALS Englisch oder Dollar-Zeichen verwenden!
 - Zielgruppe: Deutsche Steuerzahler → alles auf Deutsch!

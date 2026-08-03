@@ -64,7 +64,13 @@ def render_text_on_image(
     """
     # Bild laden
     img = Image.open(image_path).convert("RGB")
-    W, H = img.size  # Sollte 1080x1080 sein
+
+    # WICHTIG: GPT generiert 1024x1024, aber wir brauchen 1080x1080!
+    # Skalieren falls nötig (verhindert Abschneiden)
+    if img.size != (1080, 1080):
+        img = img.resize((1080, 1080), Image.LANCZOS)
+
+    W, H = img.size  # Jetzt garantiert 1080x1080
 
     draw = ImageDraw.Draw(img, "RGBA")
 
