@@ -1,0 +1,430 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Art Director Board - Visuelle Regie für ShareNext-Pipeline.
+
+Übersetzt die gewinnende kreative Route in präzise visuelle Entscheidungen:
+- Focal Point: Visueller Schwerpunkt
+- Komposition: Bildaufbau (Rule of Thirds, Symmetrie, etc.)
+- Licht: Richtung, Qualität, Stimmung
+- Farbdramaturgie: Dominante Farben, Kontraste, Temperatur
+- Emotion: Emotionaler Moment, Ausdruck
+
+Teil von Issue #4: ShareNext MVP
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Literal, Optional
+
+from openai import OpenAI
+from pydantic import BaseModel, Field
+
+from message_brief import MessageBrief
+from creative_director import CreativeRoute
+from secrets_store import get_secret
+
+log = logging.getLogger("hilo.art_director")
+
+
+def _get_client() -> OpenAI:
+    """Erstellt OpenAI-Client mit API-Key aus secrets.json oder Umgebung."""
+    api_key = get_secret("openai_api_key")
+    if not api_key:
+        api_key = os.environ.get("OPENAI_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "Kein OpenAI API-Key verfügbar! "
+            "Bitte 'openai_api_key' in data/secrets.json hinterlegen "
+            "oder OPENAI_API_KEY als Umgebungsvariable setzen."
+        )
+
+    return OpenAI(api_key=api_key)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# STRUCTURED OUTPUT MODELS (Pydantic)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class ArtDirectionBoard(BaseModel):
+    """Art Direction Board - präzise visuelle Anweisungen für Image Producer.
+
+    Das Board übersetzt eine kreative Route in konkrete visuelle Entscheidungen
+    entlang von 5 Kern-Achsen.
+    """
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # FOCAL POINT
+    # ─────────────────────────────────────────────────────────────────────────
+
+    focal_point: str = Field(
+        description="Wo liegt der visuelle Schwerpunkt? Was zieht den Blick zuerst an? "
+                    "(z.B. 'Sanduhr im Vordergrund', 'Gesicht der Person', 'Rote Zahl')"
+    )
+
+    focal_point_position: Literal[
+        "Zentrum",
+        "Links-Oben",
+        "Rechts-Oben",
+        "Links-Unten",
+        "Rechts-Unten",
+        "Linke Hälfte",
+        "Rechte Hälfte"
+    ] = Field(description="Position des Focal Points im Bild")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # KOMPOSITION
+    # ─────────────────────────────────────────────────────────────────────────
+
+    komposition_prinzip: Literal[
+        "Rule of Thirds",
+        "Goldener Schnitt",
+        "Symmetrie",
+        "Diagonale",
+        "Rahmen im Rahmen",
+        "Leading Lines",
+        "Negative Space"
+    ] = Field(description="Welches Kompositionsprinzip wird angewendet?")
+
+    bildaufbau: str = Field(
+        description="Beschreibung des Bildaufbaus (2-3 Sätze). Wo sind die Elemente platziert?"
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LICHT
+    # ─────────────────────────────────────────────────────────────────────────
+
+    licht_qualitaet: Literal["Soft", "Hart", "Dramatisch", "Diffus"] = Field(
+        description="Qualität des Lichts"
+    )
+
+    licht_richtung: Literal[
+        "Von vorne (Frontal)",
+        "Von links",
+        "Von rechts",
+        "Von oben",
+        "Von hinten (Backlight)",
+        "Seitlich-schräg"
+    ] = Field(description="Hauptrichtung des Lichts")
+
+    licht_stimmung: str = Field(
+        description="Lichtstimmung / Tageszeit (z.B. 'Warmes Morgenlicht', 'Kühles Bürolicht', "
+                    "'Dramatisches Abendlicht', 'Neutrales Studio-Licht')"
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # FARBDRAMATURGIE
+    # ─────────────────────────────────────────────────────────────────────────
+
+    dominante_farben: list[str] = Field(
+        min_length=2,
+        max_length=4,
+        description="2-4 dominante Farben im Bild (z.B. ['Blau', 'Weiß', 'Rot-Akzent'])"
+    )
+
+    farbtemperatur: Literal["Warm", "Kalt", "Neutral", "Warm-Kalt-Kontrast"] = Field(
+        description="Gesamte Farbtemperatur des Bildes"
+    )
+
+    farbkontrast: str = Field(
+        description="Art des Farbkontrasts (z.B. 'Komplementärkontrast Blau-Orange', "
+                    "'Hell-Dunkel-Kontrast', 'Monochromatisch mit Akzent')"
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # EMOTION & ATMOSPHERE
+    # ─────────────────────────────────────────────────────────────────────────
+
+    emotionaler_moment: str = Field(
+        description="Welcher emotionale Moment wird eingefangen? "
+                    "(z.B. 'Moment der Erleichterung', 'Dringende Eile', 'Ruhige Konzentration')"
+    )
+
+    atmosphaere: str = Field(
+        description="Gesamtatmosphäre des Bildes (z.B. 'Professionell und beruhigend', "
+                    "'Dringlich aber nicht panisch', 'Warm und einladend')"
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TECHNISCHE DETAILS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    kamera_perspektive: Literal[
+        "Eye-Level (Augenhöhe)",
+        "High Angle (von oben)",
+        "Low Angle (von unten)",
+        "Bird's Eye (Vogelperspektive)",
+        "Dutch Angle (schräg)"
+    ] = Field(description="Kameraperspektive")
+
+    schaerfe_tiefe: Literal[
+        "Alles scharf (große Schärfentiefe)",
+        "Fokus vorne, Hintergrund unscharf",
+        "Fokus hinten, Vordergrund unscharf",
+        "Selektive Schärfe (nur Focal Point)"
+    ] = Field(description="Schärfentiefe / Bokeh")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TEXT-ZONEN (wichtig für deterministisches Text-Rendering)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    negativraum_text: str = Field(
+        description="Wo ist Platz für Text? Welche Bereiche bleiben ruhig/leer? "
+                    "(z.B. 'Obere linke Ecke ruhig', 'Rechte Hälfte hat Raum', "
+                    "'Unten Mitte für CTA')"
+    )
+
+    text_kontrast_empfehlung: str = Field(
+        description="Empfehlung für Text-Kontrast (z.B. 'Navy-Text auf heller Zone links', "
+                    "'Weißer Text auf dunklem Hintergrund rechts')"
+    )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# GENERATOR
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def create_art_direction_board(
+    brief: MessageBrief,
+    winning_route: CreativeRoute,
+    model: str = "gpt-4o"
+) -> ArtDirectionBoard:
+    """Erstellt Art Direction Board aus gewinnender Route.
+
+    Übersetzt die kreative Route in präzise visuelle Anweisungen für den
+    Image Producer. Deckt alle 5 Kern-Achsen ab:
+    - Focal Point (Schwerpunkt)
+    - Komposition (Bildaufbau)
+    - Licht (Qualität, Richtung, Stimmung)
+    - Farbdramaturgie (Farben, Temperatur, Kontrast)
+    - Emotion (Moment, Atmosphäre)
+
+    Plus technische Details (Kamera, Schärfe) und Text-Zonen.
+
+    Args:
+        brief: Message Brief (Kontext)
+        winning_route: Gewinnende kreative Route aus Concept Jury
+        model: OpenAI-Modell (default: gpt-4o)
+
+    Returns:
+        ArtDirectionBoard: Detaillierte visuelle Anweisungen
+
+    Raises:
+        ValueError: Wenn OpenAI API-Key fehlt
+        Exception: Bei OpenAI API-Fehlern
+
+    Example:
+        >>> board = create_art_direction_board(brief, winning_route)
+        >>> print(board.focal_point)
+        'Sanduhr im Vordergrund'
+        >>> print(board.licht_stimmung)
+        'Dramatisches Abendlicht'
+        >>> print(board.dominante_farben)
+        ['Rot', 'Schwarz', 'Gold']
+    """
+    client = _get_client()
+
+    # System-Prompt: Art Director Rolle
+    system_prompt = """Du bist ein erfahrener Art Director für Social-Media-Marketing.
+Deine Aufgabe: Übersetze eine kreative Route in präzise visuelle Anweisungen.
+
+Kontext:
+- HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
+- Marke: Vertrauenswürdig, professionell, warm
+- Ziel: Professionelle Bilder die auffallen aber nicht laut/aufdringlich sind
+
+Die 5 Kern-Achsen:
+
+1. **Focal Point**
+   - Was zieht den Blick zuerst an?
+   - Wo liegt es im Bild? (Zentrum, Rule of Thirds, etc.)
+   - Muss klar und dominant sein
+
+2. **Komposition**
+   - Welches Prinzip? (Rule of Thirds, Symmetrie, etc.)
+   - Wo sind die Elemente platziert?
+   - Führt der Bildaufbau das Auge?
+
+3. **Licht**
+   - Qualität: Soft/Hart/Dramatisch?
+   - Richtung: Von wo kommt das Licht?
+   - Stimmung: Welche Tageszeit/Atmosphäre?
+
+4. **Farbdramaturgie**
+   - 2-4 dominante Farben
+   - Warm/Kalt/Neutral?
+   - Welcher Kontrast? (Komplementär, Hell-Dunkel, etc.)
+
+5. **Emotion**
+   - Welcher emotionale Moment?
+   - Gesamtatmosphäre?
+
+Plus:
+- **Kamera**: Perspektive (Eye-Level, High Angle, etc.)
+- **Schärfe**: Schärfentiefe (alles scharf vs. Bokeh)
+- **Text-Zonen**: Wo ist Platz für Text? (wichtig!)
+
+Wichtig:
+- Sei KONKRET (nicht "schönes Licht", sondern "weiches Licht von links")
+- Denk an Text-Zonen (Text muss später drauf passen!)
+- HILO-CI beachten: Navy/Blau + Limette-Akzent
+- Professionell aber nicht steril
+"""
+
+    # User-Prompt: Route + Brief
+    user_prompt = f"""Erstelle ein Art Direction Board für diese kreative Route:
+
+**Message Brief (Kontext):**
+- Kernaussage: {brief.kernaussage}
+- Zielgruppe: {brief.zielgruppe}
+- Gewünschte Emotion: (leite aus Funnel-Stufe ab: {brief.funnel_stufe})
+- Kanal: {brief.kanal}
+
+**Gewinnende Route:**
+- Typ: {winning_route.typ}
+- Titel: {winning_route.titel}
+- Beschreibung: {winning_route.beschreibung}
+- Visuelle Signatur: {winning_route.visuelle_signatur}
+- Emotionale Richtung: {winning_route.emotionale_richtung}
+- Beispiel-Szene: {winning_route.beispiel_szene}
+
+Erstelle präzise visuelle Anweisungen:
+- Focal Point (was + wo?)
+- Komposition (Prinzip + Aufbau)
+- Licht (Qualität + Richtung + Stimmung)
+- Farben (2-4 dominante + Temperatur + Kontrast)
+- Emotion (Moment + Atmosphäre)
+- Kamera + Schärfe
+- Text-Zonen (wo ist Platz?)
+
+Denk an:
+- HILO-CI: Navy/Blau + Limette
+- Text muss später drauf passen!
+- Professionell, warm, vertrauenswürdig
+"""
+
+    log.info(f"Art Director erstellt Board für: {winning_route.titel}")
+
+    try:
+        # OpenAI API-Call mit Structured Output
+        completion = client.beta.chat.completions.parse(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format=ArtDirectionBoard,
+            temperature=0.7  # Balance: Kreativ aber fokussiert
+        )
+
+        board = completion.choices[0].message.parsed
+
+        if not board:
+            raise Exception("OpenAI API gab kein valides Art Direction Board zurück")
+
+        log.info(
+            f"✓ Art Direction Board erstellt:\n"
+            f"   Focal Point: {board.focal_point}\n"
+            f"   Licht: {board.licht_stimmung}\n"
+            f"   Farben: {', '.join(board.dominante_farben)}\n"
+            f"   Emotion: {board.emotionaler_moment}"
+        )
+
+        return board
+
+    except Exception as e:
+        log.error(f"Fehler beim Erstellen des Art Direction Boards: {e}")
+        raise
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CLI TEST
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+if __name__ == "__main__":
+    # Test mit Mock-Daten
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    from message_brief import MessageBrief
+    from creative_director import CreativeRoute
+
+    print("="*80)
+    print("ART DIRECTOR BOARD TEST")
+    print("="*80)
+
+    # Test Message Brief
+    brief = MessageBrief(
+        kernaussage="Wichtige Steuerfrist endet am 31. Dezember",
+        nutzen="Rechtzeitig einreichen, Verspätungszuschlag vermeiden",
+        zielgruppe="Arbeitnehmer",
+        reaktion="Termin buchen",
+        funnel_stufe="Decision",
+        kanal="Facebook"
+    )
+
+    # Simuliere gewinnende Route (Sanduhr-Metapher)
+    winning_route = CreativeRoute(
+        typ="Visuelle Metapher",
+        titel="Sanduhr mit rotem Sand",
+        beschreibung="Dramatische Sanduhr im Fokus, roter Sand rinnt durch, "
+                     "symbolisiert ablaufende Zeit. Dunkler Hintergrund.",
+        visuelle_signatur="Dramatisches Licht von links, Rot-Kontrast",
+        emotionale_richtung="Dringlichkeit (aber nicht Panik)",
+        beispiel_szene="Sanduhr groß im Vordergrund, fast leer, roter Sand"
+    )
+
+    print(f"\nMessage Brief: {brief.kernaussage}")
+    print(f"Gewinnende Route: {winning_route.titel} ({winning_route.typ})\n")
+
+    try:
+        board = create_art_direction_board(brief, winning_route)
+
+        print("🎨 ART DIRECTION BOARD:\n")
+        print("─" * 80)
+        print("FOCAL POINT")
+        print(f"  Element: {board.focal_point}")
+        print(f"  Position: {board.focal_point_position}")
+
+        print("\n" + "─" * 80)
+        print("KOMPOSITION")
+        print(f"  Prinzip: {board.komposition_prinzip}")
+        print(f"  Aufbau: {board.bildaufbau}")
+
+        print("\n" + "─" * 80)
+        print("LICHT")
+        print(f"  Qualität: {board.licht_qualitaet}")
+        print(f"  Richtung: {board.licht_richtung}")
+        print(f"  Stimmung: {board.licht_stimmung}")
+
+        print("\n" + "─" * 80)
+        print("FARBDRAMATURGIE")
+        print(f"  Dominante Farben: {', '.join(board.dominante_farben)}")
+        print(f"  Temperatur: {board.farbtemperatur}")
+        print(f"  Kontrast: {board.farbkontrast}")
+
+        print("\n" + "─" * 80)
+        print("EMOTION & ATMOSPHÄRE")
+        print(f"  Emotionaler Moment: {board.emotionaler_moment}")
+        print(f"  Atmosphäre: {board.atmosphaere}")
+
+        print("\n" + "─" * 80)
+        print("TECHNISCH")
+        print(f"  Kamera: {board.kamera_perspektive}")
+        print(f"  Schärfe: {board.schaerfe_tiefe}")
+
+        print("\n" + "─" * 80)
+        print("TEXT-ZONEN")
+        print(f"  Negativraum: {board.negativraum_text}")
+        print(f"  Text-Kontrast: {board.text_kontrast_empfehlung}")
+
+        print("\n" + "="*80)
+
+    except Exception as e:
+        print(f"\n❌ Fehler: {e}")
+        print("\nHinweis: Dieser Test braucht einen OpenAI API-Key.")
