@@ -276,11 +276,24 @@ def generate_image(
             n=1
         )
 
-        # Download Image von URL
+        # Bild extrahieren (URL oder b64_json)
         import requests
-        image_url = response.data[0].url
-        image_response = requests.get(image_url)
-        image = Image.open(BytesIO(image_response.content))
+        import base64
+
+        image_data = response.data[0]
+
+        if image_data.url:
+            # URL-basiert
+            log.debug(f"Download von URL: {image_data.url[:50]}...")
+            image_response = requests.get(image_data.url)
+            image = Image.open(BytesIO(image_response.content))
+        elif image_data.b64_json:
+            # Base64-basiert
+            log.debug("Dekodiere Base64-Bild")
+            image_bytes = base64.b64decode(image_data.b64_json)
+            image = Image.open(BytesIO(image_bytes))
+        else:
+            raise ValueError("Response enthält weder URL noch b64_json!")
 
         log.info(f"✓ Bild generiert: {image.size[0]}x{image.size[1]} px")
 
