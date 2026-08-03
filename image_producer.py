@@ -83,21 +83,21 @@ class ImageProductionBrief(BaseModel):
     """
 
     image_prompt: str = Field(
-        min_length=100,
+        default="",
         max_length=4000,
-        description="Der vollständige Produktionsprompt für gpt-image-2"
+        description="Der vollständige Produktionsprompt für gpt-image-2 (100-4000 Zeichen bei PASS, leer bei REJECT)"
     )
 
     style_keywords: list[str] = Field(
-        min_length=3,
+        default_factory=list,
         max_length=8,
-        description="3-8 Stil-Keywords"
+        description="3-8 Stil-Keywords (leer bei REJECT)"
     )
 
     negative_hints: list[str] = Field(
-        min_length=1,
+        default_factory=list,
         max_length=10,
-        description="Liste zu vermeidender Merkmale (für QA-Checkliste)"
+        description="Liste zu vermeidender Merkmale für QA-Checkliste (leer bei REJECT)"
     )
 
     visible_text: VisibleText = Field(
