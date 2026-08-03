@@ -651,7 +651,8 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
-<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>"""
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#f59e0b;background:linear-gradient(180deg,#fffbeb,#fff)" href="/sharenext"><h3>🚀 ShareNext - Premium Bildgenerierung</h3><p>KI-basierte 6-Stufen-Pipeline für hochwertige Social-Media-Bilder (~$0.10/Bild, 30-60 Sek.)</p></a>"""
 
 ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
 .bar{max-width:920px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center}
@@ -1499,6 +1500,97 @@ def _ctx(**kw):
     except Exception:
         kw.setdefault("strip_varianten", {})
     return kw
+
+# ShareNext Templates
+SHARENEXT_FORM = """<!doctype html><meta charset=utf-8><title>ShareNext - Premium Bildgenerierung</title>
+<style>""" + _TOP + """
+.card{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:22px}
+label{display:block;font-weight:bold;color:#15191F;margin:16px 0 4px}
+textarea,input[type=text],select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccd3df;border-radius:8px;font-size:15px}
+textarea{min-height:84px;resize:vertical}
+button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:bold}
+.hint{background:#fef3c7;color:#92400e;padding:12px;border-radius:8px;font-size:14px;margin-bottom:16px}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">ShareNext - Premium Bildgenerierung</h2><a href="/">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=card>
+  <div class=hint>
+    <b>🚀 ShareNext</b> ist die Premium-Bildgenerierung mit KI-basierter 6-Stufen-Pipeline:<br>
+    1️⃣ Message Brief → 2️⃣ Creative Director → 3️⃣ Concept Jury → 4️⃣ Art Director → 5️⃣ Image Producer → 6️⃣ Visual QA
+  </div>
+  <form method=post>
+    <label>Content-Stream</label>
+    <select name=stream>
+      <option value="fristen">Fristen-Countdown</option>
+      <option value="anlass">Anlass-Tage</option>
+      <option value="radar">News/Radar</option>
+      <option value="wissen">Wissens-Serie</option>
+    </select>
+
+    <label>Thema / Überschrift</label>
+    <input type=text name=thema placeholder="z. B. Wichtige Steuerfrist endet am 31. Dezember" required>
+
+    <label>Post-Text</label>
+    <textarea name=text placeholder="z. B. Jetzt Termin sichern und Verspätungszuschlag vermeiden!" required></textarea>
+
+    <label>Social-Media-Kanal</label>
+    <select name=kanal>
+      <option value="Facebook">Facebook</option>
+      <option value="Instagram">Instagram</option>
+      <option value="LinkedIn">LinkedIn</option>
+      <option value="Google Business">Google Business</option>
+    </select>
+
+    <button>🎨 ShareNext-Bild generieren</button>
+  </form>
+  <p style="font-size:13px;color:#6b7280;margin-top:16px">
+    ⏱️ Dauer: ca. 30-60 Sekunden | 💰 Kosten: ~$0.10 pro Bild
+  </p>
+</div>"""
+
+SHARENEXT_RESULT = """<!doctype html><meta charset=utf-8><title>ShareNext Ergebnis</title>
+<style>""" + _TOP + """
+.container{max-width:1000px;margin:0 auto;padding:20px}
+.result-card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
+.result-img{width:100%;max-width:600px;border-radius:10px;margin:16px 0}
+.score{display:inline-block;background:#10b981;color:#fff;padding:6px 12px;border-radius:8px;font-weight:bold;margin-right:8px}
+.score.warning{background:#f59e0b}
+.details{background:#f9fafb;padding:16px;border-radius:8px;margin-top:16px}
+.details h4{margin:8px 0;color:#15191F}
+.details p{margin:4px 0;color:#4b5563}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">ShareNext Ergebnis</h2><a href="/sharenext">&larr; Zurück</a></div>
+<div class=container>
+  <div class=result-card>
+    <h3>{{ thema }}</h3>
+    <img src="data:image/png;base64,{{ img_b64 }}" alt="Generiertes Bild" class=result-img>
+
+    <div style="margin:16px 0">
+      {% if result.approved %}
+      <span class=score>✅ FREIGEGEBEN</span>
+      {% else %}
+      <span class="score warning">⚠️ REVIEW EMPFOHLEN</span>
+      {% endif %}
+      <span class=score style="background:#0B2545">Score: {{ "%.1f"|format(result.qa_verdict.gesamtscore) }}/10</span>
+    </div>
+
+    <div class=details>
+      <h4>🎯 Gewinnende Route</h4>
+      <p><b>{{ result.winning_route.typ }}:</b> {{ result.winning_route.titel }}</p>
+      <p>{{ result.winning_route.beschreibung }}</p>
+
+      <h4 style="margin-top:16px">🎨 Art Direction</h4>
+      <p><b>Focal Point:</b> {{ result.art_board.focal_point }}</p>
+      <p><b>Licht:</b> {{ result.art_board.licht_stimmung }}</p>
+      <p><b>Farben:</b> {{ result.art_board.dominante_farben|join(', ') }}</p>
+
+      <h4 style="margin-top:16px">✅ Visual QA</h4>
+      <p><b>Stärken:</b> {{ result.qa_verdict.staerken }}</p>
+      {% if result.qa_verdict.schwaechen %}
+      <p><b>Schwächen:</b> {{ result.qa_verdict.schwaechen }}</p>
+      {% endif %}
+      <p><b>Empfehlung:</b> {{ result.qa_verdict.empfehlung }}</p>
+    </div>
+  </div>
+</div>"""
 
 # --- Routen -----------------------------------------------------------------
 @app.route("/login", methods=["GET", "POST"])
@@ -4206,6 +4298,53 @@ def whatsapp_test_status(sid):
         n = res.get("recipients") if res else None
         flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
     return redirect(url_for("whatsapp"))
+
+@app.route("/sharenext", methods=["GET", "POST"])
+@login_required
+def sharenext():
+    """ShareNext Premium Mode - KI-basierte Bildgenerierung."""
+    if request.method == "POST":
+        from pathlib import Path
+        import base64
+        from io import BytesIO
+        from sharenext_pipeline import run_sharenext_pipeline
+
+        stream = request.form.get("stream", "fristen")
+        thema = request.form.get("thema", "").strip()
+        text = request.form.get("text", "").strip()
+        kanal = request.form.get("kanal", "Facebook")
+
+        if not thema or not text:
+            flash("Bitte Thema und Text angeben!")
+            return redirect(url_for("sharenext"))
+
+        try:
+            # ShareNext Pipeline ausführen
+            result = run_sharenext_pipeline(
+                stream=stream,
+                thema=thema,
+                text=text,
+                kanal=kanal,
+                size="1024x1024",
+                quality="medium"
+            )
+
+            # Bild als Base64 für Anzeige
+            buffered = BytesIO()
+            result.image.save(buffered, format="PNG")
+            img_b64 = base64.b64encode(buffered.getvalue()).decode()
+
+            return render_template_string(SHARENEXT_RESULT, **_ctx(
+                result=result,
+                img_b64=img_b64,
+                thema=thema
+            ))
+
+        except Exception as ex:
+            flash(f"Fehler bei ShareNext Pipeline: {ex}")
+            return redirect(url_for("sharenext"))
+
+    return render_template_string(SHARENEXT_FORM, **_ctx())
 
 def audit_log_safe(aktion):
     """Audit-Eintrag ohne harten Fehler, falls keine DB-Verbindung verfuegbar ist."""
