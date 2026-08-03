@@ -1540,56 +1540,120 @@ button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;
       <option value="Google Business">Google Business</option>
     </select>
 
-    <button>🎨 ShareNext-Bild generieren</button>
+    <label style="margin-top:20px">Bildgenerierung</label>
+    <div style="display:flex;gap:16px;margin:8px 0 16px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=modus value="standard" checked>
+        <span><b>Standard</b><br><small style="color:#6b7280">Bisherige Methode (kostenlos)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=modus value="premium">
+        <span><b>Premium</b><br><small style="color:#6b7280">ShareNext 6-Stufen-Pipeline (~$0.10)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=modus value="beides">
+        <span><b>Beides</b><br><small style="color:#6b7280">Vergleich Standard + Premium (~$0.10)</small></span>
+      </label>
+    </div>
+
+    <button>🎨 Bild generieren</button>
   </form>
-  <p style="font-size:13px;color:#6b7280;margin-top:16px">
-    ⏱️ Dauer: ca. 30-60 Sekunden | 💰 Kosten: ~$0.10 pro Bild
-  </p>
 </div>"""
 
-SHARENEXT_RESULT = """<!doctype html><meta charset=utf-8><title>ShareNext Ergebnis</title>
+SHARENEXT_RESULT = """<!doctype html><meta charset=utf-8><title>Bildgenerierung Ergebnis</title>
 <style>""" + _TOP + """
-.container{max-width:1000px;margin:0 auto;padding:20px}
-.result-card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
-.result-img{width:100%;max-width:600px;border-radius:10px;margin:16px 0}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+.result-card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:24px}
+.result-card.single{max-width:800px;margin:0 auto}
+.result-img{width:100%;border-radius:10px;margin:16px 0}
+.badge{display:inline-block;background:#4D7C0F;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold;margin-bottom:8px}
+.badge.premium{background:#f59e0b}
 .score{display:inline-block;background:#10b981;color:#fff;padding:6px 12px;border-radius:8px;font-weight:bold;margin-right:8px}
 .score.warning{background:#f59e0b}
-.details{background:#f9fafb;padding:16px;border-radius:8px;margin-top:16px}
+.details{background:#f9fafb;padding:16px;border-radius:8px;margin-top:16px;font-size:14px}
 .details h4{margin:8px 0;color:#15191F}
 .details p{margin:4px 0;color:#4b5563}</style>
-<div class=top><h2 style="margin:0;color:#0B2545">ShareNext Ergebnis</h2><a href="/sharenext">&larr; Zurück</a></div>
+<div class=top><h2 style="margin:0;color:#0B2545">Bildgenerierung Ergebnis</h2><a href="/sharenext">&larr; Zurück</a></div>
 <div class=container>
-  <div class=result-card>
-    <h3>{{ thema }}</h3>
-    <img src="data:image/png;base64,{{ img_b64 }}" alt="Generiertes Bild" class=result-img>
+  <h3 style="text-align:center;color:#15191F;margin-bottom:20px">{{ thema }}</h3>
 
+  {% if modus == "beides" %}
+  <div class=compare>
+    <!-- Standard -->
+    <div class=result-card>
+      <div class=badge>Standard (kostenlos)</div>
+      <img src="data:image/png;base64,{{ standard_b64 }}" alt="Standard" class=result-img>
+      <div class=details>
+        <p><b>Methode:</b> Pillow text-over-photo rendering</p>
+        <p><b>Kosten:</b> $0</p>
+        <p><b>Dauer:</b> ~1-2 Sekunden</p>
+      </div>
+    </div>
+
+    <!-- Premium -->
+    <div class=result-card>
+      <div class="badge premium">Premium (ShareNext)</div>
+      <img src="data:image/png;base64,{{ premium_b64 }}" alt="Premium" class=result-img>
+      <div style="margin:16px 0">
+        {% if premium_result.approved %}
+        <span class=score>✅ FREIGEGEBEN</span>
+        {% else %}
+        <span class="score warning">⚠️ REVIEW EMPFOHLEN</span>
+        {% endif %}
+        <span class=score style="background:#0B2545">Score: {{ "%.1f"|format(premium_result.qa_verdict.gesamtscore) }}/10</span>
+      </div>
+      <div class=details>
+        <h4>🎯 Route</h4>
+        <p>{{ premium_result.winning_route.typ }}: {{ premium_result.winning_route.titel }}</p>
+        <h4 style="margin-top:12px">🎨 Art Direction</h4>
+        <p><b>Focal Point:</b> {{ premium_result.art_board.focal_point }}</p>
+        <p><b>Farben:</b> {{ premium_result.art_board.dominante_farben[:3]|join(', ') }}</p>
+        <p><b>Kosten:</b> ~$0.10 | <b>Dauer:</b> ~30-60 Sek.</p>
+      </div>
+    </div>
+  </div>
+
+  {% elif modus == "premium" %}
+  <div class="result-card single">
+    <div class="badge premium">Premium (ShareNext)</div>
+    <img src="data:image/png;base64,{{ premium_b64 }}" alt="Premium" class=result-img>
     <div style="margin:16px 0">
-      {% if result.approved %}
+      {% if premium_result.approved %}
       <span class=score>✅ FREIGEGEBEN</span>
       {% else %}
       <span class="score warning">⚠️ REVIEW EMPFOHLEN</span>
       {% endif %}
-      <span class=score style="background:#0B2545">Score: {{ "%.1f"|format(result.qa_verdict.gesamtscore) }}/10</span>
+      <span class=score style="background:#0B2545">Score: {{ "%.1f"|format(premium_result.qa_verdict.gesamtscore) }}/10</span>
     </div>
-
     <div class=details>
       <h4>🎯 Gewinnende Route</h4>
-      <p><b>{{ result.winning_route.typ }}:</b> {{ result.winning_route.titel }}</p>
-      <p>{{ result.winning_route.beschreibung }}</p>
-
+      <p><b>{{ premium_result.winning_route.typ }}:</b> {{ premium_result.winning_route.titel }}</p>
+      <p>{{ premium_result.winning_route.beschreibung }}</p>
       <h4 style="margin-top:16px">🎨 Art Direction</h4>
-      <p><b>Focal Point:</b> {{ result.art_board.focal_point }}</p>
-      <p><b>Licht:</b> {{ result.art_board.licht_stimmung }}</p>
-      <p><b>Farben:</b> {{ result.art_board.dominante_farben|join(', ') }}</p>
-
+      <p><b>Focal Point:</b> {{ premium_result.art_board.focal_point }}</p>
+      <p><b>Licht:</b> {{ premium_result.art_board.licht_stimmung }}</p>
+      <p><b>Farben:</b> {{ premium_result.art_board.dominante_farben|join(', ') }}</p>
       <h4 style="margin-top:16px">✅ Visual QA</h4>
-      <p><b>Stärken:</b> {{ result.qa_verdict.staerken }}</p>
-      {% if result.qa_verdict.schwaechen %}
-      <p><b>Schwächen:</b> {{ result.qa_verdict.schwaechen }}</p>
+      <p><b>Stärken:</b> {{ premium_result.qa_verdict.staerken }}</p>
+      {% if premium_result.qa_verdict.schwaechen %}
+      <p><b>Schwächen:</b> {{ premium_result.qa_verdict.schwaechen }}</p>
       {% endif %}
-      <p><b>Empfehlung:</b> {{ result.qa_verdict.empfehlung }}</p>
+      <p><b>Empfehlung:</b> {{ premium_result.qa_verdict.empfehlung }}</p>
     </div>
   </div>
+
+  {% else %}
+  <div class="result-card single">
+    <div class=badge>Standard (kostenlos)</div>
+    <img src="data:image/png;base64,{{ standard_b64 }}" alt="Standard" class=result-img>
+    <div class=details>
+      <p><b>Methode:</b> Pillow text-over-photo rendering</p>
+      <p><b>Kosten:</b> $0</p>
+      <p><b>Dauer:</b> ~1-2 Sekunden</p>
+    </div>
+  </div>
+  {% endif %}
 </div>"""
 
 # --- Routen -----------------------------------------------------------------
@@ -4302,7 +4366,7 @@ def whatsapp_test_status(sid):
 @app.route("/sharenext", methods=["GET", "POST"])
 @login_required
 def sharenext():
-    """ShareNext Premium Mode - KI-basierte Bildgenerierung."""
+    """ShareNext - Standard, Premium oder Beides."""
     if request.method == "POST":
         from pathlib import Path
         import base64
@@ -4313,35 +4377,58 @@ def sharenext():
         thema = request.form.get("thema", "").strip()
         text = request.form.get("text", "").strip()
         kanal = request.form.get("kanal", "Facebook")
+        modus = request.form.get("modus", "standard")
 
         if not thema or not text:
             flash("Bitte Thema und Text angeben!")
             return redirect(url_for("sharenext"))
 
         try:
-            # ShareNext Pipeline ausführen
-            result = run_sharenext_pipeline(
-                stream=stream,
-                thema=thema,
-                text=text,
-                kanal=kanal,
-                size="1024x1024",
-                quality="medium"
-            )
+            standard_img = None
+            standard_b64 = None
+            premium_result = None
+            premium_b64 = None
 
-            # Bild als Base64 für Anzeige
-            buffered = BytesIO()
-            result.image.save(buffered, format="PNG")
-            img_b64 = base64.b64encode(buffered.getvalue()).decode()
+            # Standard-Bild generieren
+            if modus in ["standard", "beides"]:
+                # Bisherige Methode: bildgen.py
+                fake_entwurf = {
+                    "ueberschrift": thema,
+                    "subline": "",
+                    "bullets": [text],
+                    "cta": "Jetzt informieren"
+                }
+                standard_img = bildgen.erzeuge_bild(fake_entwurf, kanal.lower())
+                buffered = BytesIO()
+                standard_img.save(buffered, format="PNG")
+                standard_b64 = base64.b64encode(buffered.getvalue()).decode()
+
+            # Premium-Bild generieren
+            if modus in ["premium", "beides"]:
+                premium_result = run_sharenext_pipeline(
+                    stream=stream,
+                    thema=thema,
+                    text=text,
+                    kanal=kanal,
+                    size="1024x1024",
+                    quality="medium"
+                )
+                buffered = BytesIO()
+                premium_result.image.save(buffered, format="PNG")
+                premium_b64 = base64.b64encode(buffered.getvalue()).decode()
 
             return render_template_string(SHARENEXT_RESULT, **_ctx(
-                result=result,
-                img_b64=img_b64,
-                thema=thema
+                modus=modus,
+                thema=thema,
+                standard_b64=standard_b64,
+                premium_result=premium_result,
+                premium_b64=premium_b64
             ))
 
         except Exception as ex:
-            flash(f"Fehler bei ShareNext Pipeline: {ex}")
+            import traceback
+            flash(f"Fehler: {ex}")
+            log.error(f"ShareNext Fehler: {traceback.format_exc()}")
             return redirect(url_for("sharenext"))
 
     return render_template_string(SHARENEXT_FORM, **_ctx())
