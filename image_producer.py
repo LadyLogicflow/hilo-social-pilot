@@ -272,14 +272,14 @@ def generate_image(
             prompt=production_brief.dalle_prompt,
             size=size,
             quality=quality,
-            n=1,
-            response_format="b64_json"  # Base64 für direkten Download
+            n=1
         )
 
-        # Decode Base64 Image
-        image_b64 = response.data[0].b64_json
-        image_data = base64.b64decode(image_b64)
-        image = Image.open(BytesIO(image_data))
+        # Download Image von URL
+        import requests
+        image_url = response.data[0].url
+        image_response = requests.get(image_url)
+        image = Image.open(BytesIO(image_response.content))
 
         log.info(f"✓ Bild generiert: {image.size[0]}x{image.size[1]} px")
 
