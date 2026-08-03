@@ -107,7 +107,7 @@ def run_sharenext_pipeline(
     text: str,
     kanal: str,
     size: str = "1024x1024",
-    quality: str = "high",
+    quality: str = "medium",
     output_path: Optional[Path] = None
 ) -> ShareNextResult:
     """ShareNext Premium Pipeline - End-to-End Bildgenerierung.
@@ -126,7 +126,7 @@ def run_sharenext_pipeline(
         text: Post-Text
         kanal: Social-Media-Kanal ('Facebook', 'Instagram', 'LinkedIn', 'Google Business')
         size: Bildgröße (default: 1024x1024)
-        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'medium'
         output_path: Optional Speicherpfad für Bild
 
     Returns:

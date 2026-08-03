@@ -242,7 +242,7 @@ WICHTIG: KEIN TEXT im Bild!
 def generate_image(
     production_brief: ImageProductionBrief,
     size: str = "1024x1024",
-    quality: str = "high",
+    quality: str = "medium",
     output_path: Optional[Path] = None
 ) -> Image.Image:
     """Generiert Rohmotiv mit OpenAI Image Model.
@@ -250,7 +250,7 @@ def generate_image(
     Args:
         production_brief: Production Brief mit Prompt
         size: Bildgröße ('1024x1024', '1024x1792', '1792x1024')
-        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'medium'
         output_path: Optional - Pfad zum Speichern (None = nicht speichern)
 
     Returns:
@@ -307,7 +307,7 @@ def produce_image(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     size: str = "1024x1024",
-    quality: str = "high",
+    quality: str = "medium",
     output_path: Optional[Path] = None
 ) -> tuple[Image.Image, ImageProductionBrief]:
     """High-Level API: Erstellt Production Brief + generiert Bild.
@@ -319,7 +319,7 @@ def produce_image(
         route: Gewinnende kreative Route
         art_board: Art Direction Board
         size: Bildgröße (default: 1024x1024)
-        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'medium'
         output_path: Optional Speicherpfad
 
     Returns:
