@@ -255,10 +255,14 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None, pos=None):
     return output_path
 
 
-def render(fields, photo_path, slogan, out_path, portrait=None):
+def render(fields, photo_path, slogan, out_path, portrait=None, only_headline=False):
     """Rendert das HILO-Bild: Foto (oder Creme-Fallback) als Vollbild-Hintergrund, darueber
     Text programmatisch gerendert (Pille, Ueberschrift, optionale Hero-Zahl, Bullets, CTA)
-    und die beiden CI-Kreise (Logo + Slogan)."""
+    und die beiden CI-Kreise (Logo + Slogan).
+
+    Args:
+        only_headline: Wenn True, wird NUR die Überschrift gerendert (keine Bullets/CTA) - cleaner Look!
+    """
     fields = _safe_fields(fields); slogan = _safe(slogan)
     base = _background(photo_path).convert("RGB")
 
@@ -289,28 +293,43 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
     fhero = _font(_BOLD, 96)
     sub_txt = fields.get("subline", "") if not hero else ""   # ohne Hero zusaetzlich eine Hook-Subline
     fsub = _font(_REG, 30); SL = _wrap(dr, sub_txt, fsub, inw) if sub_txt else []
-    fb = _font(_BOLD, 30)
-    bullets = [b for b in (fields.get("bullets") or [])[:3] if b]
-    icon_r = 22; bx_text = inx + 2*icon_r + 22
-    bblocks = [_wrap(dr, b, fb, inw - (2*icon_r + 22)) for b in bullets]
-    lh_b = fb.size + 6
-    cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
-    fcta = _font(_BOLD, 30)
+
+    # NUR ÜBERSCHRIFT-Modus: Bullets + CTA überspringen
+    if only_headline:
+        bullets = []
+        bblocks = []
+        cta_txt = ""
+    else:
+        fb = _font(_BOLD, 30)
+        bullets = [b for b in (fields.get("bullets") or [])[:3] if b]
+        icon_r = 22; bx_text = inx + 2*icon_r + 22
+        bblocks = [_wrap(dr, b, fb, inw - (2*icon_r + 22)) for b in bullets]
+        lh_b = fb.size + 6
+        cta_txt = (_safe(fields.get("cta")) or "Jetzt Termin vereinbaren").strip()
+        fcta = _font(_BOLD, 30)
 
     # Hoehen der einzelnen Bloecke (mit Abstaenden)
     h_pill = fpill.size + 2*11
     h_head = len(HL)*lh_h
     h_hero = fhero.size if hero else 0
     h_sub = len(SL)*(fsub.size + 6)
-    bstep = lh_b + 26
-    h_bul = len(bblocks)*bstep
-    h_cta = fcta.size + 2*13
+
+    if only_headline:
+        # NUR ÜBERSCHRIFT-Modus: Keine Bullets/CTA
+        h_bul = 0
+        h_cta = 0
+    else:
+        bstep = lh_b + 26
+        h_bul = len(bblocks)*bstep
+        h_cta = fcta.size + 2*13
+
     gap = 22
     parts = [h_pill, h_head]
     if hero: parts.append(h_hero)
     if SL: parts.append(h_sub)
-    if bblocks: parts.append(h_bul)
-    parts.append(h_cta)
+    if not only_headline:
+        if bblocks: parts.append(h_bul)
+        parts.append(h_cta)
     content_h = sum(parts) + gap*(len(parts)-1)
 
     # Issue #131 (ARGUS-Blocker behoben): Die Karte muss den Inhalt VOLLSTAENDIG umschliessen,
@@ -353,18 +372,19 @@ def render(fields, photo_path, slogan, out_path, portrait=None):
         y += gap
 
     # Symbol-Bullets (gezeichnete Icons, gruen) - linksbuendig im Feld
-    for i, bl in enumerate(bblocks):
-        cyb = y + bstep//2
-        _bullet_icon(base, inx + icon_r, cyb, icon_r, _BULLET_ICONS[i % len(_BULLET_ICONS)])
-        ty = cyb - (len(bl)-1)*lh_b//2
-        for ln in bl:
-            dr.text((bx_text, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh_b
-        y += bstep
-    if bblocks:
-        y += gap
+    if not only_headline:
+        for i, bl in enumerate(bblocks):
+            cyb = y + bstep//2
+            _bullet_icon(base, inx + icon_r, cyb, icon_r, _BULLET_ICONS[i % len(_BULLET_ICONS)])
+            ty = cyb - (len(bl)-1)*lh_b//2
+            for ln in bl:
+                dr.text((bx_text, ty), ln, font=fb, fill=NAVY, anchor="lm"); ty += lh_b
+            y += bstep
+        if bblocks:
+            y += gap
 
-    # warme CTA-Pille (Gold) - der Ortsbezug steckt bereits im personalisierten cta-Text
-    _pill(base, cxc, y + h_cta//2, cta_txt, fcta, ACCENT, WHITE, padx=34, pady=13)
+        # warme CTA-Pille (Gold) - der Ortsbezug steckt bereits im personalisierten cta-Text
+        _pill(base, cxc, y + h_cta//2, cta_txt, fcta, ACCENT, WHITE, padx=34, pady=13)
 
     _draw_circles(base, slogan, pos, portrait)   # schwebende CI-Kreise, Eckposition rotiert je Beitrag
 

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Image Producer - Generiert Rohmotiv ohne Text für ShareNext-Pipeline.
+Image Producer - Generiert Premium-Bild MIT deutscher Überschrift für ShareNext-Pipeline.
 
 Übersetzt Art Direction Board in DALL-E Prompt und generiert das Bild.
 
 WICHTIG:
-- KEIN TEXT im generierten Bild!
-- Negativraum für Text muss vorhanden sein
-- Text wird später deterministisch mit Pillow gesetzt
+- Text NUR auf DEUTSCH (NIEMALS Englisch!)
+- Überschrift natürlich ins Bild integriert
+- EURO (€) verwenden, NIEMALS Dollar ($)
+- Zielgruppe: Deutsche Steuerzahler
 
 Teil von Issue #5: ShareNext MVP
 """
@@ -65,7 +66,7 @@ class ImageProductionBrief(BaseModel):
         min_length=100,
         max_length=4000,
         description="Detaillierter DALL-E Prompt (100-4000 Zeichen). "
-                    "WICHTIG: KEIN Text/Wörter/Zahlen im Bild! Nur visuelle Elemente."
+                    "WICHTIG: Text NUR auf DEUTSCH! Überschrift ins Bild integriert. NIEMALS Englisch oder Dollar-Zeichen!"
     )
 
     style_keywords: list[str] = Field(
@@ -75,7 +76,7 @@ class ImageProductionBrief(BaseModel):
     )
 
     negative_prompt_hints: str = Field(
-        description="Was soll VERMIEDEN werden? (z.B. 'text, words, numbers, generic stock photo look')"
+        description="Was soll VERMIEDEN werden? (z.B. 'English text, Dollar sign, generic stock photo look')"
     )
 
 
@@ -95,7 +96,7 @@ def create_production_brief(
     Die Prompt Director Rolle übersetzt das Art Board in einen präzisen
     DALL-E Prompt der alle visuellen Elemente beschreibt.
 
-    WICHTIG: KEIN TEXT im Bild! Text wird später deterministisch gesetzt.
+    WICHTIG: Text nur auf DEUTSCH! Überschrift wird ins Bild integriert.
 
     Args:
         brief: Message Brief (Kontext)
@@ -116,10 +117,12 @@ def create_production_brief(
     system_prompt = """Du bist ein Prompt Director für DALL-E Bildgenerierung.
 Deine Aufgabe: Übersetze ein Art Direction Board in einen präzisen DALL-E Prompt.
 
-KRITISCH WICHTIG:
-- **KEIN TEXT** im Bild! Keine Wörter, Zahlen, Buchstaben!
-- Text wird später deterministisch gesetzt (Pillow)
-- Negativraum für Text MUSS vorhanden sein
+KRITISCH WICHTIG - TEXT-REGELN:
+- **Text NUR auf DEUTSCH** - Absolutely NO English!
+- **Überschrift ins Bild integrieren** - natürlich platziert (Schilder, Anzeigen, Tafeln)
+- **EURO (€) verwenden** - NEVER Dollar ($) or USD!
+- **Zielgruppe: Deutsche Steuerzahler** - alles auf Deutsch!
+- Negativraum für weiteren Text sollte vorhanden sein
 
 DALL-E Prompt Struktur:
 
@@ -138,16 +141,24 @@ Prompt-Tipps:
 - Beschreibe was DU SIEHST, nicht was es BEDEUTET
 - DALL-E 3 versteht komplexe Prompts - nutze das!
 
+Text-Regeln (WICHTIG!):
+- **Text ist erlaubt** - Eine Überschrift IM Bild ist erwünscht
+- **NUR DEUTSCHE SPRACHE** - Absolutely NO English words!
+- **EURO (€) verwenden** - NEVER use Dollar ($) or other currencies
+- Text soll natürlich ins Bild integriert sein (auf Schildern, Anzeigen, etc.)
+- Keine zusätzlichen Labels, Captions oder Wasserzeichen
+
 Negatives (vermeiden):
-- "text", "words", "numbers", "letters", "captions"
+- "English text", "Dollar sign $", "USD"
 - "generic stock photo"
 - "cluttered"
-- "watermark", "logo" (außer explizit gewünscht)
+- "watermark" (außer HILO Logo)
 
 HILO Brand:
 - Farben: Navy (#1e3a5f), Blue (#4a7ba7), Green (#8fbc3f) - alle gleichwertig, Akzente gerne in einer dieser Farben
 - Stil: Professionell aber warm, nicht steril
 - Authentisch, nicht Stock-Klischee
+- Zielgruppe: Deutsche Steuerzahler
 """
 
     # User-Prompt: Art Board Daten
@@ -199,7 +210,10 @@ Erstelle:
 2. 3-8 Stil-Keywords
 3. Negative Prompt Hints (was vermeiden?)
 
-WICHTIG: KEIN TEXT im Bild!
+WICHTIG:
+- Text AUF DEUTSCH ins Bild integrieren (Überschrift natürlich platziert)
+- NIEMALS Englisch oder Dollar-Zeichen verwenden!
+- Zielgruppe: Deutsche Steuerzahler → alles auf Deutsch!
 """
 
     log.info(f"Prompt Director erstellt DALL-E Prompt für: {route.titel}")

@@ -993,11 +993,12 @@ def run_campaign(
             ) if not output_path else output_path
 
             log.info("Stufe 2b: Text-Rendering mit Pillow (Layout: %s)...", plan.layout_template)
+            # NUR ÜBERSCHRIFT-Modus: Supporting Points + CTA weglassen für cleanen Look!
             image_path = render_text_on_image(
                 motiv_image_path,
                 plan.headline,
-                plan.supporting_points,
-                plan.cta,
+                [],  # Supporting Points weglassen
+                "",  # CTA weglassen
                 plan.headline_box,
                 plan.supporting_box,
                 plan.cta_box,

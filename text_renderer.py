@@ -145,21 +145,23 @@ def render_text_on_image(
         background_overlay, highlight_set
     )
 
-    # 2. Supporting Points rendern
-    bullets_text = "\n".join(f"• {p}" for p in supporting_points)
-    _render_text_block(
-        draw, bullets_text,
-        supporting_box, W, H,
-        font_body, supporting_color, supporting_outline,
-        background_overlay, highlight_set
-    )
+    # 2. Supporting Points rendern (nur wenn vorhanden)
+    if supporting_points:
+        bullets_text = "\n".join(f"• {p}" for p in supporting_points)
+        _render_text_block(
+            draw, bullets_text,
+            supporting_box, W, H,
+            font_body, supporting_color, supporting_outline,
+            background_overlay, highlight_set
+        )
 
-    # 3. CTA rendern (auf grüner/navy Fläche)
-    _render_cta_button(
-        draw, cta,
-        cta_box, W, H,
-        font_cta, WHITE, GREEN
-    )
+    # 3. CTA rendern (nur wenn vorhanden)
+    if cta and cta.strip():
+        _render_cta_button(
+            draw, cta,
+            cta_box, W, H,
+            font_cta, WHITE, GREEN
+        )
 
     # Speichern
     img.save(output_path)
