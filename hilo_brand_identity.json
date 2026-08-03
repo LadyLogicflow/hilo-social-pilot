@@ -1,0 +1,77 @@
+{
+  "name": "HILO",
+  "full_name": "HILO Lohnsteuerhilfe",
+  "description": "Hilfsorganisation für Lohnsteuerhilfe - unterstützt Arbeitnehmer und Rentner bei Steuerfragen",
+
+  "colors": {
+    "notes": "Die Farben sind gleichwertig - je nach Hintergrund verwendbar",
+    "primary_navy": "#1e3a5f",
+    "primary_blue": "#4a7ba7",
+    "primary_green": "#8fbc3f",
+    "text_dark": "#1e3a5f",
+    "text_light": "#ffffff",
+    "background_light": "#f9fafb",
+    "background_dark": "#1e3a5f"
+  },
+
+  "brand_values": [
+    "Vertrauenswürdig",
+    "Professionell",
+    "Persönlich",
+    "Unterstützend"
+  ],
+
+  "tone_of_voice": {
+    "personality": "Freundlich warm und kompetent",
+    "description": "Wir kommunizieren auf Augenhöhe - professionell ohne distanziert zu sein, kompetent ohne einschüchternd zu wirken",
+    "do": [
+      "Freundlich und zugänglich sein",
+      "Kompetenz zeigen",
+      "Persönlich ansprechen",
+      "Unterstützung anbieten",
+      "Klar und verständlich erklären"
+    ],
+    "dont": [
+      "Zu laut oder aufdringlich werden",
+      "Steril oder unpersönlich wirken",
+      "Einschüchternd oder überheblich sein",
+      "Zu technisch oder kompliziert sprechen"
+    ]
+  },
+
+  "visual_style": {
+    "notes": "Aktuell keine Einschränkungen - wird später verfeinert",
+    "photography": "Authentisch, professionell aber warm",
+    "mood": "Vertrauenswürdig und einladend, nicht steril",
+    "avoid": [
+      "Zu laute oder aufdringliche Farben",
+      "Sterile Stock-Foto-Ästhetik",
+      "Zu abstrakt oder kompliziert",
+      "Unpersönlich oder kalt"
+    ],
+    "prefer": [
+      "Warme Lichtstimmungen",
+      "Klare, verständliche Motive",
+      "Authentische Szenen",
+      "Professionell aber zugänglich"
+    ]
+  },
+
+  "target_audience": {
+    "primary": [
+      "Arbeitnehmer",
+      "Rentner"
+    ],
+    "secondary": [
+      "Familien",
+      "Selbständige (in speziellen Fällen)"
+    ],
+    "characteristics": "Keine Marketing-Profis - normale Menschen die Unterstützung bei Steuerfragen suchen"
+  },
+
+  "logo": {
+    "usage": "HILO Logo mit Farbstreifen (Grün, Hellblau, Navy)",
+    "placement": "Typischerweise unten rechts im Kreis",
+    "colors_in_logo": ["Navy", "Grün", "Hellblau"]
+  }
+}
