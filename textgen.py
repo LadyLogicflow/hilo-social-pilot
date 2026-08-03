@@ -660,7 +660,7 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
     return fields
 
 
-def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_images=False):
+def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_images=False, both_images=False):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf.
 
     Args:
@@ -670,6 +670,7 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_ima
                       False = Anthropic Claude (bisheriger Workflow)
         test_mode: True = low quality für Tests (nur bei use_campaign=True)
         premium_images: True = ShareNext Premium-Bilder statt Standard
+        both_images: True = Beide Bild-Varianten generieren (Standard + Premium)
 
     Returns:
         Anzahl erzeugter Entwuerfe
@@ -715,7 +716,7 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_ima
                 entwurf_id = cursor.lastrowid
 
                 # Premium-Bilder mit ShareNext generieren
-                if premium_images:
+                if premium_images or both_images:
                     try:
                         log.info("Generiere Premium-Bild (ShareNext) für Entwurf %s...", entwurf_id)
                         from sharenext_pipeline import run_sharenext_pipeline
@@ -739,14 +740,22 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_ima
 
                             from config import DATA_DIR as _DATA_DIR
                             _os.makedirs(_DATA_DIR, exist_ok=True)
-                            bild_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}.png")
 
-                            _bildgen.add_logo_circles(tmp_raw.name, slogan, bild_pfad, pos="unten")
+                            # Bei "beides": Premium-Bild als _premium.png speichern, Standard bleibt
+                            # Bei "nur premium": Premium-Bild als Hauptbild
+                            if both_images:
+                                premium_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}_premium.png")
+                                _bildgen.add_logo_circles(tmp_raw.name, slogan, premium_pfad, pos="unten")
+                                log.info("✓ Premium-Bild generiert: %s (zusätzlich zu Standard)", premium_pfad)
+                            else:
+                                bild_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}.png")
+                                _bildgen.add_logo_circles(tmp_raw.name, slogan, bild_pfad, pos="unten")
+                                # Bild-Pfad in DB aktualisieren (nur bei "nur premium")
+                                conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, entwurf_id))
+                                log.info("✓ Premium-Bild generiert: %s", bild_pfad)
+
                             _os.unlink(tmp_raw.name)
 
-                        # Bild-Pfad in DB aktualisieren
-                        conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, entwurf_id))
-                        log.info("✓ Premium-Bild generiert: %s", bild_pfad)
                     except Exception as ex:
                         log.error("Premium-Bild-Generierung fehlgeschlagen (Entwurf %s): %s", entwurf_id, ex)
                         # Weiter mit Standard-Bild (falls vorhanden)
@@ -781,7 +790,7 @@ def generate_drafts(limit=3, kanal="google", use_campaign=False, test_mode=False
             "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
     return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
 
-def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, premium_images=False):
+def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, premium_images=False, both_images=False):
     """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs.
 
     Args:
@@ -791,6 +800,7 @@ def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, p
                       False = Anthropic Claude (bisheriger Workflow)
         test_mode: True = low quality für Tests (nur bei use_campaign=True)
         premium_images: True = ShareNext Premium-Bilder statt Standard
+        both_images: True = Beide Bild-Varianten generieren (Standard + Premium)
 
     Returns:
         Anzahl erzeugter Entwuerfe
@@ -808,7 +818,7 @@ def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, p
             "SELECT id, titel, url, volltext FROM themen WHERE id IN (%s) AND status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id AND e.kanal=?)" % ph,
             ids + [kanal]).fetchall()
-    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode, premium_images=premium_images)
+    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode, premium_images=premium_images, both_images=both_images)
 
 
 def regenerate(thema, previous, feedback, kanal="google"):
