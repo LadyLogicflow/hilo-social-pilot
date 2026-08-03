@@ -56,27 +56,60 @@ def _get_client() -> OpenAI:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-class ImageProductionBrief(BaseModel):
-    """Production Brief - DALL-E Prompt aus Art Direction Board.
+class VisibleText(BaseModel):
+    """Text-Modus und exakter Text."""
+    mode: str = Field(description="'no_text' oder 'exact_headline'")
+    exact_text: str = Field(default="", description="Exakter Text oder leer")
 
-    Übersetzt visuelle Anweisungen in einen präzisen DALL-E Prompt.
+
+class CompositionCheck(BaseModel):
+    """Kompositionsprüfung."""
+    primary_focus: str = Field(description="Position des Hauptmotivs")
+    text_zone: str = Field(description="Position der ruhigen Textfläche")
+    bottom_left_safe: bool = Field(description="Untere linke Schutzzone frei?")
+    top_right_safe: bool = Field(description="Obere rechte Schutzzone frei?")
+
+
+class Preflight(BaseModel):
+    """Preflight-Check vor Bildgenerierung."""
+    status: str = Field(description="'PASS' oder 'REJECT'")
+    issues: list[str] = Field(default_factory=list, description="Liste von Problemen bei REJECT")
+
+
+class ImageProductionBrief(BaseModel):
+    """Production Brief - ShareNext JSON-Output nach Catrins Spezifikation.
+
+    Strukturiertes Output mit Preflight-Check und Kompositionsvalidierung.
     """
 
-    dalle_prompt: str = Field(
+    image_prompt: str = Field(
         min_length=100,
         max_length=4000,
-        description="Detaillierter DALL-E Prompt (100-4000 Zeichen). "
-                    "WICHTIG: Text NUR auf DEUTSCH! Überschrift ins Bild integriert. NIEMALS Englisch oder Dollar-Zeichen!"
+        description="Der vollständige Produktionsprompt für gpt-image-2"
     )
 
     style_keywords: list[str] = Field(
         min_length=3,
         max_length=8,
-        description="3-8 Stil-Keywords (z.B. 'editorial photography', 'dramatic lighting', 'minimalist')"
+        description="3-8 Stil-Keywords"
     )
 
-    negative_prompt_hints: str = Field(
-        description="Was soll VERMIEDEN werden? (z.B. 'English text, Dollar sign, generic stock photo look')"
+    negative_hints: list[str] = Field(
+        min_length=1,
+        max_length=10,
+        description="Liste zu vermeidender Merkmale (für QA-Checkliste)"
+    )
+
+    visible_text: VisibleText = Field(
+        description="Text-Modus und exakter sichtbarer Text"
+    )
+
+    composition_check: CompositionCheck = Field(
+        description="Kompositionsprüfung mit Schutzzonen"
+    )
+
+    preflight: Preflight = Field(
+        description="Preflight-Status und ggf. Probleme"
     )
 
 
@@ -89,33 +122,179 @@ def create_production_brief(
     brief: MessageBrief,
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
+    headline: str = "",
     model: str = "gpt-4o"
 ) -> ImageProductionBrief:
-    """Erstellt Production Brief (DALL-E Prompt) aus Art Direction Board.
+    """Erstellt Production Brief nach ShareNext-Spezifikation (Catrin).
 
-    Die Prompt Director Rolle übersetzt das Art Board in einen präzisen
-    DALL-E Prompt der alle visuellen Elemente beschreibt.
-
-    WICHTIG: Text nur auf DEUTSCH! Überschrift wird ins Bild integriert.
+    Der Image Prompt Director übersetzt das Art Direction Board in einen präzisen
+    Produktionsprompt für gpt-image-2 mit Preflight-Check.
 
     Args:
         brief: Message Brief (Kontext)
         route: Gewinnende kreative Route
-        art_board: Art Direction Board mit visuellen Anweisungen
+        art_board: Art Direction Board
+        headline: Freigegebene Überschrift vom Copywriter (Campaign Plan)
         model: OpenAI-Modell (default: gpt-4o)
 
     Returns:
-        ImageProductionBrief: DALL-E Prompt + Keywords + Negative Hints
+        ImageProductionBrief: JSON-Output mit Preflight + Kompositionscheck
 
     Raises:
-        ValueError: Wenn OpenAI API-Key fehlt
+        ValueError: Wenn OpenAI API-Key fehlt oder Preflight REJECT
         Exception: Bei OpenAI API-Fehlern
     """
     client = _get_client()
 
-    # System-Prompt: Prompt Director Rolle
-    system_prompt = """Du bist ein Prompt Director für DALL-E Bildgenerierung.
-Deine Aufgabe: Übersetze ein Art Direction Board in einen präzisen DALL-E Prompt.
+    # Schutzzonen-Definitionen (basierend auf HILO-Kreisen)
+    SAFE_ZONE_WIDTH = "22%"
+    SAFE_ZONE_HEIGHT = "28%"
+
+    # System-Prompt: ShareNext Image Prompt Director (Catrin's Spezifikation)
+    system_prompt = """ROLLE
+
+Du bist der Image Prompt Director von ShareNext.
+
+Du übersetzt ein bereits freigegebenes Art Direction Board in einen präzisen
+Produktionsprompt für das OpenAI-Bildmodell gpt-image-2.
+
+Du entwickelst keine neue Kampagnenidee und veränderst weder Kernaussage noch
+freigegebene Überschrift. Deine Aufgabe ist die visuell präzise Umsetzung der
+vorgegebenen Creative Direction.
+
+ZIEL
+
+Erzeuge einen technisch klaren, visuell konkreten Bildprompt für ein
+hochwertiges Social-Media-Motiv für deutsche Steuerzahler.
+
+Das Ergebnis soll:
+- innerhalb von 1–2 Sekunden erfassbar sein,
+- einen klaren visuellen Fokus besitzen,
+- professionell, warm und glaubwürdig wirken,
+- sich deutlich von generischer Stockfotografie unterscheiden,
+- ausreichend Ruhe für das spätere HILO-Layout bieten,
+- das vorgegebene Seitenverhältnis konsequent berücksichtigen.
+
+TEXTMODUS
+
+Wenn text_mode = "no_text":
+- Erzeuge keinerlei Schrift im Bild.
+- Keine Buchstaben, Zahlen, Formulare, Displays, Beschriftungen oder Wasserzeichen.
+- Halte die definierte Textzone visuell ruhig und kontrastarm.
+- Die Überschrift wird nach der Bildgenerierung durch ShareNext gesetzt.
+
+Wenn text_mode = "exact_headline":
+- Verwende ausschließlich diese exakte sichtbare Überschrift.
+- Übernimm jedes Wort und jedes Zeichen unverändert.
+- Die Überschrift muss vollständig auf Deutsch, korrekt geschrieben und auf
+  Mobilgeräten gut lesbar sein.
+- Keine weiteren sichtbaren Wörter, Buchstaben, Zahlen oder Beschriftungen.
+- Keine Übersetzung, Ergänzung oder Umformulierung.
+- Keine Textbox, kein Banner, kein Rahmen und keine geometrische Unterlegung.
+- Die Schrift erscheint als bewusst gestaltete typografische Ebene in der
+  vorgegebenen Textzone.
+- Text niemals auf komplexen, kontrastreichen oder unruhigen Bildbereichen.
+
+WÄHRUNGSREGEL
+
+Falls im freigegebenen Motiv ein Geldbetrag sichtbar sein muss:
+- ausschließlich Euro mit dem Zeichen €,
+- niemals Dollarzeichen, USD oder andere Währungen,
+- keine erfundenen oder zusätzlichen Geldbeträge.
+
+SCHUTZZONEN
+
+Die Schutzzonen unten links und oben rechts müssen:
+- vollständig frei von Personen, Gesichtern und Händen bleiben,
+- frei von Hauptmotiven und wichtigen Gegenständen bleiben,
+- frei von Schrift, Schildern und starken Kontrasten bleiben,
+- eine ruhige, möglichst gleichmäßige Hintergrundfläche besitzen.
+
+„Frei" bedeutet nicht zwingend leer oder weiß. Eine unscharfe Wand, ruhiger
+Himmel, weiche Fläche oder gleichmäßige Umgebung ist zulässig.
+
+HILO-MARKENFÜHRUNG
+
+Verwende die HILO-Farben kontrolliert und nicht zu gleichen Anteilen:
+
+- Navy #1e3a5f als mögliche dominante Farbe
+- Blau #4a7ba7 als mögliche Sekundärfarbe
+- Grün #8fbc3f ausschließlich als gezielter Akzent
+- neutrale, natürliche Farben dürfen das Motiv ergänzen
+
+Nutze pro Motiv:
+- eine dominante Farbfamilie,
+- höchstens eine sekundäre Markenfarbe,
+- höchstens einen sparsamen grünen Akzent.
+
+Die Farben sollen natürlich über Gegenstände, Licht, Kleidung, Architektur oder
+Materialien im Motiv erscheinen. Keine künstlichen Farbflächen, sofern diese
+nicht ausdrücklich im Art Direction Board verlangt werden.
+
+BILDGESTALTUNG
+
+Beschreibe ausschließlich sichtbar darstellbare Merkmale:
+
+1. Bildmedium und visueller Stil
+2. Hauptmotiv mit konkreten Details
+3. Umgebung und relevante Nebenobjekte
+4. räumlicher Bildaufbau
+5. Position und Blickführung
+6. Kameraperspektive und Brennweitenwirkung
+7. Lichtquelle, Richtung, Härte und Kontrast
+8. dominante Farben und Materialoberflächen
+9. Atmosphäre und emotionaler Ausdruck
+10. Schärfeebenen und Hintergrundwirkung
+11. exakt definierte Freiflächen und Schutzzonen
+
+Verwende konkrete visuelle Anweisungen. Vermeide abstrakte Aussagen wie
+„das Bild symbolisiert Sicherheit". Beschreibe stattdessen, welche sichtbaren
+Elemente diesen Eindruck erzeugen.
+
+QUALITÄTSKRITERIEN
+
+Das Motiv benötigt:
+- genau einen eindeutig erkennbaren Hauptfokus,
+- eine klare visuelle Hierarchie,
+- glaubwürdige Proportionen und Materialien,
+- natürliche Perspektive und Beleuchtung,
+- authentische deutsche beziehungsweise europäische Alltagsdetails,
+- eine eigenständige redaktionelle Bildidee,
+- gute Erkennbarkeit im kleinen Social-Media-Format.
+
+ZU VERMEIDEN
+
+Vermeide insbesondere:
+- generische Stockfoto-Ästhetik,
+- gestellte Daumen-hoch-Szenen,
+- übertrieben lächelnde Büromenschen,
+- Taschenrechner-und-Münzen-Klischees ohne kreative Idee,
+- Aktenordner mit erfundenen Beschriftungen,
+- amerikanische Architektur oder US-Steuerunterlagen,
+- Dollarzeichen oder US-Währung,
+- unnötige Diagramme oder Infografiken,
+- Collagen und geteilte Bildflächen,
+- schwebende oder physikalisch unplausible Gegenstände,
+- falsche Hände oder anatomische Fehler,
+- künstlich glatte Haut,
+- übermäßige Tiefenunschärfe,
+- unruhige Hintergründe,
+- Textboxen, Banner, Rahmen und Wasserzeichen,
+- Logos oder nachgeahmte Markenzeichen.
+
+PREFLIGHT VOR DER AUSGABE
+
+Setze den Status auf REJECT, wenn:
+- die Überschrift nicht freigegeben oder länger als sieben Wörter ist,
+- sich Hauptmotiv, Textzone und Logo-Schutzzonen überschneiden,
+- das Art Direction Board widersprüchliche Angaben enthält,
+- keine klare visuelle Hierarchie erkennbar ist,
+- das Motiv nur aus einem generischen Steuerklischee besteht,
+- Kanal oder Seitenverhältnis fehlen,
+- bei exact_headline mehr als eine sichtbare Textebene verlangt wird.
+
+Erfinde bei REJECT keine fehlenden Angaben. Nenne die konkreten Probleme in
+"issues" und lasse "image_prompt" leer.
 
 KRITISCH WICHTIG - TEXT-REGELN:
 - **Text NUR auf DEUTSCH** - Absolutely NO English!
@@ -164,65 +343,63 @@ HILO Brand:
 - Zielgruppe: Deutsche Steuerzahler
 """
 
-    # User-Prompt: Art Board Daten
-    user_prompt = f"""Erstelle einen DALL-E Prompt aus diesem Art Direction Board:
+    # Text-Modus: exact_headline wenn headline vorhanden, sonst no_text
+    text_mode = "exact_headline" if headline else "no_text"
 
-**Message Brief (Kontext):**
+    # User-Prompt: Art Board Daten nach ShareNext-Spezifikation
+    user_prompt = f"""VERBINDLICHE EINGABEN
+
+Message Brief:
 - Kernaussage: {brief.kernaussage}
+- Zielgruppe: {brief.zielgruppe}
 - Kanal: {brief.kanal}
-- Emotion: {brief.funnel_stufe} (leite gewünschte Stimmung ab)
+- Seitenverhältnis: 1:1 (1080x1080)
+- Kommunikationsziel: {brief.funnel_stufe}
+- gewünschte Reaktion: {brief.reaktion}
 
-**Kreative Route:**
-- Typ: {route.typ}
-- Titel: {route.titel}
-- Beschreibung: {route.beschreibung}
+Freigegebene Creative Direction:
+- Creative Territory: {route.typ}
+- Kreative Route: {route.typ}
+- Leitidee: {route.titel}
+- Bildbeschreibung: {route.beschreibung}
+- Aufmerksamkeitsanker: {route.emotionale_richtung}
 
-**Art Direction Board:**
-
-FOCAL POINT:
-- Element: {art_board.focal_point}
-- Position: {art_board.focal_point_position}
-
-KOMPOSITION:
-- Prinzip: {art_board.komposition_prinzip}
-- Aufbau: {art_board.bildaufbau}
-
-LICHT:
-- Qualität: {art_board.licht_qualitaet}
-- Richtung: {art_board.licht_richtung}
-- Stimmung: {art_board.licht_stimmung}
-
-FARBEN:
-- Dominante: {', '.join(art_board.dominante_farben)}
-- Temperatur: {art_board.farbtemperatur}
-- Kontrast: {art_board.farbkontrast}
-
-EMOTION:
-- Moment: {art_board.emotionaler_moment}
+Art Direction Board:
+- Hauptmotiv: {art_board.focal_point}
+- Umgebung: {art_board.bildaufbau}
+- Komposition: {art_board.komposition_prinzip}
+- Kameraperspektive: {art_board.kamera_perspektive}
+- Licht: {art_board.licht_qualitaet}, {art_board.licht_richtung}, {art_board.licht_stimmung}
+- Farbführung: {', '.join(art_board.dominante_farben)}, {art_board.farbtemperatur}, {art_board.farbkontrast}
+- Materialität: (aus Beschreibung ableitbar)
 - Atmosphäre: {art_board.atmosphaere}
+- Schärfe und Optik: {art_board.schaerfe_tiefe}
+- Textzone: {art_board.negativraum_text}
 
-TECHNISCH:
-- Kamera: {art_board.kamera_perspektive}
-- Schärfe: {art_board.schaerfe_tiefe}
+Layoutvorgaben:
+- Überschrift: {headline if headline else "(keine - wird später gesetzt)"}
+- Textmodus: {text_mode}
+- Logo-Schutzzone unten links: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
+- Logo-Schutzzone oben rechts: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
 
-TEXT-ZONEN:
-- Negativraum: {art_board.negativraum_text}
-- Text-Kontrast: {art_board.text_kontrast_empfehlung}
+AUSGABEFORMAT
 
-Erstelle:
-1. Detaillierten DALL-E Prompt (100-4000 Zeichen)
-2. 3-8 Stil-Keywords
-3. Negative Prompt Hints (was vermeiden?)
+Gib ausschließlich ein gültiges JSON-Objekt zurück (wie im System-Prompt spezifiziert).
+
+Stelle sicher dass:
+- image_prompt vollständig und präzise ist
+- style_keywords 3-8 Einträge haben
+- negative_hints Liste von zu vermeidenden Merkmalen enthält (für QA-Checkliste!)
+- visible_text.mode = "{text_mode}" und exact_text = "{headline if headline else ""}"
+- composition_check alle Schutzzonen als true markiert
+- preflight.status = "PASS" (oder "REJECT" mit konkreten issues)
 
 WICHTIG:
-- **KURZE ÜBERSCHRIFT:** Erstelle eine KURZE Überschrift (max. 5-7 Wörter) basierend auf der Kernaussage "{brief.kernaussage}"
-- **NUR ÜBERSCHRIFT, KEIN FLIESSTEXT!** Kurz und prägnant, nicht die ganze Kernaussage!
-- **KEINE UNTERLEGUNG/BOX HINTER TEXT!** Text direkt aufs Bild, keine dunkle Box/Fläche dahinter!
-- **TEXT NICHT IN ECKEN!** Text zentriert oder oben Mitte platzieren - NIEMALS in den Ecken (untere linke, obere rechte)!
-- **ECKEN KOMPLETT FREI LASSEN:** Untere linke + obere rechte Ecke MÜSSEN frei bleiben (Logo-Kreise werden dort platziert)!
-- Text AUF DEUTSCH ins Bild integrieren
-- NIEMALS Englisch oder Dollar-Zeichen verwenden!
-- Zielgruppe: Deutsche Steuerzahler → alles auf Deutsch!
+- Bei text_mode = "exact_headline": Verwende EXAKT die Überschrift "{headline}"!
+- Bei text_mode = "no_text": KEINE Schrift im Bild!
+- Schutzzonen unten links + oben rechts MÜSSEN frei bleiben!
+- NUR DEUTSCHE SPRACHE, NIEMALS Englisch!
+- EURO (€) verwenden, NIEMALS Dollar ($)!
 """
 
     log.info(f"Prompt Director erstellt DALL-E Prompt für: {route.titel}")
@@ -244,10 +421,21 @@ WICHTIG:
         if not production_brief:
             raise Exception("OpenAI API gab kein valides Production Brief zurück")
 
+        # Preflight-Check: REJECT bedeutet Abbruch!
+        if production_brief.preflight.status == "REJECT":
+            issues_text = "\n".join(f"  - {issue}" for issue in production_brief.preflight.issues)
+            raise ValueError(
+                f"Preflight REJECTED! Probleme:\n{issues_text}\n\n"
+                f"Das Bild kann nicht generiert werden. Bitte Art Direction Board korrigieren."
+            )
+
         log.info(
-            f"✓ Production Brief erstellt:\n"
-            f"   Prompt-Länge: {len(production_brief.dalle_prompt)} Zeichen\n"
-            f"   Keywords: {', '.join(production_brief.style_keywords[:3])}..."
+            f"✓ Production Brief erstellt (Preflight: {production_brief.preflight.status}):\n"
+            f"   Prompt-Länge: {len(production_brief.image_prompt)} Zeichen\n"
+            f"   Keywords: {', '.join(production_brief.style_keywords[:3])}...\n"
+            f"   Text-Modus: {production_brief.visible_text.mode}\n"
+            f"   Schutzzonen: BL={production_brief.composition_check.bottom_left_safe}, "
+            f"TR={production_brief.composition_check.top_right_safe}"
         )
 
         return production_brief
@@ -286,14 +474,14 @@ def generate_image(
     client = _get_client()
 
     log.info(f"Generiere Bild ({size}, quality={quality})...")
-    log.debug(f"Prompt: {production_brief.dalle_prompt[:200]}...")
+    log.debug(f"Prompt: {production_brief.image_prompt[:200]}...")
 
     try:
         # OpenAI Image API-Call
         # Model: gpt-image-2 (neueres Modell) oder gpt-image-1 (bewährt)
         response = client.images.generate(
             model="gpt-image-2",
-            prompt=production_brief.dalle_prompt,
+            prompt=production_brief.image_prompt,
             size=size,
             quality=quality,
             n=1
@@ -347,6 +535,7 @@ def produce_image(
     brief: MessageBrief,
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
+    headline: str = "",
     size: str = "1024x1024",
     quality: str = "medium",
     output_path: Optional[Path] = None
@@ -359,6 +548,7 @@ def produce_image(
         brief: Message Brief
         route: Gewinnende kreative Route
         art_board: Art Direction Board
+        headline: Freigegebene Überschrift vom Copywriter (wird INS Bild geschrieben!)
         size: Bildgröße (default: 1024x1024)
         quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'medium'
         output_path: Optional Speicherpfad
@@ -367,12 +557,12 @@ def produce_image(
         tuple: (PIL.Image, ImageProductionBrief)
 
     Example:
-        >>> image, prod_brief = produce_image(brief, route, art_board)
+        >>> image, prod_brief = produce_image(brief, route, art_board, headline="Sparen bei Steuern")
         >>> image.show()
-        >>> print(prod_brief.dalle_prompt)
+        >>> print(prod_brief.image_prompt)
     """
-    # Schritt 1: Production Brief erstellen
-    production_brief = create_production_brief(brief, route, art_board)
+    # Schritt 1: Production Brief erstellen (mit headline!)
+    production_brief = create_production_brief(brief, route, art_board, headline=headline)
 
     # Schritt 2: Bild generieren
     image = generate_image(production_brief, size, quality, output_path)
@@ -447,7 +637,7 @@ if __name__ == "__main__":
 
         print("\n📝 DALL-E PROMPT:")
         print("-" * 80)
-        print(prod_brief.dalle_prompt)
+        print(prod_brief.image_prompt)
         print("-" * 80)
         print(f"\nKeywords: {', '.join(prod_brief.style_keywords)}")
         print(f"Negative: {prod_brief.negative_prompt_hints}\n")

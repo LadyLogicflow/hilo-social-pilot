@@ -723,12 +723,13 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_ima
                         import tempfile, os as _os
                         import bildgen as _bildgen
 
-                        # ShareNext Pipeline ausführen
+                        # ShareNext Pipeline ausführen - MIT headline vom Campaign Plan!
                         result = run_sharenext_pipeline(
                             stream="radar",  # Default, könnte aus Thema abgeleitet werden
                             thema=data.get("ueberschrift", r["titel"]),
                             text="\n".join(data.get("bullets", [])),
                             kanal=kanal.capitalize(),
+                            headline=data.get("ueberschrift", ""),  # Campaign Plan headline!
                             size="1024x1024",
                             quality="medium"
                         )

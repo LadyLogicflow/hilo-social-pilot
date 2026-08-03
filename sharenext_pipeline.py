@@ -106,6 +106,7 @@ def run_sharenext_pipeline(
     thema: str,
     text: str,
     kanal: str,
+    headline: str = "",
     size: str = "1024x1024",
     quality: str = "medium",
     output_path: Optional[Path] = None
@@ -117,7 +118,7 @@ def run_sharenext_pipeline(
     2. Creative Director - 4 Routen (KI)
     3. Concept Jury - Gewinner wählen (KI)
     4. Art Director Board (KI)
-    5. Image Producer - OpenAI Image Model (KI)
+    5. Image Producer - OpenAI Image Model (KI) - MIT freigegebener headline!
     6. Visual QA - Gate A Check (KI)
 
     Args:
@@ -125,6 +126,7 @@ def run_sharenext_pipeline(
         thema: Thema/Überschrift des Posts
         text: Post-Text
         kanal: Social-Media-Kanal ('Facebook', 'Instagram', 'LinkedIn', 'Google Business')
+        headline: Freigegebene Überschrift vom Copywriter (Campaign Plan) - wird INS Bild geschrieben!
         size: Bildgröße (default: 1024x1024)
         quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'medium'
         output_path: Optional Speicherpfad für Bild
@@ -189,11 +191,13 @@ def run_sharenext_pipeline(
     # ─────────────────────────────────────────────────────────────────────────
     # STUFE 5: Image Producer - DALL-E 3
     # ─────────────────────────────────────────────────────────────────────────
-    log.info(f"🖼️  Stufe 5/6: Image Producer (DALL-E 3 {size})")
+    log.info(f"🖼️  Stufe 5/6: Image Producer (gpt-image-2 {size})")
+    log.info(f"   Headline: '{headline}'" if headline else "   (Kein Text im Bild)")
     image, production_brief = produce_image(
         message_brief,
         winning_route,
         art_board,
+        headline=headline,
         size=size,
         quality=quality,
         output_path=output_path
