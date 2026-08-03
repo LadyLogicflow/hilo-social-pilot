@@ -660,7 +660,7 @@ def generate_with_campaign(thema, kanal=None, test_mode=False):
     return fields
 
 
-def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
+def _create_drafts(rows, kanal, use_campaign=False, test_mode=False, premium_images=False):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf.
 
     Args:
@@ -669,6 +669,7 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
         use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
                       False = Anthropic Claude (bisheriger Workflow)
         test_mode: True = low quality für Tests (nur bei use_campaign=True)
+        premium_images: True = ShareNext Premium-Bilder statt Standard
 
     Returns:
         Anzahl erzeugter Entwuerfe
@@ -708,9 +709,48 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
                     traeger.zuweisen_traeger_falls_fehlt(conn, data)
                 except Exception as ex:
                     log.warning("Traeger-Zuweisung uebersprungen: %s", ex)
-                conn.execute(
+                cursor = conn.execute(
                     "INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) VALUES (?,?,?, 'entwurf', ?)",
                     (r["id"], kanal, json.dumps(data, ensure_ascii=False), data.get("bild_pfad")))
+                entwurf_id = cursor.lastrowid
+
+                # Premium-Bilder mit ShareNext generieren
+                if premium_images:
+                    try:
+                        log.info("Generiere Premium-Bild (ShareNext) für Entwurf %s...", entwurf_id)
+                        from sharenext_pipeline import run_sharenext_pipeline
+                        import tempfile, os as _os
+                        import bildgen as _bildgen
+
+                        # ShareNext Pipeline ausführen
+                        result = run_sharenext_pipeline(
+                            stream="radar",  # Default, könnte aus Thema abgeleitet werden
+                            thema=data.get("ueberschrift", r["titel"]),
+                            text="\n".join(data.get("bullets", [])),
+                            kanal=kanal.capitalize(),
+                            size="1024x1024",
+                            quality="medium"
+                        )
+
+                        # Nur Logo-Kreise hinzufügen (kein Text-Overlay)
+                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_raw:
+                            result.image.save(tmp_raw.name, "PNG")
+                            slogan = _bildgen.pick_slogan()
+
+                            from config import DATA_DIR as _DATA_DIR
+                            _os.makedirs(_DATA_DIR, exist_ok=True)
+                            bild_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}.png")
+
+                            _bildgen.add_logo_circles(tmp_raw.name, slogan, bild_pfad, pos="unten")
+                            _os.unlink(tmp_raw.name)
+
+                        # Bild-Pfad in DB aktualisieren
+                        conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, entwurf_id))
+                        log.info("✓ Premium-Bild generiert: %s", bild_pfad)
+                    except Exception as ex:
+                        log.error("Premium-Bild-Generierung fehlgeschlagen (Entwurf %s): %s", entwurf_id, ex)
+                        # Weiter mit Standard-Bild (falls vorhanden)
+
             created += 1
             log.info("Entwurf erzeugt: Thema %s - %s", r["id"], (r["titel"] or "")[:60])
         except Exception as ex:
@@ -741,7 +781,7 @@ def generate_drafts(limit=3, kanal="google", use_campaign=False, test_mode=False
             "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
     return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
 
-def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False):
+def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, premium_images=False):
     """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs.
 
     Args:
@@ -750,6 +790,7 @@ def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False):
         use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
                       False = Anthropic Claude (bisheriger Workflow)
         test_mode: True = low quality für Tests (nur bei use_campaign=True)
+        premium_images: True = ShareNext Premium-Bilder statt Standard
 
     Returns:
         Anzahl erzeugter Entwuerfe
@@ -767,7 +808,7 @@ def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False):
             "SELECT id, titel, url, volltext FROM themen WHERE id IN (%s) AND status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id AND e.kanal=?)" % ph,
             ids + [kanal]).fetchall()
-    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
+    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode, premium_images=premium_images)
 
 
 def regenerate(thema, previous, feedback, kanal="google"):
