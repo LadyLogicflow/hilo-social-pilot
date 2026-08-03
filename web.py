@@ -221,15 +221,22 @@ def _start_generation(anzahl):
         [sys.executable, os.path.join(BASE_DIR, "main.py"), "--generate", str(anzahl)],
         cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
-def _start_generation_ids(ids):
+def _start_generation_ids(ids, bild_modus="standard"):
     """Hintergrund-Erzeugung nur fuer die ausgewaehlten Thema-IDs. Entkoppelt: NUR Text, KEIN
-    Bild (kein '--render') - das Bild wird spaeter je Beitrag per Klick erzeugt."""
+    Bild (kein '--render') - das Bild wird spaeter je Beitrag per Klick erzeugt.
+
+    Args:
+        ids: Liste der Thema-IDs
+        bild_modus: 'standard' oder 'premium' (ShareNext)
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
     logf = open(os.path.join(DATA_DIR, "generieren.log"), "a", encoding="utf-8")
+    cmd = [sys.executable, os.path.join(BASE_DIR, "main.py"),
+           "--generate-ids", ",".join(str(i) for i in ids)]
+    if bild_modus == "premium":
+        cmd.append("--premium-images")
     _gen["proc"] = subprocess.Popen(
-        [sys.executable, os.path.join(BASE_DIR, "main.py"),
-         "--generate-ids", ",".join(str(i) for i in ids)],
-        cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+        cmd, cwd=BASE_DIR, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
 
 
 # --- Taeglicher Radar-Lauf (7 Uhr), als Subprozess -------------------------
@@ -681,6 +688,19 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
       <button type=button class=delbtn onclick="event.preventDefault();event.stopPropagation();loeschThema({{t.id}},'erzeugen')">Löschen</button></label>{% endfor %}
   </div>
   {% endfor %}
+  <div style="margin-top:20px;padding:16px;background:#f9fafb;border-radius:8px">
+    <label style="font-weight:bold;color:#15191F;margin-bottom:8px;display:block">Bildgenerierung</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=bild_modus value="standard" checked>
+        <span><b>Standard</b> <small style="color:#6b7280">(kostenlos, Pillow)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type=radio name=bild_modus value="premium">
+        <span><b>Premium</b> <small style="color:#6b7280">(ShareNext, ~$0.10/Bild)</small></span>
+      </label>
+    </div>
+  </div>
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
     <button{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
@@ -2864,6 +2884,7 @@ def generieren():
 def erzeugen():
     if request.method == "POST":
         ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
+        bild_modus = request.form.get("bild_modus", "standard")  # standard oder premium
         if not ids:
             flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
         with _gen_lock:   # Pruefen+Starten atomar, sonst koennten zwei Klicks zwei Prozesse starten
@@ -2871,9 +2892,10 @@ def erzeugen():
                 flash("Erzeugung läuft bereits - einen Moment, dann die Startseite neu laden.")
                 return redirect(url_for("index"))
             try:
-                _start_generation_ids(ids)
-                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet - läuft im Hintergrund. "
-                      "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
+                _start_generation_ids(ids, bild_modus=bild_modus)
+                modus_text = "Premium (ShareNext)" if bild_modus == "premium" else "Standard"
+                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (%s) - läuft im Hintergrund. "
+                      "In ein bis zwei Minuten die Startseite neu laden." % (len(ids), modus_text))
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
         return redirect(url_for("index"))
