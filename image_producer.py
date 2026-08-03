@@ -640,7 +640,7 @@ if __name__ == "__main__":
         print(prod_brief.image_prompt)
         print("-" * 80)
         print(f"\nKeywords: {', '.join(prod_brief.style_keywords)}")
-        print(f"Negative: {prod_brief.negative_prompt_hints}\n")
+        print(f"Negative: {', '.join(prod_brief.negative_hints)}\n")
 
         # Schritt 2: Bild generieren
         print("Schritt 2: Generiere Bild mit DALL-E 3...")

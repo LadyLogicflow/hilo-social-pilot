@@ -788,6 +788,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
+        <input type="hidden" name="selected-variant-{{e.id}}" id="form-selected-variant-{{e.id}}" value="standard">
         <button class=ok name=aktion value=freigeben>Freigeben</button>
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
       </form>
@@ -803,8 +804,11 @@ function selectVariant(eid, variant, imgEl) {
   imgs.forEach(function(i) { i.classList.remove('selected'); });
   // Gewähltes Bild markieren
   imgEl.classList.add('selected');
-  // Wert speichern
-  document.getElementById('selected-variant-' + eid).value = variant;
+  // Wert in BEIDEN hidden fields speichern (Anzeige + Form)
+  var displayField = document.getElementById('selected-variant-' + eid);
+  var formField = document.getElementById('form-selected-variant-' + eid);
+  if (displayField) displayField.value = variant;
+  if (formField) formField.value = variant;
 }
 </script>"""
 
