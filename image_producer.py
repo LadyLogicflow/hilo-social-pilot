@@ -242,15 +242,15 @@ WICHTIG: KEIN TEXT im Bild!
 def generate_image(
     production_brief: ImageProductionBrief,
     size: str = "1024x1024",
-    quality: str = "standard",
+    quality: str = "high",
     output_path: Optional[Path] = None
 ) -> Image.Image:
-    """Generiert Rohmotiv mit DALL-E 3.
+    """Generiert Rohmotiv mit OpenAI Image Model.
 
     Args:
-        production_brief: Production Brief mit DALL-E Prompt
+        production_brief: Production Brief mit Prompt
         size: Bildgröße ('1024x1024', '1024x1792', '1792x1024')
-        quality: Qualität ('standard' oder 'hd')
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
         output_path: Optional - Pfad zum Speichern (None = nicht speichern)
 
     Returns:
@@ -258,16 +258,16 @@ def generate_image(
 
     Raises:
         ValueError: Wenn OpenAI API-Key fehlt
-        Exception: Bei DALL-E API-Fehlern
+        Exception: Bei Image API-Fehlern
     """
     client = _get_client()
 
-    log.info(f"Generiere Bild mit DALL-E 3 ({size}, {quality})...")
+    log.info(f"Generiere Bild ({size}, quality={quality})...")
     log.debug(f"Prompt: {production_brief.dalle_prompt[:200]}...")
 
     try:
-        # DALL-E API-Call (OpenAI Image Model)
-        # Verwende gpt-image-2 (neueres Modell) oder gpt-image-1 (bewährt)
+        # OpenAI Image API-Call
+        # Model: gpt-image-2 (neueres Modell) oder gpt-image-1 (bewährt)
         response = client.images.generate(
             model="gpt-image-2",
             prompt=production_brief.dalle_prompt,
@@ -307,7 +307,7 @@ def produce_image(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     size: str = "1024x1024",
-    quality: str = "standard",
+    quality: str = "high",
     output_path: Optional[Path] = None
 ) -> tuple[Image.Image, ImageProductionBrief]:
     """High-Level API: Erstellt Production Brief + generiert Bild.
@@ -319,7 +319,7 @@ def produce_image(
         route: Gewinnende kreative Route
         art_board: Art Direction Board
         size: Bildgröße (default: 1024x1024)
-        quality: Qualität (default: standard)
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
         output_path: Optional Speicherpfad
 
     Returns:

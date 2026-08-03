@@ -107,7 +107,7 @@ def run_sharenext_pipeline(
     text: str,
     kanal: str,
     size: str = "1024x1024",
-    quality: str = "standard",
+    quality: str = "high",
     output_path: Optional[Path] = None
 ) -> ShareNextResult:
     """ShareNext Premium Pipeline - End-to-End Bildgenerierung.
@@ -117,7 +117,7 @@ def run_sharenext_pipeline(
     2. Creative Director - 4 Routen (KI)
     3. Concept Jury - Gewinner wählen (KI)
     4. Art Director Board (KI)
-    5. Image Producer - DALL-E 3 (KI)
+    5. Image Producer - OpenAI Image Model (KI)
     6. Visual QA - Gate A Check (KI)
 
     Args:
@@ -126,7 +126,7 @@ def run_sharenext_pipeline(
         text: Post-Text
         kanal: Social-Media-Kanal ('Facebook', 'Instagram', 'LinkedIn', 'Google Business')
         size: Bildgröße (default: 1024x1024)
-        quality: DALL-E Qualität ('standard' oder 'hd')
+        quality: Qualität ('low', 'medium', 'high', 'auto') - default: 'high'
         output_path: Optional Speicherpfad für Bild
 
     Returns:
