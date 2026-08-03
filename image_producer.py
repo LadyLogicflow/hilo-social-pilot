@@ -282,18 +282,23 @@ def generate_image(
 
         image_data = response.data[0]
 
+        # DEBUG: Was ist in der Response?
+        log.info(f"DEBUG: image_data.url = {image_data.url}")
+        log.info(f"DEBUG: image_data.b64_json exists = {hasattr(image_data, 'b64_json')}")
+        log.info(f"DEBUG: response.data[0] attributes = {dir(image_data)}")
+
         if image_data.url:
             # URL-basiert
             log.debug(f"Download von URL: {image_data.url[:50]}...")
             image_response = requests.get(image_data.url)
             image = Image.open(BytesIO(image_response.content))
-        elif image_data.b64_json:
+        elif hasattr(image_data, 'b64_json') and image_data.b64_json:
             # Base64-basiert
             log.debug("Dekodiere Base64-Bild")
             image_bytes = base64.b64decode(image_data.b64_json)
             image = Image.open(BytesIO(image_bytes))
         else:
-            raise ValueError("Response enthält weder URL noch b64_json!")
+            raise ValueError(f"Response enthält weder URL noch b64_json! Response: {image_data}")
 
         log.info(f"✓ Bild generiert: {image.size[0]}x{image.size[1]} px")
 
