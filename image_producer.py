@@ -134,6 +134,7 @@ DALL-E Prompt Struktur:
 6. **Atmosphäre** (Gesamtstimmung)
 7. **Technisch** (Kamera, Schärfe)
 8. **Negativraum** (wo ist Platz für Text?)
+9. **ECKEN FREI LASSEN** - Untere linke + obere rechte Ecke MÜSSEN frei bleiben für Logo-Kreise!
 
 Prompt-Tipps:
 - Sei SEHR spezifisch (nicht "schönes Licht", sondern "soft directional light from left")
@@ -214,6 +215,7 @@ WICHTIG:
 - Text AUF DEUTSCH ins Bild integrieren (Überschrift natürlich platziert)
 - NIEMALS Englisch oder Dollar-Zeichen verwenden!
 - Zielgruppe: Deutsche Steuerzahler → alles auf Deutsch!
+- **ECKEN FREI LASSEN:** Untere linke + obere rechte Ecke MÜSSEN frei bleiben (Logo-Kreise werden dort platziert)!
 """
 
     log.info(f"Prompt Director erstellt DALL-E Prompt für: {route.titel}")

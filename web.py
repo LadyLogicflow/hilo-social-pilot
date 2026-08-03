@@ -3058,6 +3058,7 @@ def aktion(eid):
     aktion = request.form.get("aktion")
     feedback = request.form.get("feedback", "").strip()
     zurueck = request.form.get("zurueck", "entwuerfe")
+    selected_variant = request.form.get("selected-variant-%d" % eid, "standard")  # Bild-Auswahl lesen!
     ziel = url_for("einplanung") if zurueck == "einplanung" else url_for("entwuerfe")
     user = session["user"]
     with get_conn() as conn:
@@ -3068,7 +3069,16 @@ def aktion(eid):
             # Bereits gesetzter Termin (z.B. Fristen-Countdown, eigener Beitrag) bleibt erhalten;
             # ansonsten startet der Beitrag bewusst OHNE Termin ("Noch nicht geplant").
             termin = e["geplant_fuer"] if "geplant_fuer" in e.keys() else None
-            conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=? WHERE id=?", (termin, eid))
+
+            # Bild-Variante speichern: wenn "premium" gewählt, bild_pfad auf _premium.png ändern
+            bild_pfad = e["bild_pfad"]
+            if selected_variant == "premium" and bild_pfad:
+                premium_pfad = bild_pfad.replace(".png", "_premium.png")
+                if os.path.exists(premium_pfad):
+                    bild_pfad = premium_pfad
+
+            conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=?, bild_pfad=? WHERE id=?",
+                        (termin, bild_pfad, eid))
             audit_log(conn, user, "freigegeben", eid, "geplant fuer %s" % (termin or "(noch offen)"))
             if termin:
                 flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
