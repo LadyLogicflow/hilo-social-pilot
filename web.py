@@ -748,8 +748,13 @@ button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;
 
 ENTWUERFE = """<!doctype html><meta charset=utf-8><title>Freigabe: Texte & Bilder</title>
 <style>""" + _TOP + """
-.card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
+.card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1200px;margin:0 auto 18px}
 .card img{width:340px;height:340px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.img-compare{display:flex;gap:12px;flex-direction:column}
+.img-compare figure{margin:0;text-align:center}
+.img-compare img{width:280px;height:280px;cursor:pointer;border:3px solid transparent}
+.img-compare img.selected{border-color:#4D7C0F}
+.img-compare figcaption{font-size:13px;color:#6b7280;margin-top:4px}
 .t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
 .cta{display:inline-block;background:#0B2545;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
 textarea{width:100%;min-height:54px;margin:8px 0;border:1px solid #ccd;border-radius:8px;padding:8px}
@@ -764,7 +769,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=ok title="Alle offenen Entwürfe auf einen Schlag in den Pool legen">&#x267B;&#xFE0F; Alle in den Pool</button>
   </form></div></div>{% endif %}
 {% for e in entwuerfe %}
-<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Neues Bild wird gerade im Hintergrund erstellt (ca. 1-2 Min.) - Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
+<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Neues Bild wird gerade im Hintergrund erstellt (ca. 1-2 Min.) - Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% elif e.has_premium %}<div class=img-compare><p style="background:#e6eef6;color:#0B2545;padding:8px;border-radius:6px;margin:0 0 8px;font-size:13px;font-weight:bold">🎨 Beide Varianten generiert - wähle eine:</p><figure><img src="/bild/{{e.id}}" alt="Standard" class="img-variant selected" data-variant="standard" onclick="selectVariant({{e.id}},'standard',this)"><figcaption>📋 Standard</figcaption></figure><figure><img src="/bild-premium/{{e.id}}" alt="Premium" class="img-variant" data-variant="premium" onclick="selectVariant({{e.id}},'premium',this)"><figcaption>🚀 Premium (ShareNext)</figcaption></figure><input type="hidden" id="selected-variant-{{e.id}}" value="standard"></div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
@@ -790,7 +795,18 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     </div>
   </div></div>
-{% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}"""
+{% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
+<script>
+function selectVariant(eid, variant, imgEl) {
+  // Alle Bilder dieses Entwurfs deselektieren
+  var imgs = imgEl.parentElement.parentElement.querySelectorAll('.img-variant');
+  imgs.forEach(function(i) { i.classList.remove('selected'); });
+  // Gewähltes Bild markieren
+  imgEl.classList.add('selected');
+  // Wert speichern
+  document.getElementById('selected-variant-' + eid).value = variant;
+}
+</script>"""
 
 EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentlichung</title>
 <style>""" + _TOP + """
@@ -1721,7 +1737,11 @@ def entwuerfe():
     rows = []
     with get_conn() as conn:
         for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' ORDER BY id DESC"):
-            rows.append(_parse(e))
+            row = _parse(e)
+            # Prüfe ob Premium-Bild existiert (bei "Beides"-Modus)
+            premium_pfad = os.path.join(DATA_DIR, f"entwurf_{e['id']}_premium.png")
+            row["has_premium"] = os.path.exists(premium_pfad)
+            rows.append(row)
     return render_template_string(ENTWUERFE, **_ctx(entwuerfe=rows, gen_running=_generation_running()))
 
     return redirect(url_for("entwuerfe"))
@@ -3000,6 +3020,15 @@ def bild(eid):
     if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
         abort(404)
     return send_file(e["bild_pfad"], mimetype="image/png")
+
+@app.route("/bild-premium/<int:eid>")
+@login_required
+def bild_premium(eid):
+    """Premium-Bild (ShareNext) eines Entwurfs - nur wenn bei 'Beides'-Modus generiert."""
+    premium_pfad = os.path.join(DATA_DIR, f"entwurf_{eid}_premium.png")
+    if not os.path.exists(premium_pfad):
+        abort(404)
+    return send_file(premium_pfad, mimetype="image/png")
 
 @app.route("/strip-panel/<int:eid>/<int:idx>")
 @login_required
