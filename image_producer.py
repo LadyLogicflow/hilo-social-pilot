@@ -266,9 +266,10 @@ def generate_image(
     log.debug(f"Prompt: {production_brief.dalle_prompt[:200]}...")
 
     try:
-        # DALL-E 3 API-Call
+        # DALL-E API-Call (OpenAI Image Model)
+        # Verwende gpt-image-2 (neueres Modell) oder gpt-image-1 (bewährt)
         response = client.images.generate(
-            model="dall-e-3",
+            model="gpt-image-2",
             prompt=production_brief.dalle_prompt,
             size=size,
             quality=quality,
