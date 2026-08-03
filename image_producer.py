@@ -143,13 +143,13 @@ Prompt-Tipps:
 - DALL-E 3 versteht komplexe Prompts - nutze das!
 
 Text-Regeln (WICHTIG!):
-- **ÜBERSCHRIFT = KERNAUSSAGE** - Verwende die Kernaussage aus dem Message Brief als Überschrift im Bild!
+- **KURZE ÜBERSCHRIFT** - Max. 5-7 Wörter, basierend auf Kernaussage, NICHT die ganze Kernaussage!
+- **KEINE UNTERLEGUNG/BOX** - Text direkt aufs Bild, keine dunkle Fläche/Box dahinter!
 - **NUR DEUTSCHE SPRACHE** - Absolutely NO English words!
 - **EURO (€) verwenden** - NEVER use Dollar ($) or other currencies
 - Text soll natürlich ins Bild integriert sein (auf Schildern, Anzeigen, etc.)
 - **KEINE geometrischen Formen um Text** - Kein Sechseck, Diamant, Rahmen um Text!
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen
-- **KEINE ERFUNDENEN ÜBERSCHRIFTEN** - Nur die vorgegebene Kernaussage verwenden!
 
 Negatives (vermeiden):
 - "English text", "Dollar sign $", "USD"
@@ -169,6 +169,7 @@ HILO Brand:
 
 **Message Brief (Kontext):**
 - Kernaussage: {brief.kernaussage}
+- Kanal: {brief.kanal}
 - Emotion: {brief.funnel_stufe} (leite gewünschte Stimmung ab)
 
 **Kreative Route:**
@@ -214,12 +215,14 @@ Erstelle:
 3. Negative Prompt Hints (was vermeiden?)
 
 WICHTIG:
-- **ÜBERSCHRIFT = KERNAUSSAGE:** Verwende GENAU die Kernaussage "{brief.kernaussage}" als Überschrift im Bild!
-- **KEINE ERFUNDENEN ÜBERSCHRIFTEN!** Nur die vorgegebene Kernaussage verwenden!
-- Text AUF DEUTSCH ins Bild integrieren (Überschrift natürlich platziert)
+- **KURZE ÜBERSCHRIFT:** Erstelle eine KURZE Überschrift (max. 5-7 Wörter) basierend auf der Kernaussage "{brief.kernaussage}"
+- **NUR ÜBERSCHRIFT, KEIN FLIESSTEXT!** Kurz und prägnant, nicht die ganze Kernaussage!
+- **KEINE UNTERLEGUNG/BOX HINTER TEXT!** Text direkt aufs Bild, keine dunkle Box/Fläche dahinter!
+- **TEXT NICHT IN ECKEN!** Text zentriert oder oben Mitte platzieren - NIEMALS in den Ecken (untere linke, obere rechte)!
+- **ECKEN KOMPLETT FREI LASSEN:** Untere linke + obere rechte Ecke MÜSSEN frei bleiben (Logo-Kreise werden dort platziert)!
+- Text AUF DEUTSCH ins Bild integrieren
 - NIEMALS Englisch oder Dollar-Zeichen verwenden!
 - Zielgruppe: Deutsche Steuerzahler → alles auf Deutsch!
-- **ECKEN FREI LASSEN:** Untere linke + obere rechte Ecke MÜSSEN frei bleiben (Logo-Kreise werden dort platziert)!
 """
 
     log.info(f"Prompt Director erstellt DALL-E Prompt für: {route.titel}")
