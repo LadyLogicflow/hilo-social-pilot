@@ -2994,8 +2994,8 @@ def erzeugen():
                 return redirect(url_for("index"))
             try:
                 _start_generation_ids(ids, bild_modus=bild_modus)
-                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (Premium ShareNext) - läuft im Hintergrund. "
-                      "In ein bis zwei Minuten die Startseite neu laden." % (len(ids), modus_text))
+                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (ShareNext Premium) - läuft im Hintergrund. "
+                      "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
         return redirect(url_for("index"))
