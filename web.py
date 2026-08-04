@@ -683,20 +683,7 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 <form method=post onsubmit="return chk(this)">
   <div style="margin-bottom:20px;padding:16px;background:#e6eef6;border-radius:8px;border:2px solid #0B2545">
     <label style="font-weight:bold;color:#0B2545;margin-bottom:8px;display:block;font-size:15px">🎨 Bildgenerierung</label>
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type=radio name=bild_modus value="standard" checked>
-        <span><b>Standard</b> <small style="color:#6b7280">(kostenlos, schnell)</small></span>
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type=radio name=bild_modus value="premium">
-        <span><b>Premium</b> <small style="color:#6b7280">(ShareNext, ~$0.10/Bild)</small></span>
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type=radio name=bild_modus value="beides">
-        <span><b>Beides</b> <small style="color:#6b7280">(Vergleich, ~$0.10/Bild)</small></span>
-      </label>
-    </div>
+    <p style="color:#6b7280;font-size:14px;margin:8px 0">Alle Bilder werden mit <b>ShareNext Premium</b> generiert (~$0.10/Bild)</p>
   </div>
   <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
   {% for g in gruppen %}{% set gi = loop.index %}
@@ -3023,7 +3010,7 @@ def generieren():
 def erzeugen():
     if request.method == "POST":
         ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
-        bild_modus = request.form.get("bild_modus", "standard")  # standard, premium oder beides
+        bild_modus = "premium"  # NUR NOCH ShareNext Premium-Bilder!
         if not ids:
             flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
         with _gen_lock:   # Pruefen+Starten atomar, sonst koennten zwei Klicks zwei Prozesse starten
@@ -3032,8 +3019,7 @@ def erzeugen():
                 return redirect(url_for("index"))
             try:
                 _start_generation_ids(ids, bild_modus=bild_modus)
-                modus_text = {"standard": "Standard", "premium": "Premium (ShareNext)", "beides": "Standard + Premium"}.get(bild_modus, "Standard")
-                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (%s) - läuft im Hintergrund. "
+                flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (Premium ShareNext) - läuft im Hintergrund. "
                       "In ein bis zwei Minuten die Startseite neu laden." % (len(ids), modus_text))
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
