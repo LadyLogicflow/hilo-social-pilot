@@ -12,10 +12,10 @@ def daily_run():
     anzahl = radar.run()
     log.info("Tageslauf: %s neue Themen aus dem Radar.", anzahl)
     limit = int(os.environ.get("HILO_GENERATE_LIMIT", "3"))
-    erzeugt = textgen.generate_drafts(limit=limit, kanal="google", use_campaign=True)
+    # NUR NOCH ShareNext Premium-Bilder! use_campaign=False (kein kampagne.py mehr!)
+    erzeugt = textgen.generate_drafts(limit=limit, kanal="google", use_campaign=False)
     log.info("Tageslauf: %s neue Textentwuerfe erzeugt.", erzeugt)
-    # bildgen.render_drafts() bleibt als Fallback bestehen, ist aber i.d.R. ein No-Op:
-    # use_campaign=True erzeugt das Bild schon direkt (bild_pfad wird beim INSERT gesetzt).
+    # ShareNext erzeugt Bilder direkt - kein Fallback mehr nötig
     bilder = bildgen.render_drafts()
     log.info("Tageslauf: %s Bilder ueber Fallback-Pipeline erzeugt (normalerweise 0).", bilder)
     log.info("HILO-Pilot Tageslauf beendet.")
@@ -179,12 +179,11 @@ def main():
                  textgen.generate_drafts(limit=args.generate, kanal="google", use_campaign=True))
     if args.generate_ids is not None:
         ids = [x.strip() for x in args.generate_ids.split(",") if x.strip()]
-        premium = args.premium_images if hasattr(args, 'premium_images') else False
-        both = args.both_images if hasattr(args, 'both_images') else False
-        modus_text = "Standard + Premium" if both else ("Premium-Bilder" if premium else "Standard-Bilder")
-        log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen, %s).",
-                 textgen.generate_for_ids(ids, kanal="google", use_campaign=True, premium_images=premium, both_images=both),
-                 len(ids), modus_text)
+        # premium_images und both_images werden ignoriert - NUR NOCH ShareNext Premium!
+        # use_campaign=False (kein kampagne.py mehr!)
+        log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen, ShareNext Premium).",
+                 textgen.generate_for_ids(ids, kanal="google", use_campaign=False),
+                 len(ids))
     if args.render:
         log.info("%s Bilder erzeugt.", bildgen.render_drafts())
     if args.once:
