@@ -756,7 +756,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=ok title="Alle offenen Entwürfe auf einen Schlag in den Pool legen">&#x267B;&#xFE0F; Alle in den Pool</button>
   </form></div></div>{% endif %}
 {% for e in entwuerfe %}
-<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Neues Bild wird gerade im Hintergrund erstellt (ca. 1-2 Min.) - Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% elif e.has_premium %}<div class=img-compare><p style="background:#e6eef6;color:#0B2545;padding:8px;border-radius:6px;margin:0 0 8px;font-size:13px;font-weight:bold">🎨 Beide Varianten generiert - wähle eine:</p><figure><img src="/bild/{{e.id}}" alt="Standard" class="img-variant selected" data-variant="standard" onclick="selectVariant({{e.id}},'standard',this)"><figcaption>📋 Standard</figcaption></figure><figure><img src="/bild-premium/{{e.id}}" alt="Premium" class="img-variant" data-variant="premium" onclick="selectVariant({{e.id}},'premium',this)"><figcaption>🚀 Premium (ShareNext)</figcaption></figure><input type="hidden" id="selected-variant-{{e.id}}" value="standard"></div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
+<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Neues Bild wird gerade im Hintergrund erstellt (ca. 1-2 Min.) - Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}{% if e.f.strip_panels %}<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start">{% for _p in e.f.strip_panels %}<figure style="margin:0;text-align:center"><img src="/strip-panel/{{e.id}}/{{loop.index0}}" alt="Panel {{loop.index}}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ee;display:block"><figcaption style="font-size:12px;color:#6b7280">Bild {{loop.index}}</figcaption></figure>{% endfor %}</div>{% else %}<img src="/bild/{{e.id}}" alt="Vorschau">{% endif %}
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
@@ -775,32 +775,15 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
-        <input type="hidden" name="selected-variant-{{e.id}}" id="form-selected-variant-{{e.id}}" value="standard">
         <button class=ok name=aktion value=freigeben>Freigeben</button>
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
       </form>
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
-        <input type="hidden" name="selected-variant-{{e.id}}" id="pool-selected-variant-{{e.id}}" value="standard">
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     </div>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
-<script>
-function selectVariant(eid, variant, imgEl) {
-  // Alle Bilder dieses Entwurfs deselektieren
-  var imgs = imgEl.parentElement.parentElement.querySelectorAll('.img-variant');
-  imgs.forEach(function(i) { i.classList.remove('selected'); });
-  // Gewähltes Bild markieren
-  imgEl.classList.add('selected');
-  // Wert in ALLEN hidden fields speichern (Anzeige + Freigeben-Form + Pool-Form)
-  var displayField = document.getElementById('selected-variant-' + eid);
-  var formField = document.getElementById('form-selected-variant-' + eid);
-  var poolField = document.getElementById('pool-selected-variant-' + eid);
-  if (displayField) displayField.value = variant;
-  if (formField) formField.value = variant;
-  if (poolField) poolField.value = variant;
-}
-</script>"""
+"""
 
 EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentlichung</title>
 <style>""" + _TOP + """
