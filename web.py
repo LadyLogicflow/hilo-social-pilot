@@ -793,6 +793,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Entwurf wirklich löschen? Das kann nicht rückgängig gemacht werden.')">Löschen</button>
       </form>
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
+        <input type="hidden" name="selected-variant-{{e.id}}" id="pool-selected-variant-{{e.id}}" value="standard">
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
     </div>
   </div></div>
@@ -804,11 +805,13 @@ function selectVariant(eid, variant, imgEl) {
   imgs.forEach(function(i) { i.classList.remove('selected'); });
   // Gewähltes Bild markieren
   imgEl.classList.add('selected');
-  // Wert in BEIDEN hidden fields speichern (Anzeige + Form)
+  // Wert in ALLEN hidden fields speichern (Anzeige + Freigeben-Form + Pool-Form)
   var displayField = document.getElementById('selected-variant-' + eid);
   var formField = document.getElementById('form-selected-variant-' + eid);
+  var poolField = document.getElementById('pool-selected-variant-' + eid);
   if (displayField) displayField.value = variant;
   if (formField) formField.value = variant;
+  if (poolField) poolField.value = variant;
 }
 </script>"""
 
@@ -1894,10 +1897,21 @@ def pool_aufnehmen(eid):
     Der Status wechselt auf 'pool' -> faellt aus dem Einmal-Posten-Fluss heraus, wird stattdessen
     automatisch je Stelle/Kanal gezogen."""
     user = session["user"]
+    selected_variant = request.form.get("selected-variant-%d" % eid, "standard")  # Premium-Auswahl!
+
     with get_conn() as conn:
-        e = conn.execute("SELECT id FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        e = conn.execute("SELECT id, bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
+
+        # Bild-Variante: wenn "premium" gewählt, bild_pfad auf _premium.png ändern
+        bild_pfad = e["bild_pfad"]
+        if selected_variant == "premium" and bild_pfad:
+            premium_pfad = bild_pfad.replace(".png", "_premium.png")
+            if os.path.exists(premium_pfad):
+                bild_pfad = premium_pfad
+                conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, eid))
+
         conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
         conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))   # frueher entfernten reaktivieren
         conn.execute("UPDATE entwuerfe SET status='pool' WHERE id=?", (eid,))
