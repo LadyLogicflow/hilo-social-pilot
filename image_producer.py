@@ -156,11 +156,13 @@ def create_production_brief(
 Deine Aufgabe: Übersetze ein Art Direction Board in einen präzisen DALL-E Prompt.
 
 KRITISCH WICHTIG - TEXT-REGELN:
+- **ÜBERSCHRIFT MUSS SICHTBAR SEIN** - Die vorgegebene deutsche Überschrift MUSS groß, lesbar und prominent im Bild erscheinen!
 - **Text NUR auf DEUTSCH** - Absolutely NO English!
-- **Überschrift ins Bild integrieren** - natürlich platziert (Schilder, Anzeigen, Tafeln)
+- **Text natürlich integrieren** - auf Schildern, Wänden, Tafeln, Anzeigen, Plakaten (nicht schwebend!)
+- **GROß UND LESBAR** - Die Überschrift muss auf Mobilgeräten gut lesbar sein!
+- **EXAKT die vorgegebene Überschrift verwenden** - Keine Änderungen, keine Übersetzung!
 - **EURO (€) verwenden** - NEVER Dollar ($) or USD!
 - **Zielgruppe: Deutsche Steuerzahler** - alles auf Deutsch!
-- Negativraum für weiteren Text sollte vorhanden sein
 
 DALL-E Prompt Struktur:
 
@@ -179,11 +181,13 @@ Prompt-Tipps:
 - Beschreibe was DU SIEHST, nicht was es BEDEUTET
 - DALL-E 3 versteht komplexe Prompts - nutze das!
 
-Text-Regeln (WICHTIG!):
-- **Text ist erlaubt** - Eine Überschrift IM Bild ist erwünscht
+Text-Regeln (SEHR WICHTIG!):
+- **ÜBERSCHRIFT IST PFLICHT** - Wenn eine Überschrift vorgegeben ist, MUSS sie prominent im Bild erscheinen!
+- **GROß, DEUTLICH, LESBAR** - Die Überschrift muss das wichtigste Text-Element im Bild sein!
 - **NUR DEUTSCHE SPRACHE** - Absolutely NO English words!
 - **EURO (€) verwenden** - NEVER use Dollar ($) or other currencies
-- Text soll natürlich ins Bild integriert sein (auf Schildern, Anzeigen, etc.)
+- **Natürliche Integration** - Text auf Schildern, Wänden, Tafeln, Plakaten, Anzeigen (nicht schwebend!)
+- **EXAKT übernehmen** - Die vorgegebene Überschrift Wort für Wort verwenden, keine Änderungen!
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen
 
 Negatives (vermeiden):
