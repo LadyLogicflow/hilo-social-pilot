@@ -1719,9 +1719,7 @@ def entwuerfe():
     with get_conn() as conn:
         for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' ORDER BY id DESC"):
             row = _parse(e)
-            # Prüfe ob Premium-Bild existiert (bei "Beides"-Modus)
-            premium_pfad = os.path.join(DATA_DIR, f"entwurf_{e['id']}_premium.png")
-            row["has_premium"] = os.path.exists(premium_pfad)
+            # NUR NOCH ShareNext Premium-Bilder - keine has_premium Flag mehr!
             rows.append(row)
     return render_template_string(ENTWUERFE, **_ctx(entwuerfe=rows, gen_running=_generation_running()))
 
@@ -1867,20 +1865,14 @@ def pool_aufnehmen(eid):
     Der Status wechselt auf 'pool' -> faellt aus dem Einmal-Posten-Fluss heraus, wird stattdessen
     automatisch je Stelle/Kanal gezogen."""
     user = session["user"]
-    selected_variant = request.form.get("selected-variant-%d" % eid, "standard")  # Premium-Auswahl!
 
     with get_conn() as conn:
         e = conn.execute("SELECT id, bild_pfad FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
 
-        # Bild-Variante: wenn "premium" gewählt, bild_pfad auf _premium.png ändern
-        bild_pfad = e["bild_pfad"]
-        if selected_variant == "premium" and bild_pfad:
-            premium_pfad = bild_pfad.replace(".png", "_premium.png")
-            if os.path.exists(premium_pfad):
-                bild_pfad = premium_pfad
-                conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, eid))
+        # NUR NOCH ShareNext Premium-Bilder - keine Varianten-Auswahl mehr!
+        # bild_pfad ist immer .png (nicht _premium.png!)
 
         conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
         conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))   # frueher entfernten reaktivieren
@@ -3103,15 +3095,6 @@ def bild(eid):
         abort(404)
     return send_file(e["bild_pfad"], mimetype="image/png")
 
-@app.route("/bild-premium/<int:eid>")
-@login_required
-def bild_premium(eid):
-    """Premium-Bild (ShareNext) eines Entwurfs - nur wenn bei 'Beides'-Modus generiert."""
-    premium_pfad = os.path.join(DATA_DIR, f"entwurf_{eid}_premium.png")
-    if not os.path.exists(premium_pfad):
-        abort(404)
-    return send_file(premium_pfad, mimetype="image/png")
-
 @app.route("/strip-panel/<int:eid>/<int:idx>")
 @login_required
 def strip_panel(eid, idx):
@@ -3140,7 +3123,7 @@ def aktion(eid):
     aktion = request.form.get("aktion")
     feedback = request.form.get("feedback", "").strip()
     zurueck = request.form.get("zurueck", "entwuerfe")
-    selected_variant = request.form.get("selected-variant-%d" % eid, "standard")  # Bild-Auswahl lesen!
+    # NUR NOCH ShareNext Premium-Bilder - keine Varianten-Auswahl mehr!
     ziel = url_for("einplanung") if zurueck == "einplanung" else url_for("entwuerfe")
     user = session["user"]
     with get_conn() as conn:
@@ -3152,15 +3135,11 @@ def aktion(eid):
             # ansonsten startet der Beitrag bewusst OHNE Termin ("Noch nicht geplant").
             termin = e["geplant_fuer"] if "geplant_fuer" in e.keys() else None
 
-            # Bild-Variante speichern: wenn "premium" gewählt, bild_pfad auf _premium.png ändern
-            bild_pfad = e["bild_pfad"]
-            if selected_variant == "premium" and bild_pfad:
-                premium_pfad = bild_pfad.replace(".png", "_premium.png")
-                if os.path.exists(premium_pfad):
-                    bild_pfad = premium_pfad
+            # NUR NOCH ShareNext Premium-Bilder - keine Varianten-Auswahl mehr!
+            # bild_pfad ist immer .png (nicht _premium.png!)
 
-            conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=?, bild_pfad=? WHERE id=?",
-                        (termin, bild_pfad, eid))
+            conn.execute("UPDATE entwuerfe SET status='freigegeben', geplant_fuer=? WHERE id=?",
+                        (termin, eid))
             audit_log(conn, user, "freigegeben", eid, "geplant fuer %s" % (termin or "(noch offen)"))
             if termin:
                 flash("Entwurf %d freigegeben und für %s eingeplant." % (eid, _de_datum(termin)))
