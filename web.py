@@ -696,7 +696,10 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
   {% endfor %}
   <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
     <span class=hint><b id=cnt>0</b> ausgewählt</span>
-    <button{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
+    <div style="display:flex;gap:8px">
+      <button name=aktion value=loeschen type=submit style="background:#b00020" onclick="return confirm('Ausgewählte Themen wirklich löschen?')">Markierte löschen</button>
+      <button name=aktion value=erzeugen{% if laeuft %} disabled title="Es läuft bereits eine Erzeugung"{% endif %}>Ausgewählte erzeugen</button>
+    </div>
   </div>
 </form>
 <script>
@@ -2860,7 +2863,24 @@ def generieren():
 @login_required
 def erzeugen():
     if request.method == "POST":
+        aktion = request.form.get("aktion", "erzeugen")
         ids = [i for i in request.form.getlist("thema_id") if i.strip().isdigit()]
+
+        if aktion == "loeschen":
+            # Bulk-Delete für Stufe 2
+            if not ids:
+                flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
+            with get_conn() as conn:
+                q = ("UPDATE themen SET status='geloescht' WHERE id IN (%s) AND status='ausgewaehlt' "
+                     "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id)") % ",".join("?" * len(ids))
+                cur = conn.execute(q, ids)
+                geloescht = cur.rowcount
+                audit_log(conn, session["user"], "themen_geloescht_stufe2", None, "%d Themen" % geloescht)
+                conn.commit()
+                flash("%d Themen gelöscht." % geloescht)
+            return redirect(url_for("erzeugen"))
+
+        # Standard: Erzeugen
         bild_modus = "premium"  # NUR NOCH ShareNext Premium-Bilder!
         if not ids:
             flash("Bitte mindestens ein Thema anhaken."); return redirect(url_for("erzeugen"))
