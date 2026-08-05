@@ -3742,8 +3742,7 @@ def vorschau(eid):
                     os.remove(fp)
         except Exception:
             pass
-        import personalisierung, stilwahl, shutil
-        stil = stilwahl.aktiver_stil(f)
+        import personalisierung, shutil
         def _caps_fuer(kanal, base_fn):
             """Liste (Kanal-Label, Begleittext) fuer die je Ziel gewaehlten Kanaele."""
             out = []
@@ -3763,26 +3762,7 @@ def vorschau(eid):
             try:
                 caps = _caps_fuer(kanal, lambda k, st=stelle: personalisierung.caption_fuer_stelle(f, st, k))
                 label = "%s%s" % (stelle["name"], " · %s" % stelle["ort"] if stelle["ort"] else "")
-                if stil == "comic_strip":
-                    # #163: Comic-Strip als Karussell. render_slides_fuer_stelle liefert die 3 gecachten
-                    # KI-Panels DIESER Stelle (ueber deren Berater-Referenz) - kein Einzelbild-Fallback,
-                    # kein erzwungenes Neu-Rendern. Panels in den preview-Ordner kopieren, damit sie ueber
-                    # die geschuetzte /preview-strip-Route (rolle_required freigeber) ausgeliefert werden.
-                    strip_out = os.path.join(pdir, "e%d_stelle_%d_strip" % (eid, sid_i))
-                    _f, panels = personalisierung.render_slides_fuer_stelle(f, stelle, strip_out, "panel")
-                    urls = []
-                    for idx, pfad in enumerate(panels or []):
-                        if not pfad or not os.path.exists(pfad):
-                            continue
-                        ziel = os.path.join(pdir, "e%d_stelle_%d_p%d.png" % (eid, sid_i, idx))
-                        shutil.copyfile(pfad, ziel)
-                        v = int(os.path.getmtime(ziel))
-                        urls.append(url_for("preview_strip", eid=eid, sid=sid_i, idx=idx) + "?v=%d" % v)
-                    if not urls:
-                        raise RuntimeError("keine Comic-Strip-Panels")
-                    items.append({"label": label, "ok": True, "kanal_de": _KANAL_DE[kanal],
-                                  "caps": caps, "urls": urls})
-                    continue
+                # ShareNext-Bilder: Text ist schon im Bild, nur Logo-Kreise werden personalisiert
                 out = os.path.join(pdir, "e%d_stelle_%d.png" % (eid, sid_i))
                 personalisierung.render_fuer_stelle(f, stelle, out)
                 v = int(os.path.getmtime(out))
