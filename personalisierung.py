@@ -174,7 +174,22 @@ def render_fuer_stelle(fields, stelle, out_path):
     der Stelle, genau wie bei der alten Pipeline, nur ohne die teure Neugenerierung.
     Alte/Nicht-Kampagnen-Entwuerfe fallen weiter auf die bisherige Pipeline zurueck."""
     import bildgen, bildmotiv
+    import shutil
     f = fuer_stelle(fields, stelle)
+
+    # ShareNext Premium-Bilder: Text ist schon im Bild, keine Personalisierung nötig!
+    # Verwende bild_pfad direkt (kopiere nur mit Logo-Kreisen für die Stelle)
+    bild_pfad = f.get("bild_pfad")
+    if bild_pfad and os.path.exists(bild_pfad):
+        # Prüfe ob es ein ShareNext-Bild ist (KEIN kampagne_motiv_pfad)
+        if not f.get("kampagne_motiv_pfad"):
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            # ShareNext-Bilder haben Text schon drin - nur Logo-Kreise anpassen
+            slogan = bildgen.pick_slogan(f.get("slogan"))
+            bildgen.add_logo_circles(bild_pfad, slogan, out_path, portrait=_portrait(stelle), pos="unten")
+            return f, out_path
+
+    # Alte kampagne.py Bilder: Text-Overlay mit personalisiertem CTA
     motiv_pfad = f.get("kampagne_motiv_pfad")
     layout_template = f.get("kampagne_layout_template")
     if motiv_pfad and layout_template and os.path.exists(motiv_pfad):
