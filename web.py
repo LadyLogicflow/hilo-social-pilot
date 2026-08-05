@@ -765,9 +765,6 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
     </form>
-    <form method=post action="/bild-neu/{{e.id}}" style="display:inline-block;margin-right:6px" onsubmit="return confirm('Nur den Text im Bild neu rendern? Text und Termin bleiben unveraendert, kein neues Foto, kostenlos.')">
-      <input type=hidden name=zurueck value=entwuerfe>
-      <button style="background:#6b7280" title="Nur den Text-Layer im Bild neu zeichnen (kostenlos), Foto bleibt gleich">&#x21BB; Text im Bild neu</button></form>
     <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
@@ -2069,38 +2066,6 @@ def text_neu(eid):
         flash("Text von Beitrag %d überarbeitet (Bild an den neuen Text angepasst, kostenlos) - bitte prüfen." % eid)
     except Exception as ex:
         flash("Text-Überarbeitung fehlgeschlagen: %s" % ex)
-    return redirect(ziel)
-
-@app.route("/bild-neu/<int:eid>", methods=["POST"])
-@rolle_required("freigeber")
-def bild_neu(eid):
-    """Rendert NUR das Bild eines Beitrags neu (aktuelles Layout, bestehendes Motiv aus dem Cache) -
-    ohne Text- oder Motiv-Neuerzeugung, also ohne KI-Kosten. Text, Status und Termin bleiben."""
-    zurueck = request.form.get("zurueck", "einplanung")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
-    with get_conn() as conn:
-        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
-    if not e:
-        abort(404)
-    if e["status"] not in ("freigegeben", "entwurf"):
-        flash("Bild von Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
-        return redirect(ziel)
-    try:
-        data = json.loads(e["text"])
-        out = _kampagne_pillow_rerender(data, eid)
-        if out is None:
-            import bildmotiv
-            photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
-            slogan = bildgen.pick_slogan(data.get("slogan"))
-            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.render(data, photo, slogan, out)
-        with get_conn() as conn:
-            conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, eid))
-            audit_log(conn, session["user"], "bild_neu_erzeugt", eid)
-            conn.commit()
-        flash("Bild von Beitrag %d neu erzeugt (Text unverändert, kostenlos)." % eid)
-    except Exception as ex:
-        flash("Bild konnte nicht neu erzeugt werden: %s" % ex)
     return redirect(ziel)
 
 @app.route("/anderes-bild/<int:eid>", methods=["POST"])
