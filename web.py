@@ -765,10 +765,6 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
     </form>
-    <form method=post action="/bild-aktion/{{e.id}}" style="display:inline-block;margin-right:6px">
-      <input type=hidden name=zurueck value=entwuerfe>
-      <input type=hidden name=bild_aktion value=foto_neu>
-      <button style="background:#0B2545" title="Neues Bild erzeugen (Art Director + GPT Image 2 + QA)">&#x1F3B2; Neues Bild erzeugen</button></form>
     <form method=post action="/bild-neu/{{e.id}}" style="display:inline-block;margin-right:6px" onsubmit="return confirm('Nur den Text im Bild neu rendern? Text und Termin bleiben unveraendert, kein neues Foto, kostenlos.')">
       <input type=hidden name=zurueck value=entwuerfe>
       <button style="background:#6b7280" title="Nur den Text-Layer im Bild neu zeichnen (kostenlos), Foto bleibt gleich">&#x21BB; Text im Bild neu</button></form>
@@ -1054,11 +1050,6 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 {% if status in ('entwurf','freigegeben') %}
 <div style="border:1px solid #e3e7ee;border-radius:10px;padding:10px;margin:10px 0;background:#f7f9fc">
-  <form method=post action="/bild-aktion/{{e.id}}" style="margin:0;display:inline-block">
-    <input type=hidden name=zurueck value=beitrag>
-    <input type=hidden name=bild_aktion value=foto_neu>
-    <button style="background:#0B2545" title="Neues Bild erzeugen (Art Director + GPT Image 2 + QA)">&#x1F3B2; Neues Bild erzeugen</button>
-  </form>
   {% if e.f.bild_motiv_thema %}
   <details style="margin-top:8px">
     <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Option: Bildtyp umschalten</summary>
@@ -2158,85 +2149,6 @@ def anderes_bild(eid):
         flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
 
-def _foto_neu_hintergrund(eid, user):
-    """Fuehrt die komplette Bild-Neuerzeugung (Art Director + GPT Image 2 + QA) in einem
-    eigenen Hintergrund-Thread aus, ENTKOPPELT vom HTTP-Request (#Hintergrund-Fix).
-
-    Vorher lief das synchron IM Request - die Anfrage blieb 1-2 Minuten haengen, bis GPT Image 2
-    + QA durchgelaufen waren. Das serverseitige Python laeuft zwar unabhaengig vom Client weiter
-    (ein Tab-Wechsel oder Schliessen aendert daran nichts), aber ohne Rueckmeldung sah es nach
-    einem Abbruch aus - u.a. weil mobile Browser die Verbindung im Hintergrund kappen und man
-    dann nie erfaehrt, ob's geklappt hat. Jetzt: die Route kehrt SOFORT zurueck, diese Funktion
-    laeuft in einem separaten Daemon-Thread weiter und aktualisiert die DB, sobald sie fertig ist
-    - unabhaengig davon, was der Browser in der Zwischenzeit macht."""
-    with get_conn() as conn:
-        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
-    if not e:
-        log.warning("foto_neu (Hintergrund): Entwurf %d existiert nicht mehr.", eid)
-        return
-    try:
-        data = json.loads(e["text"]) if e["text"] else {}
-    except Exception:
-        data = {}
-
-    import kampagne
-    import uuid
-    headline = data.get("ueberschrift", "")
-    bullets = data.get("bullets", [])
-    cta = data.get("cta", "")
-    kontext = data.get("subline") or data.get("caption") or ""
-
-    try:
-        timestamp = int(time.time())
-        unique_id = uuid.uuid4().hex[:12]
-        final_path = os.path.join(DATA_DIR, "bilder", f"regen_{timestamp}_{unique_id}.png")
-
-        image_path, review, motiv_path, layout_template, highlight_words = \
-            kampagne.generate_image_for_fixed_text(headline, bullets, cta, context=kontext)
-
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        bildgen.add_logo_circles(str(image_path), slogan, final_path, pos="diagonal2")
-
-        # Caption nachträglich generieren falls fehlt (Bestandsposts)
-        if not data.get("caption") and e["thema_id"]:
-            try:
-                with get_conn() as conn:
-                    thema = conn.execute("SELECT titel, volltext FROM themen WHERE id=?",
-                                         (e["thema_id"],)).fetchone()
-                if thema:
-                    article = f"{thema['titel']}\n\n{thema['volltext']}"
-                    data["caption"] = kampagne.generate_caption_only(article)
-            except Exception as ex:
-                log.warning("Caption-Generierung (Hintergrund) fehlgeschlagen: %s", ex)
-
-        data["qa_approved"] = review.approved
-        data["qa_problems"] = review.problems if not review.approved else []
-        data["bild_pfad"] = str(final_path)
-        data["kampagne_motiv_pfad"] = str(motiv_path)
-        data["kampagne_layout_template"] = layout_template
-        data["highlight_words"] = highlight_words
-        data["bild_wird_erstellt"] = False
-
-        with get_conn() as conn:
-            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
-                         (json.dumps(data, ensure_ascii=False), str(final_path), eid))
-            audit_log(conn, user, "foto_neu_gewuerfelt", eid)
-            conn.commit()
-        log.info("foto_neu (Hintergrund) fertig fuer Entwurf %d (QA: %s)",
-                  eid, "OK" if review.approved else ("Probleme: " + ", ".join(review.problems)))
-    except Exception as ex:
-        log.error("foto_neu (Hintergrund) fehlgeschlagen fuer Entwurf %d: %s", eid, ex, exc_info=True)
-        try:
-            data["bild_wird_erstellt"] = False
-            data["bild_fehler"] = str(ex)
-            with get_conn() as conn:
-                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
-                             (json.dumps(data, ensure_ascii=False), eid))
-                conn.commit()
-        except Exception:
-            pass
-
-
 def _premium_foto_hintergrund(eid, user):
     """Erzeugt Premium-Bild via ShareNext Pipeline im Hintergrund-Thread.
 
@@ -2353,24 +2265,6 @@ def bild_aktion(eid):
                 audit_log(conn, session["user"], "layout_neu", eid)
                 conn.commit()
             flash("Layout von Beitrag %d neu gerendert (kein KI-Call)." % eid)
-
-        elif aktion == "foto_neu":
-            # Neues Foto erzeugen - LAEUFT IM HINTERGRUND (#Hintergrund-Fix), damit die Anfrage
-            # nicht 1-2 Minuten haengt und nichts vom Browser/Client abhaengt (Navigieren weg,
-            # Tab schliessen, Handy sperrt die Verbindung im Hintergrund - alles ohne Einfluss).
-            if not data.get("ueberschrift"):
-                flash("Kein Text vorhanden! Bitte Post neu erstellen.")
-                return redirect(ziel)
-            data["bild_wird_erstellt"] = True
-            data.pop("bild_fehler", None)
-            with get_conn() as conn:
-                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
-                             (json.dumps(data, ensure_ascii=False), eid))
-                conn.commit()
-            threading.Thread(target=_foto_neu_hintergrund, args=(eid, session["user"]),
-                              daemon=True).start()
-            flash("Neues Bild für Beitrag %d wird im Hintergrund erstellt (dauert ca. 1-2 "
-                  "Minuten) - Seite gleich neu laden, um das Ergebnis zu sehen." % eid)
 
         elif aktion == "premium_neu":
             # Premium-Bild via ShareNext Pipeline - LÄUFT IM HINTERGRUND
