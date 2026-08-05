@@ -745,7 +745,12 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
                         # ShareNext Bild als Hauptbild speichern
                         bild_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}.png")
                         _bildgen.add_logo_circles(tmp_raw.name, slogan, bild_pfad, pos="unten")
-                        conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (bild_pfad, entwurf_id))
+
+                        # WICHTIG: bild_pfad in DB Spalte UND im JSON setzen!
+                        # render_fuer_stelle() liest aus dem JSON, nicht aus der DB Spalte!
+                        data["bild_pfad"] = bild_pfad
+                        conn.execute("UPDATE entwuerfe SET bild_pfad=?, text=? WHERE id=?",
+                                   (bild_pfad, json.dumps(data, ensure_ascii=False), entwurf_id))
                         log.info("✓ ShareNext Bild generiert: %s", bild_pfad)
 
                         _os.unlink(tmp_raw.name)
