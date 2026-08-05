@@ -165,15 +165,17 @@ def _rang(items, keyfn):
 
 def _insights_aktualisieren():
     """Ruft fuer alle veroeffentlichten Posts mit Plattform-ID die aktuellen Insights ab und
-    speichert Reichweite + Interaktionen. Rueckgabe: (aktualisiert, fehlgeschlagen)."""
+    speichert Reichweite + Interaktionen. Rueckgabe: (aktualisiert, fehlgeschlagen, fehler_details)."""
     import publish
     with get_conn() as conn:
         # seite IS NOT NULL: nur Posts mit hinterlegter Seiten-ID - das Seiten-Token kann die
         # Insights lesen. Alte Posts ohne Seiten-ID werden uebersprungen (kein Fehl-Call).
-        rows = conn.execute("SELECT id, kanal, plattform_post_id, seite FROM posts "
+        rows = conn.execute("SELECT id, kanal, plattform_post_id, seite, veroeffentlicht_am FROM posts "
                             "WHERE status='veroeffentlicht' AND plattform_post_id IS NOT NULL "
                             "AND plattform_post_id!='' AND seite IS NOT NULL AND seite!=''").fetchall()
     ok, fehler = 0, 0
+    fehler_kategorien = {"zu_alt": 0, "zu_neu": 0, "kein_zugriff": 0, "api_fehler": 0}
+    fehler_beispiele = []
     for r in rows:
         try:
             reichweite, interakt = publish.post_insights(r["kanal"], r["plattform_post_id"], r["seite"])
@@ -185,7 +187,21 @@ def _insights_aktualisieren():
         except Exception as ex:
             log.warning("Insights-Abruf fehlgeschlagen (Post %s): %s", r["id"], ex)
             fehler += 1
-    return ok, fehler
+            # Kategorisiere Fehler
+            err_str = str(ex).lower()
+            if "permission" in err_str or "access" in err_str or "token" in err_str:
+                fehler_kategorien["kein_zugriff"] += 1
+                if len(fehler_beispiele) < 3:
+                    fehler_beispiele.append(f"Post {r['id']}: Kein Zugriff")
+            elif "not found" in err_str or "does not exist" in err_str:
+                fehler_kategorien["zu_alt"] += 1
+                if len(fehler_beispiele) < 3:
+                    fehler_beispiele.append(f"Post {r['id']}: Zu alt (>90 Tage)")
+            else:
+                fehler_kategorien["api_fehler"] += 1
+                if len(fehler_beispiele) < 3:
+                    fehler_beispiele.append(f"Post {r['id']}: {str(ex)[:50]}")
+    return ok, fehler, {"kategorien": fehler_kategorien, "beispiele": fehler_beispiele}
 
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
     """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
@@ -2513,10 +2529,26 @@ table.aw td{padding:4px 0;vertical-align:middle}
 def insights_abrufen():
     """Holt die aktuellen Reichweiten-/Interaktionszahlen aller veroeffentlichten Beitraege."""
     try:
-        ok, fehler = _insights_aktualisieren()
+        ok, fehler, details = _insights_aktualisieren()
         if ok or fehler:
-            flash("Zahlen aktualisiert: %d Beitrag/Beitraege abgerufen%s."
-                  % (ok, (", %d fehlgeschlagen" % fehler) if fehler else ""))
+            msg = "Zahlen aktualisiert: %d Beitrag/Beitraege abgerufen%s." % (
+                ok, (", %d fehlgeschlagen" % fehler) if fehler else "")
+            flash(msg)
+
+            # Detaillierte Fehler-Kategorien anzeigen
+            if fehler and details:
+                kat = details.get("kategorien", {})
+                if kat.get("zu_alt"):
+                    flash("⏰ %d Beiträge zu alt (>90 Tage - Insights nicht mehr verfügbar)" % kat["zu_alt"], "warning")
+                if kat.get("kein_zugriff"):
+                    flash("🔒 %d Beiträge: Kein Zugriff (Token-Berechtigung prüfen)" % kat["kein_zugriff"], "warning")
+                if kat.get("api_fehler"):
+                    flash("⚠️ %d Beiträge: API-Fehler" % kat["api_fehler"], "warning")
+
+                # Zeige Beispiele
+                beispiele = details.get("beispiele", [])
+                if beispiele:
+                    flash("Beispiele: " + " | ".join(beispiele), "info")
         else:
             flash("Keine veröffentlichten Beiträge mit Plattform-ID zum Abrufen gefunden.")
     except Exception as ex:
