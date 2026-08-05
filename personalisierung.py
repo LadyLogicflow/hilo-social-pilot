@@ -179,18 +179,28 @@ def render_fuer_stelle(fields, stelle, out_path):
 
     # DEBUG LOGGING (temporär!) - in Datei schreiben
     import sys
+    import traceback
     debug_log = "/home/caterina/hilo-social-pilot/data/personalisierung_debug.log"
-    with open(debug_log, "a") as df:
-        df.write(f"\n=== RENDER_FUER_STELLE START ===\n")
-        df.write(f"Entwurf-ID: {fields.get('id', '?')}\n")
-        df.write(f"Stelle: {stelle.get('name', '?') if stelle else 'keine'}\n")
+    try:
+        with open(debug_log, "a") as df:
+            df.write(f"\n=== RENDER_FUER_STELLE START ===\n")
+            df.write(f"Entwurf-ID: {fields.get('id', '?')}\n")
+            df.write(f"Stelle: {stelle.get('name', '?') if stelle else 'keine'}\n")
+    except Exception as e:
+        with open(debug_log, "a") as df:
+            df.write(f"ERROR in START: {e}\n")
 
     # ShareNext Premium-Bilder: Text ist schon im Bild, keine Personalisierung nötig!
     # Verwende bild_pfad direkt (kopiere nur mit Logo-Kreisen für die Stelle)
-    bild_pfad = f.get("bild_pfad")
-    with open(debug_log, "a") as df:
-        df.write(f"bild_pfad: {bild_pfad}\n")
-        df.write(f"bild_pfad exists: {os.path.exists(bild_pfad) if bild_pfad else False}\n")
+    try:
+        bild_pfad = f.get("bild_pfad")
+        with open(debug_log, "a") as df:
+            df.write(f"bild_pfad: {bild_pfad}\n")
+            df.write(f"bild_pfad exists: {os.path.exists(bild_pfad) if bild_pfad else False}\n")
+    except Exception as e:
+        with open(debug_log, "a") as df:
+            df.write(f"ERROR in bild_pfad: {e}\n")
+            df.write(f"Traceback: {traceback.format_exc()}\n")
 
     if bild_pfad and os.path.exists(bild_pfad):
         # Prüfe ob es ein ShareNext-Bild ist (Dateiname: entwurf_{id}.png)
