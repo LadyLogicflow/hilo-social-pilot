@@ -181,8 +181,10 @@ def render_fuer_stelle(fields, stelle, out_path):
     # Verwende bild_pfad direkt (kopiere nur mit Logo-Kreisen für die Stelle)
     bild_pfad = f.get("bild_pfad")
     if bild_pfad and os.path.exists(bild_pfad):
-        # Prüfe ob es ein ShareNext-Bild ist (KEIN kampagne_motiv_pfad)
-        if not f.get("kampagne_motiv_pfad"):
+        # Prüfe ob es ein ShareNext-Bild ist (Dateiname: entwurf_{id}.png)
+        # Kampagne-Bilder haben andere Namen (campaign_*.png, frist_motiv_*.png)
+        basename = os.path.basename(bild_pfad)
+        if basename.startswith("entwurf_") and "_premium" not in basename:
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             # ShareNext-Bilder haben Text schon drin - nur Logo-Kreise anpassen
             slogan = bildgen.pick_slogan(f.get("slogan"))
