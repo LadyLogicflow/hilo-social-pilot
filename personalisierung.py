@@ -177,24 +177,43 @@ def render_fuer_stelle(fields, stelle, out_path):
     import shutil
     f = fuer_stelle(fields, stelle)
 
+    # DEBUG LOGGING (temporär!)
+    import sys
+    print(f"[DEBUG personalisierung] Entwurf-ID: {fields.get('id', '?')}", file=sys.stderr)
+
     # ShareNext Premium-Bilder: Text ist schon im Bild, keine Personalisierung nötig!
     # Verwende bild_pfad direkt (kopiere nur mit Logo-Kreisen für die Stelle)
     bild_pfad = f.get("bild_pfad")
+    print(f"[DEBUG] bild_pfad: {bild_pfad}", file=sys.stderr)
+    print(f"[DEBUG] bild_pfad exists: {os.path.exists(bild_pfad) if bild_pfad else False}", file=sys.stderr)
+
     if bild_pfad and os.path.exists(bild_pfad):
         # Prüfe ob es ein ShareNext-Bild ist (Dateiname: entwurf_{id}.png)
         # Kampagne-Bilder haben andere Namen (campaign_*.png, frist_motiv_*.png)
         basename = os.path.basename(bild_pfad)
+        print(f"[DEBUG] basename: {basename}", file=sys.stderr)
+        print(f"[DEBUG] starts with 'entwurf_': {basename.startswith('entwurf_')}", file=sys.stderr)
+        print(f"[DEBUG] has '_premium': {'_premium' in basename}", file=sys.stderr)
+
         if basename.startswith("entwurf_") and "_premium" not in basename:
+            print(f"[DEBUG] -> ShareNext-Pfad! Verwende bild_pfad", file=sys.stderr)
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             # ShareNext-Bilder haben Text schon drin - nur Logo-Kreise anpassen
             slogan = bildgen.pick_slogan(f.get("slogan"))
             bildgen.add_logo_circles(bild_pfad, slogan, out_path, portrait=_portrait(stelle), pos="unten")
             return f, out_path
+        else:
+            print(f"[DEBUG] -> KEIN ShareNext (Bedingung FALSE)", file=sys.stderr)
 
     # Alte kampagne.py Bilder: Text-Overlay mit personalisiertem CTA
     motiv_pfad = f.get("kampagne_motiv_pfad")
     layout_template = f.get("kampagne_layout_template")
+    print(f"[DEBUG] kampagne_motiv_pfad: {motiv_pfad}", file=sys.stderr)
+    print(f"[DEBUG] layout_template: {layout_template}", file=sys.stderr)
+    print(f"[DEBUG] motiv exists: {os.path.exists(motiv_pfad) if motiv_pfad else False}", file=sys.stderr)
+
     if motiv_pfad and layout_template and os.path.exists(motiv_pfad):
+        print(f"[DEBUG] -> Verwende kampagne.py Logik!", file=sys.stderr)
         import kampagne
         from text_renderer import render_text_on_image
         template = kampagne.LAYOUT_TEMPLATES[layout_template]
