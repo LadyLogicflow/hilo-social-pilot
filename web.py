@@ -2273,16 +2273,15 @@ def _premium_foto_hintergrund(eid, user):
             quality="medium"
         )
 
-        # Bild speichern
-        timestamp = int(time.time())
-        unique_id = uuid.uuid4().hex[:12]
-        final_path = os.path.join(DATA_DIR, "bilder", f"premium_{timestamp}_{unique_id}.png")
+        # Bild speichern als entwurf_{eid}.png (ShareNext-Standard!)
+        # NICHT mehr premium_*.png - einheitliches Namens-Schema!
+        final_path = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
         result.image.save(final_path)
 
         # Logo-Kreise hinzufügen
         slogan = bildgen.pick_slogan(data.get("slogan", ""))
-        temp_with_logos = os.path.join(DATA_DIR, "bilder", f"premium_{timestamp}_{unique_id}_logos.png")
-        bildgen.add_logo_circles(final_path, slogan, temp_with_logos, pos="diagonal2")
+        temp_with_logos = final_path + ".tmp_logos.png"
+        bildgen.add_logo_circles(final_path, slogan, temp_with_logos, pos="unten")
         os.replace(temp_with_logos, final_path)
 
         # Daten aktualisieren
