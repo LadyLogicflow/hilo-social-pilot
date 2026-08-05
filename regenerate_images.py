@@ -48,20 +48,23 @@ def regenerate_image(entwurf_id, entwurf_data, dry_run=False):
 
     Args:
         entwurf_id: ID des Entwurfs
-        entwurf_data: Dict mit Entwurf-Daten (text, kanal, bild_pfad)
+        entwurf_data: sqlite3.Row mit Entwurf-Daten (text, kanal, bild_pfad)
         dry_run: Wenn True, nur simulieren (kein echtes Generieren)
 
     Returns:
         (success, message) Tuple
     """
     try:
+        # sqlite3.Row zu dict konvertieren für .get() Support
+        entwurf_dict = dict(entwurf_data)
+
         # Text aus JSON parsen
-        fields = json.loads(entwurf_data["text"])
+        fields = json.loads(entwurf_dict["text"])
 
         # Überschrift und Bullets extrahieren
         ueberschrift = fields.get("ueberschrift", "")
         bullets = fields.get("bullets", [])
-        kanal = entwurf_data.get("kanal", "google")
+        kanal = entwurf_dict.get("kanal", "google")
 
         if not ueberschrift:
             return (False, "Keine Überschrift gefunden")
@@ -93,7 +96,7 @@ def regenerate_image(entwurf_id, entwurf_data, dry_run=False):
             new_bild_pfad = os.path.join(DATA_DIR, f"entwurf_{entwurf_id}.png")
 
             # Altes Bild sichern (falls es existiert)
-            old_bild_pfad = entwurf_data.get("bild_pfad")
+            old_bild_pfad = entwurf_dict.get("bild_pfad")
             if old_bild_pfad and os.path.exists(old_bild_pfad):
                 backup_pfad = old_bild_pfad + ".old"
                 print(f"  Altes Bild sichern: {os.path.basename(backup_pfad)}")
