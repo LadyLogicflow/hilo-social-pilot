@@ -165,101 +165,32 @@ def _setze_berater_comic(f, stelle):
 
 
 def render_fuer_stelle(fields, stelle, out_path):
-    """Rendert das Bild mit personalisiertem CTA (gleiches Foto/Design). Liefert (felder, pfad).
-    Hat die Stelle ein Kreisportraet hinterlegt, ersetzt es den blauen Slogan-Punkt.
+    """Rendert das ShareNext-Bild mit personalisierten Logo-Kreisen für die Beratungsstelle.
 
-    Kampagnen-Bilder (3-Stufen-Workflow, 'kampagne_motiv_pfad' vorhanden): das rohe KI-Motiv
-    wird WIEDERVERWENDET - nur der personalisierte CTA-Text wird per Pillow neu draufgerendert,
-    KEIN neuer GPT-Image-Call (#Kostenschutz). Der CTA im Bild nennt dadurch weiterhin den Ort
-    der Stelle, genau wie bei der alten Pipeline, nur ohne die teure Neugenerierung.
-    Alte/Nicht-Kampagnen-Entwuerfe fallen weiter auf die bisherige Pipeline zurueck."""
-    import bildgen, bildmotiv
-    import shutil
+    ShareNext-Bilder haben Text bereits integriert - keine Text-Personalisierung nötig!
+    Nur Logo-Kreise werden angepasst (Portrait der Beratungsstelle).
+
+    NUR ShareNext-Bilder (entwurf_*.png) werden unterstützt - alle anderen Bild-Typen
+    wurden entfernt (Standard, kampagne.py, etc.)."""
+    import bildgen
     f = fuer_stelle(fields, stelle)
 
-    # DEBUG LOGGING (temporär!) - in Datei schreiben
-    import sys
-    import traceback
-    debug_log = "/home/caterina/hilo-social-pilot/data/personalisierung_debug.log"
-    try:
-        with open(debug_log, "a") as df:
-            df.write(f"\n=== RENDER_FUER_STELLE START ===\n")
-            df.write(f"Entwurf-ID: {fields.get('id', '?')}\n")
-            df.write(f"Stelle: {stelle.get('name', '?') if stelle else 'keine'}\n")
-    except Exception as e:
-        with open(debug_log, "a") as df:
-            df.write(f"ERROR in START: {e}\n")
+    bild_pfad = f.get("bild_pfad")
 
-    # ShareNext Premium-Bilder: Text ist schon im Bild, keine Personalisierung nötig!
-    # Verwende bild_pfad direkt (kopiere nur mit Logo-Kreisen für die Stelle)
-    try:
-        bild_pfad = f.get("bild_pfad")
-        with open(debug_log, "a") as df:
-            df.write(f"bild_pfad: {bild_pfad}\n")
-            df.write(f"bild_pfad exists: {os.path.exists(bild_pfad) if bild_pfad else False}\n")
-    except Exception as e:
-        with open(debug_log, "a") as df:
-            df.write(f"ERROR in bild_pfad: {e}\n")
-            df.write(f"Traceback: {traceback.format_exc()}\n")
+    # ShareNext-Bild muss existieren
+    if not bild_pfad or not os.path.exists(bild_pfad):
+        raise ValueError(f"Kein Bild gefunden für Entwurf: {bild_pfad}")
 
-    if bild_pfad and os.path.exists(bild_pfad):
-        # Prüfe ob es ein ShareNext-Bild ist (Dateiname: entwurf_{id}.png)
-        # Kampagne-Bilder haben andere Namen (campaign_*.png, frist_motiv_*.png)
-        basename = os.path.basename(bild_pfad)
-        with open(debug_log, "a") as df:
-            df.write(f"basename: {basename}\n")
-            df.write(f"starts with 'entwurf_': {basename.startswith('entwurf_')}\n")
-            df.write(f"has '_premium': {'_premium' in basename}\n")
+    # Nur ShareNext-Bilder (entwurf_*.png) werden unterstützt
+    basename = os.path.basename(bild_pfad)
+    if not (basename.startswith("entwurf_") and "_premium" not in basename):
+        raise ValueError(f"Nur ShareNext-Bilder werden unterstützt: {basename}")
 
-        if basename.startswith("entwurf_") and "_premium" not in basename:
-            with open(debug_log, "a") as df:
-                df.write(f"-> ShareNext-Pfad! Verwende bild_pfad\n")
-            os.makedirs(os.path.dirname(out_path), exist_ok=True)
-            # ShareNext-Bilder haben Text schon drin - nur Logo-Kreise anpassen
-            slogan = bildgen.pick_slogan(f.get("slogan"))
-            bildgen.add_logo_circles(bild_pfad, slogan, out_path, portrait=_portrait(stelle), pos="unten")
-            with open(debug_log, "a") as df:
-                df.write(f"out_path: {out_path}\n")
-                df.write(f"=== RETURN ShareNext ===\n")
-            return f, out_path
-        else:
-            with open(debug_log, "a") as df:
-                df.write(f"-> KEIN ShareNext (Bedingung FALSE)\n")
-
-    # Alte kampagne.py Bilder: Text-Overlay mit personalisiertem CTA
-    motiv_pfad = f.get("kampagne_motiv_pfad")
-    layout_template = f.get("kampagne_layout_template")
-    with open(debug_log, "a") as df:
-        df.write(f"kampagne_motiv_pfad: {motiv_pfad}\n")
-        df.write(f"layout_template: {layout_template}\n")
-        df.write(f"motiv exists: {os.path.exists(motiv_pfad) if motiv_pfad else False}\n")
-
-    if motiv_pfad and layout_template and os.path.exists(motiv_pfad):
-        with open(debug_log, "a") as df:
-            df.write(f"-> Verwende kampagne.py Logik!\n")
-            df.write(f"=== RETURN kampagne.py ===\n")
-        import kampagne
-        from text_renderer import render_text_on_image
-        template = kampagne.LAYOUT_TEMPLATES[layout_template]
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        text_path = out_path + ".tmp_text.png"
-        render_text_on_image(
-            motiv_pfad, f.get("ueberschrift", ""), f.get("bullets", []), f.get("cta", ""),
-            template["headline_box"], template["supporting_box"], template["cta_box"],
-            text_path, background_overlay=True, highlight_words=f.get("highlight_words"),
-        )
-        slogan = bildgen.pick_slogan(f.get("slogan"))
-        bildgen.add_logo_circles(text_path, slogan, out_path, portrait=_portrait(stelle), pos="diagonal2")
-        try:
-            os.remove(text_path)
-        except Exception:
-            pass
-        return f, out_path
-    _setze_berater_comic(f, stelle)   # Stil 'comic_beratung': Berater-Comic DIESER Stelle einsetzen
-    photo = bildmotiv.ensure_photo_fuer(f)
-    slogan = bildgen.pick_slogan(f.get("slogan"))
+    # ShareNext-Bild kopieren + Logo-Kreise hinzufügen
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    bildgen.render(f, photo, slogan, out_path, portrait=_portrait(stelle))
+    slogan = bildgen.pick_slogan(f.get("slogan"))
+    bildgen.add_logo_circles(bild_pfad, slogan, out_path, portrait=_portrait(stelle), pos="unten")
+
     return f, out_path
 
 
