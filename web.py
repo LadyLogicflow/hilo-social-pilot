@@ -1117,7 +1117,8 @@ THEMEN = """<!doctype html><meta charset=utf-8><title>Freigabe: Themen</title><s
 <form method=post>
 <p><label><input type=checkbox onclick="for(var c of document.querySelectorAll('input[name=thema_ids]'))c.checked=this.checked"> <b>Alle markieren</b></label>
 &nbsp;&nbsp;<button name=aktion value=auswaehlen>Markierte freigeben &rarr; Stufe 2</button>
-<button name=aktion value=verwerfen style="background:#9aa0a6">Markierte verwerfen</button></p>
+<button name=aktion value=verwerfen style="background:#9aa0a6">Markierte verwerfen</button>
+<button name=aktion value=loeschen style="background:#b00020" onclick="return confirm('Ausgewählte Themen wirklich löschen?')">Markierte löschen</button></p>
 <table><tr><th></th><th>Quelle</th><th>Titel</th><th></th></tr>
 {% for t in themen %}<tr><td><input type=checkbox name=thema_ids value="{{t.id}}"></td>
 <td><span class=q>{{t.quelle}}</span></td>
@@ -2737,16 +2738,26 @@ def themen():
         if request.method == "POST":
             ids = request.form.getlist("thema_ids")
             aktion = request.form.get("aktion")
-            if ids and aktion in ("auswaehlen", "verwerfen"):
-                ziel = "ausgewaehlt" if aktion == "auswaehlen" else "verworfen"
-                q = "UPDATE themen SET status=? WHERE id IN (%s) AND status='vorgeschlagen'" % ",".join("?" * len(ids))
-                conn.execute(q, [ziel] + ids)
-                audit_log(conn, session["user"], "themen_" + aktion, None, "%d Themen" % len(ids))
-                conn.commit()
-                if ziel == "ausgewaehlt":
-                    flash("%d Themen freigegeben. Auf der Startseite 'Texte & Bilder erzeugen' klicken." % len(ids))
+            if ids and aktion in ("auswaehlen", "verwerfen", "loeschen"):
+                if aktion == "loeschen":
+                    # Bulk-Delete: mehrere Themen auf einmal löschen (soft-delete)
+                    q = ("UPDATE themen SET status='geloescht' WHERE id IN (%s) AND status='vorgeschlagen' "
+                         "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id)") % ",".join("?" * len(ids))
+                    cur = conn.execute(q, ids)
+                    geloescht = cur.rowcount
+                    audit_log(conn, session["user"], "themen_geloescht", None, "%d Themen" % geloescht)
+                    conn.commit()
+                    flash("%d Themen gelöscht." % geloescht)
                 else:
-                    flash("%d Themen verworfen." % len(ids))
+                    ziel = "ausgewaehlt" if aktion == "auswaehlen" else "verworfen"
+                    q = "UPDATE themen SET status=? WHERE id IN (%s) AND status='vorgeschlagen'" % ",".join("?" * len(ids))
+                    conn.execute(q, [ziel] + ids)
+                    audit_log(conn, session["user"], "themen_" + aktion, None, "%d Themen" % len(ids))
+                    conn.commit()
+                    if ziel == "ausgewaehlt":
+                        flash("%d Themen freigegeben. Auf der Startseite 'Texte & Bilder erzeugen' klicken." % len(ids))
+                    else:
+                        flash("%d Themen verworfen." % len(ids))
             else:
                 flash("Bitte mindestens ein Thema markieren.")
         rows = conn.execute("SELECT id, quelle, titel, url FROM themen WHERE status='vorgeschlagen' "
