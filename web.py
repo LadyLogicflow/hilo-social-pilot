@@ -870,7 +870,11 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
     <p class=hint>Tipp: Lege in der Verwaltung Beratungsstellen mit Facebook-Seite an, dann werden Beiträge automatisch personalisiert.</p>
     {% else %}<p class=sub>Kein Facebook-Zugang/keine Beratungsstelle aktiv.</p>{% endif %}
   </div></div>
-{% else %}<p style="text-align:center">Keine freigegebenen Beiträge zur Einplanung.</p>{% endfor %}"""
+{% else %}<p style="text-align:center">Keine freigegebenen Beiträge zur Einplanung.</p>{% endfor %}
+{% if bilder_werden_erstellt %}<script>
+// Auto-Refresh alle 30 Sekunden wenn Bilder im Hintergrund generiert werden
+setTimeout(function() { location.reload(); }, 30000);
+</script>{% endif %}"""
 
 POOL = """<!doctype html><meta charset=utf-8><title>Zufalls-Pool</title><style>""" + _TOP + """
 .card{display:flex;gap:16px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:14px;max-width:1040px;margin:0 auto 14px}
@@ -1738,8 +1742,11 @@ def einplanung():
     if rows and stellen:
         pg, _ = _pages()
         ig_seiten = {str(p["id"]) for p in (pg or []) if p.get("ig_id")}
+    # Auto-Refresh wenn Bilder im Hintergrund generiert werden
+    bilder_werden_erstellt = any(r["f"].get("bild_wird_erstellt") for r in rows)
     return render_template_string(EINPLANUNG, **_ctx(freigegeben=rows, stellen=stellen,
-                                  pages=pages, pages_err=pages_err, ig_seiten=ig_seiten))
+                                  pages=pages, pages_err=pages_err, ig_seiten=ig_seiten,
+                                  bilder_werden_erstellt=bilder_werden_erstellt))
 
 @app.route("/pool")
 @login_required
@@ -2853,10 +2860,10 @@ def erzeugen():
             try:
                 _start_generation_ids(ids, bild_modus=bild_modus)
                 flash("Erzeugung für %d ausgewählte Thema/Themen gestartet (ShareNext Premium) - läuft im Hintergrund. "
-                      "In ein bis zwei Minuten die Startseite neu laden." % len(ids))
+                      "Die Seite lädt automatisch alle 30 Sekunden neu." % len(ids))
             except Exception as ex:
                 flash("Erzeugung konnte nicht gestartet werden: %s" % ex)
-        return redirect(url_for("index"))
+        return redirect(url_for("einplanung"))
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, titel, quelle, erkannt_am FROM themen t WHERE status='ausgewaehlt' "
