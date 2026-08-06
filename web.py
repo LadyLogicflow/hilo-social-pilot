@@ -3137,10 +3137,11 @@ def aktion(eid):
         conn.commit()
     return redirect(ziel)
 
-def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id, location_id=None):
+def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id, location_id=None, alt_text=None):
     """Instagram-Veroeffentlichung: Bild(er) oeffentlich hochladen (IONOS) -> https-URL(s),
     das mit der Facebook-Seite verknuepfte IG-Konto ermitteln, dann posten. (ok, info).
-    location_id = optionale Facebook-Orts-ID fuer den Geotag."""
+    location_id = optionale Facebook-Orts-ID fuer den Geotag.
+    alt_text = optionaler Alt-Text fuer Barrierefreiheit (wird an publish_instagram weitergegeben)."""
     import uploader, time
     if not uploader.configured():
         return False, ("Instagram-Bild-Upload nicht konfiguriert (Secrets ionos_sftp_* + "
@@ -3159,7 +3160,7 @@ def _publish_instagram(publish, fb_page_id, bilder, caption, fmt, eid, stelle_id
             for i, b in enumerate(valid)]
     if fmt == "karussell" and len(urls) > 1:
         return publish.publish_instagram_carousel(ig_id, urls, caption, location_id=location_id)
-    return publish.publish_instagram(ig_id, urls[0], caption, location_id=location_id)
+    return publish.publish_instagram(ig_id, urls[0], caption, location_id=location_id, alt_text=alt_text)
 
 def _publish_story(publish, fb_page_id, bilder, eid, stelle_id, do_ig=True, do_fb=False):
     """Postet die uebergebenen Bilder NACHEINANDER als Story-Frames (9:16) - ein Karussell
@@ -3300,15 +3301,20 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         return bilder
 
     ergebnisse = []   # (kanal, ok, info)
+    # Alt-Text aus Entwurf-JSON lesen (falls vorhanden)
+    alt_text = f.get("alt_text") or None
+
     if kanal in ("facebook", "beide"):
         try:
             bilder = _render(fmt_fb)
             if not bilder:
                 ok, info = False, "Kein Bild vorhanden"
             elif fmt_fb == "karussell":
-                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, _caption("facebook"), place=loc_id)
+                # Für Karussell: Liste mit gleichem Alt-Text für jedes Bild
+                alt_texts = [alt_text] * len(bilder) if alt_text else None
+                ok, info = publish.publish_facebook_carousel(ziel_seite, bilder, _caption("facebook"), place=loc_id, alt_texts=alt_texts)
             else:
-                ok, info = publish.publish_facebook(ziel_seite, bilder[0], _caption("facebook"), place=loc_id)
+                ok, info = publish.publish_facebook(ziel_seite, bilder[0], _caption("facebook"), place=loc_id, alt_text=alt_text)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("facebook", ok, info))
@@ -3346,7 +3352,7 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
                 ok, info = False, "Kein Bild vorhanden"
             else:
                 ok, info = _publish_instagram(publish, ziel_seite, bilder, _caption("instagram"),
-                                              fmt_ig, eid, stelle_id, location_id=loc_id)
+                                              fmt_ig, eid, stelle_id, location_id=loc_id, alt_text=alt_text)
         except Exception as ex:
             ok, info = False, str(ex)
         ergebnisse.append(("instagram", ok, info))

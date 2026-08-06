@@ -746,12 +746,15 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
                         bild_pfad = _os.path.join(_DATA_DIR, f"entwurf_{entwurf_id}.png")
                         _bildgen.add_logo_circles(tmp_raw.name, slogan, bild_pfad, pos="unten")
 
-                        # WICHTIG: bild_pfad in DB Spalte UND im JSON setzen!
+                        # WICHTIG: bild_pfad + alt_text in DB Spalte UND im JSON setzen!
                         # render_fuer_stelle() liest aus dem JSON, nicht aus der DB Spalte!
                         data["bild_pfad"] = bild_pfad
+                        data["alt_text"] = result.production_brief.alt_text or ""
                         conn.execute("UPDATE entwuerfe SET bild_pfad=?, text=? WHERE id=?",
                                    (bild_pfad, json.dumps(data, ensure_ascii=False), entwurf_id))
                         log.info("✓ ShareNext Bild generiert: %s", bild_pfad)
+                        if result.production_brief.alt_text:
+                            log.info("✓ Alt-Text: %s", result.production_brief.alt_text[:80])
 
                         _os.unlink(tmp_raw.name)
 
