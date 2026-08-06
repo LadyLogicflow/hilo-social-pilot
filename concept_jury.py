@@ -205,6 +205,13 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
     verdict.winning_titel = gewinner.route_titel
     verdict.quality_warning = gewinner.gesamtscore < MINDEST_SCORE
 
+    # Fallback: Beste Route auch wenn < MINDEST_SCORE (besser als Fehler!)
+    if verdict.quality_warning:
+        log.warning(
+            "Gewinner-Route hat Score %.2f < MINDEST_SCORE %.1f - beste verfügbare Route wird trotzdem verwendet. "
+            "Qualitätskontrolle empfohlen!", gewinner.gesamtscore, MINDEST_SCORE
+        )
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # EVALUATOR
