@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regeneriert ShareNext Premium-Bilder für Entwürfe mit alten kampagne.py Bildern."""
+"""Regeneriert ShareNext Premium-Bilder für Entwürfe mit alten Legacy-Bildern."""
 
 import sys
 import os

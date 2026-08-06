@@ -55,9 +55,8 @@ def render_text_on_image(
         output_path: Ausgabe-Pfad
         background_overlay: Falls True, halbtransparente Hintergründe hinter Text
         highlight_words: Optionale Liste von Wörtern/Zahlen (aus headline/supporting_points),
-            die GRÜN statt in der Standardfarbe hervorgehoben werden (z.B. von GPT gewählt,
-            siehe kampagne.CampaignPlan.highlight_words). Nur in Headline/Bullets wirksam,
-            nicht im CTA (der hat bereits eine eigene, klare Signalfarbe als Button).
+            die GRÜN statt in der Standardfarbe hervorgehoben werden. Nur in Headline/Bullets
+            wirksam, nicht im CTA (der hat bereits eine eigene, klare Signalfarbe als Button).
 
     Returns:
         Path zum finalen Bild
@@ -215,10 +214,9 @@ def _render_text_block(
     Aufrufer nicht angepasst werden muessen - es wird nie mehr eine Flaeche gezeichnet.
 
     'highlight_words' (normalisiert, kleingeschrieben, ohne Satzzeichen): einzelne Woerter aus
-    diesem Textblock, die GRUEN statt in 'text_color' gezeichnet werden (#Hervorhebung, von GPT
-    ausgewaehlt - siehe kampagne.CampaignPlan.highlight_words). Erfordert Wort-fuer-Wort-
-    Rendering statt einem einzigen draw.text-Aufruf pro Zeile, da eine Zeile jetzt gemischte
-    Farben enthalten kann.
+    diesem Textblock, die GRUEN statt in 'text_color' gezeichnet werden (#Hervorhebung).
+    Erfordert Wort-fuer-Wort-Rendering statt einem einzigen draw.text-Aufruf pro Zeile,
+    da eine Zeile jetzt gemischte Farben enthalten kann.
 
     Fortsetzungszeilen (2. Zeile eines umgebrochenen Bullet-Points) werden eingerueckt, damit sie
     unter dem TEXT der 1. Zeile stehen statt unter dem Aufzaehlungszeichen - und zwischen den

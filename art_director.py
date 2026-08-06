@@ -34,7 +34,7 @@ log = logging.getLogger("hilo.art_director")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # VARIANZ-MECHANISMUS (gegen LLM-Bias bei Kameraperspektive/Komposition)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# #Varianz-Fix: Analog zu kampagne.py's pick_layout_template() - bei Literal-Feldern ohne
+# #Varianz-Fix: Bei Literal-Feldern ohne
 # starkes inhaltliches Unterscheidungsmerkmal (hier: Kameraperspektive, Kompositionsprinzip)
 # neigt das LLM zu denselben 1-2 Optionen. Anders als beim Layout (dort codeseitig zufaellig
 # VORGEGEBEN) bleibt die Wahl hier bewusst beim LLM, weil sie inhaltlich von der Route abhaengt -

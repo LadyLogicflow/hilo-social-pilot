@@ -128,11 +128,9 @@ def motive_ordner_groesse():
     return gesamt
 
 
-def _kampagne_in_benutzung_pfade(conn):
-    """Analog zu _in_benutzung_pfade, aber fuer den 3-Stufen-Workflow: schuetzt sowohl das rohe
-    Motiv (fields['kampagne_motiv_pfad'], gebraucht fuer die Personalisierung je
-    Beratungsstelle - render_fuer_stelle) als auch entwuerfe.bild_pfad (falls es ausnahmsweise
-    im kampagne/-Ordner liegt, z.B. bei einem expliziten output_path)."""
+def _legacy_kampagne_in_benutzung_pfade(conn):
+    """Legacy-Funktion: Schuetzt alte kampagne_motiv_pfad Dateien die noch von aktiven
+    Entwürfen referenziert werden (nur noch für Migration/Cleanup relevantrelevant)."""
     in_benutzung = set()
     ph_status = ",".join("?" for _ in AKTIVE_ENTWURF_STATUS)
     ph_geplant = ",".join("?" for _ in AKTIVE_GEPLANT_STATUS)
@@ -148,7 +146,7 @@ def _kampagne_in_benutzung_pfade(conn):
         try:
             fields = json.loads(row["text"]) if row["text"] else {}
         except Exception:
-            log.warning("aufraeumen_kampagne: Entwurf %s nicht parsebar, uebersprungen.", row["id"])
+            log.warning("aufraeumen_legacy_kampagne: Entwurf %s nicht parsebar, uebersprungen.", row["id"])
             continue
         motiv = fields.get("kampagne_motiv_pfad")
         if motiv:
@@ -156,16 +154,12 @@ def _kampagne_in_benutzung_pfade(conn):
     return in_benutzung
 
 
-def aufraeumen_kampagne(conn, schonfrist_tage=14):
-    """Raeumt verwaiste Dateien aus DATA_DIR/kampagne/ auf (rohe Motive + Text-Zwischenbilder
-    des 3-Stufen-Workflows, VOR den finalen CI-Kreisen - die fertigen Bilder liegen unter
-    DATA_DIR/bilder/ und werden hier NIE angefasst, siehe entwuerfe.bild_pfad-Schutz).
+def aufraeumen_legacy_kampagne(conn, schonfrist_tage=14):
+    """Legacy-Funktion: Raeumt verwaiste Dateien aus DATA_DIR/kampagne/ auf.
+    Nur noch für alte Entwürfe mit kampagne_motiv_pfad relevant (pre-ShareNext Migration).
 
     Gleiche Sicherheitslogik wie aufraeumen_motive: geloescht wird nur, was kein aktiver
-    Entwurf mehr referenziert UND aelter als die Schonfrist ist. Die rohen Motive muessen so
-    lange erhalten bleiben, wie der Entwurf noch personalisiert werden koennte (#Kostenschutz -
-    ohne sie wuerde die Personalisierung je Beratungsstelle wieder einen neuen, kostenpflichtigen
-    GPT-Image-Call brauchen).
+    Entwurf mehr referenziert UND aelter als die Schonfrist ist.
 
     Args:
         conn: offene SQLite-Verbindung.
@@ -178,7 +172,7 @@ def aufraeumen_kampagne(conn, schonfrist_tage=14):
 
     if not os.path.isdir(KAMPAGNE_DIR):
         return (0, 0)
-    in_benutzung = _kampagne_in_benutzung_pfade(conn)
+    in_benutzung = _legacy_kampagne_in_benutzung_pfade(conn)
     schwelle = time.time() - max(0, schonfrist_tage) * 86400
     geloescht = 0
     bytes_frei = 0
@@ -202,13 +196,13 @@ def aufraeumen_kampagne(conn, schonfrist_tage=14):
             geloescht += 1
             bytes_frei += groesse
         except OSError as ex:
-            log.warning("aufraeumen_kampagne: konnte %s nicht loeschen: %s", name, ex)
-    log.info("aufraeumen_kampagne: %d Datei(en) geloescht, %.1f MB frei.",
+            log.warning("aufraeumen_legacy_kampagne: konnte %s nicht loeschen: %s", name, ex)
+    log.info("aufraeumen_legacy_kampagne: %d Datei(en) geloescht, %.1f MB frei.",
              geloescht, bytes_frei / (1024 * 1024))
     return (geloescht, bytes_frei)
 
 
-def kampagne_ordner_groesse():
+def legacy_kampagne_ordner_groesse():
     """Summe der Dateigroessen im kampagne/-Ordner in Bytes (0, wenn der Ordner fehlt)."""
     if not os.path.isdir(KAMPAGNE_DIR):
         return 0

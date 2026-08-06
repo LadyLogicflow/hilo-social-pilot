@@ -233,9 +233,8 @@ def add_logo_circles(image_path, slogan, output_path, portrait=None, pos=None):
             altes Verhalten (Zufallsrotation bzw. 'diagonal2' bei Portrait). Der 3-Stufen-
             Workflow uebergibt hier IMMER 'oben' (#Kollisionsschutz) - die Kreis-Position war
             bisher zufaellig und unabhaengig von der Text-Layout-Vorlage, wodurch Ueberschrift
-            oder CTA je nach Zufall hinter einem Kreis verschwinden konnten. Die Layout-
-            Templates (LAYOUT_TEMPLATES in kampagne.py) reservieren dafuer bewusst die obere
-            linke/rechte Ecke frei von Text.
+            oder CTA je nach Zufall hinter einem Kreis verschwinden konnten. ShareNext
+            platziert Text intelligent um Überlappungen zu vermeiden.
 
     Returns:
         output_path

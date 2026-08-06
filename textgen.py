@@ -572,21 +572,18 @@ def generate(thema, kanal=None):
     return _normalize_bild(_normalize_captions(_parse_json(raw)))
 
 
-def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
+def _create_drafts(rows, kanal):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf.
 
     Args:
         rows: Themen-Zeilen aus der DB
         kanal: Ziel-Kanal (google, facebook, instagram)
-        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
-                      False = Anthropic Claude (bisheriger Workflow)
-        test_mode: True = low quality für Tests (nur bei use_campaign=True)
 
     Returns:
         Anzahl erzeugter Entwuerfe
 
     Note:
-        Alle Bilder werden NUR NOCH mit ShareNext Premium generiert!
+        Nutzt ShareNext Pipeline (6-stufige Premium-Bildgenerierung).
     """
     from db import get_conn
     created = 0
@@ -673,56 +670,50 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
             log.warning("Texterzeugung fehlgeschlagen (Thema %s): %s", r["id"], ex)
     return created
 
-def generate_drafts(limit=3, kanal="google", use_campaign=False, test_mode=False):
-    """Erzeugt Entwuerfe fuer ausgewaehlte Themen.
+def generate_drafts(limit=3, kanal="google"):
+    """Erzeugt Entwuerfe fuer ausgewaehlte Themen via ShareNext Pipeline.
 
     Args:
         limit: Max. Anzahl Entwuerfe
         kanal: Ziel-Kanal (google, facebook, instagram)
-        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
-                      False = Anthropic Claude (bisheriger Workflow)
-        test_mode: True = low quality für Tests (nur bei use_campaign=True)
 
     Returns:
         Anzahl erzeugter Entwuerfe
     """
     from db import get_conn
-    if not use_campaign and not get_secret("anthropic_api_key"):
-        log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
+    from secrets_store import get_secret
+
+    if not get_secret("openai_api_key"):
+        log.info("Texterzeugung uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
         return 0
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, titel, url, volltext FROM themen t WHERE status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id AND e.kanal=?) "
             "ORDER BY erkannt_am DESC LIMIT ?", (kanal, limit)).fetchall()
-    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
+    return _create_drafts(rows, kanal)
 
-def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, premium_images=False, both_images=False):
-    """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs.
+def generate_for_ids(ids, kanal="google"):
+    """Erzeugt Entwuerfe NUR fuer die ausgewaehlten Thema-IDs via ShareNext Pipeline.
 
     Args:
         ids: Liste von Thema-IDs
         kanal: Ziel-Kanal (google, facebook, instagram)
-        use_campaign: True = 3-Stufen-Workflow (GPT-5.6 Terra + GPT Image 2 + QA)
-                      False = Anthropic Claude (bisheriger Workflow)
-        test_mode: True = low quality für Tests (nur bei use_campaign=True)
-        premium_images: DEPRECATED - wird ignoriert (immer ShareNext!)
-        both_images: DEPRECATED - wird ignoriert (immer ShareNext!)
 
     Returns:
         Anzahl erzeugter Entwuerfe
 
     Note:
-        Alle Bilder werden NUR NOCH mit ShareNext Premium generiert!
-        Die Parameter premium_images und both_images werden aus Kompatibilitätsgründen
-        noch akzeptiert, aber ignoriert.
+        Nutzt ShareNext Pipeline (6-stufige Premium-Bildgenerierung).
     """
     from db import get_conn
+    from secrets_store import get_secret
+
     ids = [int(i) for i in ids if str(i).strip().isdigit()]
     if not ids:
         return 0
-    if not use_campaign and not get_secret("anthropic_api_key"):
-        log.info("Texterzeugung uebersprungen: kein 'anthropic_api_key' hinterlegt (secrets.json).")
+    if not get_secret("openai_api_key"):
+        log.info("Texterzeugung uebersprungen: kein 'openai_api_key' hinterlegt (secrets.json).")
         return 0
     ph = ",".join("?" * len(ids))
     with get_conn() as conn:
@@ -730,8 +721,7 @@ def generate_for_ids(ids, kanal="google", use_campaign=False, test_mode=False, p
             "SELECT id, titel, url, volltext FROM themen WHERE id IN (%s) AND status='ausgewaehlt' "
             "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=themen.id AND e.kanal=?)" % ph,
             ids + [kanal]).fetchall()
-    # premium_images und both_images werden ignoriert - immer ShareNext!
-    return _create_drafts(rows, kanal, use_campaign=use_campaign, test_mode=test_mode)
+    return _create_drafts(rows, kanal)
 
 
 def regenerate(thema, previous, feedback, kanal="google"):

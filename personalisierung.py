@@ -129,8 +129,8 @@ def render_fuer_stelle(fields, stelle, out_path):
     ShareNext-Bilder haben Text bereits integriert - keine Text-Personalisierung nötig!
     Nur Logo-Kreise werden angepasst (Portrait der Beratungsstelle).
 
-    NUR ShareNext-Bilder (entwurf_*.png) werden unterstützt - alle anderen Bild-Typen
-    wurden entfernt (Standard, kampagne.py, etc.)."""
+    NUR ShareNext-Bilder (entwurf_*.png) werden unterstützt - Legacy-Systeme
+    wurden entfernt."""
     import bildgen
     f = fuer_stelle(fields, stelle)
 

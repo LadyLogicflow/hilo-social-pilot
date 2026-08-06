@@ -12,10 +12,10 @@ def daily_run():
     anzahl = radar.run()
     log.info("Tageslauf: %s neue Themen aus dem Radar.", anzahl)
     limit = int(os.environ.get("HILO_GENERATE_LIMIT", "3"))
-    # NUR NOCH ShareNext Premium-Bilder! use_campaign=False (kein kampagne.py mehr!)
-    erzeugt = textgen.generate_drafts(limit=limit, kanal="google", use_campaign=False)
+    # ShareNext Premium-Bilder (6-stufige Pipeline)
+    erzeugt = textgen.generate_drafts(limit=limit, kanal="google")
     log.info("Tageslauf: %s neue Textentwuerfe erzeugt.", erzeugt)
-    # ShareNext erzeugt Bilder direkt - kein Fallback mehr nötig
+    # ShareNext erzeugt Bilder direkt - Fallback nur für alte Entwürfe
     bilder = bildgen.render_drafts()
     log.info("Tageslauf: %s Bilder ueber Fallback-Pipeline erzeugt (normalerweise 0).", bilder)
     log.info("HILO-Pilot Tageslauf beendet.")
@@ -175,14 +175,13 @@ def main():
     if args.add_url:
         import ingest; ingest.add_url(args.add_url)
     if args.generate is not None:
-        log.info("%s Textentwuerfe erzeugt.",
-                 textgen.generate_drafts(limit=args.generate, kanal="google", use_campaign=True))
+        log.info("%s Textentwuerfe erzeugt (ShareNext Premium).",
+                 textgen.generate_drafts(limit=args.generate, kanal="google"))
     if args.generate_ids is not None:
         ids = [x.strip() for x in args.generate_ids.split(",") if x.strip()]
-        # premium_images und both_images werden ignoriert - NUR NOCH ShareNext Premium!
-        # use_campaign=False (kein kampagne.py mehr!)
+        # ShareNext Premium-Pipeline (6-stufig)
         log.info("%s Textentwuerfe erzeugt (Auswahl von %d Themen, ShareNext Premium).",
-                 textgen.generate_for_ids(ids, kanal="google", use_campaign=False),
+                 textgen.generate_for_ids(ids, kanal="google"),
                  len(ids))
     if args.render:
         log.info("%s Bilder erzeugt.", bildgen.render_drafts())

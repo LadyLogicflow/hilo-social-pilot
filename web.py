@@ -557,7 +557,7 @@ def _cache_cleanup_scheduler():
             if now.hour >= 7 and last != heute:
                 with get_conn() as conn:
                     n, frei = wartung.aufraeumen_motive(conn)
-                    n2, frei2 = wartung.aufraeumen_kampagne(conn)
+                    n2, frei2 = wartung.aufraeumen_legacy_kampagne(conn)
                 os.makedirs(DATA_DIR, exist_ok=True)
                 open(marker, "w", encoding="utf-8").write(heute)
                 log.info("Cache-Aufraeumung: %d Foto(s) geloescht, %.1f MB frei + "
@@ -4051,7 +4051,7 @@ def verwaltung():
                 import wartung
                 try:
                     n, frei = wartung.aufraeumen_motive(conn)
-                    n2, frei2 = wartung.aufraeumen_kampagne(conn)
+                    n2, frei2 = wartung.aufraeumen_legacy_kampagne(conn)
                     audit_log(conn, session["user"], "cache_aufgeraeumt", None,
                               "%d Foto(s) + %d Kampagnen-Datei(en), %d Bytes" % (n, n2, frei + frei2))
                     flash("%d Foto(s) + %d Kampagnen-Datei(en) geloescht, %s frei." %
@@ -4139,7 +4139,7 @@ def verwaltung():
         speicher = {
             "schonfrist_tage": 14,
             "motive_lesbar": wartung.menschlich(wartung.motive_ordner_groesse()),
-            "kampagne_lesbar": wartung.menschlich(wartung.kampagne_ordner_groesse()),
+            "kampagne_lesbar": wartung.menschlich(wartung.legacy_kampagne_ordner_groesse()),
             "frei_lesbar": wartung.menschlich(frei),
             "gesamt_lesbar": wartung.menschlich(gesamt),
             "speicher_warnung": bool(frei and frei < 1024 * 1024 * 1024),  # < 1 GB
