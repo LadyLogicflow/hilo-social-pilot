@@ -272,7 +272,7 @@ Plus:
 Wichtig:
 - Sei KONKRET (nicht "schönes Licht", sondern "weiches Licht von links")
 - Denk an Text-Zonen (Text muss später drauf passen!)
-- HILO-CI beachten: Navy (#1e3a5f), Blue (#4a7ba7), Green (#8fbc3f) - Akzente gerne in einer dieser Farben
+- HILO-CI beachten: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente gerne in diesen Markenfarben
 - Professionell aber nicht steril
 """
 
@@ -303,7 +303,7 @@ Erstelle präzise visuelle Anweisungen:
 - Text-Zonen (wo ist Platz?)
 
 Denk an:
-- HILO-CI: Navy (#1e3a5f), Blue (#4a7ba7), Green (#8fbc3f) - Akzente in diesen Farben
+- HILO-CI: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente in diesen Markenfarben
 - Text muss später drauf passen!
 - Professionell, warm, vertrauenswürdig
 """

@@ -197,7 +197,7 @@ Negatives (vermeiden):
 - "watermark" (außer HILO Logo)
 
 HILO Brand:
-- Farben: Navy (#1e3a5f), Blue (#4a7ba7), Green (#8fbc3f) - alle gleichwertig, Akzente gerne in einer dieser Farben
+- Farben: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente gerne in diesen Markenfarben
 - Stil: Professionell aber warm, nicht steril
 - Authentisch, nicht Stock-Klischee
 - Zielgruppe: Deutsche Steuerzahler
