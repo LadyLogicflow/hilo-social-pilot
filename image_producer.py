@@ -123,7 +123,7 @@ def create_production_brief(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     headline: str = "",
-    model: str = "gpt-4o"
+    model: str = "gpt-5.6-terra"
 ) -> ImageProductionBrief:
     """Erstellt Production Brief nach ShareNext-Spezifikation (Catrin).
 
@@ -135,7 +135,7 @@ def create_production_brief(
         route: Gewinnende kreative Route
         art_board: Art Direction Board
         headline: Freigegebene Überschrift vom Copywriter (Campaign Plan)
-        model: OpenAI-Modell (default: gpt-4o)
+        model: OpenAI-Modell (default: gpt-5.6-terra)
 
     Returns:
         ImageProductionBrief: JSON-Output mit Preflight + Kompositionscheck

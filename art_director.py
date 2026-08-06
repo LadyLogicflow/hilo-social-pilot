@@ -192,7 +192,7 @@ class ArtDirectionBoard(BaseModel):
 def create_art_direction_board(
     brief: MessageBrief,
     winning_route: CreativeRoute,
-    model: str = "gpt-4o"
+    model: str = "gpt-5.6-terra"
 ) -> ArtDirectionBoard:
     """Erstellt Art Direction Board aus gewinnender Route.
 
@@ -209,7 +209,7 @@ def create_art_direction_board(
     Args:
         brief: Message Brief (Kontext)
         winning_route: Gewinnende kreative Route aus Concept Jury
-        model: OpenAI-Modell (default: gpt-4o)
+        model: OpenAI-Modell (default: gpt-5.6-terra)
 
     Returns:
         ArtDirectionBoard: Detaillierte visuelle Anweisungen
