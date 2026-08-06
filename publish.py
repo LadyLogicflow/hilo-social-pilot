@@ -108,16 +108,20 @@ def _page_token(page_id):
 # ---------------------------------------------------------------------------
 # Facebook: Foto-Beitrag
 # ---------------------------------------------------------------------------
-def publish_facebook(page_id, image_path, caption, place=None):
+def publish_facebook(page_id, image_path, caption, place=None, alt_text=None):
     """Veroeffentlicht ein Foto mit Begleittext auf einer Facebook-Seite.
     place = optionale Facebook-Orts-ID fuer die Standort-Markierung. Schlaegt der Post MIT Ort fehl
     (z.B. ungueltige Orts-ID), wird OHNE Ort erneut versucht, damit der Beitrag trotzdem erscheint.
+    alt_text = optionaler Alt-Text fuer Barrierefreiheit (Feld 'alt_text_custom' - das schreibbare
+    Feld der Graph API; 'alt_text' selbst ist schreibgeschuetzt/automatisch generiert).
     Rueckgabe: (ok, info) - info ist die Post-/Foto-ID oder die Fehlermeldung."""
     token = _page_token(page_id)
     def _post(with_place):
         data = {"message": caption or "", "access_token": token}
         if with_place and place:
             data["place"] = place
+        if alt_text:
+            data["alt_text_custom"] = alt_text
         with open(image_path, "rb") as fh:
             return requests.post(GRAPH + "/%s/photos" % page_id, timeout=120, data=data, files={"source": fh})
     r = _post(True)
@@ -144,20 +148,27 @@ def _delete_fb_photos(media_ids, token):
             pass
 
 
-def publish_facebook_carousel(page_id, image_paths, caption, place=None):
+def publish_facebook_carousel(page_id, image_paths, caption, place=None, alt_texts=None):
     """Veroeffentlicht mehrere Bilder als Karussell-Beitrag auf einer Facebook-Seite.
     Jedes Foto wird zunaechst unveroeffentlicht (published=false) hochgeladen, danach
     werden alle Foto-IDs in einem Feed-Beitrag zusammengefuehrt (attached_media).
-    Scheitert ein Schritt, werden bereits hochgeladene Fotos wieder geloescht."""
+    Scheitert ein Schritt, werden bereits hochgeladene Fotos wieder geloescht.
+    alt_texts = optionale Liste mit einem Alt-Text je Bild (gleiche Reihenfolge/Laenge wie
+    image_paths, einzelne Eintraege duerfen None sein). Feld 'alt_text_custom' (schreibbar)."""
     if not image_paths:
         return False, "Keine Bilder fuer Karussell uebergeben."
+    if alt_texts is not None and len(alt_texts) != len(image_paths):
+        return False, "alt_texts muss dieselbe Laenge wie image_paths haben."
     token = _page_token(page_id)
     media_ids = []
-    for path in image_paths:
+    for i, path in enumerate(image_paths):
+        data = {"published": "false", "access_token": token}
+        alt = alt_texts[i] if alt_texts else None
+        if alt:
+            data["alt_text_custom"] = alt
         with open(path, "rb") as fh:
             r = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
-                              data={"published": "false", "access_token": token},
-                              files={"source": fh})
+                              data=data, files={"source": fh})
         if r.status_code != 200:
             _delete_fb_photos(media_ids, token)
             return False, _err(r)
@@ -187,17 +198,20 @@ def publish_facebook_carousel(page_id, image_paths, caption, place=None):
 # ---------------------------------------------------------------------------
 # Facebook: Story (Foto, verschwindet nach 24 Stunden) - offizielle Page-Stories-API
 # ---------------------------------------------------------------------------
-def publish_facebook_story(page_id, image_path):
+def publish_facebook_story(page_id, image_path, alt_text=None):
     """Veroeffentlicht ein Bild als Facebook-Seiten-Story (verschwindet nach 24 Stunden).
     Zweistufig: Foto unveroeffentlicht hochladen (POST /{page_id}/photos?published=false),
     dann die Foto-ID an POST /{page_id}/photo_stories uebergeben. Anders als bei Instagram
     ist KEINE oeffentliche Bild-URL noetig (direkter Binaer-Upload). Ideal im Hochformat 9:16.
+    alt_text = optionaler Alt-Text fuer Barrierefreiheit (Feld 'alt_text_custom').
     Rueckgabe: (ok, info) - info ist die Story-/Post-ID oder die Fehlermeldung."""
     token = _page_token(page_id)
+    data = {"published": "false", "access_token": token}
+    if alt_text:
+        data["alt_text_custom"] = alt_text
     with open(image_path, "rb") as fh:
         up = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
-                           data={"published": "false", "access_token": token},
-                           files={"source": fh})
+                           data=data, files={"source": fh})
     if up.status_code != 200:
         return False, _err(up)
     photo_id = up.json().get("id")
@@ -215,10 +229,13 @@ def publish_facebook_story(page_id, image_path):
 # ---------------------------------------------------------------------------
 # Instagram: zweistufige Veroeffentlichung (benoetigt oeffentliche Bild-URL)
 # ---------------------------------------------------------------------------
-def publish_instagram(ig_user_id, image_url, caption, location_id=None):
+def publish_instagram(ig_user_id, image_url, caption, location_id=None, alt_text=None):
     """Veroeffentlicht ein Bild auf einem Instagram-Business-Konto.
     image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!).
     location_id = optionale Facebook-Orts-ID fuer den Geotag (Standort-Markierung).
+    alt_text = optionaler Alt-Text fuer Barrierefreiheit (Feld 'alt_text', seit 24.03.2025
+    Teil der Instagram Graph API fuer Bild-Posts auf /media - NICHT unterstuetzt bei
+    Reels/Stories).
 
     #Bugfix 'Media ID is not available': Instagram laedt das Bild von image_url ASYNCHRON
     herunter, nachdem der Container erstellt wurde - media_publish schlug bisher fehl, wenn der
@@ -229,6 +246,8 @@ def publish_instagram(ig_user_id, image_url, caption, location_id=None):
     data = {"image_url": image_url, "caption": caption or "", "access_token": token}
     if location_id:
         data["location_id"] = location_id
+    if alt_text:
+        data["alt_text"] = alt_text
     c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60, data=data)
     if c.status_code != 200:
         return False, _err(c)
@@ -259,6 +278,8 @@ def comment_facebook(post_id, page_id, message):
 def publish_instagram_story(ig_user_id, image_url):
     """Veroeffentlicht ein Bild als Instagram-Story (verschwindet nach 24 Stunden).
     image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ideal im Hochformat 9:16.
+    KEIN alt_text-Parameter: Meta unterstuetzt das alt_text-Feld laut Doku nur fuer Bild-Posts
+    auf /media, ausdruecklich NICHT fuer Stories/Reels (Stand 2026).
     Rueckgabe: (ok, info)."""
     token = _user_token()
     c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=60,
@@ -295,20 +316,27 @@ def _wait_ig_container(container_id, token, attempts=12, delay=2):
     return False, "Instagram-Container nicht rechtzeitig bereit (Timeout)."
 
 
-def publish_instagram_carousel(ig_user_id, image_urls, caption, location_id=None):
+def publish_instagram_carousel(ig_user_id, image_urls, caption, location_id=None, alt_texts=None):
     """Veroeffentlicht mehrere Bilder als Karussell auf einem Instagram-Business-Konto.
     Jede image_url MUSS oeffentlich erreichbar sein (kein Pi-localhost!). Ablauf:
     je Bild einen Kind-Container (is_carousel_item=true) -> auf FINISHED warten,
     dann einen CAROUSEL-Container mit allen Kindern -> auf FINISHED warten -> Publish.
+    alt_texts = optionale Liste mit einem Alt-Text je Bild (gleiche Reihenfolge/Laenge wie
+    image_urls, einzelne Eintraege duerfen None sein). Feld 'alt_text' je Kind-Container.
     Hinweis: wie publish_instagram noch nicht in der Web-Oberflaeche verdrahtet -
     wird scharfgeschaltet, sobald die Bilder oeffentlich erreichbar sind (IG-Anbindung)."""
     if not image_urls:
         return False, "Keine Bild-URLs fuer Karussell uebergeben."
+    if alt_texts is not None and len(alt_texts) != len(image_urls):
+        return False, "alt_texts muss dieselbe Laenge wie image_urls haben."
     token = _user_token()
     child_ids = []
-    for url in image_urls:
-        c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120,
-                          data={"image_url": url, "is_carousel_item": "true", "access_token": token})
+    for i, url in enumerate(image_urls):
+        data = {"image_url": url, "is_carousel_item": "true", "access_token": token}
+        alt = alt_texts[i] if alt_texts else None
+        if alt:
+            data["alt_text"] = alt
+        c = requests.post(GRAPH + "/%s/media" % ig_user_id, timeout=120, data=data)
         if c.status_code != 200:
             return False, _err(c)
         cid = c.json().get("id")

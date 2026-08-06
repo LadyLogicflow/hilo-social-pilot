@@ -15,6 +15,7 @@ Teil von Issue #4: ShareNext MVP
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Literal, Optional
@@ -22,11 +23,53 @@ from typing import Literal, Optional
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from config import DATA_DIR
 from message_brief import MessageBrief
 from creative_director import CreativeRoute
 from secrets_store import get_secret
 
 log = logging.getLogger("hilo.art_director")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# VARIANZ-MECHANISMUS (gegen LLM-Bias bei Kameraperspektive/Komposition)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# #Varianz-Fix: Analog zu kampagne.py's pick_layout_template() - bei Literal-Feldern ohne
+# starkes inhaltliches Unterscheidungsmerkmal (hier: Kameraperspektive, Kompositionsprinzip)
+# neigt das LLM zu denselben 1-2 Optionen. Anders als beim Layout (dort codeseitig zufaellig
+# VORGEGEBEN) bleibt die Wahl hier bewusst beim LLM, weil sie inhaltlich von der Route abhaengt -
+# es wird nur informiert, was zuletzt genutzt wurde, und um Abwechslung GEBETEN (kein Zwang),
+# damit die Kreativitaet nicht leidet, falls die letzte Wahl objektiv die beste bleibt.
+
+_VARIANZ_FELDER = ("kamera_perspektive", "komposition_prinzip")
+_VARIANZ_HISTORY_LEN = 3  # wie viele letzte Werte je Feld gemerkt werden
+
+
+def _variance_history_path() -> str:
+    return os.path.join(DATA_DIR, "art_director_variance.json")
+
+
+def _load_variance_history() -> dict[str, list[str]]:
+    try:
+        with open(_variance_history_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        return {feld: data.get(feld, []) for feld in _VARIANZ_FELDER}
+    except Exception:
+        return {feld: [] for feld in _VARIANZ_FELDER}
+
+
+def _save_variance_choice(history: dict[str, list[str]], board: "ArtDirectionBoard") -> None:
+    for feld in _VARIANZ_FELDER:
+        wert = getattr(board, feld)
+        werte = history.get(feld, [])
+        werte = [w for w in werte if w != wert] + [wert]
+        history[feld] = werte[-_VARIANZ_HISTORY_LEN:]
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(_variance_history_path(), "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 
 def _get_client() -> OpenAI:
@@ -229,6 +272,9 @@ def create_art_direction_board(
     """
     client = _get_client()
 
+    # Varianz-Historie laden (letzte genutzte Kameraperspektiven/Kompositionsprinzipien)
+    variance_history = _load_variance_history()
+
     # System-Prompt: Art Director Rolle
     system_prompt = """Du bist ein erfahrener Art Director für Social-Media-Marketing.
 Deine Aufgabe: Übersetze eine kreative Route in präzise visuelle Anweisungen.
@@ -263,6 +309,16 @@ Die 5 Kern-Achsen:
 5. **Emotion**
    - Welcher emotionale Moment?
    - Gesamtatmosphäre?
+
+SCROLL-STOP HOOK (wichtig für Feed-Wirkung):
+Der Focal Point entscheidet, ob jemand im Feed innehält oder weiterscrollt - das passiert in
+Bruchteilen einer Sekunde, bevor überhaupt gelesen wird. "Schön" reicht dafür nicht. Wähle einen
+Focal Point, der einen kleinen Widerspruch, eine Überraschung oder eine unmittelbare Frage im
+Kopf auslöst (z.B. eine ungewöhnliche Nahaufnahme statt Totale, ein unerwartetes Detail im
+Vordergrund, ein Moment mitten in einer Handlung statt einer ruhigen Pose). Das muss NICHT
+reißerisch oder dramatisch sein - bei HILO passt eher ein stiller, aber ungewöhnlicher Moment
+als Effekthascherei. Aber: ein rein dekoratives, erwartbares Motiv (Person lächelt in Kamera,
+Dokument liegt ordentlich auf dem Tisch) ist selten ein Hook.
 
 Plus:
 - **Kamera**: Perspektive (Eye-Level, High Angle, etc.)
@@ -306,6 +362,13 @@ Denk an:
 - HILO-CI: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente in diesen Markenfarben
 - Text muss später drauf passen!
 - Professionell, warm, vertrauenswürdig
+
+VARIANZ (Hinweis, kein Zwang):
+- Zuletzt genutzte Kameraperspektiven: {', '.join(variance_history['kamera_perspektive']) or 'keine'}
+- Zuletzt genutzte Kompositionsprinzipien: {', '.join(variance_history['komposition_prinzip']) or 'keine'}
+Wähle bevorzugt eine andere Option als zuletzt, WENN sie zur Route genauso gut oder besser passt.
+Wenn die zuletzt genutzte Option für dieses Motiv klar die stärkste Wahl ist, nimm sie trotzdem -
+die inhaltliche Passung zur Route hat immer Vorrang vor reiner Abwechslung.
 """
 
     log.info(f"Art Director erstellt Board für: {winning_route.titel}")
@@ -330,10 +393,14 @@ Denk an:
         log.info(
             f"✓ Art Direction Board erstellt:\n"
             f"   Focal Point: {board.focal_point}\n"
+            f"   Kamera: {board.kamera_perspektive} | Komposition: {board.komposition_prinzip}\n"
             f"   Licht: {board.licht_stimmung}\n"
             f"   Farben: {', '.join(board.dominante_farben)}\n"
             f"   Emotion: {board.emotionaler_moment}"
         )
+
+        # Varianz-Historie aktualisieren (fuer den naechsten Aufruf)
+        _save_variance_choice(variance_history, board)
 
         return board
 

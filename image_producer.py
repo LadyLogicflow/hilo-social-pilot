@@ -9,7 +9,7 @@ WICHTIG:
 - Text NUR auf DEUTSCH (NIEMALS Englisch!)
 - Überschrift natürlich ins Bild integriert
 - EURO (€) verwenden, NIEMALS Dollar ($)
-- Zielgruppe: Deutsche Steuerzahler
+- Zielgruppe: konkret aus Message Brief (nicht pauschal "Steuerzahler")
 
 Teil von Issue #5: ShareNext MVP
 """
@@ -112,6 +112,13 @@ class ImageProductionBrief(BaseModel):
         description="Preflight-Status und ggf. Probleme"
     )
 
+    alt_text: str = Field(
+        default="",
+        max_length=300,
+        description="Barrierefreier Alt-Text für Instagram/Facebook, wird nach der Bildgenerierung "
+                     "aus dem tatsächlichen Bild erzeugt (nicht Teil des GPT-Outputs, wird separat gesetzt)"
+    )
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # PROMPT GENERATOR
@@ -162,7 +169,7 @@ KRITISCH WICHTIG - TEXT-REGELN:
 - **GROß UND LESBAR** - Die Überschrift muss auf Mobilgeräten gut lesbar sein!
 - **EXAKT die vorgegebene Überschrift verwenden** - Keine Änderungen, keine Übersetzung!
 - **EURO (€) verwenden** - NEVER Dollar ($) or USD!
-- **Zielgruppe: Deutsche Steuerzahler** - alles auf Deutsch!
+- **Zielgruppe strikt beachten** - siehe konkrete Zielgruppe im User-Prompt, nicht pauschalisieren!
 
 Bildgenerierungs-Prompt Struktur:
 
@@ -190,17 +197,43 @@ Text-Regeln (SEHR WICHTIG!):
 - **EXAKT übernehmen** - Die vorgegebene Überschrift Wort für Wort verwenden, keine Änderungen!
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen
 
-Negatives (vermeiden):
+Negatives (eher vermeiden, wenn es zum Motiv passt - kein starres Verbot):
 - "English text", "Dollar sign $", "USD"
-- "generic stock photo"
+- generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm, Händeschütteln
+  vor Glaswand, Daumen hoch im Anzug)
+- sichtlich gestellte Stockfoto-Posen (übertrieben künstliche Körperhaltung, grundlos breit in
+  die Kamera grinsend)
+- übertriebenes/unnatürliches Lächeln
 - "cluttered"
 - "watermark" (außer HILO Logo)
+
+Diese Liste beschreibt abgenutzte Bildsprache, keine verbotenen Themen oder Stile. Editorial-,
+Konzept-, Still-Life- oder Illustrationsansätze mit echten Emotionen, ungewöhnlichen Perspektiven
+oder starken Farbkontrasten sind ausdrücklich erwünscht - das Art Direction Board hat Vorrang,
+diese Liste soll nur die immer gleichen Stockfoto-Reflexe verhindern.
 
 HILO Brand:
 - Farben: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente gerne in diesen Markenfarben
 - Stil: Professionell aber warm, nicht steril
 - Authentisch, nicht Stock-Klischee
-- Zielgruppe: Deutsche Steuerzahler
+- Zielgruppe: konkret laut User-Prompt (Personen/Alter/Situation im Bild sollten dazu passen -
+  nicht pauschal "Steuerzahler")
+
+KONTRAST & SÄTTIGUNG (wichtig für Feed-Wirkung):
+Das Bild muss im Instagram-/Facebook-Feed sofort auffallen - vermeide flaue, blasse oder
+gleichförmig helle Bilder. Sorge für kräftigen Hell-Dunkel-Kontrast am Focal Point und mindestens
+einen satten, klar erkennbaren Farbakzent (z.B. das Grün oder Navy als Objekt, nicht nur als
+zartes Detail). "Professionell und warm" heißt nicht zurückhaltend - lieber ein Bild mit klarem
+visuellem Punch als ein sicheres, gedämpftes Motiv.
+
+SCROLL-STOP HOOK (wichtig für Feed-Wirkung):
+Das Art Direction Board hat bereits einen Focal Point mit Hook-Potenzial festgelegt - übersetze
+ihn so, dass er im ersten Sekundenbruchteil wirkt: Platziere ihn dominant, nicht beiläufig am
+Rand. Nutze wenn passend eine ungewöhnliche Kameraperspektive oder einen engeren Ausschnitt statt
+einer neutralen Totale - Nähe und ein leicht ungewöhnlicher Blickwinkel wirken stärker als eine
+ruhige, symmetrische Übersichtsaufnahme. Der erste Eindruck sollte eine kleine Frage im Kopf
+auslösen ("was ist da los?"), bevor der Text überhaupt gelesen wird - nicht nur hübsch, sondern
+ein Motiv mit einem Moment.
 """
 
     # Text-Modus: exact_headline wenn headline vorhanden, sonst no_text
@@ -303,6 +336,104 @@ WICHTIG:
     except Exception as e:
         log.error(f"Fehler beim Erstellen des Production Briefs: {e}")
         raise
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ALT-TEXT GENERATOR (Barrierefreiheit + Plattform-Signal)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def generate_alt_text(
+    image: Image.Image,
+    headline: str = "",
+    kernaussage: str = "",
+    model: str = "gpt-4o-mini"
+) -> str:
+    """Erzeugt barrierefreien Alt-Text aus dem TATSÄCHLICH generierten Bild.
+
+    Nutzt ein Vision-Modell auf dem fertigen Bild (nicht den Produktions-Prompt), da das
+    generierte Bild vom Prompt abweichen kann (z.B. bei Textplatzierung). Alt-Text ist für
+    Screenreader-Nutzer:innen UND ein Ranking-Signal bei Instagram/Facebook.
+
+    Args:
+        image: Das fertig generierte Bild
+        headline: Überschrift, die bereits im Bild steht (wird NICHT wiederholt, da sie im
+            Bild selbst schon lesbar/vorgelesen wird - Alt-Text beschreibt das Visuelle)
+        kernaussage: Kernaussage aus dem Message Brief (Kontext für treffendere Beschreibung)
+        model: Vision-fähiges OpenAI-Modell (default: gpt-4o-mini)
+
+    Returns:
+        str: Alt-Text auf Deutsch, prägnant (Ziel: unter 150 Zeichen), ohne "Bild von..."-Floskeln
+
+    Raises:
+        ValueError: Wenn OpenAI API-Key fehlt
+        Exception: Bei OpenAI API-Fehlern
+    """
+    client = _get_client()
+
+    # Bild als Base64 für Vision-API vorbereiten
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    image_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    system_prompt = """Du erstellst Alt-Texte für Social-Media-Bilder (Instagram/Facebook) für HILO,
+einen deutschen Lohnsteuerhilfeverein.
+
+REGELN:
+- Beschreibe was WIRKLICH im Bild zu sehen ist (Motiv, Personen, Objekte, Stimmung) - konkret,
+  nicht generisch
+- Beginne NICHT mit "Bild von", "Foto zeigt", "Grafik mit" - Screenreader kündigen das Bild
+  bereits als Bild an, das ist redundant
+- Wiederhole NICHT die im Bild sichtbare Überschrift wortwörtlich - der Screenreader liest ggf.
+  auch den Bildtext vor, doppelt beschreiben verwirrt. Beschreibe stattdessen das VISUELLE.
+- Kurz und dicht: 1-2 Sätze, ca. 100-150 Zeichen. Kein Blumen-Deutsch, keine Adjektiv-Häufung.
+- Keine Hashtags, keine Keyword-Anhäufung, kein SEO-Spam
+- Deutsche Sprache, echte Umlaute (ä, ö, ü, ß)
+- Wenn Personen im Bild sind: nur äußerlich erkennbare Fakten beschreiben (z.B. "ältere Frau am
+  Küchentisch"), keine Vermutungen über Identität, Emotion, die nicht sichtbar ist
+"""
+
+    user_prompt = f"""Erstelle einen Alt-Text für dieses Bild.
+
+Kontext (NICHT wortwörtlich übernehmen, nur zur Einordnung):
+- Kernaussage des Posts: {kernaussage or "(nicht angegeben)"}
+- Im Bild sichtbare Überschrift (NICHT wiederholen): {headline or "(kein Text im Bild)"}
+"""
+
+    log.info("Generiere Alt-Text aus fertigem Bild...")
+
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_b64}"}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=150,
+            temperature=0.3  # Faktentreue wichtiger als Kreativität
+        )
+
+        alt_text = completion.choices[0].message.content.strip()
+
+        if not alt_text:
+            raise Exception("OpenAI API gab keinen Alt-Text zurück")
+
+        log.info(f"✓ Alt-Text generiert ({len(alt_text)} Zeichen): {alt_text[:80]}...")
+        return alt_text
+
+    except Exception as e:
+        # Alt-Text ist ein Zusatznutzen, kein Blocker - Pipeline soll bei Fehler weiterlaufen
+        log.warning(f"Alt-Text-Generierung fehlgeschlagen, wird leer gelassen: {e}")
+        return ""
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -414,18 +545,25 @@ def produce_image(
         output_path: Optional Speicherpfad
 
     Returns:
-        tuple: (PIL.Image, ImageProductionBrief)
+        tuple: (PIL.Image, ImageProductionBrief) - production_brief.alt_text enthält den
+            barrierefreien Alt-Text (leer bei Fehler, blockiert die Pipeline nicht)
 
     Example:
         >>> image, prod_brief = produce_image(brief, route, art_board, headline="Sparen bei Steuern")
         >>> image.show()
         >>> print(prod_brief.image_prompt)
+        >>> print(prod_brief.alt_text)
     """
     # Schritt 1: Production Brief erstellen (mit headline!)
     production_brief = create_production_brief(brief, route, art_board, headline=headline)
 
     # Schritt 2: Bild generieren
     image = generate_image(production_brief, size, quality, output_path)
+
+    # Schritt 3: Alt-Text aus dem fertigen Bild generieren (best effort, nicht blockierend)
+    production_brief.alt_text = generate_alt_text(
+        image, headline=headline, kernaussage=brief.kernaussage
+    )
 
     return image, production_brief
 

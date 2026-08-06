@@ -203,6 +203,7 @@ def run_sharenext_pipeline(
         output_path=output_path
     )
     log.info(f"   ✓ Bild generiert: {image.size[0]}x{image.size[1]} px")
+    log.info(f"   ✓ Alt-Text: {production_brief.alt_text or '(nicht generiert)'}")
 
     # ─────────────────────────────────────────────────────────────────────────
     # STUFE 6: Visual QA - Gate A
@@ -295,6 +296,7 @@ if __name__ == "__main__":
         print(f"  Stärken: {result.qa_verdict.staerken}")
         print(f"  Schwächen: {result.qa_verdict.schwaechen}")
         print(f"\nBild gespeichert: /tmp/sharenext-result.png")
+        print(f"\nAlt-Text: {result.production_brief.alt_text or '(nicht generiert)'}")
         print("="*80)
 
     except Exception as e:

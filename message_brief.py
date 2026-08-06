@@ -65,7 +65,17 @@ class MessageBrief(BaseModel):
         description="Was hat die Zielgruppe davon? Welches Problem wird gelöst oder welcher Vorteil geboten?"
     )
     zielgruppe: str = Field(
-        description="Wen spricht dieser Post an? (z.B. 'Arbeitnehmer', 'Rentner', 'Eltern mit Kindern', 'Selbständige')"
+        description="Wen spricht dieser Post KONKRET an? Keine pauschale Kategorie wie "
+                     "'Arbeitnehmer' oder 'Steuerzahler', sondern die spezifische Gruppe, die "
+                     "wirklich vom Thema betroffen ist - inkl. Altersbereich oder Lebenssituation, "
+                     "wo das den Personenkreis eingrenzt. Beispiele: 'Berufstätige ab 40 mit "
+                     "pflegebedürftigen Angehörigen' (bei Pflegethemen), 'Eltern von Kindern im "
+                     "Kita-/Grundschulalter' (bei Kinderbetreuungskosten), 'Berufstätige "
+                     "Pendler:innen, keine Rentner' (bei Fahrtkosten/Werbungskosten), "
+                     "'Rentner:innen ohne bisherige Steuererklärung' (bei Rentenbesteuerung), "
+                     "'Auszubildende, meist unter 25' (bei Ausbildungskosten/erstem Steuerjahr), "
+                     "'Alleinstehende ohne Kinder' (bei Themen, die sich von Familien-/"
+                     "Paar-Konstellationen unterscheiden, z.B. Grundfreibetrag, Steuerklasse 1)."
     )
     reaktion: str = Field(
         description="Was soll die Zielgruppe tun? (z.B. 'Termin buchen', 'Artikel lesen', 'Frist merken')"
@@ -88,7 +98,7 @@ def generate_message_brief(
     thema: str,
     text: str,
     kanal: str,
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-5.6-terra"
 ) -> MessageBrief:
     """Generiert automatisch ein Message Brief aus Post-Daten via KI.
 
@@ -97,7 +107,9 @@ def generate_message_brief(
         thema: Thema/Überschrift des Posts
         text: Post-Text/Beschreibung
         kanal: Social-Media-Kanal ('Facebook', 'Instagram', 'LinkedIn', 'Google Business')
-        model: OpenAI-Modell (default: gpt-4o-mini für schnelle, günstige Generierung)
+        model: OpenAI-Modell (default: gpt-5.6-terra - das Brief ist die Grundlage für alle
+            nachfolgenden Pipeline-Stufen, insbesondere die Zielgruppen-Ableitung; ein schwaches
+            Modell hier pflanzt sich durch die gesamte Pipeline fort)
 
     Returns:
         MessageBrief: Strukturiertes Message Brief mit allen Feldern
@@ -126,7 +138,6 @@ Deine Aufgabe: Analysiere Social-Media-Posts und erstelle ein strukturiertes Mes
 
 Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
-- Zielgruppe: Primär Arbeitnehmer und Rentner (aber leite die spezifische Zielgruppe aus dem Thema ab!)
 - Content-Streams:
   * 'radar': Aktuelle News/Gesetzesänderungen → meist Awareness
   * 'fristen': Wichtige Termine/Deadlines → meist Decision
@@ -135,10 +146,35 @@ Kontext:
 
 Wichtig:
 - Kernaussage: Klar und prägnant (1-2 Sätze)
-- Nutzen: Konkret, nicht generisch ("Versp­ätungszuschlag vermeiden" statt "gut informiert sein")
-- Zielgruppe: Intelligent aus Thema ableiten (Kindergeld → Eltern, Rente → Rentner, etc.)
+- Nutzen: Konkret, nicht generisch ("Verspätungszuschlag vermeiden" statt "gut informiert sein")
 - Reaktion: Realistisch (meist "Termin buchen", "Frist merken", "Artikel lesen")
 - Funnel-Stufe: Logisch aus Stream ableiten, aber flexibel
+
+ZIELGRUPPE - PRÄZISE ABLEITEN (WICHTIG!):
+
+"Arbeitnehmer und Rentner" oder "Steuerzahler" ist KEINE brauchbare Zielgruppe - das trifft auf
+fast jeden Post zu und hilft der Bildregie nicht. Leite stattdessen die tatsächlich betroffene
+Gruppe aus dem konkreten Thema ab, so eng wie das Thema es hergibt. Prüfe dabei:
+- Lebenssituation/Alter: Wer hat dieses Problem typischerweise? (z.B. Pflege → Menschen ab
+  etwa 40, oft mit alternden Eltern; Kinderbetreuungskosten → Eltern mit Kindern im
+  Betreuungs-/Grundschulalter, nicht Eltern erwachsener Kinder)
+- Erwerbsstatus: Betrifft es nur Erwerbstätige (z.B. Fahrtkosten/Werbungskosten,
+  Homeoffice-Pauschale - hier sind Rentner explizit AUSGESCHLOSSEN) oder nur Rentner
+  (z.B. Rentenbesteuerung) oder beide?
+- Familiensituation: Singles, Familien, Alleinerziehende - wenn das Thema danach unterscheidet
+
+Beispiele guter Zielgruppen-Ableitung:
+- "Pflegegrad als Steuerabzug" → "Berufstätige ab ca. 40 mit pflegebedürftigen Angehörigen"
+- "Kinderbetreuungskosten absetzen" → "Eltern von Kindern im Kita-/Grundschulalter"
+- "Fahrtkosten als Werbungskosten" → "Berufstätige Pendler:innen (nicht Rentner)"
+- "Rentenbesteuerung 2026" → "Rentner:innen, insbesondere Neurentner:innen"
+- "Homeoffice-Pauschale" → "Angestellte im Homeoffice, aktuell erwerbstätig"
+- "Erste Steuererklärung als Azubi" → "Auszubildende, meist unter 25"
+- "Grundfreibetrag/Steuerklasse 1" → "Alleinstehende ohne Kinder"
+
+Wenn das Thema wirklich alle gleichermaßen betrifft (z.B. allgemeine Fristerinnerung ohne
+inhaltliche Einschränkung), ist eine breitere Zielgruppe in Ordnung - aber das ist die Ausnahme,
+nicht der Standardfall.
 """
 
     # User-Prompt: Konkrete Post-Daten
@@ -152,7 +188,8 @@ Kanal: {kanal}
 Erstelle ein strukturiertes Message Brief mit:
 - kernaussage: Was ist die Hauptbotschaft?
 - nutzen: Was hat die Zielgruppe davon?
-- zielgruppe: Wen spricht das an? (leite aus Thema ab!)
+- zielgruppe: Wen spricht das KONKRET an? (Alter/Lebenssituation/Erwerbsstatus, wenn das Thema
+  danach unterscheidet - keine pauschale Kategorie wie "Steuerzahler" oder "Arbeitnehmer")
 - reaktion: Was soll passieren?
 - funnel_stufe: Awareness, Consideration oder Decision?
 - kanal: {kanal}
