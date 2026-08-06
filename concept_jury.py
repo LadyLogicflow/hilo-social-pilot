@@ -214,7 +214,7 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
 def evaluate_routes(
     brief: MessageBrief,
     territories: CreativeTerritories,
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5-nano"
 ) -> ConceptJuryVerdict:
     """Bewertet 4 kreative Routen und wählt die beste aus.
 
@@ -232,7 +232,7 @@ def evaluate_routes(
     Args:
         brief: Message Brief (Kontext für Bewertung)
         territories: 4 kreative Routen vom Creative Director
-        model: OpenAI-Modell (default: gpt-5.6-terra)
+        model: OpenAI-Modell (default: gpt-5-nano - günstiges Modell für Bewertungsaufgabe)
 
     Returns:
         ConceptJuryVerdict: Bewertungen aller Routen + Gewinner
