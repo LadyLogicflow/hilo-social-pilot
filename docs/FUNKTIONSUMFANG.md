@@ -1,4 +1,4 @@
-# HISOME – Technischer Funktionsumfang (Stand 2026-06-14)
+# HISOME – Technischer Funktionsumfang (Stand 2026-08-06)
 
 Technische Zusammenfassung dessen, was **HISOME (HILO Social Media Tool)** aktuell kann.
 
@@ -80,9 +80,16 @@ KI-Token. Die Veröffentlichung läuft auf die hinterlegte Facebook-Seite der St
 
 ## 7. Veröffentlichung
 
-- **Facebook:** Foto-Beitrag direkt auf die Seite (umgesetzt).
-- **Instagram:** im Code vorbereitet (braucht öffentliche Bild-URL + IG-Token-Freigabe).
-- Veröffentlichungen werden protokolliert (Erfolg/Fehler).
+- **Facebook:** Feed-Beitrag direkt auf die Seite – als Einzelbild oder Karussell; optional
+  zusätzlich als **Story** (9:16). Bei Beratungsstellen kommt der Termin-Link automatisch als
+  erster Kommentar.
+- **Instagram:** Feed-Beitrag (Einzelbild oder Karussell) und optional zusätzlich als **Story**
+  (9:16). Zweistufig über Bild-Container → Veröffentlichung; benötigt eine öffentliche Bild-URL
+  (automatischer SFTP-Upload) und ein verknüpftes Instagram-Business-Konto.
+- **Story-Regel:** Eine Story wird nur **zusätzlich zu einem erfolgreichen Feed-Post** gepostet
+  und ist flüchtig (24 h) – sie wird protokolliert, aber nicht als eigener Post verbucht.
+- Veröffentlichungen werden protokolliert (Erfolg/Fehler). Details:
+  [VEROEFFENTLICHUNG.md](VEROEFFENTLICHUNG.md).
 
 ## 8. Verwaltung & Rollen
 
@@ -145,11 +152,15 @@ Die menschliche Endkontrolle bleibt gewahrt – sie liegt beim **einmaligen Pool
 ## 12. Status & Ausblick
 
 **Funktionsfähig:** komplette Inhaltspipeline (Quellen → Text → Bild → Freigabe → Kalender →
-Facebook), 4 Content-Streams, Personalisierung, Verwaltung, Automatik.
+Facebook & Instagram), 4 Content-Streams, Personalisierung, Verwaltung, Automatik.
+Die Veröffentlichung ist für **Facebook und Instagram** implementiert und im Dashboard
+verdrahtet – jeweils als Feed (Einzelbild/Karussell) und optional als Story.
 
 **Noch offen / nächste Schritte:**
 - Facebook-Langzeit-Token (App-Zugangsdaten) für den Dauerbetrieb.
-- Instagram-Veröffentlichung scharf schalten (Token mit IG-Freigabe, öffentliche Bild-URL).
+- Instagram/Story im Live-Betrieb: Token mit IG-Freigabe (`instagram_content_publish`) und die
+  öffentliche Bild-URL (IONOS-Upload-Secrets) hinterlegen; die Facebook-Story braucht
+  `pages_manage_posts`.
 - Beratungsstellen-Daten erfassen.
 - Optional: automatische Veröffentlichung am geplanten Tag (statt manuell), weitere Kanäle
   (Google, LinkedIn), Newsletter.

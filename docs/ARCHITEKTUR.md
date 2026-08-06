@@ -43,7 +43,8 @@ Wissens-Serie ───┘
 | `wissen.py` | Wissens-Serie (zeitlose Themen, füllt leere Tage) |
 | `personalisierung.py` | Beitrag je Beratungsstelle anpassen (CTA + Begleittext) |
 | `pool.py` | Zufalls-Pool: Kanäle, „nie doppelt"-Logik je Stelle/Kanal, tägliche Ziehung, Restbestand/Warnung |
-| `publish.py` | Veröffentlichung auf Facebook (Foto-Upload) + Instagram (vorbereitet) |
+| `publish.py` | Meta-Graph-API: Veröffentlichung auf **Facebook** (Feed-Einzelbild/Karussell + Story) und **Instagram** (Feed-Einzelbild/Karussell + Story) sowie Reichweiten-Insights und Token-Handling – siehe [VEROEFFENTLICHUNG.md](VEROEFFENTLICHUNG.md) |
+| `uploader.py` | Lädt ein Bild per SFTP auf den Webspace (IONOS) und liefert die **öffentliche URL** – nötig, weil Instagram Bilder nur über öffentliche URLs zieht |
 | `logging_setup.py` | Logging nach `logs/hilo.log` |
 
 ## Die vier Content-Streams

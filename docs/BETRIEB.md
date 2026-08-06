@@ -78,8 +78,11 @@ ist nicht nötig, solange der Dashboard-Dienst läuft.
 4. Prüfen: `.venv/bin/python main.py --list-pages` zeigt die verbundenen Seiten.
 5. In der Verwaltung jede Beratungsstelle mit ihrer **Facebook-Seiten-ID** verknüpfen.
 
-> Instagram-Veröffentlichung ist im Code vorbereitet (`publish.publish_instagram`), braucht
-> aber eine öffentliche Bild-URL (der Pi ist privat) und ein Token mit IG-Freigabe.
+> **Instagram** ist implementiert und im Dashboard verdrahtet (Feed + Story). Für den
+> Live-Betrieb braucht es zusätzlich eine **öffentliche Bild-URL** (der Pi ist privat) – dafür
+> die `ionos_sftp_*`- und `ionos_public_base_url`-Secrets setzen (`uploader.py`) – sowie ein
+> Token mit IG-Freigabe (`instagram_content_publish`). Details:
+> [VEROEFFENTLICHUNG.md](VEROEFFENTLICHUNG.md).
 
 ## 7. Tagesablauf prüfen / manuell auslösen
 
