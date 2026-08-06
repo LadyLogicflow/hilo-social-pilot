@@ -138,6 +138,75 @@ class ConceptJuryVerdict(BaseModel):
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SCORE-BERECHNUNG (code-seitig, nicht vom LLM)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MINDEST_SCORE = 7.0
+
+# Kriterium -> Gewicht (Summe = 1.00)
+_GEWICHTE = {
+    "botschaftsklarheit": 0.20,
+    "scroll_stop_potenzial": 0.20,
+    "markenpassung": 0.15,
+    "originalitaet": 0.15,
+    "umsetzbarkeit": 0.10,
+    "emotionale_wirkung": 0.10,
+    "zielgruppenrelevanz": 0.10,
+}
+
+
+def _weighted_score(evaluation: "RouteEvaluation") -> float:
+    """Berechnet den gewichteten Gesamtscore einer Route."""
+    return round(sum(getattr(evaluation, k) * w for k, w in _GEWICHTE.items()), 2)
+
+
+def _empfehlung_fuer(score: float) -> str:
+    if score >= 8.5:
+        return "Stark empfohlen"
+    if score >= 7.0:
+        return "Empfohlen"
+    if score >= 5.0:
+        return "Bedingt empfohlen"
+    return "Nicht empfohlen"
+
+
+def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
+    """Rechnet Scores nach und bestimmt den Gewinner CODE-seitig.
+
+    #Rechen-Fix: Vorher hat das LLM sowohl den gewichteten Durchschnitt als auch die Auswahl
+    des Gewinners selbst vorgenommen - ohne Pruefung, ob die gewaehlte Route wirklich den
+    hoechsten Score hat. LLMs rechnen unzuverlaessig; die Auswahl ist eine Gate-Entscheidung.
+    Das LLM liefert jetzt faktisch nur noch die Einzelbewertungen + Begruendungen.
+    """
+    evaluations = {
+        1: verdict.evaluation_1,
+        2: verdict.evaluation_2,
+        3: verdict.evaluation_3,
+        4: verdict.evaluation_4,
+    }
+
+    # Einzelscores + Empfehlungen neu berechnen
+    for evaluation in evaluations.values():
+        evaluation.gesamtscore = _weighted_score(evaluation)
+        evaluation.empfehlung = _empfehlung_fuer(evaluation.gesamtscore)
+
+    # Gewinner = hoechster Score (bei Gleichstand niedrigste Routennummer)
+    gewinner_nr = max(evaluations, key=lambda nr: (evaluations[nr].gesamtscore, -nr))
+    gewinner = evaluations[gewinner_nr]
+
+    if verdict.winning_route != gewinner_nr:
+        log.warning(
+            "LLM waehlte Route %s, hoechster berechneter Score hat aber Route %s (%.2f) - "
+            "korrigiert.", verdict.winning_route, gewinner_nr, gewinner.gesamtscore
+        )
+
+    verdict.winning_route = gewinner_nr
+    verdict.winning_score = gewinner.gesamtscore
+    verdict.winning_titel = gewinner.route_titel
+    verdict.quality_warning = gewinner.gesamtscore < MINDEST_SCORE
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # EVALUATOR
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -145,7 +214,7 @@ class ConceptJuryVerdict(BaseModel):
 def evaluate_routes(
     brief: MessageBrief,
     territories: CreativeTerritories,
-    model: str = "gpt-4o"
+    model: str = "gpt-5.6-terra"
 ) -> ConceptJuryVerdict:
     """Bewertet 4 kreative Routen und wählt die beste aus.
 
@@ -163,7 +232,7 @@ def evaluate_routes(
     Args:
         brief: Message Brief (Kontext für Bewertung)
         territories: 4 kreative Routen vom Creative Director
-        model: OpenAI-Modell (default: gpt-4o)
+        model: OpenAI-Modell (default: gpt-5.6-terra)
 
     Returns:
         ConceptJuryVerdict: Bewertungen aller Routen + Gewinner
@@ -195,7 +264,8 @@ Deine Aufgabe: Bewerte 4 kreative Routen objektiv und wähle die beste aus.
 Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
 - Marke: Vertrauenswürdig, professionell, aber NICHT langweilig
-- Zielgruppe: Arbeitnehmer und Rentner (keine Marketing-Profis!)
+- Zielgruppe: siehe Message Brief im User-Prompt - die dort genannte KONKRETE Zielgruppe ist
+  maßgeblich für das Kriterium "Zielgruppenrelevanz", nicht eine pauschale Annahme
 - Ziel: Scroll-Stop-Potenzial + Markenpassung
 
 Bewertungskriterien (Skala 1-10):
@@ -217,6 +287,9 @@ Bewertungskriterien (Skala 1-10):
    - 7-8: Gut, passt
    - 5-6: Etwas off-brand
    - 1-4: Passt nicht zur Marke
+   - WICHTIG: "Vertrauenswürdig" heißt NICHT "brav". Auffällige, kontraststarke oder
+     ungewöhnliche Konzepte NICHT abwerten, nur weil sie mutig sind - werte nur ab, wenn es
+     reißerisch wird oder die Seriosität eines Lohnsteuerhilfevereins beschädigt.
 
 4. **Originalität (15%)**: Hebt sich das Konzept ab?
    - 9-10: Völlig neu, unerwartet
@@ -243,19 +316,11 @@ Bewertungskriterien (Skala 1-10):
    - 1-4: Verfehlt Zielgruppe
 
 **Gesamtscore Berechnung:**
-- Botschaftsklarheit × 0.20
-- Scroll-Stop × 0.20
-- Markenpassung × 0.15
-- Originalität × 0.15
-- Umsetzbarkeit × 0.10
-- Emotionale Wirkung × 0.10
-- Zielgruppenrelevanz × 0.10
-
-**Empfehlung:**
-- 8.5-10.0: "Stark empfohlen"
-- 7.0-8.4: "Empfohlen"
-- 5.0-6.9: "Bedingt empfohlen"
-- 1.0-4.9: "Nicht empfohlen"
+Der gewichtete Gesamtscore und die Auswahl des Gewinners werden VOM SYSTEM berechnet
+(Gewichte: Botschaftsklarheit 20%, Scroll-Stop 20%, Markenpassung 15%, Originalität 15%,
+Umsetzbarkeit 10%, Emotionale Wirkung 10%, Zielgruppenrelevanz 10%).
+Du musst NICHT rechnen - konzentriere dich auf präzise Einzelbewertungen (1-10) und gute
+Begründungen. Deine Angaben zu gesamtscore/winning_route werden überschrieben.
 
 **Mindestwert für Gewinner: 7.0/10**
 
@@ -293,9 +358,8 @@ Wichtig:
 {routes_text}
 
 Bewerte jede Route nach den 7 Kriterien (1-10).
-Berechne den gewichteten Gesamtscore.
-Wähle den Gewinner (höchster Score, mind. 7.0).
-Begründe deine Entscheidung.
+Begründe Stärken und Schwächen je Route.
+Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du musst nicht rechnen.
 """
 
     log.info(f"Concept Jury bewertet 4 Routen für: {brief.kernaussage}")
@@ -317,18 +381,20 @@ Begründe deine Entscheidung.
         if not verdict:
             raise Exception("OpenAI API gab kein valides Concept Jury Verdict zurück")
 
+        # Scores + Gewinner code-seitig neu berechnen (LLM-Werte werden überschrieben)
+        _recompute_verdict(verdict)
+
         # Warnung falls Score zu niedrig
-        if verdict.winning_score < 7.0:
+        if verdict.quality_warning:
             log.warning(
-                f"⚠️ Gewinner-Score ({verdict.winning_score:.1f}) unter Mindestwert 7.0! "
-                f"Qualitätswarnung aktiv."
+                f"⚠️ Gewinner-Score ({verdict.winning_score:.1f}) unter Mindestwert "
+                f"{MINDEST_SCORE}! Qualitätswarnung aktiv."
             )
-            verdict.quality_warning = True
 
         log.info(
             f"✓ Concept Jury Verdict:\n"
             f"   Gewinner: Route {verdict.winning_route} - {verdict.winning_titel}\n"
-            f"   Score: {verdict.winning_score:.1f}/10\n"
+            f"   Score: {verdict.winning_score:.1f}/10 (berechnet)\n"
             f"   Begründung: {verdict.begruendung}"
         )
 

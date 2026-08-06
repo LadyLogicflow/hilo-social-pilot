@@ -114,7 +114,7 @@ class CreativeTerritories(BaseModel):
 
 def generate_creative_routes(
     brief: MessageBrief,
-    model: str = "gpt-4o"
+    model: str = "gpt-5.6-terra"
 ) -> CreativeTerritories:
     """Generiert 4 kreative Routen aus einem Message Brief.
 
@@ -126,7 +126,7 @@ def generate_creative_routes(
 
     Args:
         brief: Message Brief mit Kernaussage, Nutzen, Zielgruppe, etc.
-        model: OpenAI-Modell (default: gpt-4o für kreative Aufgaben)
+        model: OpenAI-Modell (default: gpt-5.6-terra für kreative Aufgaben)
 
     Returns:
         CreativeTerritories: 4 kreative Routen
@@ -157,7 +157,9 @@ Deine Aufgabe: Entwickle 4 unterschiedliche kreative Routen für ein Social-Medi
 
 Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
-- Zielgruppe: Hauptsächlich Arbeitnehmer und Rentner
+- Zielgruppe: siehe Message Brief im User-Prompt - die dort genannte KONKRETE Zielgruppe
+  (Alter, Lebenssituation, Erwerbsstatus) ist maßgeblich, nicht eine pauschale Annahme.
+  Die Personen/Situationen in deinen Routen müssen zu dieser Zielgruppe passen.
 - Stil: Professionell, vertrauenswürdig, aber NICHT langweilig
 - Ziel: Scroll-Stop-Potenzial - das Bild soll auffallen!
 
@@ -192,7 +194,16 @@ Wichtig:
 - Visuell erkennbare Signaturen (Licht, Farbe, Komposition)
 - Alle 4 müssen zur Kernaussage passen
 - Scroll-Stop-Potenzial beachten
-- Keine generischen Stock-Foto-Klischees
+
+ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
+- generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
+  Händeschütteln vor Glaswand, Daumen hoch im Anzug)
+- sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
+- übertriebenes/unnatürliches Lächeln
+- Geldregen, übergroße Eurozeichen
+Das sind abgenutzte Muster, keine verbotenen Themen. Echte Emotionen, ungewöhnliche
+Perspektiven und starke Farbkontraste sind ausdrücklich erwünscht - wenn eine Idee wirklich
+trägt, hat sie Vorrang vor dieser Liste.
 """
 
     # User-Prompt: Message Brief Daten

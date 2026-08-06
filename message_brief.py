@@ -223,6 +223,94 @@ Erstelle ein strukturiertes Message Brief mit:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# HEADLINE-FALLBACK (wenn kein Copywriter-Text vorliegt)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class GeneratedHeadline(BaseModel):
+    """Selbst generierte Bild-Überschrift (Fallback, wenn keine freigegebene vorliegt)."""
+
+    headline: str = Field(
+        max_length=55,
+        description="Prägnante deutsche Überschrift für das Bild (max. 55 Zeichen). Kurz genug, "
+                     "um im Bild groß und auf dem Smartphone lesbar dargestellt zu werden."
+    )
+
+
+def generate_headline(brief: MessageBrief, text: str = "", model: str = "gpt-5.6-terra") -> str:
+    """Erzeugt eine Bild-Überschrift, wenn keine freigegebene Überschrift vorliegt.
+
+    #Headline-Fallback: Ohne Überschrift laeuft der Image Producer im Modus 'no_text' und
+    erzeugt ein Bild komplett ohne Text - fuer einen Social-Media-Post meist unbrauchbar.
+
+    WICHTIG - rechtliche Sorgfalt: Die Überschrift darf ausschliesslich Aussagen enthalten, die
+    durch Kernaussage/Quelltext gedeckt sind. Betraege, Fristen, Prozentsaetze und Rechtsfolgen
+    duerfen NICHT erfunden oder gerundet werden. Liegt eine vom Copywriter freigegebene
+    Überschrift vor, ist diese IMMER vorzuziehen.
+
+    Args:
+        brief: Message Brief (Kernaussage, Nutzen, Zielgruppe)
+        text: Optionaler Original-Posttext als Faktenbasis
+        model: OpenAI-Modell (default: gpt-5.6-terra)
+
+    Returns:
+        str: Überschrift (max. 55 Zeichen)
+
+    Raises:
+        ValueError: Wenn OpenAI API-Key fehlt
+        Exception: Bei OpenAI API-Fehlern
+    """
+    client = _get_client()
+
+    system_prompt = """Du bist Werbetexter für HILO, einen deutschen Lohnsteuerhilfeverein.
+Deine Aufgabe: Eine einzige, prägnante Überschrift für ein Social-Media-Bild.
+
+REGELN:
+- MAXIMAL 55 Zeichen (sie wird gross ins Bild gesetzt und muss auf dem Handy lesbar sein)
+- Deutsch, echte Umlaute (ä, ö, ü, ß)
+- SIE-Form, wenn eine Anrede vorkommt (nie duzen)
+- Nicht gendern
+- Konkret und nutzenorientiert, kein Fachchinesisch, keine Floskeln
+- KEINE Hashtags, keine Emojis, keine Anführungszeichen, kein Punkt am Ende
+- Zur Zielgruppe passend formulieren (siehe Message Brief)
+
+RECHTLICH KRITISCH:
+- Erfinde KEINE Beträge, Fristen, Prozentsätze, Voraussetzungen oder Rechtsfolgen
+- Übernimm Zahlen/Daten NUR, wenn sie wörtlich in Kernaussage oder Quelltext stehen
+- Im Zweifel: eine Überschrift ohne konkrete Zahl formulieren
+"""
+
+    user_prompt = f"""Formuliere die Bild-Überschrift.
+
+- Kernaussage: {brief.kernaussage}
+- Nutzen: {brief.nutzen}
+- Zielgruppe: {brief.zielgruppe}
+- Gewünschte Reaktion: {brief.reaktion}
+- Quelltext (Faktenbasis, nichts hinzuerfinden): {text or "(nicht angegeben)"}
+"""
+
+    log.info("Keine Überschrift übergeben - generiere Fallback-Überschrift...")
+
+    completion = client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format=GeneratedHeadline,
+        temperature=0.7
+    )
+
+    result = completion.choices[0].message.parsed
+    if not result or not result.headline.strip():
+        raise Exception("Es wurde keine Überschrift erzeugt.")
+
+    headline = result.headline.strip()
+    log.info(f"✓ Fallback-Überschrift ({len(headline)} Zeichen): {headline}")
+    return headline
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # CLI TEST
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

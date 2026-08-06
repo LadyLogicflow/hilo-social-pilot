@@ -22,7 +22,7 @@ from typing import Optional
 
 from PIL import Image
 
-from message_brief import MessageBrief, generate_message_brief
+from message_brief import MessageBrief, generate_message_brief, generate_headline
 from creative_director import CreativeTerritories, generate_creative_routes
 from concept_jury import ConceptJuryVerdict, evaluate_routes
 from art_director import ArtDirectionBoard, create_art_direction_board
@@ -156,6 +156,14 @@ def run_sharenext_pipeline(
     message_brief = generate_message_brief(stream, thema, text, kanal)
     log.info(f"   ✓ Zielgruppe: {message_brief.zielgruppe}")
 
+    # Headline-Fallback: Ohne Überschrift liefe der Image Producer im Modus 'no_text' und
+    # erzeugte ein Bild ganz ohne Text. Eine freigegebene Überschrift hat immer Vorrang.
+    if not headline or not headline.strip():
+        headline = generate_headline(message_brief, text=text)
+        log.info(f"   ℹ Überschrift selbst generiert (keine freigegebene übergeben)")
+    else:
+        headline = headline.strip()
+
     # ─────────────────────────────────────────────────────────────────────────
     # STUFE 2: Creative Director - 4 Routen
     # ─────────────────────────────────────────────────────────────────────────
@@ -209,7 +217,7 @@ def run_sharenext_pipeline(
     # STUFE 6: Visual QA - Gate A
     # ─────────────────────────────────────────────────────────────────────────
     log.info("✅ Stufe 6/6: Visual QA (Gate A)")
-    qa_verdict = check_raw_image(image, message_brief, winning_route, art_board)
+    qa_verdict = check_raw_image(image, message_brief, winning_route, art_board, headline=headline)
     log.info(f"   ✓ QA Score: {qa_verdict.gesamtscore:.1f}/10")
     log.info(f"   {'✓ FREIGEGEBEN' if qa_verdict.freigegeben else '⚠ ABGELEHNT'}")
 
