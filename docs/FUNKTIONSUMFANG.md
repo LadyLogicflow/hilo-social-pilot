@@ -8,8 +8,8 @@ Technische Zusammenfassung dessen, was **HISOME (HILO Social Media Tool)** aktue
   HILO-Beratungsstellen.
 - **Betrieb:** Python/Flask-Webanwendung mit SQLite-Datenbank, läuft auf einem
   Raspberry Pi, **komplett über den Browser** bedienbar (kein Terminal nötig).
-- **Stack:** Python 3, Flask, SQLite, Pillow (Bildrendering), feedparser/BeautifulSoup
-  (Quellen), Anthropic Claude (Texte), optional OpenAI (Foto-Motive).
+- **Stack:** Python 3, Flask, SQLite, Pillow (Bild-Overlays/CI-Kreise), feedparser/BeautifulSoup
+  (Quellen), **Anthropic Claude** (Texte) und **OpenAI** (ShareNext-Bild-Pipeline, `gpt-image-2`).
 - **Grundprinzip:** nichts geht ungefragt raus – **Veröffentlichung erst nach menschlicher
   Freigabe**; jede Aktion wird im Audit-Log protokolliert.
 
@@ -39,19 +39,20 @@ automatisch in einzelne Themen.
 
 ## 3. Beitragserstellung
 
-- **Text:** GPT-5.6 Terra erzeugt strukturierte Beiträge (Überschrift, Stichpunkte, Call-to-
-  Action, Begleittext) im HILO-Stil, faktentreu (keine erfundenen Zahlen/Fristen/Adressen).
-  Ausnahme Fristen-Countdown: Text bleibt bewusst fest vorformuliert (rechtlich relevante
-  Fristen/Beträge), nur das Bild kommt von der KI.
-- **Bild:** 1080×1080, **3-Stufen-Workflow** (Planung → GPT Image 2 Motiv → QA, siehe
-  [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design)): der Text (Headline/Bullets/CTA) liegt ohne
-  Hintergrundfläche direkt über dem KI-Motiv, Textfarbe automatisch je nach Bildhelligkeit
-  gewählt. Die blau-weißen **CI-Kreise** kommen stets vom Code (CI garantiert). Über den
-  🎲-Knopf in der Freigabe lässt sich je Beitrag ein neues Bild erzeugen (kein Auto-Retry -
-  kostet bei jedem Klick). Ein **Cache** speichert Motive (u.a. für die Personalisierung je
-  Beratungsstelle wiederverwendet, kein neuer KI-Call nötig) und räumt ungenutzte automatisch
-  auf. *(Die alten drei Stile Standard/KI-Tafel/Kreativ + Ideogram-Option existieren als
-  Fallback für Alt-Entwürfe weiter, sind für neue Beiträge aber nicht mehr aktiv.)*
+- **Text:** **Claude** (`claude-sonnet-4-6`) erzeugt strukturierte Beiträge (Überschrift,
+  Stichpunkte, Call-to-Action, Captions je Kanal) im HILO-Stil, faktentreu (keine erfundenen
+  Zahlen/Fristen/Adressen). Ausnahme Fristen-Countdown: Text bleibt bewusst fest vorformuliert
+  (rechtlich relevante Fristen/Beträge), nur das Bild kommt von der KI.
+- **Bild:** quadratisch, erzeugt in der **ShareNext-Pipeline** (6-stufig: Message Brief →
+  Creative Director → Concept Jury → Art Director → Image Producer → Visual QA; Bildmodell
+  `gpt-image-2`, siehe [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design)). Die **Headline schreibt die
+  KI direkt ins Bild**; danach setzt der Code nur noch die blau-weißen **CI-Kreise** auf (CI
+  garantiert). Über den 🎲-Knopf in der Freigabe lässt sich je Beitrag ein neues Bild erzeugen
+  (kein Auto-Retry – kostet bei jedem Klick). Das erzeugte Bild wird für die Personalisierung je
+  Beratungsstelle wiederverwendet (kein neuer KI-Call nötig); ungenutzte Cache-Dateien werden
+  automatisch aufgeräumt. *(Die alte Pipeline mit den drei Stilen Standard/KI-Tafel/Kreativ +
+  Ideogram-Option bleibt als Fallback für Alt-Entwürfe, ist für neue Beiträge aber nicht mehr
+  aktiv.)*
 - **Überarbeiten:** auf Knopfdruck mit Änderungswunsch („Bild freundlicher") neu erzeugen.
 
 ## 4. Freigabe-Workflow (Dashboard)

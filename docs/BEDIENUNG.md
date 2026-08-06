@@ -83,7 +83,7 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
 - **Bild-Stil** – *(Stand-Hinweis: Diese Einstellung stammt aus der alten Bild-Pipeline und
   wirkt sich auf neue Beiträge aktuell NICHT mehr aus - alle vier Content-Ströme nutzen jetzt
-  den 3-Stufen-Workflow, siehe [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Bleibt als
+  die ShareNext-Bildpipeline, siehe [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Bleibt als
   Fallback für Alt-Entwürfe erhalten.)* Legt fest, welche der **drei Stile** im Zufalls-Topf
   sind (je an/aus): **Standard** (Foto + Textfeld), **KI-Tafel** (Botschaft auf einer Tafel/
   einem Rahmen in einer Umgebung) und **Kreativ** (kinoreifes Foto ohne Text). Das Tool
@@ -99,7 +99,7 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
   (löscht nur Fotos, die kein aktiver Beitrag mehr braucht).
 
 > **In der Freigabe (Stufe 3)** hat jeder Beitrag den 🎲-Knopf **„Anderes Bild"** – erzeugt für
-> genau diesen Beitrag ein neues Bild über den 3-Stufen-Workflow (inkl. QA-Check, ohne
+> genau diesen Beitrag ein neues Bild über die ShareNext-Bildpipeline (inkl. QA-Check, ohne
 > Auto-Retry - bei Problemen bitte manuell prüfen statt erneut zu würfeln, das kostet jedes Mal).
 
 ## Automatik

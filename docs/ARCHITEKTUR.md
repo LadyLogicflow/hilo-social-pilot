@@ -28,15 +28,22 @@ Wissens-Serie ───┘
 | `relevance.py` | Schlagwort-Klassifizierung (relevant / verworfen / neutral) |
 | `sources.py` | Aktive Quellen aus der Konfiguration |
 | `ingest.py` | Eigene Quellen: PDF/Link → Text → **Mehr-Themen-Extraktion** |
-| `textgen.py` | Text/Bild-Orchestrierung: `generate_with_campaign` (aktiver Pfad, ruft `kampagne.run_campaign`) sowie `generate`/`extract_topics` (Claude, nur noch für Themen-Extraktion aus PDFs/Links genutzt) |
-| `kampagne.py` | **Aktive Bild-Pipeline**: 3-Stufen-Workflow (GPT-5.6 Terra Planung → GPT Image 2 Motiv → GPT-5.6 Terra/nano QA), `run_campaign` (textet + gestaltet selbst) und `generate_image_for_fixed_text`/`create_visual_plan` (Art-Director-only, Text bleibt fest vorgegeben - genutzt vom Fristen-Countdown) |
-| `text_renderer.py` | Pillow-Text-Rendering: zeichnet Headline/Bullets/CTA deterministisch aufs KI-Motiv (kein Hintergrund-Rechteck - Textfarbe wird automatisch aus der gemessenen Bildhelligkeit gewählt) |
+| `textgen.py` | Text/Bild-Orchestrierung (aktiver Pfad): `generate_drafts`/`generate_for_ids` → `_create_drafts`; erzeugt den **Text** je Beitrag via `generate()` (Anthropic **Claude**) und ruft fürs **Bild** die ShareNext-Pipeline (`run_sharenext_pipeline`); `extract_topics` extrahiert Themen aus PDFs/Links (Claude) |
+| `sharenext_pipeline.py` | **Aktive Bild-Pipeline** (`run_sharenext_pipeline`): 6-stufiger Workflow (Message Brief → Creative Director → Concept Jury → Art Director → Image Producer → Visual QA), siehe [Bild-Design](#bild-design) |
+| `message_brief.py` | ShareNext-Stufe 1: Kernaussage/Zielgruppe + Headline-Fallback (`gpt-5.6-terra`) |
+| `creative_director.py` | ShareNext-Stufe 2: vier kreative Bild-Routen (Szene/Metapher/Objekt/Kontrast) (`gpt-5.6-terra`) |
+| `concept_jury.py` | ShareNext-Stufe 3: bewertet die Routen, wählt die Gewinner-Route (`gpt-5-nano`) |
+| `art_director.py` | ShareNext-Stufe 4: Art-Direction-Board (Focal Point, Licht, dominante Farben) (`gpt-5.6-terra`) |
+| `image_producer.py` | ShareNext-Stufe 5: baut den Produktions-Prompt (`gpt-5.6-terra`), erzeugt das Bild (`gpt-image-2`) inkl. Headline im Bild + Alt-Text (`gpt-4o-mini`) |
+| `visual_qa.py` | ShareNext-Stufe 6: prüft das Rohbild (Score/Freigabe, Vision-`gpt-5.6-terra`) |
+| `sharenext_integration.py`, `prompt_builder.py`, `image_pipeline/` | Separates, template-basiertes Prompt-Builder-System – im aktuellen Produktionspfad **nicht** aktiv (experimentell/Legacy) |
+| `text_renderer.py` | Pillow-Text-Rendering der alten Pipeline – **im Normalpfad ungenutzt** (ShareNext schreibt den Text per `gpt-image-2` direkt ins Bild) |
 | `bildgen.py` | **Nur noch Fallback + CI-Kreise**: `add_logo_circles` (Logo/Portrait-Kreis, wird von allen Streams genutzt) läuft weiter aktiv; `render_drafts`/die 3 alten Stile (Standard/KI-Tafel/Kreativ) sind nur Absicherung für Altfälle, im Normalbetrieb ungenutzt |
 | `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) - bleibt im Repo für spätere Wiederverwendung, wird aktuell von keinem der vier Content-Ströme mehr automatisch aufgerufen |
-| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline - nur noch relevant für Altfälle ohne `kampagne_motiv_pfad` |
+| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline – setzt nur noch Metadaten am Entwurf (`fields['bild_stil']`); das ShareNext-Bild ignoriert diese Felder |
 | `schauplatz.py` | Schauplätze der alten Pipeline (nur noch für Altfälle) |
 | `traeger.py` | Botschafts-Träger der alten Pipeline (nur noch für Altfälle) |
-| `wartung.py` | Cache-Aufräumung für **beide** Bild-Pipelines: `aufraeumen_motive` (alt, `DATA_DIR/motive/`) und `aufraeumen_kampagne` (3-Stufen-Workflow, `DATA_DIR/kampagne/` - schützt insbesondere das rohe Motiv für die Personalisierung je Stelle) |
+| `wartung.py` | Cache-Aufräumung: `aufraeumen_motive` (KI-Foto-Cache `DATA_DIR/motive/` der alten Pipeline) und die Legacy-Funktion `aufraeumen_legacy_kampagne` (`DATA_DIR/kampagne/`, nur noch für alte Vor-ShareNext-Entwürfe mit `kampagne_motiv_pfad`) |
 | `countdown_motive.py` | Gezeichnete Icons (Kalender, Wecker, Sanduhr) |
 | `fristen.py` | Fristen-Countdown (gestaffelte Erinnerungen) |
 | `anlass.py` | Anlass-Tage (besondere Tage mit Steuer-Aufhänger) |
@@ -49,25 +56,27 @@ Wissens-Serie ───┘
 
 ## Die vier Content-Streams
 
-Alle Streams münden in dieselbe Freigabe und denselben Kalender. Text UND Bild kommen bei
-allen vier Strömen aus dem **3-Stufen-Workflow** (`kampagne.py`, GPT-5.6 Terra + GPT Image 2) -
-**außer** beim Fristen-Countdown, wo der Text bewusst hart vorformuliert bleibt (rechtlich
-relevante Fristen/Beträge) und nur das Bild von der KI kommt (Art-Director-only, siehe unten):
+Alle Streams münden in dieselbe Freigabe und denselben Kalender. Der **Text** kommt bei allen
+vier Strömen von **Claude** (`textgen.generate`), das **Bild** aus der **ShareNext-Pipeline**
+(`sharenext_pipeline.run_sharenext_pipeline`, OpenAI) – **außer** beim Fristen-Countdown, wo der
+Text bewusst hart vorformuliert bleibt (rechtlich relevante Fristen/Beträge) und nur das Bild von
+der KI kommt (die feste Überschrift wird der Pipeline als `headline` übergeben, siehe unten):
 
 1. **Aktuelles (News)** – `radar.py` wertet täglich die Quellen aus. Relevante externe
    News (Haufe, BFH) gehen in **Stufe 1** (Themenauswahl). HILO-eigene Steuertipps und
-   BVL überspringen Stufe 1 und gehen direkt in die Texterstellung
-   (`textgen.generate_with_campaign`).
+   BVL überspringen Stufe 1 und gehen direkt in die Entwurfserstellung
+   (`textgen.generate_drafts`/`generate_for_ids` → `_create_drafts`).
 2. **Fristen-Countdown** – `fristen.py` erzeugt gestaffelte Erinnerungen vor den
    Abgabefristen (ab 3 Monaten 1×/Woche, letzte 4 Wochen 2×/Woche, letzte Woche täglich).
    Text fest vorformuliert (kein KI-Token für den Text), Bild via
-   `kampagne.generate_image_for_fixed_text` (nur Motiv/Layout von der KI).
-3. **Anlass-Tage** – `anlass.py` erzeugt zu besonderen Tagen (Tabelle `anlasstage`) einen
-   Beitrag mit Steuer-Bezug (`generate_with_campaign`); Wochenend-Tage erscheinen am
-   Freitag davor.
-4. **Wissens-Serie** – `wissen.py` füllt leere Kalendertage mit zeitlosen Themen
-   (Tabelle `wissensthemen`, `generate_with_campaign`), sobald der Vorrat offener Beiträge
-   unter eine Schwelle fällt.
+   `sharenext_pipeline.run_sharenext_pipeline` mit fest übergebener `headline` (die feste
+   Überschrift wird ins Bild geschrieben, siehe `fristen.py`).
+3. **Anlass-Tage** – `anlass.py` (`erzeuge_anlass_posts`) erzeugt zu besonderen Tagen
+   (Tabelle `anlasstage`) einen Beitrag mit Steuer-Bezug: Text via `textgen.generate` (Claude),
+   Bild via ShareNext-Pipeline; Wochenend-Tage erscheinen am Freitag davor.
+4. **Wissens-Serie** – `wissen.py` (`auffuellen`) füllt leere Kalendertage mit zeitlosen Themen
+   (Tabelle `wissensthemen`, ebenfalls Text via `textgen.generate` + ShareNext-Bild), sobald der
+   Vorrat offener Beiträge unter eine Schwelle fällt.
 
 ## Datenbank (Tabellen)
 
@@ -92,6 +101,8 @@ relevante Fristen/Beträge) und nur das Bild von der KI kommt (Art-Director-only
 - `wissensthemen` – zeitlose Themen (Titel, Aufhänger, zuletzt genutzt).
 - `einstellungen` – globale Schlüssel-Wert-Einstellungen (z.B. `bild_tool` = openai/ideogram,
   `bild_stil_standard`/`_ki_tafel`/`_kreativ` = welche Bild-Stile im Zufalls-Topf sind).
+  *Hinweis:* `bild_tool` und die `bild_stil_*`-Schalter wirken nur noch auf die **alte**
+  `bildmotiv.py`-Pipeline (Fallback); der aktive ShareNext-Weg nutzt immer `gpt-image-2`.
 - `schauplaetze` – pflegbare Liste schöner Umgebungen (Beschreibung, Jahreszeit, aktiv, zuletzt_genutzt);
   je Beitrag wird einer gezogen (Rotation, nie doppelt im Zyklus).
 - `traeger` – pflegbare Liste der Botschafts-Träger (Name, prompt_snippet, aktiv, zuletzt_genutzt).
@@ -122,46 +133,58 @@ Die `entwuerfe.text`-JSON trägt pro Beitrag u.a. `bild_stil`, `schauplatz`, `tr
     Text und – für Status – personalisiertem 9:16-Bild. Dienst-Fehler → `status='fehler'`, kein
     Status-Flip. Der FB/IG-Pfad (`_veroeffentliche_ziel`) bleibt unberührt.
 - **Cache-Aufräumung** (`web.py._cache_cleanup_scheduler`): Thread, einmal täglich (Marker
-  `last_cache_cleanup.txt`), räumt BEIDE Bild-Pipelines auf - `wartung.aufraeumen_motive`
-  (`DATA_DIR/motive/`, alte Pipeline) UND `wartung.aufraeumen_kampagne` (`DATA_DIR/kampagne/`,
-  3-Stufen-Workflow: rohe Motive + Text-Zwischenbilder). Beide orphan-basiert, 14-Tage-Schonfrist;
-  was ein aktiver Beitrag noch braucht (inkl. `kampagne_motiv_pfad` für die Personalisierung je
-  Stelle) wird NIE gelöscht. Verwaltung zeigt Cache-Größe beider Ordner + freien Speicher + Knopf.
+  `last_cache_cleanup.txt`), räumt `wartung.aufraeumen_motive` (`DATA_DIR/motive/`, KI-Foto-Cache
+  der alten Pipeline) UND die Legacy-Funktion `wartung.aufraeumen_legacy_kampagne`
+  (`DATA_DIR/kampagne/`, nur noch für alte Vor-ShareNext-Entwürfe mit `kampagne_motiv_pfad`).
+  Beide orphan-basiert, 14-Tage-Schonfrist; was ein aktiver Beitrag noch braucht, wird NIE
+  gelöscht. Verwaltung zeigt Cache-Größe beider Ordner + freien Speicher + Knopf.
 
 ## Bild-Design
 
-Das Beitragsbild (1080×1080) entsteht im **3-Stufen-Workflow** (`kampagne.py`):
+Das Beitragsbild (quadratisch, Pipeline-Größe `1024×1024`) entsteht in der **ShareNext-Pipeline**
+(`sharenext_pipeline.run_sharenext_pipeline`) – einem 6-stufigen Workflow über OpenAI-Modelle:
 
-1. **Planung** (GPT-5.6 Terra) – entwickelt aus dem Steuertext Headline, Infopunkte, CTA,
-   Begleittext, ein visuelles Konzept, ein Layout (6 Vorlagen: Text links/rechts/oben/unten
-   vom Motiv, zentrale Headline, editorial split) und einen englischen Motiv-Prompt (NUR
-   Bildbeschreibung, kein Text). Beim Fristen-Countdown steht der Text bereits fest (rechtlich
-   relevante Fristen/Beträge) - hier plant GPT-5.6 Terra NUR das visuelle Konzept
-   (`create_visual_plan`/`generate_image_for_fixed_text`), der Text bleibt unverändert.
-2. **Motiv** (GPT Image 2, Qualität `medium` - kaum Unterschied zu `high`, ~75% günstiger) –
-   erzeugt ein Foto/Illustration OHNE Text, mit bewusst freigehaltener, kontrastreicher Fläche
-   für den späteren Text.
-3. **QA** (`gpt-5-nano`, günstigstes Vision-Modell) – prüft Lesbarkeit/Kontrast, Themenbezug,
-   Layout. Kein Auto-Retry bei Ablehnung (#Kostenschutz): das Bild geht bei Problemen zur
-   manuellen Prüfung statt automatisch (kostenpflichtig) neu erzeugt zu werden.
+1. **Message Brief** (`message_brief.py`, `gpt-5.6-terra`) – leitet aus Thema/Text die
+   Kernaussage und Zielgruppe ab (Grundlage der Bildidee); liefert bei Bedarf einen
+   Headline-Fallback.
+2. **Creative Director** (`creative_director.py`, `gpt-5.6-terra`) – entwickelt vier kreative
+   Bild-Routen (emotionale Szene, Metapher, Objekt, Kontrast).
+3. **Concept Jury** (`concept_jury.py`, `gpt-5-nano`) – bewertet die vier Routen und wählt die
+   stärkste aus (bewusst günstiges Bewertungsmodell).
+4. **Art Director Board** (`art_director.py`, `gpt-5.6-terra`) – legt die visuelle Regie fest:
+   Focal Point, Lichtstimmung, dominante Farben.
+5. **Image Producer** (`image_producer.py`) – baut aus dem Board den Produktions-Prompt
+   (`gpt-5.6-terra`) und erzeugt das reale Bild mit **`gpt-image-2`** (Qualität `medium`). Die
+   **Headline wird direkt ins Bild geschrieben** (kein nachträgliches Text-Overlay); zusätzlich
+   entsteht ein Alt-Text für die Barrierefreiheit (`gpt-4o-mini`).
+6. **Visual QA** (`visual_qa.py`, Vision-`gpt-5.6-terra`) – prüft das Rohbild (Lesbarkeit,
+   Themenbezug) und vergibt einen Score. **Kein Auto-Retry** bei schwacher Bewertung
+   (#Kostenschutz): das Bild geht bei Problemen zur manuellen Prüfung.
 
-Der Text (Headline, Bullets, CTA) wird per **Pillow** (`text_renderer.py`) direkt aufs Motiv
-gerendert - OHNE Hintergrundfläche, layert also harmonisch über das Bild. Die Textfarbe
-(Navy oder Weiß) wird automatisch aus der gemessenen Helligkeit des Bildbereichs hinter der
-jeweiligen Textbox gewählt, nicht fest vorgegeben. CTA bleibt bewusst ein solider grüner Button.
+Beim **Fristen-Countdown** läuft dieselbe Pipeline, jedoch mit der bereits festen Überschrift als
+`headline`-Parameter – so bleibt der rechtlich relevante Text unverändert und wird nur ins Bild
+gesetzt.
 
+Nach der Pipeline setzt der Code nur noch die **CI-Kreise** aufs fertige Bild
+(`bildgen.add_logo_circles`) und speichert es als `entwurf_<id>.png`. Einen **Fallback gibt es
+nicht mehr** – ShareNext ist der einzige aktive Weg; schlägt die Generierung fehl, bleibt der
+Beitrag zunächst ohne Bild (er kann später manuell/erneut erzeugt werden).
+
+- **Text im Bild:** Anders als in der alten Pipeline rendert der Code den Text **nicht** mehr per
+  Pillow aufs Motiv – `gpt-image-2` schreibt die Headline selbst ins Bild. `text_renderer.py`
+  gehört damit zur alten Pipeline und ist im Normalpfad ungenutzt.
 - **CI-Kreise** (Markenzeichen): weißer Logo-Kreis + blauer Slogan-Kreis, per Code-Overlay
-  (`bildgen.add_logo_circles`) nach dem Pillow-Text-Rendering aufgesetzt - läuft unabhängig vom
-  Bild-Workflow und wird von allen vier Content-Strömen genutzt. Ein Stellen-Porträt (`portrait`)
+  (`bildgen.add_logo_circles`) nach der Bilderzeugung aufgesetzt – läuft unabhängig von der
+  Bild-KI und wird von allen vier Content-Strömen genutzt. Ein Stellen-Porträt (`portrait`)
   ersetzt optional einen Kreis.
-- **Personalisierung je Beratungsstelle** (`personalisierung.render_fuer_stelle`): das rohe
-  KI-Motiv (`kampagne_motiv_pfad`, vor dem Text-Overlay) wird wiederverwendet - nur der
-  personalisierte CTA-Text (nennt den Ort) wird per Pillow neu draufgerendert + der
-  Stellen-Portrait-Kreis gesetzt. KEIN neuer GPT-Image-Call nötig.
-- **Alte Pipeline** (`bildgen.py`/`bildmotiv.py`/`stilwahl.py`, drei Stile Standard/KI-Tafel/
-  Kreativ + Comic-Varianten): bleibt im Repo, wird aber von keinem der vier Content-Ströme mehr
-  automatisch aufgerufen - nur noch Fallback für Alt-Entwürfe ohne `kampagne_motiv_pfad`. Die
-  Comic-Stile (inkl. personalisiertem Berater-Comic je Stelle) sind für einen späteren,
-  gezielten Einsatz vorgesehen, aktuell aber nicht aktiv.
+- **Personalisierung je Beratungsstelle** (`personalisierung.render_fuer_stelle`): das erzeugte
+  ShareNext-Bild (`entwuerfe.bild_pfad` bzw. `fields['bild_pfad']`) wird wiederverwendet – nur der
+  personalisierte CTA/Logo-Kreis + der Stellen-Porträt-Kreis werden neu aufgesetzt. **KEIN neuer
+  GPT-Image-Call** nötig.
+- **Alte Pipeline** (`bildmotiv.py`/`bildgen.render_drafts`/`stilwahl.py`, drei Stile
+  Standard/KI-Tafel/Kreativ + Comic-Varianten, Bild-KI wählbar über `bild_tool`): bleibt im Repo,
+  wird aber von keinem der vier Content-Ströme mehr automatisch aufgerufen – nur noch Fallback für
+  Alt-Entwürfe. Die Comic-Stile (inkl. personalisiertem Berater-Comic je Stelle) sind für einen
+  späteren, gezielten Einsatz vorgesehen, aktuell aber nicht aktiv.
 
 Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.
