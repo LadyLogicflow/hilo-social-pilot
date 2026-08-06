@@ -353,10 +353,10 @@ def generate_image(
 
         image_data = response.data[0]
 
-        # DEBUG: Was ist in der Response?
-        log.info(f"DEBUG: image_data.url = {image_data.url}")
-        log.info(f"DEBUG: image_data.b64_json exists = {hasattr(image_data, 'b64_json')}")
-        log.info(f"DEBUG: response.data[0] attributes = {dir(image_data)}")
+        # Debug: Response-Struktur (nur bei log.debug() aktiv)
+        log.debug(f"image_data.url = {image_data.url}")
+        log.debug(f"image_data.b64_json exists = {hasattr(image_data, 'b64_json')}")
+        log.debug(f"response.data[0] attributes = {dir(image_data)}")
 
         if image_data.url:
             # URL-basiert
