@@ -32,7 +32,7 @@ def auffuellen(heute=None, min_buffer=3):
         return 0
     thema = {"titel": topic["titel"], "volltext": topic["hook"] or ""}
     try:
-        fields = textgen.generate_with_campaign(thema, "facebook")
+        fields = textgen.generate(thema, "facebook")
     except Exception as ex:
         log.warning("Wissens-Text/Bild fehlgeschlagen (%s): %s", topic["titel"], ex)
         return 0

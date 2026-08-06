@@ -1948,38 +1948,6 @@ def umplanen(eid):
             conn.commit()
     return redirect(url_for("einplanung"))
 
-def _kampagne_pillow_rerender(data, eid):
-    """Rendert bei einem Kampagnen-Entwurf (kampagne_motiv_pfad vorhanden) den AKTUELLEN Text
-    (Ueberschrift/Bullets/CTA aus 'data') per Pillow neu auf das vorhandene KI-Motiv - OHNE
-    neuen GPT-Image-Call (#Kostenschutz). Fuer 'Nur Bild neu'/'Ueberarbeiten', damit diese
-    Aktionen bei Kampagnen-Entwuerfen tatsaechlich kostenlos bleiben (statt wie zuvor ueber die
-    alte Pipeline zu laufen, was fuer Kampagnen-Entwuerfe unbemerkt einen neuen, kostenpflichtigen
-    KI-Bild-Call ausgeloest haette - 'ensure_photo_fuer' kennt kein echtes Cache-Foto fuer sie).
-    Liefert den neuen Bildpfad, oder None wenn kein Kampagnen-Motiv vorhanden ist (Alt-Entwurf -
-    der Aufrufer faellt dann auf die alte Pipeline zurueck)."""
-    motiv_pfad = data.get("kampagne_motiv_pfad")
-    layout_template = data.get("kampagne_layout_template")
-    if not (motiv_pfad and layout_template and os.path.exists(motiv_pfad)):
-        return None
-    import kampagne
-    from text_renderer import render_text_on_image
-    template = kampagne.LAYOUT_TEMPLATES[layout_template]
-    out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-    text_path = out + ".tmp_text.png"
-    render_text_on_image(
-        motiv_pfad, data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
-        template["headline_box"], template["supporting_box"], template["cta_box"],
-        text_path, background_overlay=True, highlight_words=data.get("highlight_words"),
-    )
-    slogan = bildgen.pick_slogan(data.get("slogan"))
-    bildgen.add_logo_circles(text_path, slogan, out, pos="diagonal2")
-    try:
-        os.remove(text_path)
-    except Exception:
-        pass
-    return out
-
-
 @app.route("/beitrag-neu/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def beitrag_neu(eid):
@@ -1996,30 +1964,46 @@ def beitrag_neu(eid):
         thema = conn.execute("SELECT titel, url, volltext FROM themen WHERE id=?",
                              (e["thema_id"],)).fetchone() if e["thema_id"] else None
         kanal = e["kanal"] or "google"
-    import kampagne
     out = None
     try:
         if thema:
-            # Volles Thema vorhanden -> kompletter 3-Stufen-Workflow (Text + Bild neu geplant).
-            data = textgen.generate_with_campaign(
+            # Volles Thema vorhanden -> kompletter ShareNext-Workflow (Text + Bild neu geplant).
+            data = textgen.generate(
                 {"titel": thema["titel"], "volltext": thema["volltext"], "url": thema["url"]}, kanal)
             out = data.get("bild_pfad")
         else:
             # Kein Thema hinterlegt (z.B. manuell erstellter Beitrag) -> bestehenden Text
-            # behalten, nur ein frisches Bildkonzept vom Art Director planen lassen.
+            # behalten, nur ein frisches Bildkonzept via ShareNext Pipeline planen lassen.
+            from sharenext_pipeline import run_sharenext_pipeline
+            from pathlib import Path
+
             data = json.loads(e["text"])
-            image_path, review, motiv_path, layout_template, highlight_words = kampagne.generate_image_for_fixed_text(
-                data.get("ueberschrift", ""), data.get("bullets", []), data.get("cta", ""),
-                context=data.get("subline") or data.get("caption") or "",
+
+            # Text für ShareNext zusammenstellen
+            bullets_text = "\n".join(["• " + b for b in data.get("bullets", [])])
+            post_text = f"{bullets_text}\n\n{data.get('cta', '')}" if bullets_text else data.get("caption", "")
+
+            # ShareNext Pipeline durchlaufen
+            result = run_sharenext_pipeline(
+                stream="custom",
+                thema=data.get("ueberschrift", "Beitrag"),
+                text=post_text,
+                kanal=kanal.capitalize(),
+                headline=data.get("ueberschrift", ""),
+                size="1024x1024"
             )
+
+            # Bild mit Logo-Circles speichern
+            temp_path = f"/tmp/entwurf_{eid}_temp.png"
+            result.image.save(temp_path)
             final_path = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(data.get("slogan")), final_path, pos="diagonal2")
+            bildgen.add_logo_circles(temp_path, bildgen.pick_slogan(data.get("slogan")), final_path, pos="diagonal2")
+
+            # Daten aktualisieren (ShareNext Version)
             data["bild_pfad"] = final_path
-            data["kampagne_motiv_pfad"] = str(motiv_path)
-            data["kampagne_layout_template"] = layout_template
-            data["highlight_words"] = highlight_words
-            data["qa_approved"] = review.approved
-            data["qa_problems"] = review.problems if not review.approved else []
+            data["qa_approved"] = result.approved
+            data["qa_problems"] = [] if result.approved else [result.qa_verdict.schwaechen]
+            data["alt_text"] = result.production_brief.alt_text or ""
             out = final_path
     except Exception as ex:
         flash("Neu-Erzeugung fehlgeschlagen: %s" % ex)
@@ -2071,20 +2055,15 @@ def text_neu(eid):
         th = {"titel": thema["titel"] if thema else "", "volltext": (thema["volltext"] if thema else "") or ""}
         neu = textgen.regenerate(th, prev, feedback, kanal)
         # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
-        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person"),
-                        ("kampagne_motiv_pfad", ""), ("kampagne_layout_template", "")):
+        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
             neu.setdefault(k, prev.get(k, dflt))
-        # Bild an den ueberarbeiteten Text anpassen: bei Kampagnen-Entwuerfen kostenlos per Pillow
-        # auf das vorhandene Motiv neu rendern (KEIN neuer GPT-Image-Call); nur Alt-Entwuerfe ohne
-        # Kampagnen-Motiv fallen auf die alte Pipeline zurueck (dort echt aus dem Cache, ebenfalls
-        # kostenlos).
-        out = _kampagne_pillow_rerender(neu, eid)
-        if out is None:
-            import bildmotiv
-            photo = bildmotiv.ensure_photo_fuer(neu)   # Motiv aus Cache -> keine Bild-KI-Kosten
-            slogan = bildgen.pick_slogan(neu.get("slogan"))
-            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.render(neu, photo, slogan, out)
+        # Bild an den überarbeiteten Text anpassen: Standard-Pipeline (bildmotiv + bildgen)
+        # verwendet Cache-Foto, daher keine zusätzlichen KI-Kosten.
+        import bildmotiv
+        photo = bildmotiv.ensure_photo_fuer(neu)
+        slogan = bildgen.pick_slogan(neu.get("slogan"))
+        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
+        bildgen.render(neu, photo, slogan, out)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(neu, ensure_ascii=False), out, eid))
@@ -3093,19 +3072,15 @@ def aktion(eid):
             try:
                 neu = textgen.regenerate(thema, prev, feedback, e["kanal"])
                 # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
-                for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person"),
-                                ("kampagne_motiv_pfad", ""), ("kampagne_layout_template", "")):
+                for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
                     neu.setdefault(k, prev.get(k, dflt))
-                # Bild an den ueberarbeiteten Text anpassen: bei Kampagnen-Entwuerfen kostenlos per
-                # Pillow auf das vorhandene Motiv neu rendern (KEIN neuer GPT-Image-Call) - statt wie
-                # zuvor bild_pfad=NULL zu setzen und ueber die alte Pipeline (bildgen.render_drafts)
-                # komplett neu zu erzeugen, was das gute Kampagnen-Bild verworfen haette.
-                out = _kampagne_pillow_rerender(neu, eid)
+                # Bild an den überarbeiteten Text anpassen: bild_pfad auf None setzen und
+                # bildgen.render_drafts() aufrufen (rendert aus Cache, keine KI-Kosten).
+                out = None
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                              (json.dumps(neu, ensure_ascii=False), out, eid))
                 conn.commit()
-                if out is None:
-                    bildgen.render_drafts()  # Alt-Entwurf ohne Kampagnen-Motiv: alte Pipeline als Fallback
+                bildgen.render_drafts()  # Bild neu rendern aus Cache
                 audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
                 flash("Entwurf %d überarbeitet (neuer Vorschlag erstellt)." % eid)
             except Exception as ex:
@@ -3114,11 +3089,31 @@ def aktion(eid):
             # Caption nachträglich erstellen für Bestandsposts
             if e["thema_id"]:
                 try:
-                    import kampagne
+                    from openai import OpenAI
+                    from secrets_store import get_secret
+
                     t = conn.execute("SELECT titel, volltext FROM themen WHERE id=?", (e["thema_id"],)).fetchone()
                     if t:
                         article = f"{t['titel']}\n\n{t['volltext']}"
-                        caption = kampagne.generate_caption_only(article)
+
+                        # Caption direkt via OpenAI generieren (ohne kampagne.py)
+                        client = OpenAI(api_key=get_secret("openai_api_key"))
+                        response = client.chat.completions.create(
+                            model="gpt-5.6-terra",
+                            messages=[{
+                                "role": "system",
+                                "content": "Du bist ein erfahrener Social-Media-Texter für den HILO Lohnsteuerhilfeverein. "
+                                           "Schreibe kurze, verständliche Facebook-Captions die Steuer-Themen für normale "
+                                           "Steuerzahler zugänglich machen. Nutze echte Umlaute (ä, ö, ü, ß)."
+                            }, {
+                                "role": "user",
+                                "content": f"Schreibe eine Caption für folgenden Artikel:\n\n{article}"
+                            }],
+                            max_tokens=300,
+                            temperature=0.7
+                        )
+                        caption = response.choices[0].message.content.strip()
+
                         data = json.loads(e["text"])
                         data["caption"] = caption
                         conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))

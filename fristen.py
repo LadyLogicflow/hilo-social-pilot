@@ -95,9 +95,9 @@ def erzeuge_countdowns(heute=None):
     """Legt fuer heute faellige Countdown-Beitraege als Entwurf an (Stufe 2, auf den Tag geplant).
     Maximal 1 pro Tag (die dringlichste Frist). Idempotent (Dublettenschutz via hash).
 
-    Bild: KI-generiertes Motiv statt statischem Icon (Art-Director-Stufe, kampagne.py) - der
+    Bild: KI-generiertes Motiv via ShareNext Pipeline (6-stufige Premium-Bildgenerierung) - der
     Text selbst bleibt UNVERAENDERT hart vorformuliert (_post_fields), nur das visuelle Konzept
-    kommt von GPT-5.6 Terra + GPT Image 2. Rechtlich relevante Daten/Betraege werden dadurch
+    kommt von GPT-5.6 Terra + gpt-image-2. Rechtlich relevante Daten/Betraege werden dadurch
     NICHT von der KI angefasst."""
     from db import get_conn
     from secrets_store import get_secret
@@ -115,20 +115,37 @@ def erzeuge_countdowns(heute=None):
     bild_pfad = None
     if get_secret("openai_api_key"):
         try:
-            import kampagne
-            image_path, review, motiv_path, layout_template, highlight_words = kampagne.generate_image_for_fixed_text(
-                fields["ueberschrift"], fields["bullets"], fields["cta"],
-                context=fields.get("subline", ""),
+            # ShareNext Pipeline für Fristen-Countdown
+            from sharenext_pipeline import run_sharenext_pipeline
+            from pathlib import Path
+
+            # Text für Pipeline zusammenstellen
+            bullets_text = "\n".join(["• " + b for b in fields["bullets"]])
+            post_text = f"{bullets_text}\n\n{fields['cta']}"
+
+            # ShareNext Pipeline durchlaufen
+            result = run_sharenext_pipeline(
+                stream="fristen",
+                thema=fields["ueberschrift"],
+                text=post_text,
+                kanal="Facebook",
+                headline=fields["ueberschrift"],
+                size="1024x1024"
             )
+
+            # Temporäres Bild speichern für Logo-Circles
             import bildgen
-            final_path = str(image_path).replace(".png", "_ci.png")
-            bildgen.add_logo_circles(str(image_path), bildgen.pick_slogan(fields.get("slogan")), final_path, pos="diagonal2")
+            temp_path = f"/tmp/frist_{frist['name'].replace(' ', '_')}.png"
+            result.image.save(temp_path)
+            final_path = temp_path.replace(".png", "_ci.png")
+            bildgen.add_logo_circles(temp_path, bildgen.pick_slogan(fields.get("slogan")), final_path, pos="diagonal2")
             bild_pfad = final_path
-            fields["qa_approved"] = review.approved
-            fields["qa_problems"] = review.problems if not review.approved else []
-            fields["highlight_words"] = highlight_words
-            fields["kampagne_motiv_pfad"] = str(motiv_path)
-            fields["kampagne_layout_template"] = layout_template
+
+            # QA-Daten speichern (ShareNext Version)
+            fields["qa_approved"] = result.approved
+            fields["qa_problems"] = [] if result.approved else [result.qa_verdict.schwaechen]
+            fields["alt_text"] = result.production_brief.alt_text or ""
+
         except Exception as ex:
             log.warning("Fristen-Bild fehlgeschlagen (%s): %s - Beitrag ohne Bild.", frist["name"], ex)
     else:

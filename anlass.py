@@ -27,9 +27,9 @@ def faellige(heute):
 
 def erzeuge_anlass_posts(heute=None):
     """Legt fuer heute faellige Anlass-Beitraege als Entwurf an (auf den Tag geplant).
-    Idempotent (Dublettenschutz via hash). Nutzt den 3-Stufen-Workflow (GPT-5.6 Terra + GPT
-    Image 2 + Pillow-Text), daher 'openai_api_key' statt 'anthropic_api_key' (Claude wird hier
-    nicht mehr verwendet - #Comic-Ablösung)."""
+    Idempotent (Dublettenschutz via hash). Nutzt ShareNext Pipeline (6-stufige Premium-
+    Bildgenerierung mit GPT-5.6 Terra + gpt-image-2), daher 'openai_api_key' statt
+    'anthropic_api_key'."""
     from db import get_conn
     from secrets_store import get_secret
     import textgen
@@ -50,7 +50,7 @@ def erzeuge_anlass_posts(heute=None):
         thema = {"titel": a["anlass"],
                  "volltext": "Anlass: %s. Steuerlicher Aufhaenger: %s" % (a["anlass"], a["steuer_hook"] or "")}
         try:
-            fields = textgen.generate_with_campaign(thema, "facebook")
+            fields = textgen.generate(thema, "facebook")
         except Exception as ex:
             log.warning("Anlass-Text/Bild fehlgeschlagen (%s): %s", a["anlass"], ex)
             continue

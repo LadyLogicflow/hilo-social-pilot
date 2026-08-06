@@ -572,94 +572,6 @@ def generate(thema, kanal=None):
     return _normalize_bild(_normalize_captions(_parse_json(raw)))
 
 
-def generate_with_campaign(thema, kanal=None, test_mode=False):
-    """Neuer 3-Stufen-Workflow mit GPT-5.6 Terra + GPT Image 2 + QA.
-
-    Statt Anthropic Claude verwenden wir den kampagne.run_campaign() Workflow:
-    1. GPT-5.6 Terra: Kampagnenplanung
-    2. GPT Image 2: Grafik-Generierung (mit Text im Bild!)
-    3. GPT-5.6 Terra: Qualitätskontrolle (Retry bei Fehlern)
-
-    Args:
-        thema: Dict mit {titel, volltext, url} oder String
-        kanal: Ziel-Kanal (für CTA)
-        test_mode: True = low quality für Tests, False = high quality
-
-    Returns:
-        Dict mit fields + bild_pfad + qa_status
-
-    Raises:
-        Exception: Bei Fehlern in der Kampagnen-Generierung
-    """
-    import kampagne
-    import os
-    from config import DATA_DIR
-
-    # Thema zu Text konvertieren
-    if isinstance(thema, dict):
-        article = f"{thema.get('titel', '')}\n\n{thema.get('volltext', '')}"
-    else:
-        article = str(thema)
-
-    # CTA basierend auf Kanal
-    cta = "Jetzt Beratungsstelle finden"
-    if kanal == "facebook":
-        cta = "Mehr erfahren"
-    elif kanal == "instagram":
-        cta = "Link in Bio"
-
-    # 3-Stufen-Workflow ausführen
-    log.info("3-Stufen-Workflow wird ausgeführt (test_mode=%s)...", test_mode)
-    plan, image_path, review, motiv_path = kampagne.run_campaign(
-        article=article,
-        cta=cta,
-        test_mode=test_mode,
-    )
-
-    # Bild in das Standard-Verzeichnis kopieren + Logo-Kreise drüberlegen
-    import shutil
-    import time
-    import uuid
-    import bildgen
-    from pathlib import Path
-    final_image_dir = os.path.join(DATA_DIR, "bilder")
-    os.makedirs(final_image_dir, exist_ok=True)
-
-    # Eindeutiger Dateiname (timestamp + UUID gegen Race Condition)
-    timestamp = int(time.time())
-    unique_id = uuid.uuid4().hex[:12]
-    final_image_path = os.path.join(final_image_dir, f"campaign_{timestamp}_{unique_id}.png")
-
-    # Logo-Kreise drüberlegen (wie bei bildgen.render() für v5.x Bilder)
-    slogan = bildgen.pick_slogan(None)
-    bildgen.add_logo_circles(image_path, slogan, final_image_path, pos="diagonal2")
-
-    # Fields zusammenstellen (kompatibel mit bestehendem Format)
-    fields = {
-        "ueberschrift": plan.headline,
-        "subline": plan.core_message,  # Kernaussage als Subline
-        "bullets": plan.supporting_points,
-        "cta": plan.cta,
-        "caption": plan.caption,  # Begleittext ✅
-        "bild_motiv": plan.visual_concept,  # Für Dokumentation
-        "bild_stil": "standard",  # v5.x wird automatisch erkannt
-        "bild_pfad": final_image_path,  # Bild ist BEREITS erstellt!
-        "qa_approved": review.approved,  # QA-Status
-        "qa_problems": review.problems if not review.approved else [],
-        # NEU: rohes Motiv + Layout fuer personalisierung.render_fuer_stelle - damit die
-        # Personalisierung je Beratungsstelle (anderer CTA-Text IM Bild) den Text per Pillow
-        # neu drauf rendern kann, OHNE nochmal GPT Image 2 aufzurufen (#Kostenschutz).
-        "kampagne_motiv_pfad": str(motiv_path),
-        "kampagne_layout_template": plan.layout_template,
-        "highlight_words": plan.highlight_words,
-    }
-
-    log.info("3-Stufen-Workflow abgeschlossen: %s (QA: %s)",
-             plan.headline, "✅" if review.approved else "❌")
-
-    return fields
-
-
 def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
     """Erzeugt fuer die uebergebenen Themen-Zeilen je einen Entwurf.
 
@@ -680,15 +592,8 @@ def _create_drafts(rows, kanal, use_campaign=False, test_mode=False):
     created = 0
     for r in rows:
         try:
-            # WAHL: 3-Stufen-Workflow oder bisheriger Claude-Workflow
-            if use_campaign:
-                data = generate_with_campaign(
-                    {"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]},
-                    kanal,
-                    test_mode=test_mode
-                )
-            else:
-                data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
+            # ShareNext Premium Pipeline (6-stufig)
+            data = generate({"titel": r["titel"], "volltext": r["volltext"], "url": r["url"]}, kanal)
             with get_conn() as conn:
                 # #144: Bild-Stil EINMAL zufaellig aus den aktiven Stilen waehlen und in
                 # fields['bild_stil'] ablegen (stabil ueber Re-Renders). Robust gegen Fehler.
