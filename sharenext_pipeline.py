@@ -8,7 +8,7 @@ Komplette Pipeline von Message Brief bis fertiges Bild:
 2. Creative Director (4 Routen)
 3. Concept Jury (Gewinner wählen)
 4. Art Director Board
-5. Image Producer (DALL-E 3)
+5. Image Producer (gpt-image-2)
 6. Visual QA (Gate A)
 
 Teil von Issue #7: ShareNext MVP - Integration
@@ -189,7 +189,7 @@ def run_sharenext_pipeline(
     log.info(f"   ✓ Farben: {', '.join(art_board.dominante_farben[:3])}")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # STUFE 5: Image Producer - DALL-E 3
+    # STUFE 5: Image Producer - gpt-image-2
     # ─────────────────────────────────────────────────────────────────────────
     log.info(f"🖼️  Stufe 5/6: Image Producer (gpt-image-2 {size})")
     log.info(f"   Headline: '{headline}'" if headline else "   (Kein Text im Bild)")
