@@ -3,7 +3,7 @@
 """
 Image Producer - Generiert Premium-Bild MIT deutscher Überschrift für ShareNext-Pipeline.
 
-Übersetzt Art Direction Board in DALL-E Prompt und generiert das Bild.
+Übersetzt Art Direction Board in gpt-image-2 Prompt und generiert das Bild.
 
 WICHTIG:
 - Text NUR auf DEUTSCH (NIEMALS Englisch!)
@@ -152,8 +152,8 @@ def create_production_brief(
 
     # System-Prompt: ShareNext Image Prompt Director (Catrin's Spezifikation)
     # System-Prompt: Einfacher Prompt Director (Stand 12:10, gute Bilder!)
-    system_prompt = """Du bist ein Prompt Director für DALL-E Bildgenerierung.
-Deine Aufgabe: Übersetze ein Art Direction Board in einen präzisen DALL-E Prompt.
+    system_prompt = """Du bist ein Prompt Director für gpt-image-2 Bildgenerierung.
+Deine Aufgabe: Übersetze ein Art Direction Board in einen präzisen Bildgenerierungs-Prompt.
 
 KRITISCH WICHTIG - TEXT-REGELN:
 - **ÜBERSCHRIFT MUSS SICHTBAR SEIN** - Die vorgegebene deutsche Überschrift MUSS groß, lesbar und prominent im Bild erscheinen!
@@ -164,7 +164,7 @@ KRITISCH WICHTIG - TEXT-REGELN:
 - **EURO (€) verwenden** - NEVER Dollar ($) or USD!
 - **Zielgruppe: Deutsche Steuerzahler** - alles auf Deutsch!
 
-DALL-E Prompt Struktur:
+Bildgenerierungs-Prompt Struktur:
 
 1. **Stil & Medium** (z.B. "editorial photography", "still life", "digital art")
 2. **Hauptmotiv** (Focal Point detailliert beschreiben)
@@ -179,7 +179,7 @@ Prompt-Tipps:
 - Sei SEHR spezifisch (nicht "schönes Licht", sondern "soft directional light from left")
 - Verwende Fotografie-Fachbegriffe (shallow depth of field, rule of thirds, etc.)
 - Beschreibe was DU SIEHST, nicht was es BEDEUTET
-- DALL-E 3 versteht komplexe Prompts - nutze das!
+- gpt-image-2 versteht komplexe Prompts - nutze das!
 
 Text-Regeln (SEHR WICHTIG!):
 - **ÜBERSCHRIFT IST PFLICHT** - Wenn eine Überschrift vorgegeben ist, MUSS sie prominent im Bild erscheinen!
@@ -262,7 +262,7 @@ WICHTIG:
 - EURO (€) verwenden, NIEMALS Dollar ($)!
 """
 
-    log.info(f"Prompt Director erstellt DALL-E Prompt für: {route.titel}")
+    log.info(f"Prompt Director erstellt Bildgenerierungs-Prompt für: {route.titel}")
 
     try:
         # OpenAI API-Call mit Structured Output
@@ -503,7 +503,7 @@ if __name__ == "__main__":
         print(f"Negative: {', '.join(prod_brief.negative_hints)}\n")
 
         # Schritt 2: Bild generieren
-        print("Schritt 2: Generiere Bild mit DALL-E 3...")
+        print("Schritt 2: Generiere Bild mit gpt-image-2...")
         output_path = Path("/tmp/sharenext-test-image.png")
         image = generate_image(prod_brief, output_path=output_path)
 
