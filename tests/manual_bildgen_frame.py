@@ -17,7 +17,7 @@ gezeichnete Inhaltskante (Unterkante der CTA-Pille) und vergleicht sie mit der a
 Layout-Code berechneten Kartenunterkante cy1.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_bildgen_frame.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_bildgen_frame.py
 """
 import os, sys
 

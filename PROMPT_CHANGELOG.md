@@ -16,6 +16,76 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Zwei externe Kritiken zusammengefuehrt: Visuelle Uebersetzung statt Illustration (neunte Runde)
+
+**Anlass:** Zwei unabhaengige externe Bewertungen (die eigene Analyse aus der vorherigen Runde
+und eine weitere externe KI-Kritik) nach ca. 10 realen Vergleichsbildern. Beide kritisch
+gegeneinander und gegen den Code geprueft (siehe Chat-Protokoll fuer die vollstaendige
+Punkt-fuer-Punkt-Abwaegung) - Konvergenzpunkte direkt uebernommen, bei Widerspruechen eigene
+Einschaetzung mit Begruendung durchgesetzt.
+
+**Bewusst NICHT uebernommen (mit Begruendung):**
+- "Brand Distinctiveness" als Jury- oder QA-Kriterium - ohne Referenzbild-Vergleichsmechanismus
+  kann ein Modell das nicht serious bewerten (reines Raten). Zum zweiten Mal verworfen.
+- 5 weitere Structured-Output-Felder (`visual_idea`, `brand_connection`, `thumbnail_read`,
+  `first_500ms_read`, `visual_tension`) - `first_500ms_read`/`visual_tension` waren in der
+  Review-Runde bereits verworfen worden (Redundanz zu `beispiel_szene`). Nur EIN neues Feld
+  uebernommen: `headline_dependency` (low/medium/high) - klar verifizierbar, direkt mit dem
+  bestehenden `scroll_stop_wirkung`-Kriterium verknuepfbar.
+- Neues Jury-Kriterium "Visual Translation" (10%) + dritte Gewichts-Verschiebung in Folge -
+  inhaltlich stark ueberlappend mit dem bestehenden Originalitaet-Kriterium. Stattdessen als
+  Bewertungs-Anker IN die bestehende Originalitaet-Skala eingebaut (Transformation vs. reine
+  Abbildung), keine neue Dimension, keine weitere Gewichtsdebatte ohne neue Bilddaten dazwischen.
+- Zweite Image-Producer-Restrukturierung - die Prioritaets-Struktur (A/B/C) existiert bereits
+  seit der dritten Runde, keine zweite Ueberarbeitung noetig.
+
+**Umgesetzt (4 Dateien):**
+
+1. `creative_director.py`:
+   - Neues Kernprinzip "VISUELLE UEBERSETZUNG STATT ILLUSTRATION" vor der Routen-Beschreibung -
+     5 Transformationsarten (Transformation, visueller Widerspruch, Editorial Intervention,
+     Narrative Situation, Groessenrelation) statt reiner Themen-Abbildung.
+   - ONE-IDEA-TEST mit Gut/Schlecht-Beispielen ("Ein Steuerformular wird zum Papierflugzeug" vs.
+     "Auf einem Tisch liegen ein Brief und eine Karte").
+   - Neues Pflichtfeld `headline_dependency` (low/medium/high) pro Route.
+   - Neue Regel KEINE-ERKLAER-LABELS (Etiketten wie "Unterstuetzung"/"Erholungszeit" an
+     Gegenstaenden sind ein Warnsignal fuer eine zu schwache visuelle Idee).
+   - Neue Regel SIGNALFARBEN kontrolliert einsetzen (erlaubt bei Warnthemen, aber kein Ersatz
+     fuer eine starke Idee, HILO-Farbdramaturgie darf nicht verdraengt werden) - direkter Fix
+     fuer den Befund "rotes V ohne HILO-Farbe".
+   - "Formular wird zu Objekt" (Bruecke, Papierflugzeug) als beobachtetes, potenziell abgenutztes
+     Muster in die Vermeiden-Liste aufgenommen (nicht verboten, aber markiert).
+2. `concept_jury.py`:
+   - Scroll-Stop-Skala umformuliert: bewertet jetzt explizit die STAERKE DER IDEE, nicht Farbe/
+     Groesse - mit explizitem Hinweis "ein grosses rotes Element ist nicht automatisch Scroll-Stop".
+   - Originalitaet-Skala um Transformation-vs-Illustration-Anker erweitert (ersetzt separates
+     "Visual Translation"-Kriterium).
+   - `headline_dependency` wird an die Jury durchgereicht und fliesst in die Scroll-Stop-Bewertung
+     ein (hoch = Warnsignal).
+   - Signalfarben-Regel gespiegelt.
+   - Gewichte UNVERAENDERT gelassen (dritte Aenderung in Folge waere ohne neue Bilddaten
+     spekulativ).
+3. `art_director.py`:
+   - Brand-Signature-Achse zur "HILO Visual Signature" gebuendelt (8 Bausteine einer visuellen
+     Grammatik) - mit explizitem Anti-Template-Satz ("kein starres Template, nicht jedes Bild
+     muss alle Punkte erfuellen"), um nicht dieselbe Ueber-Generalisierung wie beim Produktshot-
+     und Formular-Muster zu wiederholen.
+   - Signalfarben-Regel gespiegelt.
+4. `visual_qa.py`:
+   - Neues Kriterium `composition_integrity` - prueft ob Text/Motiv/Logo wie EINE Gestaltung
+     wirken oder wie "Foto + Textkasten + Logo" (deckt den Koffer-Kritikpunkt "Template-
+     Charakter" ab, der bisher kein Zuhause in den Kriterien hatte).
+   - `scroll_stop_wirkung`-Kriterium um denselben Farbe/Groesse-Anker wie in der Jury ergaenzt.
+   - Signalfarben-Regel in die Markenpassung-Bewertung gespiegelt.
+   - Kriterien-Nummerierung im Prompt-Text entsprechend verschoben (7→9 fuer Ueberschrift).
+
+**Nicht geprueft:** Wie bei allen vorherigen Runden nur statisch getestet (Syntax + bestehende
+Unit-Tests), keine echte Bildgenerierung moeglich in dieser Umgebung. Insbesondere nicht
+verifiziert, ob `headline_dependency` von der KI zuverlaessig und konsistent mit dem
+tatsaechlichen Bildergebnis eingeschaetzt wird.
+
+---
+
 ## 2026-08-11 – Ursache statt Symptom: Kernaussage plattet auf "Geld sparen" (achte Runde)
 
 **Anlass:** Nutzer beobachtete, dass beim wiederholten Neu-Generieren AUS DEMSELBEN bereits

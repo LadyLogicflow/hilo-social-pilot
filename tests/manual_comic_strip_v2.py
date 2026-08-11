@@ -15,7 +15,7 @@ Beweist:
 
 Ausfuehrung:
   HILO_DATA_DIR=/tmp/v2-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_comic_strip_v2.py
+    /workspace/.hvenv/bin/python tests/manual_comic_strip_v2.py
 """
 import os
 import sys

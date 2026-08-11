@@ -290,12 +290,20 @@ Bewertungskriterien (Skala 1-10):
    - 1-4: Verwirrend, unklar
 
 2. **Scroll-Stop-Potenzial (25%)**: Fällt das Bild im Feed auf?
-   - 9-10: Funktioniert bereits als kleines Thumbnail OHNE Text. Ein dominanter visueller Reiz
-     ist innerhalb von <1 Sekunde erfassbar und erzeugt Neugier, Überraschung oder Spannung.
-   - 7-8: Deutlich stärker als gewöhnlicher Social-Media-Content, aber der Effekt hängt
-     teilweise von Headline/Kontext ab, nicht rein vom Bild allein.
-   - 5-6: Professionell und attraktiv, aber im Feed erwartbar - nichts, das man zweimal ansieht.
-   - 3-4: Typisches Stock-/Corporate-/Steuer-Motiv.
+   Bewerte NICHT einfach, ob das Bild bunt, groß, kontrastreich oder attraktiv wäre - bewerte die
+   STÄRKE DER ZUGRUNDE LIEGENDEN VISUELLEN IDEE (siehe VISUELLE ÜBERSETZUNG/ONE-IDEA-TEST im
+   Creative-Director-Prompt). Ein riesiges rotes Element oder eine aggressive Signalfarbe
+   erhalten NICHT automatisch einen hohen Score - frage: Ist die IDEE auffällig, oder
+   hauptsächlich Farbe/Größe?
+   - 9-10: Das Motiv funktioniert bereits als kleines Thumbnail OHNE Text UND ohne aggressive
+     Signalfarbe. Ein dominanter visueller Gedanke erzeugt innerhalb von <1 Sekunde Neugier,
+     Überraschung oder Spannung - headline_dependency ist dabei meist 'low'.
+   - 7-8: Klarer visueller Hook, aber für vollständiges Verständnis wird die Headline teilweise
+     benötigt (headline_dependency 'medium').
+   - 5-6: Professionell und attraktiv, aber überwiegend thematische Illustration oder bekanntes
+     Symbol - im Feed erwartbar, nichts das man zweimal ansieht.
+   - 3-4: Typisches Stock-/Corporate-/Steuer-Motiv, austauschbares Alltagsobjekt
+     (headline_dependency 'high' ist hier ein starkes Warnsignal).
    - 1-2: Visuell austauschbar oder ohne dominanten Focal Point.
    - ACHTUNG Requisiten-Häufung: Mehrere kleine, gleichrangige Objekte (+ Mini-Beschriftungen
      darauf) in einer Szene wirken im Thumbnail unruhig statt eines klaren Eyecatchers - werte
@@ -312,10 +320,13 @@ Bewertungskriterien (Skala 1-10):
      reißerisch wird oder die Seriosität eines Lohnsteuerhilfevereins beschädigt.
 
 4. **Originalität (20%)**: Hebt sich das Konzept ab?
-   - 9-10: Völlig neu, unerwartet
-   - 7-8: Frisch, vermeidet Klischees
-   - 5-6: Etwas gesehen, aber okay
-   - 1-4: Stock-Klischee
+   - 9-10: Echte Transformation, überraschende Kombination oder visuelle Analogie trägt die
+     Aussage (siehe VISUELLE ÜBERSETZUNG im Creative-Director-Prompt) - völlig neu, unerwartet.
+   - 7-8: Eigenständige Interpretation des Themas, vermeidet Klischees.
+   - 5-6: Passendes Symbol, aber wenig Transformation - der Gegenstand aus dem Thema wird
+     erkennbar, aber kaum verändert/neu kombiniert.
+   - 1-4: Ein Gegenstand aus dem Thema wird lediglich abgebildet (Stock-Klischee) - keine
+     eigenständige visuelle Idee, nur Illustration eines Begriffs.
 
 5. **Umsetzbarkeit (5%)**: Kann man das realistisch umsetzen?
    - 9-10: Einfach umsetzbar
@@ -349,6 +360,10 @@ Wichtig:
 - Begründe deine Bewertungen
 - Der beste ist nicht immer der "sicherste" - Originalität zählt!
 - Aber: Markenpassung ist wichtig (keine wilden Experimente)
+- SIGNALFARBEN (Rot, Orange, Neon o.ä.): erlaubt, wenn semantisch begründet (z.B. Warnung/
+  Risiko-Thema), aber KEIN Ersatz für eine starke visuelle Idee - eine Route, deren Scroll-Stop
+  hauptsächlich aus einer auffälligen Farbe statt aus der Idee selbst kommt, gehört unter
+  Scroll-Stop-Potenzial UND Originalität abgewertet, nicht nur toleriert.
 """
 
     # User-Prompt: Routes + Message Brief
@@ -360,7 +375,8 @@ Wichtig:
         f"Visuelle Signatur: {route.visuelle_signatur}\n"
         f"Emotion: {route.emotionale_richtung}\n"
         f"Beispiel: {route.beispiel_szene}\n"
-        f"Scroll-Stop-Device: {route.scroll_stop_device}"
+        f"Scroll-Stop-Device: {route.scroll_stop_device}\n"
+        f"Headline-Abhängigkeit: {route.headline_dependency}"
         for name, route in routes
     ])
 

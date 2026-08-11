@@ -19,7 +19,7 @@ Variation macht jedes Beitrags-Bild ANDERS. Alles gemockt - KEINE echten Bild-/K
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/cav-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_comic_ref_anchor_variety.py
+    /workspace/.hvenv/bin/python tests/manual_comic_ref_anchor_variety.py
 """
 import os
 import sys

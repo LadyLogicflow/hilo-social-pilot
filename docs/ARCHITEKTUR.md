@@ -39,10 +39,10 @@ Wissens-Serie ───┘
 | `sharenext_integration.py`, `prompt_builder.py`, `image_pipeline/` | Separates, template-basiertes Prompt-Builder-System – im aktuellen Produktionspfad **nicht** aktiv (experimentell/Legacy) |
 | `text_renderer.py` | Pillow-Text-Rendering der alten Pipeline – **im Normalpfad ungenutzt** (ShareNext schreibt den Text per `gpt-image-2` direkt ins Bild) |
 | `bildgen.py` | **Nur noch CI-Kreise + ShareNext-Aufruf** (Stand 2026-08-11): `add_logo_circles` setzt Logo-/Portrait-Kreis auf JEDES Bild; `render_drafts()` ruft für neue Entwürfe direkt `run_sharenext_pipeline` auf. Die alte Karten-Pipeline (`render()` mit Pille/Bullets/CTA per Pillow, drei Stile Standard/KI-Tafel/Kreativ) ist vollständig entfernt – auch aus allen `web.py`-Routen (Text überarbeiten, Anderes Bild, Bild-Aktion, Bildtyp, Veröffentlichungs-Fallback). `render_slides()` (Multi-Slide) existiert nur noch für die **Story-Frames**-Funktion, nicht mehr für ein Karussell-Postformat. |
-| `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) – wird von KEINER Route/keinem Button mehr aufgerufen (Stand 2026-08-11); bleibt nur als totes Modul im Repo, falls Einzelfunktionen später wiederverwendet werden sollen |
-| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline – wird von keiner Route mehr aufgerufen (Stand 2026-08-11), totes Modul |
-| `schauplatz.py` | Schauplätze der alten Pipeline (nur noch für Altfälle) |
-| `traeger.py` | Botschafts-Träger der alten Pipeline (nur noch für Altfälle) |
+| `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) – für das normale Feed-Bild nicht mehr in Gebrauch (das läuft über ShareNext); weiterhin aktiv genutzt für **Story-Frames** (`render_slides`) und die **Comic-Berater-Verwaltung** (`erzeuge_berater_comic`, `COMIC_STRIP_VARIANTEN`) |
+| `stilwahl.py` | Bild-Stil-Zufallslogik – für das Feed-Bild nicht mehr wirksam; weiterhin gelesen von `bildmotiv.ensure_photo_fuer()` (Story-Frames) |
+| `schauplatz.py` | Schauplätze – weiterhin bei jeder neuen Entwurfs-Erzeugung zugewiesen (stabil für spätere Story-Frame-Nutzung), auch wenn das Feed-Bild sie nicht mehr liest |
+| `traeger.py` | Botschafts-Träger – gleiche Rolle wie `schauplatz.py` |
 | `wartung.py` | Cache-Aufräumung: `aufraeumen_motive` (KI-Foto-Cache `DATA_DIR/motive/` der alten Pipeline) und die Legacy-Funktion `aufraeumen_legacy_kampagne` (`DATA_DIR/kampagne/`, nur noch für alte Vor-ShareNext-Entwürfe mit `kampagne_motiv_pfad`) |
 | `countdown_motive.py` | Gezeichnete Icons (Kalender, Wecker, Sanduhr) |
 | `fristen.py` | Fristen-Countdown (gestaffelte Erinnerungen) |
@@ -101,9 +101,11 @@ der KI kommt (die feste Überschrift wird der Pipeline als `headline` übergeben
 - `wissensthemen` – zeitlose Themen (Titel, Aufhänger, zuletzt genutzt).
 - `einstellungen` – globale Schlüssel-Wert-Einstellungen (z.B. `bild_tool` = openai/ideogram,
   `bild_stil_standard`/`_ki_tafel`/`_kreativ` = welche Bild-Stile im Zufalls-Topf sind).
-  *Hinweis (Stand 2026-08-11):* `bild_tool` und die `bild_stil_*`-Schalter wirken auf **gar
-  nichts** mehr – die alte `bildmotiv.py`-Pipeline wird von keiner Route mehr aufgerufen; der
-  ShareNext-Weg nutzt immer `gpt-image-2` und ignoriert diese Einstellungen vollständig.
+  *Hinweis (Stand 2026-08-11):* Auf das normale Feed-Bild (ShareNext) wirken sich `bild_tool`
+  und die `bild_stil_*`-Schalter **nicht mehr** aus. Sie sind aber weiterhin aktiv für die
+  **Story-Frames-Funktion** (`bildgen.render_slides()` → `bildmotiv.ensure_photo_fuer()` →
+  `stilwahl.aktiver_stil()`) - dort bestimmen sie nach wie vor, welcher Alt-Stil/welches
+  Bild-Tool für die Mehrbild-Story verwendet wird.
 - `schauplaetze` – pflegbare Liste schöner Umgebungen (Beschreibung, Jahreszeit, aktiv, zuletzt_genutzt);
   je Beitrag wird einer gezogen (Rotation, nie doppelt im Zyklus).
 - `traeger` – pflegbare Liste der Botschafts-Träger (Name, prompt_snippet, aktiv, zuletzt_genutzt).
@@ -183,12 +185,16 @@ Beitrag zunächst ohne Bild (er kann später manuell/erneut erzeugt werden).
   ShareNext-Bild (`entwuerfe.bild_pfad` bzw. `fields['bild_pfad']`) wird wiederverwendet – nur der
   personalisierte CTA/Logo-Kreis + der Stellen-Porträt-Kreis werden neu aufgesetzt. **KEIN neuer
   GPT-Image-Call** nötig.
-- **Alte Pipeline entfernt** (Stand 2026-08-11): `bildmotiv.py`/die alte `bildgen.render()`
-  (Pille/Bullets/CTA per Pillow)/`stilwahl.py` – drei Stile Standard/KI-Tafel/Kreativ +
-  Comic-Varianten, Bild-KI wählbar über `bild_tool` – werden von **keiner** Route/keinem Button
-  mehr aufgerufen, auch nicht als Fallback. Alle Bild-Buttons (Neu erzeugen, Text überarbeiten,
-  Anderes Bild, Layout neu, Stil wechseln, Bildtyp wechseln, Veröffentlichungs-Fallback) laufen
-  über `run_sharenext_pipeline`. Die Module bleiben nur als totes Repo-Gepäck stehen.
+- **Alte Karten-Pipeline für das Feed-Bild entfernt** (Stand 2026-08-11): `bildgen.render()`
+  (Pille/Bullets/CTA per Pillow) - drei Stile Standard/KI-Tafel/Kreativ + Comic-Varianten,
+  Bild-KI wählbar über `bild_tool` - wird von **keiner** Route/keinem Button mehr für das
+  eigentliche Feed-Bild aufgerufen, auch nicht als Fallback. Alle Bild-Buttons (Neu erzeugen,
+  Text überarbeiten, Anderes Bild, Layout neu, Stil wechseln, Bildtyp wechseln,
+  Veröffentlichungs-Fallback) laufen über `run_sharenext_pipeline`. `bildgen.render()` selbst
+  ist damit unreachable/totes Repo-Gepäck (bestätigt: keine Aufrufstelle mehr im Code) - wurde
+  aber (noch) nicht gelöscht, da es mit `text_renderer.py`-Nachfolgern verwoben ist und eine
+  saubere Entfernung eine eigene Prüfrunde verdient. `bildmotiv.py`/`stilwahl.py` sind dagegen
+  NICHT tot - siehe Modul-Tabelle oben (Story-Frames, Comic-Berater-Verwaltung).
 - **Karussell-Postformat entfernt** (Stand 2026-08-11): Facebook/Instagram-Feed-Posts sind nur
   noch Einzelbild; die Formatauswahl (`format_fb`/`format_ig`) wurde aus der Vorschau entfernt
   und liefert serverseitig immer `einzelbild`. `render_slides()` existiert nur noch für die

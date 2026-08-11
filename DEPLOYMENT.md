@@ -100,7 +100,11 @@ python -m pytest tests/test_sharenext_integration.py -v
 # Oder alle Tests auf einmal
 python -m pytest tests/ -v
 
-# Erwartetes Ergebnis: 48 passed
+# Erwartetes Ergebnis: 52 passed (Stand 2026-08-11; steigt mit neuen Tests).
+# Hinweis: tests/manual_*.py sind KEINE pytest-Module (eigenstaendige Skripte, teils mit
+# sys.exit() bei Fehlern) und werden ueber pytest.ini bewusst NICHT eingesammelt - einzeln
+# ausfuehrbar per 'python tests/manual_<name>.py' (siehe jeweiliger Docstring fuer noetige
+# Umgebungsvariablen wie HILO_DATA_DIR).
 ```
 
 **Falls Tests feilen:**

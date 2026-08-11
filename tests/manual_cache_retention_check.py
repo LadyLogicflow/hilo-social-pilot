@@ -2,6 +2,13 @@
 """Tests fuer Issue #134 - sicheres, orphan-basiertes Aufraeumen des KI-Foto-Caches
 (DATA_DIR/motive/) + Speicher-Status.
 
+WICHTIG: Das ist bewusst KEIN pytest-Modul, sondern ein eigenstaendiges Skript (script-style,
+sys.exit(1) bei Fehlern, arbeitet auf einem per HILO_DATA_DIR gesetzten Verzeichnis). Deshalb
+NICHT nach dem Muster 'test_*.py' benannt - pytest wuerde die Datei sonst automatisch einsammeln
+und importieren, wodurch der komplette Testlauf beim ersten sys.exit() abbricht, statt nur diesen
+einen Fehlschlag zu melden (das ist am 2026-08-11 real passiert, siehe PROMPT_CHANGELOG.md /
+MIGRATION.md Phase 3 - die Datei wurde deshalb von 'test_cache_retention.py' hierher umbenannt).
+
 Beweist:
   A) bildmotiv.cache_dateien_fuer_fields: liefert die KORREKTEN Cache-Pfade
      (Standard-Szene UND KI-Tafel) fuer einen Entwurf; die gekapselte Hash-Formel ist
@@ -16,8 +23,9 @@ Beweist:
      - per geplante_posts (geplant/laeuft) referenzierter Entwurf -> Foto bleibt.
   C) Speicher-Helfer: motive_ordner_groesse, freier_speicher (disk_usage), menschlich.
 
-Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_cache_retention.py
+Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen - NIEMALS ohne diese Variable laufen lassen,
+sonst arbeitet das Skript auf dem echten, konfigurierten DATA_DIR!):
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ python3 tests/manual_cache_retention_check.py
 """
 import hashlib
 import json

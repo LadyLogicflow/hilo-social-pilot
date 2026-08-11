@@ -344,14 +344,21 @@ Die 7 Kern-Achsen:
    - Welcher emotionale Moment?
    - Gesamtatmosphäre?
 
-6. **Brand Signature**
+6. **Brand Signature (HILO Visual Signature)**
    - Wie wird HILO in DIESEM Motiv spürbar - unabhängig von Logo-/Slogan-Kreis?
-   - Das kann sehr unterschiedlich aussehen, je nach Motiv - nicht immer dieselbe Formel:
-     * Navy/Grün als Umgebungslicht in einer echten Szene (z.B. kühles Fensterlicht, blaue Stunde)
-     * Navy/Grün als Material eines realen Objekts IN einer echten Umgebung (nicht freigestellt)
-     * Navy/Grün als Farbe eines Details im Raum (Tür, Stoff, Wandfläche, Geschirr)
-     * Ein kräftiger Hell-Dunkel-Kontrast, der zur Marke passt, ganz ohne dass Navy/Grün
-       wörtlich als Fläche vorkommen muss
+   - Bevorzugte visuelle Grammatik (KEIN starres Template - nicht jedes Bild muss alle Punkte
+     erfüllen, das sind Bausteine zur Auswahl, nicht eine Checkliste):
+     * tiefes Navy als starke Bühne oder strukturierende Fläche
+     * sattes HILO-Grün als bewusster, prägnanter Akzent (nicht als erzwungene Requisite)
+     * Weiß/helle Materialien für starken Kontrast
+     * ein dominantes Hero-Element statt vieler Requisiten
+     * hochwertige Editorial-/Werbefotografie oder bewusst gestaltete grafische Intervention
+     * eine überraschende Transformation eines vertrauten Gegenstands ist besonders geeignet
+     * klare Formen und starke Silhouetten, die auch im Thumbnail funktionieren
+     * großzügiger Negative Space ist erwünscht, solange das Hero-Element dominant bleibt
+   - Diese Merkmale sind eine visuelle Grammatik, kein Rezept - wenn jedes Bild denselben
+     Navy-Hintergrund mit derselben Papierkante bekommt, ist das genauso eine Monotonie wie ein
+     generisches Stockfoto. Wähle pro Motiv aus, was zur konkreten Idee passt.
    - Gedankenexperiment: Würde man das Bild OHNE Logo/Slogan/Überschrift noch als HILO
      erkennen? Wenn nein, ist die Brand Signature zu schwach.
 
@@ -393,6 +400,10 @@ Wichtig:
 - Sei KONKRET (nicht "schönes Licht", sondern "weiches Licht von links")
 - Denk an Text-Zonen (Text muss später drauf passen!)
 - HILO-CI beachten: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente gerne in diesen Markenfarben
+- SIGNALFARBEN (Rot, Orange, Neon o.ä.) sind erlaubt, wenn sie semantisch begründet sind (z.B.
+  bei einem Warnungs-/Risiko-Thema) - aber sie dürfen die HILO-Farbdramaturgie (Navy/Grün) nicht
+  vollständig verdrängen. Navy oder Grün müssen im Bild weiterhin spürbar bleiben, auch wenn eine
+  Signalfarbe den Akzent setzt.
 - Professionell aber nicht steril
 """
 

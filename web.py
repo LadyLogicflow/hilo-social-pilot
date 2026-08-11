@@ -2830,7 +2830,7 @@ def eigener():
         # die Nutzerin waehlt spaeter unter "3. Freigabe" je Beitrag einen Stil und erzeugt das
         # Bild per Klick ("Bild generieren").
         flash("Beitrag-Entwurf zum Thema „%s“ für %s erstellt – jetzt unter „3. Freigabe: Texte & Bilder“ "
-              "prüfen, Bild-Stil wählen und Bild erzeugen." % (thema_txt[:60], _de_datum(datum)))
+              "prüfen und Bild erzeugen." % (thema_txt[:60], _de_datum(datum)))
         return redirect(url_for("entwuerfe"))
     # GET: Vorgaben aus dem Kalender-Klick (Datum, optional Thema aus einem Anlass-Tag)
     vorgabe_datum = request.args.get("datum", "").strip()

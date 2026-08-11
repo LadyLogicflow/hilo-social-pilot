@@ -12,7 +12,7 @@ Rahmen-Regression: background='opaque'/size '1024x1024' + Cache-Praefixe (szene:
 unveraendert; beide Modi rendern 1080x1080 mit Dummy-Foto.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_ki_tafel_feinschliff2.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_ki_tafel_feinschliff2.py
 """
 import os, sys
 

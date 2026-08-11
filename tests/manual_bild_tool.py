@@ -17,7 +17,7 @@ Deckt ab (alles OHNE echten Netz-/API-Call - Anbieter werden gemockt):
   H) Secrets werden NIE im Klartext geloggt/ausgegeben.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_bild_tool.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_bild_tool.py
 """
 import os, sys, types
 

@@ -81,7 +81,7 @@ def test_generate_message_brief_mock(mock_get_client):
     # Prüfe dass OpenAI aufgerufen wurde
     mock_client.beta.chat.completions.parse.assert_called_once()
     call_args = mock_client.beta.chat.completions.parse.call_args
-    assert call_args.kwargs["model"] == "gpt-4o-mini"
+    assert call_args.kwargs["model"] == "gpt-5.6-terra"
     assert call_args.kwargs["response_format"] == MessageBrief
 
 

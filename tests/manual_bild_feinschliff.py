@@ -15,7 +15,7 @@ Deckt ab:
      - Render mit opakem Dummy-Foto in beiden Modi (standard + ki_tafel): 1080x1080, kein Crash.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_bild_feinschliff.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_bild_feinschliff.py
 """
 import os, sys
 

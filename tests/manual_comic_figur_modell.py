@@ -23,7 +23,7 @@ Beweist:
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/s161-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_comic_figur_modell.py
+    /workspace/.hvenv/bin/python tests/manual_comic_figur_modell.py
 """
 import os
 import sys

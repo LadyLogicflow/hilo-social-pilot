@@ -12,7 +12,7 @@ Deckt ab:
      Creme-Fallback ohne Foto.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_ki_tafel.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_ki_tafel.py
 """
 import os, sys
 

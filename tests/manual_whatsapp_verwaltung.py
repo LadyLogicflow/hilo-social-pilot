@@ -13,7 +13,7 @@ Beweist die VERDRAHTUNG (KEIN echter Node-/Baileys-Dienst, kein Netz - _wa_call 
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/wa-verw-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_whatsapp_verwaltung.py
+    /workspace/.hvenv/bin/python tests/manual_whatsapp_verwaltung.py
 """
 import os, sys
 

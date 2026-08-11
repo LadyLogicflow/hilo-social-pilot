@@ -92,6 +92,16 @@ class CreativeRoute(BaseModel):
                     "herausgeschnitten wurde - man fragt sich sofort, warum genau dieses Stück.'"
     )
 
+    headline_dependency: Literal["low", "medium", "high"] = Field(
+        description="Wie sehr braucht diese Route die Überschrift, um verstanden zu werden? "
+                    "'low' = die visuelle Idee funktioniert bereits für sich allein, ganz ohne Text "
+                    "(z.B. ein Objekt, das unerwartet seine Form/Funktion ändert). 'medium' = das Motiv "
+                    "ist interessant, aber der volle Sinn erschließt sich erst mit der Überschrift. "
+                    "'high' = ohne Überschrift ist das Motiv nur ein austauschbares Alltagsobjekt (z.B. "
+                    "ein Briefumschlag, ein Koffer) - das ist ein Warnsignal für eine schwache visuelle "
+                    "Idee, nicht nur eine neutrale Eigenschaft."
+    )
+
 
 class CreativeTerritories(BaseModel):
     """5 kreative Routen vom Creative Director.
@@ -181,6 +191,35 @@ Kontext:
 - Stil: Professionell, vertrauenswürdig, aber NICHT langweilig
 - Ziel: Scroll-Stop-Potenzial - das Bild soll auffallen!
 
+VISUELLE ÜBERSETZUNG STATT ILLUSTRATION (WICHTIGSTES PRINZIP - vor allen Routen-Details unten!):
+
+Zeige nicht einfach einen Gegenstand, der im Thema vorkommt. Übersetze die Kernaussage in einen
+EIGENSTÄNDIGEN visuellen Gedanken. Ein Gegenstand, der nur benennt worum es geht, ist eine
+Illustration - keine Idee. Bevorzuge:
+- **Transformation**: Ein bekanntes Objekt verändert unerwartet Form, Material oder Funktion
+  (Beispiel: ein Steuerformular wird zum Papierflugzeug).
+- **Visueller Widerspruch**: Zwei normalerweise nicht zusammengehörende Dinge bilden EIN Motiv.
+- **Editorial Intervention**: Eine starke grafische Intervention verändert die Wahrnehmung einer
+  realistischen Szene (Beispiel: ein riesiges "AUSNAHME?" durchschneidet das Motiv).
+- **Narrative Situation**: Ein einzelner ungewöhnlicher Moment erzeugt eine Frage im Kopf.
+- **Bedeutungsvolle Größenrelation**: Ein Element wird ungewöhnlich groß/klein, wenn das die
+  Aussage trägt.
+
+Schwächer sind Motive, die lediglich einen Begriff aus dem Thema abbilden - "Erholungsbeihilfe"
+→ ein Koffer, "Arbeitsuchend" → ein Brief, "Schenkung" → ein Haustürschlüssel, "Steuer" → ein
+Ordner. Das sind austauschbare Symbole, keine eigenständigen Bildideen. Aus einem Gegenstand aus
+dem Thema muss eine NEUE visuelle Idee entstehen, nicht nur seine Abbildung.
+
+ONE-IDEA-TEST: Die visuelle Leitidee muss in einem kurzen Satz mit möglichst nur EINEM
+Hauptmotiv beschreibbar sein. Je kürzer und bildlicher dieser Satz, desto stärker die Route.
+- Stark: "Ein Steuerformular wird zum Papierflugzeug." / "Ein riesiges AUSNAHME? durchschneidet
+  das Motiv."
+- Schwach: "Eine Waage zeigt links Schlüssel mit Unterstützungsschild, rechts einen
+  Steuerordner und in der Mitte ein Gewicht." / "Auf einem Tisch liegen ein Brief und eine
+  Karte zum Thema."
+Dieser Test zwingt dazu, Idee von bloßer Ausstattung zu unterscheiden - wenn die Route nur mit
+einem Nebensatz voller "und" beschreibbar ist, ist sie noch keine Idee, sondern eine Szene.
+
 Die 4 Routen-Typen:
 
 1. **Emotionale Szene**
@@ -244,6 +283,18 @@ Wichtig:
   Behörden-/Bank-Bezug (z.B. Wehrdienst, Beamtenstatus, Behördenbrief). Das Objekt (Umschlag,
   Uniform, Formular) ja, ein echtes fremdes Kennzeichen darauf nein. Rechtliches Risiko, hat
   Vorrang vor Scroll-Stop-Überlegungen.
+- **KEINE ERKLÄR-LABELS.** Beschrifte Gegenstände nicht mit Begriffen, nur damit eine Metapher
+  verständlich wird (z.B. ein Etikett "Unterstützung" an einem Schlüssel, ein Schild
+  "gesetzliche Unterhaltspflicht" an einem Gewicht, ein Label "Erholungszeit" an einem Handtuch).
+  Wenn ein Gegenstand ein Label braucht, um seine Bedeutung zu erklären, ist das ein Signal, dass
+  die visuelle Idee selbst noch nicht trägt - überarbeite dann bevorzugt die Idee, statt sie mit
+  Text zu erklären. Ausnahme: Schrift ist ein natürlicher, fachlich notwendiger Bestandteil des
+  Motivs selbst (z.B. echter Aufdruck auf einem Dokument, eine Headline-Fläche).
+- **SIGNALFARBEN kontrolliert einsetzen.** Rot, Orange, Neon oder andere markenfremde
+  Signalfarben sind erlaubt, wenn sie semantisch begründet sind (z.B. eine Warnung/ein Risiko-
+  Thema). Sie dürfen aber NICHT der alleinige Grund für Scroll-Stop-Wirkung sein und die
+  HILO-Farbdramaturgie (Navy/Grün) nicht vollständig verdrängen - Navy oder Grün müssen weiterhin
+  spürbar bleiben, auch wenn eine Signalfarbe den Akzent setzt.
 
 ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
 - generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
@@ -251,6 +302,12 @@ ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
 - sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
 - übertriebenes/unnatürliches Lächeln
 - wörtlicher Geldregen (fallende Scheine/Münzen als Klischee-Symbol für "Geld")
+- **ein Steuerformular/Dokument, das zu einem anderen Objekt gefaltet/verformt wird** (Papierflieger,
+  Brücke, Boot o.ä.) als Standardlösung für "Visuelle Metapher" - war ursprünglich eine starke,
+  frische Idee, ist inzwischen bei mehreren unterschiedlichen Themen wiederholt aufgetaucht und
+  droht zur neuen Formel zu werden. Eine Formular-Transformation ist nicht per se abgenutzt, aber
+  sollte nicht die naheliegende Standardantwort auf jedes Thema sein - prüfe, ob eine andere
+  Transformation (siehe VISUELLE ÜBERSETZUNG oben) besser zur KONKRETEN Kernaussage passt.
 Das sind abgenutzte Muster, keine verbotenen Themen. Ein einzelnes, mutig inszeniertes
 Euro-Symbol oder ein in Euro-Form verformtes Alltagsobjekt (z.B. ein Kuchen, ein Gegenstand)
 ist AUSDRÜCKLICH KEIN Klischee, sondern ein starkes Kontrast/Störmoment-Motiv - das ist
@@ -284,6 +341,7 @@ Jede Route braucht:
 - Emotionale Richtung (welche Emotion?)
 - Beispiel-Szene (konkretes Bild-Beispiel)
 - Scroll-Stop-Device (was GENAU stoppt den Daumen? Ein konkretes Detail, kein Stilwort)
+- Headline-Abhängigkeit (low/medium/high - funktioniert die Idee auch ganz ohne Überschrift?)
 """
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")

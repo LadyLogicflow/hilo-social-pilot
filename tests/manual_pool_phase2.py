@@ -9,7 +9,7 @@ Beweist:
   5. bestehender 'freigegeben'-Fluss bleibt unveraendert (Status-Flip nur fuer Nicht-Pool).
 
 Ausfuehrung (HILO_DATA_DIR muss VOR dem Import gesetzt sein, siehe Hinweis am Ende):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_pool_phase2.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_pool_phase2.py
 """
 import os, sys, random, datetime
 

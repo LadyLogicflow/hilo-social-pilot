@@ -9,7 +9,7 @@ Beweist:
   4. Die Stufe-2-Seite (/entwuerfe) rendert den Bulk-Button "Alle in den Pool", solange Entwuerfe da sind.
 
 Ausfuehrung (HILO_DATA_DIR muss VOR dem Import gesetzt sein):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_pool_bulk.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_pool_bulk.py
 """
 import os, sys
 

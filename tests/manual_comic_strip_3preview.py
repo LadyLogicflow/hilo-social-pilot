@@ -14,7 +14,7 @@ Einplanung) statt nur einem. Beweist die Verdrahtung (KEINE echten externen KI-/
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/p3-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_comic_strip_3preview.py
+    /workspace/.hvenv/bin/python tests/manual_comic_strip_3preview.py
 """
 import os
 import sys

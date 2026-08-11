@@ -81,11 +81,11 @@ Texterstellung vor. **Wichtig:** nur öffentliche/unkritische Inhalte – keine 
 - **Anlass-Tage** – besondere Tage mit Steuer-Aufhänger (Datum als MM-TT). Fällt der Tag
   aufs Wochenende, erscheint der Beitrag am Freitag davor.
 - **Wissens-Serie** – zeitlose Themen, die leere Kalendertage füllen.
-- **Bild-Stil** – *(entfernt, 2026-08-11: die alte Bild-Pipeline mit den drei Stilen
-  Standard/KI-Tafel/Kreativ + Comic-Varianten wurde vollständig abgeschaltet. Alle vier
-  Content-Ströme und alle Bild-Buttons nutzen jetzt ausschließlich die ShareNext-Bildpipeline,
-  siehe [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Diese Einstellung hat keine Wirkung mehr
-  und kann aus der Verwaltung entfernt werden, sobald die Alt-Entwürfe migriert/gelöscht sind.)*
+- **Bild-Stil** – *(Stand 2026-08-11: Für das normale Feed-Bild wirkungslos - alle vier
+  Content-Ströme und alle Bild-Buttons nutzen die ShareNext-Bildpipeline, siehe
+  [ARCHITEKTUR.md](ARCHITEKTUR.md#bild-design). Diese Einstellung wirkt aber weiterhin auf die
+  **Story-Frames-Funktion** beim Veröffentlichen als Story - dort wird noch die alte Stil-Logik
+  genutzt. Nicht ersatzlos entfernen, solange Story-Posting mit mehreren Frames genutzt wird.)*
 - **Schauplätze** – die schönen Umgebungen (z.B. „Terrasse am Meer", „Biergarten in München"),
   in denen Tafel/Rahmen stehen. Pflegbar wie die Anlass-Tage; je Eintrag eine Jahreszeit.
 - **Träger** – wie die Botschaft präsentiert wird (Tafel, Bilderrahmen, Holzschild, Postkarte …).

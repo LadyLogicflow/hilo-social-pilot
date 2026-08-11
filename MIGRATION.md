@@ -207,3 +207,69 @@ ins Foto, Pillow ergänzt nur die beiden CI-Kreise).
   migriert.
 - `bildmotiv.py`, `stilwahl.py`, `text_renderer.py`, `schauplatz.py`, `traeger.py` wurden nicht
   gelöscht, nur entkoppelt (siehe oben) – Aufräumen als separater Schritt möglich.
+
+---
+
+## Phase 3 – Vollständiger Code-Audit + Korrektur einer Ungenauigkeit aus Phase 2 (2026-08-11)
+
+**Anlass:** Auf Anfrage vollständiger Code-Audit vor einem Commit (Syntax, Duplikate, verwaiste
+Dateien). Dabei eine eigene, zu weitreichende Aussage aus Phase 2 gefunden und korrigiert.
+
+**Korrektur:** Phase 2 (oben) behauptete, `bildmotiv.py`, `stilwahl.py`, `schauplatz.py`,
+`traeger.py` seien "totes Repo-Gepäck", das von keiner Route mehr aufgerufen wird. **Das
+stimmt nicht.** Beim Audit bestätigt:
+- `bildmotiv.py`/`stilwahl.py` werden weiterhin aktiv genutzt von `render_slides()`
+  (Story-Frames-Funktion, bewusst erhalten) über `bildmotiv.ensure_photo_fuer()` →
+  `stilwahl.aktiver_stil()`, sowie von der separaten **Comic-Berater-Verwaltung**
+  (`bildmotiv.erzeuge_berater_comic`, `COMIC_STRIP_VARIANTEN`).
+- `schauplatz.py`/`traeger.py` werden bei jeder Entwurfs-Erzeugung weiterhin aufgerufen (stabile
+  Zuweisung für spätere Story-Frame-Konsistenz).
+- Die Einstellungen `bild_tool`/`bild_stil_*` wirken sich entgegen der Phase-2-Aussage NICHT auf
+  "gar nichts" mehr aus, sondern weiterhin auf die Story-Frames.
+- **Tatsächlich tot** (bestätigt: keine einzige Aufrufstelle mehr im gesamten Code) ist nur
+  `bildgen.render()` selbst (die alte Karten-Funktion) sowie `text_renderer.py` (dessen einziger
+  Verwender `bildgen.render()` war).
+
+`docs/ARCHITEKTUR.md` und `docs/BEDIENUNG.md` entsprechend korrigiert.
+
+**Bereinigt:**
+- `text_renderer.py` gelöscht (verifiziert: keine Referenz mehr in Code oder Tests).
+- `test_message_brief.py` lag im Projekt-Root statt in `tests/` - dadurch von **keinem**
+  bisherigen Testlauf dieser Session erfasst. Nach `tests/` verschoben; enthielt eine veraltete
+  Modell-Assertion (`gpt-4o-mini` statt dem tatsächlich verwendeten `gpt-5.6-terra`) - korrigiert,
+  läuft jetzt gruen.
+- Veraltete Flash-Meldung in `web.py::eigener()` ("Bild-Stil wählen und Bild erzeugen") entfernt -
+  diese Auswahl existiert seit der Runde 1 dieser Session (`/bild-generieren` umgebaut) nicht mehr
+  für das Feed-Bild.
+
+**Geprüft, aber bewusst NICHT verändert** (echtes Risiko, kein reiner Aufräum-Fall):
+- `bildgen.render()` selbst - bestätigt unreachable, aber ~250 Zeilen groß und mit mehreren
+  Helper-Funktionen verwoben, die möglicherweise auch von `render_slides()` (aktiv genutzt)
+  mitverwendet werden. Eine sichere Entfernung braucht eine eigene, sorgfältige Prüfrunde statt
+  einer schnellen Löschung im Rahmen dieses Audits.
+- `bildmotiv.py`, `stilwahl.py`, `schauplatz.py`, `traeger.py` - aktiv in Gebrauch (siehe oben),
+  keine Änderung.
+
+**Ergebnis Vollständigkeits-Check:**
+- Alle 39 Python-Dateien syntaktisch fehlerfrei.
+- Keine doppelten Funktionsdefinitionen innerhalb derselben Datei gefunden.
+- `git status` sauber (nur erwartete Arbeitsstand-Änderungen + korrekt ignorierte `data/`,
+  `secrets.json`, `.pytest_cache/`).
+
+**Größerer Fund - kompletter `pytest tests/`-Lauf hat NIE funktioniert:** 27 Testdateien
+waren im Skript-Stil geschrieben (Top-Level-Ausfuehrungscode statt `def test_...()`-Funktionen,
+`sys.exit(1)` bei Fehlschlag statt `assert`). Sammelt pytest so eine Datei ein, bricht der
+KOMPLETTE Testlauf ab, nicht nur diese eine Datei - live beobachtet bei zwei verschiedenen
+Dateien waehrend dieses Audits. Das erklaert, warum in dieser gesamten Session nie ein
+vollstaendiger `pytest tests/`-Lauf sauber durchlief, nur gezielte Einzeldatei-Laeufe.
+
+Alle 27 Dateien tragen laut eigenem Docstring ohnehin einen manuellen Aufruf mit gesetzter
+`HILO_DATA_DIR`-Variable (`python tests/test_XXX.py`) - sie waren nie als pytest-Module gedacht,
+nur so benannt. Fix: alle nach dem Muster `test_*.py` -> `manual_*.py` umbenannt (Docstrings
+mit dem alten Dateinamen ebenfalls korrigiert), zusaetzlich neue `pytest.ini` mit
+`--ignore-glob=tests/manual_*.py` als zweite Absicherung. Reiner Umbenennungs-Vorgang, keine
+Logik veraendert - alle bleiben unveraendert einzeln ausfuehrbar.
+
+**Ergebnis:** `pytest tests/` läuft jetzt zum ersten Mal in dieser Session sauber durch:
+**52 passed**, kein Absturz.
+

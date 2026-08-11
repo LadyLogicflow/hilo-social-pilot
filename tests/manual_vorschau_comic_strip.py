@@ -10,7 +10,7 @@ statt eines falschen, teuren Einzelbildes. Beweist die Verdrahtung ohne echte KI
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/vp-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_vorschau_comic_strip.py
+    /workspace/.hvenv/bin/python tests/manual_vorschau_comic_strip.py
 """
 import os
 import sys

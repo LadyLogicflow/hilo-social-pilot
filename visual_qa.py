@@ -71,7 +71,18 @@ class VisualQAVerdict(BaseModel):
         description="Wuerde DIESES tatsaechlich generierte Bild im Feed auffallen - unabhaengig von "
                     "der Headline? Prueft, ob das bei der Jury bewertete Scroll-Stop-Potenzial (das "
                     "auf der TEXT-Beschreibung der Route beruhte, bevor das Bild existierte) im "
-                    "fertigen Bild wirklich ankommt."
+                    "fertigen Bild wirklich ankommt. WICHTIG: Grosse Schrift, aggressive Farbe oder "
+                    "hoher Kontrast allein rechtfertigen KEINEN hohen Score - bewerte die Staerke der "
+                    "visuellen IDEE, nicht ob das Bild bunt/grell ist."
+    )
+    composition_integrity: float = Field(
+        ge=1.0, le=10.0, default=5.0,
+        description="Bilden Hero-Element, Headline-Flaeche und Gesamtkomposition eine gemeinsame, "
+                    "durchdachte Gestaltung - oder wirkt das Ergebnis wie drei separate Teile "
+                    "('Foto + aufgesetzter Textkasten + Logo')? Hoher Score: Text und Motiv sind "
+                    "sichtbar aufeinander abgestimmt (z.B. Text auf einer Flaeche IM Motiv, "
+                    "Farbbezug zwischen Text und Bildelement). Niedriger Score: Text-Box wirkt wie "
+                    "ein Werbe-Template ueber ein beliebiges Foto gelegt."
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -136,6 +147,7 @@ _QA_KRITERIEN = (
     "technische_qualitaet",
     "schutzzonen_frei",
     "scroll_stop_wirkung",
+    "composition_integrity",
 )
 
 # Zusaetzliche Kriterien, die nur zaehlen, wenn eine Überschrift ins Bild gerendert wurde
@@ -238,6 +250,9 @@ GATE A CHECKS (vor Text-Rendering):
      ERWÜNSCHT und dürfen NICHT abgewertet werden - sie sind bewusste Vorgabe der Art Direction.
      Werte nur ab, wenn das Bild reißerisch/effekthascherisch wirkt oder die Seriosität eines
      Lohnsteuerhilfevereins beschädigt - nicht, weil es auffällig ist.
+   - SIGNALFARBEN (Rot, Orange, Neon o.ä.): bei Warnungs-/Risiko-Themen erlaubt, aber die
+     HILO-Farbdramaturgie (Navy/Grün) muss weiterhin spürbar bleiben - eine Signalfarbe, die
+     Navy/Grün komplett verdrängt, drückt diesen Score.
    - Vermeiden: reißerisch, unseriös, steril
 
 5. **Technische Qualität? (1-10)**
@@ -264,11 +279,26 @@ GATE A CHECKS (vor Text-Rendering):
    - THUMBNAIL-TEST: Wäre die Leitidee auch bei ca. 180×180 Pixel (kleine Feed-Vorschau)
      sofort verständlich und visuell dominant? Braucht es feine Details oder kleine Requisiten,
      um die Idee zu verstehen? Dann ist der Score niedriger.
-   - 9-10: Funktioniert bereits als Thumbnail ohne Text, erzeugt sofort Neugier/Überraschung.
+   - WICHTIG: Große Schrift, aggressive Farbe oder hoher Kontrast allein rechtfertigen KEINEN
+     hohen Score - frage, ob die zugrunde liegende visuelle IDEE auffällig ist, nicht nur ihre
+     Farbe/Größe. Ein großes rotes Element ist nicht automatisch ein starker Scroll-Stop.
+   - 9-10: Funktioniert bereits als Thumbnail ohne Text, erzeugt sofort Neugier/Überraschung -
+     durch die IDEE, nicht nur durch Farbe/Größe.
    - 5-6: Professionell, aber im Feed erwartbar.
    - 1-4: Visuell austauschbar, kein dominanter Reiz.
 
-8. **Überschrift (nur wenn im User-Prompt eine Überschrift vorgegeben ist!)**
+8. **Composition Integrity? (1-10)**
+   - Bilden Hero-Element, Headline-Fläche und Gesamtkomposition eine gemeinsame, durchdachte
+     Gestaltung - oder wirkt das Ergebnis wie drei separate Teile ("Foto + aufgesetzter
+     Textkasten + Logo")?
+   - 9-10: Text und Motiv sind sichtbar aufeinander abgestimmt (z.B. Text auf einer Fläche
+     IM Motiv platziert, Farbbezug zwischen Textfläche und Bildelement, Text folgt der
+     Bildkomposition).
+   - 5-6: Ordentlich getrennt, aber nicht unangenehm - Text und Foto koexistieren neutral.
+   - 1-4: Wirkt wie ein Werbe-Template, das über ein beliebiges Foto gelegt wurde - keine
+     erkennbare Verzahnung zwischen Text und Motiv.
+
+9. **Überschrift (nur wenn im User-Prompt eine Überschrift vorgegeben ist!)**
    - headline_vorhanden (1-10): Ist die Überschrift im Bild sichtbar und prominent?
    - headline_lesbar (1-10): Auf dem Smartphone gut lesbar? Groß genug, genug Kontrast,
      nicht vom Motiv überlagert oder angeschnitten? Falls eine eigene Fläche/Tafel/Banner hinter
@@ -298,7 +328,7 @@ berechnet - du musst nicht rechnen.
     mit_headline = bool(headline and headline.strip())
     if mit_headline:
         headline_block = (
-            "8. ÜBERSCHRIFT - die folgende Überschrift sollte im Bild stehen:\n"
+            "9. ÜBERSCHRIFT - die folgende Überschrift sollte im Bild stehen:\n"
             f'   >>> {headline.strip()} <<<\n'
             "   - headline_vorhanden: sichtbar und prominent?\n"
             "   - headline_lesbar: auf dem Smartphone gut lesbar?\n"
@@ -308,7 +338,7 @@ berechnet - du musst nicht rechnen.
         )
     else:
         headline_block = (
-            "8. ÜBERSCHRIFT: Es wurde KEINE Überschrift vorgegeben - die Headline-Felder sind "
+            "9. ÜBERSCHRIFT: Es wurde KEINE Überschrift vorgegeben - die Headline-Felder sind "
             "nicht relevant (Standardwerte belassen). Im Bild sollte dann auch kein Text stehen."
         )
 
@@ -332,7 +362,8 @@ Bewerte (1-10):
 4. Markenpassung (HILO: warm, professionell, persönlich - auffällig/kontraststark ist ERWÜNSCHT)?
 5. Technische Qualität (inkl. Anatomie bei Personen, KEINE Hoheitszeichen/fremden Logos)?
 6. Schutzzonen unten links + oben rechts frei (je ca. 22% × 28%)?
-7. Scroll-Stop-Wirkung (Thumbnail-Test: sofort verständlich/dominant auch bei ca. 180×180px)?
+7. Scroll-Stop-Wirkung (Thumbnail-Test: sofort verständlich/dominant auch bei ca. 180×180px; Farbe/Größe allein zählt nicht, die IDEE muss auffallen)?
+8. Composition Integrity (wirkt Text+Motiv wie EINE Gestaltung, oder wie 'Foto + Textkasten + Logo'?)
 
 {headline_block}
 

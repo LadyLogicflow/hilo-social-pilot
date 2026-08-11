@@ -14,7 +14,7 @@ Beweist die VERDRAHTUNG (KEINE echten externen KI-/Bild-APIs, kein Netz - alles 
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/berater-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_berater_comic.py
+    /workspace/.hvenv/bin/python tests/manual_berater_comic.py
 """
 import os, sys
 

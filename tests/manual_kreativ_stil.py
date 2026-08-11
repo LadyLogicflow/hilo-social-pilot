@@ -17,7 +17,7 @@ Deckt ab:
   E) E2E-Retention: aktiver Entwurf im kreativ-Modus, altes kreativ-Foto -> bleibt erhalten.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_kreativ_stil.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_kreativ_stil.py
 """
 import hashlib
 import json

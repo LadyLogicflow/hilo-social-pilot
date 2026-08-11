@@ -15,7 +15,7 @@ Beweist die VERDRAHTUNG (KEINE echten externen KI-/Bild-APIs - alles gemockt):
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
   HILO_DATA_DIR=/tmp/fid-XYZ BELEGSORT_SKIP_BACKEND=1 \
-    /workspace/.hvenv/bin/python tests/test_comic_input_fidelity.py
+    /workspace/.hvenv/bin/python tests/manual_comic_input_fidelity.py
 """
 import os, sys
 

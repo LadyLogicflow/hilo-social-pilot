@@ -17,7 +17,7 @@ Deckt ab:
      auch mit Bullets; render beide Modi mit Dummy-Foto ok.
 
 Ausfuehrung (HILO_DATA_DIR VOR dem Import setzen):
-  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/test_ki_tafel_mehr_text.py
+  HILO_DATA_DIR=/tmp/hilo-test-XYZ /workspace/.hvenv/bin/python tests/manual_ki_tafel_mehr_text.py
 """
 import os, sys
 
