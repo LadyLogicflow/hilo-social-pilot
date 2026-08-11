@@ -244,6 +244,12 @@ Die 4 Routen-Typen:
    - Emotionen: Erleichterung, Stress, Freude, Zufriedenheit
    - Beispiele: Erleichterter Unternehmer am Schreibtisch, Familie beim Ausfüllen von Formularen
    - NICHT: Stock-Foto-Klischees vermeiden!
+   - BRAUCHT EINE KONKRETE HANDLUNG ODER BEZIEHUNG, nicht nur eine Person mit einem Gegenstand.
+     "Eine Frau hält ein Dokument und schaut aus dem Bild" ist keine Szene, sondern eine Pose -
+     das ist dieselbe Schwäche wie eine reine Objekt-Illustration, nur mit Person statt Gegenstand.
+     Stark ist eine sichtbare Handlung ZWISCHEN Menschen oder ein Moment mit klarem Vorher/Nachher
+     (z.B. eine Übergabe-Geste zwischen zwei Personen, ein Vergleich zweier Zustände derselben
+     Person). Die Szene muss auch ohne Headline erkennbar "etwas passiert hier gerade" vermitteln.
 
 2. **Visuelle Metapher**
    - Abstraktes Konzept bildlich dargestellt

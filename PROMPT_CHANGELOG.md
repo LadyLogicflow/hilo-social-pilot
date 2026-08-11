@@ -16,6 +16,36 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Emotionale Szene braucht konkrete Handlung (elfte Runde)
+
+**Anlass:** Vier frische Vergleichsbilder, kritisch mit einer weiteren externen Kritik (ChatGPT)
+abgeglichen. Zwei Funde beim Gegenpruefen: (1) die externe Kritik bewertete ein Bild mit 8,0/10
+Gesamt, obwohl ihre eigene Beschreibung explizit die Schwaeche aus Runde 10 (Bedeutung erschliesst
+sich erst durch die Headline) benennt - interner Widerspruch, nicht uebernommen. (2) der
+Abschluss-Vorschlag behauptete, "Transformation" und "Editorial Intervention" muessten dem Prompt
+erst noch erlaubt werden - sachlich falsch, beide stehen bereits als 2 von 5 Typen im
+VISUELLE-UEBERSETZUNG-Abschnitt aus Runde 9. Nur der dritte Punkt war tatsaechlich neu und wurde
+uebernommen.
+
+**Umgesetzt (1 Datei, eng begrenzt auf eine Route):**
+
+1. `creative_director.py`: Route 1 "Emotionale Szene" um die Anforderung einer KONKRETEN
+   Handlung/Beziehung ergaenzt - "Person haelt Dokument und schaut aus dem Bild" ist eine Pose,
+   keine Szene (dieselbe Schwaeche wie reine Objekt-Illustration, nur mit Person statt
+   Gegenstand). Erklaert im Nachhinein den Qualitaetsunterschied zwischen einem schwaecheren
+   Vergleichsbild (Person mit Beleg, kein sichtbares Geschehen) und einem staerkeren
+   (Uebergabe-Geste zwischen mehreren Personen).
+
+**Bewusst nicht uebernommen:** die vorgeschlagene Neu-Einfuehrung von "Transformation" und
+"Editorial Intervention" als Kategorien (bereits vorhanden, siehe oben) sowie eine neue Regel
+zum wiederholt beobachteten "Haken auf Linie/Strasse"-Element (bislang nur 2 Vorkommen - noch
+keine bestaetigte Wiederholung, bleibt Beobachtung statt Regel, konsistent mit dem bisherigen
+Vorgehen bei "Formular-wird-Papierflieger" in Runde 9).
+
+**Nicht geprueft:** Keine echte Bildgenerierung moeglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Semantische Praezision: nicht nur ueberraschend, sondern treffend (zehnte Runde)
 
 **Anlass:** Drei frische Vergleichsbilder zeigten, dass Runde 9 ("Visuelle Uebersetzung statt
