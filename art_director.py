@@ -130,7 +130,9 @@ class ArtDirectionBoard(BaseModel):
         "Diagonale",
         "Rahmen im Rahmen",
         "Leading Lines",
-        "Negative Space"
+        "Negative Space",
+        "Bildfüllende Großaufnahme",
+        "Bewusst asymmetrisch/ungeordnet"
     ] = Field(description="Welches Kompositionsprinzip wird angewendet?")
 
     bildaufbau: str = Field(

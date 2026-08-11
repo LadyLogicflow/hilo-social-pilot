@@ -81,6 +81,7 @@ class ShareNextResult:
             2: self.creative_territories.route_2_metapher,
             3: self.creative_territories.route_3_objekt,
             4: self.creative_territories.route_4_kontrast,
+            5: self.creative_territories.route_5_unkonventionell,
         }
         return route_map[self.concept_verdict.winning_route]
 
@@ -185,6 +186,7 @@ def run_sharenext_pipeline(
         2: creative_territories.route_2_metapher,
         3: creative_territories.route_3_objekt,
         4: creative_territories.route_4_kontrast,
+        5: creative_territories.route_5_unkonventionell,
     }
     winning_route = route_map[concept_verdict.winning_route]
 

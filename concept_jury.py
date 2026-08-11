@@ -3,7 +3,7 @@
 """
 Concept Jury - Bewertung und Auswahl der besten kreativen Route.
 
-Bewertet die 4 kreativen Routen nach gewichteten Kriterien und wählt den Gewinner.
+Bewertet die 5 kreativen Routen nach gewichteten Kriterien und wählt den Gewinner.
 
 Bewertungskriterien:
 - Botschaftsklarheit (20%)
@@ -107,17 +107,18 @@ class RouteEvaluation(BaseModel):
 
 
 class ConceptJuryVerdict(BaseModel):
-    """Verdict der Concept Jury - Bewertung aller 4 Routen + Gewinner."""
+    """Verdict der Concept Jury - Bewertung aller 5 Routen + Gewinner."""
 
-    # Bewertungen aller 4 Routen
+    # Bewertungen aller 5 Routen
     evaluation_1: RouteEvaluation = Field(description="Bewertung Route 1 (Emotionale Szene)")
     evaluation_2: RouteEvaluation = Field(description="Bewertung Route 2 (Metapher)")
     evaluation_3: RouteEvaluation = Field(description="Bewertung Route 3 (Objekt)")
     evaluation_4: RouteEvaluation = Field(description="Bewertung Route 4 (Kontrast)")
+    evaluation_5: RouteEvaluation = Field(description="Bewertung Route 5 (Unkonventionell)")
 
     # Gewinner
-    winning_route: Literal[1, 2, 3, 4] = Field(
-        description="Nummer der gewinnenden Route (1-4)"
+    winning_route: Literal[1, 2, 3, 4, 5] = Field(
+        description="Nummer der gewinnenden Route (1-5)"
     )
     winning_score: float = Field(
         ge=1.0, le=10.0,
@@ -144,14 +145,17 @@ class ConceptJuryVerdict(BaseModel):
 MINDEST_SCORE = 7.0
 
 # Kriterium -> Gewicht (Summe = 1.00)
+# Angepasst 2026-08-11: scroll_stop_potenzial + originalitaet hoeher gewichtet,
+# umsetzbarkeit + zielgruppenrelevanz reduziert - diese beiden Kriterien werteten mutige/
+# originelle Konzepte am haeufigsten ab (siehe PROMPT_CHANGELOG.md).
 _GEWICHTE = {
     "botschaftsklarheit": 0.20,
-    "scroll_stop_potenzial": 0.20,
+    "scroll_stop_potenzial": 0.25,
     "markenpassung": 0.15,
-    "originalitaet": 0.15,
-    "umsetzbarkeit": 0.10,
+    "originalitaet": 0.20,
+    "umsetzbarkeit": 0.05,
     "emotionale_wirkung": 0.10,
-    "zielgruppenrelevanz": 0.10,
+    "zielgruppenrelevanz": 0.05,
 }
 
 
@@ -183,6 +187,7 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
         2: verdict.evaluation_2,
         3: verdict.evaluation_3,
         4: verdict.evaluation_4,
+        5: verdict.evaluation_5,
     }
 
     # Einzelscores + Empfehlungen neu berechnen
@@ -223,7 +228,7 @@ def evaluate_routes(
     territories: CreativeTerritories,
     model: str = "gpt-5-nano"
 ) -> ConceptJuryVerdict:
-    """Bewertet 4 kreative Routen und wählt die beste aus.
+    """Bewertet 5 kreative Routen und wählt die beste aus.
 
     Die Concept Jury bewertet jede Route nach 7 gewichteten Kriterien:
     - Botschaftsklarheit (20%)
@@ -238,7 +243,7 @@ def evaluate_routes(
 
     Args:
         brief: Message Brief (Kontext für Bewertung)
-        territories: 4 kreative Routen vom Creative Director
+        territories: 5 kreative Routen vom Creative Director
         model: OpenAI-Modell (default: gpt-5-nano - günstiges Modell für Bewertungsaufgabe)
 
     Returns:
@@ -262,11 +267,12 @@ def evaluate_routes(
         ("Route 2: Visuelle Metapher", territories.route_2_metapher),
         ("Route 3: Objektmotiv", territories.route_3_objekt),
         ("Route 4: Kontrast/Störmoment", territories.route_4_kontrast),
+        ("Route 5: Unkonventionell", territories.route_5_unkonventionell),
     ]
 
     # System-Prompt: Concept Jury Rolle
     system_prompt = """Du bist eine Concept Jury für Social-Media-Marketing.
-Deine Aufgabe: Bewerte 4 kreative Routen objektiv und wähle die beste aus.
+Deine Aufgabe: Bewerte 5 kreative Routen objektiv und wähle die beste aus.
 
 Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
@@ -283,7 +289,7 @@ Bewertungskriterien (Skala 1-10):
    - 5-6: Etwas unklar, muss nachdenken
    - 1-4: Verwirrend, unklar
 
-2. **Scroll-Stop-Potenzial (20%)**: Fällt das Bild im Feed auf?
+2. **Scroll-Stop-Potenzial (25%)**: Fällt das Bild im Feed auf?
    - 9-10: Sofortiger Eye-Catcher, unmöglich zu ignorieren
    - 7-8: Fällt auf, hebt sich ab
    - 5-6: Okay, aber nichts Besonderes
@@ -302,13 +308,13 @@ Bewertungskriterien (Skala 1-10):
      ungewöhnliche Konzepte NICHT abwerten, nur weil sie mutig sind - werte nur ab, wenn es
      reißerisch wird oder die Seriosität eines Lohnsteuerhilfevereins beschädigt.
 
-4. **Originalität (15%)**: Hebt sich das Konzept ab?
+4. **Originalität (20%)**: Hebt sich das Konzept ab?
    - 9-10: Völlig neu, unerwartet
    - 7-8: Frisch, vermeidet Klischees
    - 5-6: Etwas gesehen, aber okay
    - 1-4: Stock-Klischee
 
-5. **Umsetzbarkeit (10%)**: Kann man das realistisch umsetzen?
+5. **Umsetzbarkeit (5%)**: Kann man das realistisch umsetzen?
    - 9-10: Einfach umsetzbar
    - 7-8: Machbar mit Standard-Tools
    - 5-6: Herausfordernd
@@ -320,7 +326,7 @@ Bewertungskriterien (Skala 1-10):
    - 5-6: Etwas flach
    - 1-4: Keine emotionale Wirkung
 
-7. **Zielgruppenrelevanz (10%)**: Spricht es die Zielgruppe an?
+7. **Zielgruppenrelevanz (5%)**: Spricht es die Zielgruppe an?
    - 9-10: Perfekt auf Zielgruppe zugeschnitten
    - 7-8: Passt zur Zielgruppe
    - 5-6: Etwas daneben
@@ -328,8 +334,8 @@ Bewertungskriterien (Skala 1-10):
 
 **Gesamtscore Berechnung:**
 Der gewichtete Gesamtscore und die Auswahl des Gewinners werden VOM SYSTEM berechnet
-(Gewichte: Botschaftsklarheit 20%, Scroll-Stop 20%, Markenpassung 15%, Originalität 15%,
-Umsetzbarkeit 10%, Emotionale Wirkung 10%, Zielgruppenrelevanz 10%).
+(Gewichte: Botschaftsklarheit 20%, Scroll-Stop 25%, Markenpassung 15%, Originalität 20%,
+Umsetzbarkeit 5%, Emotionale Wirkung 10%, Zielgruppenrelevanz 5%).
 Du musst NICHT rechnen - konzentriere dich auf präzise Einzelbewertungen (1-10) und gute
 Begründungen. Deine Angaben zu gesamtscore/winning_route werden überschrieben.
 
@@ -354,7 +360,7 @@ Wichtig:
         for name, route in routes
     ])
 
-    user_prompt = f"""Bewerte diese 4 kreativen Routen und wähle die beste aus.
+    user_prompt = f"""Bewerte diese 5 kreativen Routen und wähle die beste aus.
 
 **Message Brief (Kontext):**
 - Kernaussage: {brief.kernaussage}
@@ -373,7 +379,7 @@ Begründe Stärken und Schwächen je Route.
 Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du musst nicht rechnen.
 """
 
-    log.info(f"Concept Jury bewertet 4 Routen für: {brief.kernaussage}")
+    log.info(f"Concept Jury bewertet 5 Routen für: {brief.kernaussage}")
 
     try:
         # OpenAI API-Call mit Structured Output
@@ -446,14 +452,15 @@ if __name__ == "__main__":
 
     try:
         # Generiere Routen (braucht OpenAI API-Key)
-        print("Schritt 1: Creative Director generiert 4 Routen...")
+        print("Schritt 1: Creative Director generiert 5 Routen...")
         territories = generate_creative_routes(brief)
 
-        print("✓ 4 Routen generiert:")
+        print("✓ 5 Routen generiert:")
         print(f"  1. {territories.route_1_emotionale_szene.titel}")
         print(f"  2. {territories.route_2_metapher.titel}")
         print(f"  3. {territories.route_3_objekt.titel}")
-        print(f"  4. {territories.route_4_kontrast.titel}\n")
+        print(f"  4. {territories.route_4_kontrast.titel}")
+        print(f"  5. {territories.route_5_unkonventionell.titel}\n")
 
         # Bewerte Routen
         print("Schritt 2: Concept Jury bewertet Routen...\n")

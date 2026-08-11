@@ -228,9 +228,10 @@ GATE A CHECKS (vor Text-Rendering):
    - headline_vorhanden (1-10): Ist die Überschrift im Bild sichtbar und prominent?
    - headline_lesbar (1-10): Auf dem Smartphone gut lesbar? Groß genug, genug Kontrast,
      nicht vom Motiv überlagert oder angeschnitten? Falls eine eigene Fläche/Tafel/Banner hinter
-     dem Text liegt: ist diese Fläche in HILO-Farben (Navy #1f428d oder Grün #60a33c, mit weißer
-     Schrift) oder Weiß mit Navy-Schrift? Eine willkürliche neutrale Farbe (Creme/Beige/Grau/
-     Pastell) für diese Fläche ist ein Lesbarkeits-Trick ohne Markenwirkung und drückt den Score.
+     dem Text liegt: bevorzugt HILO-Farben (Navy #1f428d oder Grün #60a33c, mit weißer Schrift)
+     oder Weiß mit Navy-Schrift. Eine neutrale Fläche (Creme/Beige/Grau) ist NUR dann kein
+     Abzug, wenn zusätzlich ein sichtbares Markenfarb-Element (Rand/Akzent) in der Nähe liegt -
+     eine Fläche ganz ohne jeden Markenfarbbezug drückt den Score.
    - gefundener_text: Tippe den im Bild lesbaren Überschriften-Text EXAKT ab, so wie er
      dasteht - inklusive eventueller Fehler. Nicht korrigieren, nicht glätten!
    - headline_text_exakt (true/false): Stimmt der abgetippte Text ZEICHENGENAU mit der Vorgabe

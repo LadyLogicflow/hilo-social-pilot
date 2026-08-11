@@ -31,7 +31,7 @@ Wissens-Serie ───┘
 | `textgen.py` | Text/Bild-Orchestrierung (aktiver Pfad): `generate_drafts`/`generate_for_ids` → `_create_drafts`; erzeugt den **Text** je Beitrag via `generate()` (Anthropic **Claude**) und ruft fürs **Bild** die ShareNext-Pipeline (`run_sharenext_pipeline`); `extract_topics` extrahiert Themen aus PDFs/Links (Claude) |
 | `sharenext_pipeline.py` | **Aktive Bild-Pipeline** (`run_sharenext_pipeline`): 6-stufiger Workflow (Message Brief → Creative Director → Concept Jury → Art Director → Image Producer → Visual QA), siehe [Bild-Design](#bild-design) |
 | `message_brief.py` | ShareNext-Stufe 1: Kernaussage/Zielgruppe + Headline-Fallback (`gpt-5.6-terra`) |
-| `creative_director.py` | ShareNext-Stufe 2: vier kreative Bild-Routen (Szene/Metapher/Objekt/Kontrast) (`gpt-5.6-terra`) |
+| `creative_director.py` | ShareNext-Stufe 2: fünf kreative Bild-Routen (Szene/Metapher/Objekt/Kontrast/Unkonventionell) (`gpt-5.6-terra`) |
 | `concept_jury.py` | ShareNext-Stufe 3: bewertet die Routen, wählt die Gewinner-Route (`gpt-5-nano`) |
 | `art_director.py` | ShareNext-Stufe 4: Art-Direction-Board (Focal Point, Licht, dominante Farben) (`gpt-5.6-terra`) |
 | `image_producer.py` | ShareNext-Stufe 5: baut den Produktions-Prompt (`gpt-5.6-terra`), erzeugt das Bild (`gpt-image-2`) inkl. Headline im Bild + Alt-Text (`gpt-4o-mini`) |
@@ -148,10 +148,11 @@ Das Beitragsbild (quadratisch, Pipeline-Größe `1024×1024`) entsteht in der **
 1. **Message Brief** (`message_brief.py`, `gpt-5.6-terra`) – leitet aus Thema/Text die
    Kernaussage und Zielgruppe ab (Grundlage der Bildidee); liefert bei Bedarf einen
    Headline-Fallback.
-2. **Creative Director** (`creative_director.py`, `gpt-5.6-terra`) – entwickelt vier kreative
-   Bild-Routen (emotionale Szene, Metapher, Objekt, Kontrast).
-3. **Concept Jury** (`concept_jury.py`, `gpt-5-nano`) – bewertet die vier Routen und wählt die
-   stärkste aus (bewusst günstiges Bewertungsmodell).
+2. **Creative Director** (`creative_director.py`, `gpt-5.6-terra`) – entwickelt fünf kreative
+   Bild-Routen (emotionale Szene, Metapher, Objekt, Kontrast, Unkonventionell - seit
+   2026-08-11, siehe [PROMPT_CHANGELOG.md](../PROMPT_CHANGELOG.md)).
+3. **Concept Jury** (`concept_jury.py`, `gpt-5-nano`) – bewertet die fünf Routen und wählt die
+   stärkste aus (bewusst günstiges Bewertungsmodell; Gewichte siehe PROMPT_CHANGELOG.md).
 4. **Art Director Board** (`art_director.py`, `gpt-5.6-terra`) – legt die visuelle Regie fest:
    Focal Point, Lichtstimmung, dominante Farben.
 5. **Image Producer** (`image_producer.py`) – baut aus dem Board den Produktions-Prompt

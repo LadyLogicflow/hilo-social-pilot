@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Creative Director - 4 kreative Routen für ShareNext-Pipeline.
+Creative Director - 5 kreative Routen für ShareNext-Pipeline.
 
-Entwickelt aus einem Message Brief 4 unterschiedliche kreative Routen:
+Entwickelt aus einem Message Brief 5 unterschiedliche kreative Routen:
 1. Emotionale Szene - Menschen in Situationen
 2. Visuelle Metapher - Abstraktes bildlich dargestellt
 3. Objektmotiv - Fokus auf ein zentrales Objekt
 4. Kontrast/Störmoment - Unerwartetes Element
+5. Unkonventionell - passt bewusst in keine der 4 Kategorien (seit 2026-08-11, gegen
+   Nivellierung durch feste Schemata, siehe PROMPT_CHANGELOG.md)
 
 Teil von Issue #2: ShareNext MVP
 """
@@ -58,7 +60,8 @@ class CreativeRoute(BaseModel):
         "Emotionale Szene",
         "Visuelle Metapher",
         "Objektmotiv",
-        "Kontrast/Störmoment"
+        "Kontrast/Störmoment",
+        "Unkonventionell"
     ] = Field(description="Art der kreativen Route")
 
     titel: str = Field(
@@ -84,9 +87,9 @@ class CreativeRoute(BaseModel):
 
 
 class CreativeTerritories(BaseModel):
-    """4 kreative Routen vom Creative Director.
+    """5 kreative Routen vom Creative Director.
 
-    Der Creative Director entwickelt 4 unterschiedliche Ansätze um die
+    Der Creative Director entwickelt 5 unterschiedliche Ansätze um die
     Kernaussage visuell darzustellen. Jede Route folgt einem anderen Prinzip.
     """
 
@@ -95,7 +98,8 @@ class CreativeTerritories(BaseModel):
     )
 
     route_2_metapher: CreativeRoute = Field(
-        description="Route 2: Visuelle Metapher - Abstraktes Konzept bildlich (Wegweiser, Waage, Puzzle, Sanduhr)"
+        description="Route 2: Visuelle Metapher - Abstraktes Konzept bildlich (Wegweiser, Puzzle, Sanduhr) - "
+                     "EIN Bildelement, keine Requisiten-Ansammlung"
     )
 
     route_3_objekt: CreativeRoute = Field(
@@ -104,6 +108,12 @@ class CreativeTerritories(BaseModel):
 
     route_4_kontrast: CreativeRoute = Field(
         description="Route 4: Kontrast/Störmoment - Unerwartetes Element das Aufmerksamkeit erzeugt"
+    )
+
+    route_5_unkonventionell: CreativeRoute = Field(
+        description="Route 5: Unkonventionell - passt bewusst in KEINE der 4 Kategorien oben (z.B. grafisch/"
+                     "typografisch, Doppelbelichtung, Collage, surreale Verfremdung eines Alltagsobjekts). "
+                     "Freiraum für eine Idee, die sich nicht in ein Schema pressen lässt."
     )
 
 
@@ -193,6 +203,16 @@ Die 4 Routen-Typen:
    - Pattern-Interrupt - bricht Erwartungen
    - NICHT willkürlich - muss zur Botschaft passen
 
+5. **Unkonventionell**
+   - Passt bewusst in KEINE der 4 Kategorien oben - Freiraum für eine Idee, die sich nicht in
+     ein Schema pressen lässt
+   - Beispiele: grafisch/typografische Lösung statt Foto, Doppelbelichtung, Collage-Ästhetik,
+     surreale Verfremdung eines Alltagsobjekts, ungewöhnliches Bildformat/Cropping als Konzept
+   - Muss trotzdem zur Kernaussage passen und umsetzbar sein - "unkonventionell" heißt nicht
+     "beliebig"
+   - Diese Route existiert explizit, damit gute Ideen nicht in eine unpassende Schublade
+     gezwungen werden, nur weil die anderen 4 Kategorien vorgeben, wie ein HILO-Bild auszusehen hat
+
 Wichtig:
 - Jede Route muss ANDERS sein (nicht nur leichte Variationen)
 - Visuell erkennbare Signaturen (Licht, Farbe, Komposition)
@@ -229,11 +249,12 @@ trägt, hat sie Vorrang vor dieser Liste.
 - Funnel-Stufe: {brief.funnel_stufe}
 - Kanal: {brief.kanal}
 
-Erstelle 4 unterschiedliche kreative Routen:
+Erstelle 5 unterschiedliche kreative Routen:
 1. Emotionale Szene (Menschen)
 2. Visuelle Metapher (Abstraktes)
 3. Objektmotiv (Objekt-Fokus)
 4. Kontrast/Störmoment (Unerwartetes)
+5. Unkonventionell (passt bewusst in keine der 4 Kategorien oben)
 
 Jede Route braucht:
 - Titel (kurz, prägnant)

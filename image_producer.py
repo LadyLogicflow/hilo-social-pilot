@@ -166,10 +166,13 @@ KRITISCH WICHTIG - TEXT-REGELN:
 - **ÜBERSCHRIFT MUSS SICHTBAR SEIN** - Die vorgegebene deutsche Überschrift MUSS groß, lesbar und prominent im Bild erscheinen!
 - **Text NUR auf DEUTSCH** - Absolutely NO English!
 - **Text natürlich integrieren** - auf Schildern, Wänden, Tafeln, Anzeigen, Plakaten (nicht schwebend!)
-- **Textfarbe/Untergrund für Kontrast: HILO-Farben, nicht willkürlich** - braucht die Überschrift
-  eine eigene Fläche/Unterlegung für Lesbarkeit (Schild, Tafel, Banner, Fläche), MUSS diese in
-  Navy (#1f428d) oder Grün (#60a33c) gehalten sein, Text weiß oder umgekehrt (weiße Fläche,
-  Navy-Text) - KEINE beliebigen neutralen Farben (Creme, Beige, Grau, Pastell) für diese Fläche!
+- **Textfarbe/Untergrund: HILO-Farbbezug statt willkürlicher Farbe** - braucht die Überschrift
+  eine eigene Fläche/Unterlegung für Lesbarkeit (Schild, Tafel, Banner, Fläche), soll diese
+  bevorzugt in Navy (#1f428d) oder Grün (#60a33c) gehalten sein (Text weiß, oder umgekehrt
+  weiße Fläche mit Navy-Text). Passt eine neutrale Fläche erkennbar besser zur Szene (z.B.
+  warme Holztafel in einer Herbstszene), ist das erlaubt - dann MUSS aber ein sichtbares
+  HILO-Farbelement in der Nähe sein (farbiger Rand/Streifen an der Fläche, ein Akzent-Detail
+  in Navy oder Grün) - komplett ohne jeden Markenfarbbezug im Bild selbst nicht.
   Wo möglich lieber OHNE separate Fläche direkt auf dem Motiv (z.B. auf einer ohnehin dunklen
   Wand/Objektfläche im Bild) mit Halo/Kontrast statt einer aufgesetzten Farbfläche.
 - **GROß UND LESBAR** - Die Überschrift muss auf Mobilgeräten gut lesbar sein!
@@ -200,10 +203,12 @@ Text-Regeln (SEHR WICHTIG!):
 - **NUR DEUTSCHE SPRACHE** - Absolutely NO English words!
 - **EURO (€) verwenden** - NEVER use Dollar ($) or other currencies
 - **Natürliche Integration** - Text auf Schildern, Wänden, Tafeln, Plakaten, Anzeigen (nicht schwebend!)
-- **Kontrastfläche in HILO-Farben** - falls für die Lesbarkeit eine eigene Fläche hinter dem Text
-  nötig ist: Navy (#1f428d) oder Grün (#60a33c) mit weißer Schrift (oder Weiß mit Navy-Schrift).
-  Keine willkürliche neutrale Unterlegung (Creme/Beige/Grau) - die Fläche selbst ist Teil der
-  Markenwirkung, nicht nur ein Lesbarkeits-Trick.
+- **Kontrastfläche: bevorzugt HILO-Farben, sonst mit Markenfarb-Akzent** - falls für die
+  Lesbarkeit eine eigene Fläche hinter dem Text nötig ist: bevorzugt Navy (#1f428d) oder Grün
+  (#60a33c) mit weißer Schrift (oder Weiß mit Navy-Schrift). Eine neutrale Fläche ist nur
+  erlaubt, wenn sie erkennbar besser zur Szene passt UND zusätzlich ein sichtbares
+  HILO-Farbelement (Rand, Streifen, Akzent) in der Nähe liegt - nie eine Fläche komplett ohne
+  jeden Markenfarbbezug.
 - **EXAKT übernehmen** - Die vorgegebene Überschrift Wort für Wort verwenden, keine Änderungen!
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen
 
