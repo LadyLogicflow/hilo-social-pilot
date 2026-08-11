@@ -662,6 +662,11 @@ def _create_drafts(rows, kanal):
 
                 except Exception as ex:
                     log.error("ShareNext Bildgenerierung fehlgeschlagen (Entwurf %s): %s", entwurf_id, ex)
+                    # Fehler sichtbar machen (Stufe-2-Seite zeigt e.f.bild_fehler als rote Warnung an) -
+                    # vorher ging der Grund nur ins Log verloren, der Entwurf blieb kommentarlos ohne Bild.
+                    data["bild_fehler"] = str(ex)
+                    conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                               (json.dumps(data, ensure_ascii=False), entwurf_id))
                     # Kein Fallback mehr - ShareNext ist einzige Option!
 
             created += 1

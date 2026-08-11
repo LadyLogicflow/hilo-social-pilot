@@ -2198,6 +2198,7 @@ def _sharenext_bild_synchron(data, eid):
     data["qa_problems"] = [] if result.approved else ["ShareNext QA"]
     data["bild_pfad"] = out
     data["sharenext_used"] = True
+    data.pop("bild_fehler", None)   # alte Fehlermeldung nach erfolgreichem Retry entfernen
     return out
 
 
