@@ -173,9 +173,13 @@ Die 4 Routen-Typen:
 
 2. **Visuelle Metapher**
    - Abstraktes Konzept bildlich dargestellt
-   - Beispiele: Sanduhr (Zeit läuft ab), Wegweiser (Orientierung), Waage (Ausgleich), Puzzle (Komplexität)
+   - Beispiele: Sanduhr (Zeit läuft ab), Wegweiser (Orientierung), Puzzle (Komplexität),
+     ein verformtes/umgestaltetes Alltagsobjekt (z.B. ein Kuchen in Symbolform)
    - Muss zur Kernaussage passen
    - Darf nicht zu abstrakt sein (Zielgruppe muss es verstehen)
+   - EIN Bildelement trägt die Metapher – NICHT mehrere Requisiten zu einem Arrangement
+     kombinieren (z.B. keine Waage-Szene mit zusätzlichen Objekten auf beiden Schalen plus
+     Beschriftungen). Eine Metapher, die man in einem Wort erklären kann, nicht in einem Satz.
 
 3. **Objektmotiv**
    - Fokus auf EIN zentrales Objekt
@@ -194,14 +198,22 @@ Wichtig:
 - Visuell erkennbare Signaturen (Licht, Farbe, Komposition)
 - Alle 4 müssen zur Kernaussage passen
 - Scroll-Stop-Potenzial beachten
+- **EIN dominantes Bildelement pro Route, keine Requisiten-Ansammlung.** Mehrere kleine Objekte
+  (+ Labels/Beschriftungen darauf) konkurrieren um Aufmerksamkeit und werden im Feed-Thumbnail
+  unlesbar. Lieber ein einzelnes, klares Element mutig/großformatig inszenieren als eine
+  Szene aus vielen kleinen Requisiten zusammenzustellen - das gilt besonders für "Visuelle
+  Metapher" und "Kontrast/Störmoment".
 
 ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
 - generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
   Händeschütteln vor Glaswand, Daumen hoch im Anzug)
 - sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
 - übertriebenes/unnatürliches Lächeln
-- Geldregen, übergroße Eurozeichen
-Das sind abgenutzte Muster, keine verbotenen Themen. Echte Emotionen, ungewöhnliche
+- wörtlicher Geldregen (fallende Scheine/Münzen als Klischee-Symbol für "Geld")
+Das sind abgenutzte Muster, keine verbotenen Themen. Ein einzelnes, mutig inszeniertes
+Euro-Symbol oder ein in Euro-Form verformtes Alltagsobjekt (z.B. ein Kuchen, ein Gegenstand)
+ist AUSDRÜCKLICH KEIN Klischee, sondern ein starkes Kontrast/Störmoment-Motiv - das ist
+etwas anderes als Geldregen und soll nicht vermieden werden. Echte Emotionen, ungewöhnliche
 Perspektiven und starke Farbkontraste sind ausdrücklich erwünscht - wenn eine Idee wirklich
 trägt, hat sie Vorrang vor dieser Liste.
 """

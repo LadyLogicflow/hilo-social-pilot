@@ -290,6 +290,10 @@ Die 5 Kern-Achsen:
    - Was zieht den Blick zuerst an?
    - Wo liegt es im Bild? (Zentrum, Rule of Thirds, etc.)
    - Muss klar und dominant sein
+   - EIN Element trägt das Bild - alle weiteren Objekte sind klar untergeordnet (kleiner,
+     unscharf, im Hintergrund) oder fehlen ganz. Eine Ansammlung mehrerer gleich wichtiger
+     Requisiten (z.B. mehrere Gegenstände nebeneinander mit eigenen Beschriftungen) verwässert
+     den Focal Point und wirkt im Feed unruhig statt eines einzelnen, mutigen Bildeindrucks.
 
 2. **Komposition**
    - Welches Prinzip? (Rule of Thirds, Symmetrie, etc.)

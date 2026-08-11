@@ -288,6 +288,10 @@ Bewertungskriterien (Skala 1-10):
    - 7-8: Fällt auf, hebt sich ab
    - 5-6: Okay, aber nichts Besonderes
    - 1-4: Langweilig, geht unter
+   - ACHTUNG Requisiten-Häufung: Mehrere kleine, gleichrangige Objekte (+ Mini-Beschriftungen
+     darauf) in einer Szene wirken im Thumbnail unruhig statt eines klaren Eyecatchers - werte
+     das ab, auch wenn jedes Einzelteil für sich passend ist. Ein einzelnes, mutig
+     inszeniertes Element schlägt eine Ansammlung von Requisiten.
 
 3. **Markenpassung (15%)**: Passt es zur HILO-Marke?
    - 9-10: Perfekt: vertrauenswürdig UND interessant
