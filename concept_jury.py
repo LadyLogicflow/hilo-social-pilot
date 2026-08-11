@@ -284,10 +284,16 @@ Kontext:
 Bewertungskriterien (Skala 1-10):
 
 1. **Botschaftsklarheit (20%)**: Ist die Kernaussage klar und sofort verständlich?
-   - 9-10: Kristallklar, unmissverständlich
-   - 7-8: Klar erkennbar
-   - 5-6: Etwas unklar, muss nachdenken
-   - 1-4: Verwirrend, unklar
+   Prüfe konkret: Welche anderen Bedeutungen könnte ein Betrachter dem Motiv OHNE Headline
+   geben? Je mehr naheliegende Alternativ-Deutungen bestehen (z.B. eine Uhr, die genauso gut
+   Frist, Zeitdruck oder Arbeitszeit statt des KONKRETEN Themas bedeuten könnte), desto
+   niedriger der Score - auch wenn das Motiv selbst klar und eindeutig aussieht. Die Headline
+   soll die visuelle Idee präzisieren, nicht erst erklären müssen.
+   - 9-10: Kristallklar, unmissverständlich - kaum plausible Alternativ-Deutungen zum
+     konkreten Thema.
+   - 7-8: Klar erkennbar, aber ein bis zwei naheliegende Alternativ-Deutungen denkbar.
+   - 5-6: Etwas unklar, muss nachdenken - mehrere ähnlich plausible Deutungen möglich.
+   - 1-4: Verwirrend, unklar - das Motiv könnte für fast jedes Thema derselben Kategorie stehen.
 
 2. **Scroll-Stop-Potenzial (25%)**: Fällt das Bild im Feed auf?
    Bewerte NICHT einfach, ob das Bild bunt, groß, kontrastreich oder attraktiv wäre - bewerte die

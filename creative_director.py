@@ -220,6 +220,23 @@ Hauptmotiv beschreibbar sein. Je kürzer und bildlicher dieser Satz, desto stär
 Dieser Test zwingt dazu, Idee von bloßer Ausstattung zu unterscheiden - wenn die Route nur mit
 einem Nebensatz voller "und" beschreibbar ist, ist sie noch keine Idee, sondern eine Szene.
 
+SEMANTISCHE PRÄZISION: Eine ungewöhnliche Transformation ist nur dann stark, wenn ihre Bedeutung
+möglichst eng mit der Kernaussage verbunden ist - nicht nur überraschend, sondern auch treffend.
+Frage bei jeder Route: "Welche anderen Bedeutungen könnte ein Betrachter diesem Motiv OHNE
+Headline geben?" Je mehr naheliegende Alternativ-Deutungen bestehen, desto schwächer die Route -
+die Headline soll die visuelle Idee PRÄZISIEREN, nicht erst ERKLÄREN müssen.
+- Stark: eine Straße, deren Lichtspur sich zu einem Haken formt, bei "Heimfahrten steuerlich
+  absetzen" - ein Haken bedeutet kulturell fast immer "bestätigt/richtig", kaum Fehldeutung.
+- Schwächer: eine überdimensionierte Uhr bei "Teilzeitstudium" - eine Uhr steht für "Zeit" ganz
+  allgemein und könnte genauso gut Frist, Zeitdruck oder Arbeitszeit bedeuten; die Verbindung zum
+  KONKRETEN Thema bleibt vage.
+WICHTIG - keine Verwechslung mit "möglichst wörtlich": Das Ziel ist NICHT, Mehrdeutigkeit durch
+pure Abbildung zu vermeiden (ein Foto vom Gegenstand aus dem Thema hat kaum Fehldeutungen, ist
+aber wieder reine Illustration, siehe oben). Das Ziel ist ein TRANSFORMIERTES Motiv, dessen
+symbolische Bedeutung kulturell eindeutig ist (wie der Haken), statt eines Mehrzweck-Symbols mit
+vielen möglichen Lesarten (wie die Uhr). Beide Prinzipien - Transformation UND semantische
+Präzision - gelten gemeinsam, keins ersetzt das andere.
+
 Die 4 Routen-Typen:
 
 1. **Emotionale Szene**

@@ -16,6 +16,39 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Semantische Praezision: nicht nur ueberraschend, sondern treffend (zehnte Runde)
+
+**Anlass:** Drei frische Vergleichsbilder zeigten, dass Runde 9 ("Visuelle Uebersetzung statt
+Illustration") greift, aber eine Luecke offenlaesst: der One-Idea-Test prueft nur, ob eine Idee
+in einem Satz sagbar ist, nicht ob dieser Satz auch EINDEUTIG zum konkreten Thema fuehrt. Die
+Uhr bei "Kindergeld trotz Teilzeitstudium" bestand den One-Idea-Test (klares Einzelmotiv),
+transportierte aber nur "Zeit" allgemein - haette genauso gut fuer Frist, Ueberstunden oder
+Zeitdruck stehen koennen. Externe Kritik (ChatGPT) hat das treffend benannt und EINE gezielte
+Ergaenzung vorgeschlagen, kritisch geprueft und mit einer wichtigen Praezisierung uebernommen.
+
+**Kritische Pruefung vor der Uebernahme:** Der Vorschlag wortwoertlich genommen ("moeglichst
+wenig Fehldeutungen") wuerde reine Illustration begluenstigen - ein Foto des Gegenstands aus dem
+Thema hat kaum Fehldeutungen, ist aber genau die reine Abbildung, die Runde 9 verhindern sollte.
+Der Unterschied liegt nicht zwischen "transformiert vs. woertlich", sondern zwischen einem
+**kulturell eindeutigen Symbol** (ein Haken = fast immer "bestaetigt/richtig") und einem
+**Mehrzweck-Symbol** (eine Uhr = "Zeit" ganz allgemein, viele moegliche Lesarten). Diese
+Klarstellung wurde explizit in den Prompt-Text aufgenommen, damit die Regel nicht versehentlich
+gegen Runde 9 arbeitet.
+
+**Umgesetzt (bewusst nur 2 Dateien, keine neuen Structured-Output-Felder):**
+
+1. `creative_director.py`: neuer Abschnitt SEMANTISCHE PRAEZISION direkt nach dem ONE-IDEA-TEST -
+   Frage "welche anderen Bedeutungen koennte ein Betrachter dem Motiv ohne Headline geben?" +
+   Klarstellung "kulturell eindeutiges Symbol vs. Mehrzweck-Symbol, nicht woertlich vs.
+   transformiert".
+2. `concept_jury.py`: bestehende Botschaftsklarheit-Skala (KEIN neues Kriterium) um denselben
+   Test geschaerft, damit die Jury tatsaechlich danach auswaehlt statt die Regel nur eine gut
+   gemeinte Absicht beim Creative Director bleibt, ohne Durchgriff bei der Routen-Auswahl.
+
+**Nicht geprueft:** Keine echte Bildgenerierung moeglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Zwei externe Kritiken zusammengefuehrt: Visuelle Uebersetzung statt Illustration (neunte Runde)
 
 **Anlass:** Zwei unabhaengige externe Bewertungen (die eigene Analyse aus der vorherigen Runde
