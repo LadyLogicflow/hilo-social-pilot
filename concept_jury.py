@@ -290,10 +290,13 @@ Bewertungskriterien (Skala 1-10):
    - 1-4: Verwirrend, unklar
 
 2. **Scroll-Stop-Potenzial (25%)**: Fällt das Bild im Feed auf?
-   - 9-10: Sofortiger Eye-Catcher, unmöglich zu ignorieren
-   - 7-8: Fällt auf, hebt sich ab
-   - 5-6: Okay, aber nichts Besonderes
-   - 1-4: Langweilig, geht unter
+   - 9-10: Funktioniert bereits als kleines Thumbnail OHNE Text. Ein dominanter visueller Reiz
+     ist innerhalb von <1 Sekunde erfassbar und erzeugt Neugier, Überraschung oder Spannung.
+   - 7-8: Deutlich stärker als gewöhnlicher Social-Media-Content, aber der Effekt hängt
+     teilweise von Headline/Kontext ab, nicht rein vom Bild allein.
+   - 5-6: Professionell und attraktiv, aber im Feed erwartbar - nichts, das man zweimal ansieht.
+   - 3-4: Typisches Stock-/Corporate-/Steuer-Motiv.
+   - 1-2: Visuell austauschbar oder ohne dominanten Focal Point.
    - ACHTUNG Requisiten-Häufung: Mehrere kleine, gleichrangige Objekte (+ Mini-Beschriftungen
      darauf) in einer Szene wirken im Thumbnail unruhig statt eines klaren Eyecatchers - werte
      das ab, auch wenn jedes Einzelteil für sich passend ist. Ein einzelnes, mutig
@@ -356,7 +359,8 @@ Wichtig:
         f"Beschreibung: {route.beschreibung}\n"
         f"Visuelle Signatur: {route.visuelle_signatur}\n"
         f"Emotion: {route.emotionale_richtung}\n"
-        f"Beispiel: {route.beispiel_szene}"
+        f"Beispiel: {route.beispiel_szene}\n"
+        f"Scroll-Stop-Device: {route.scroll_stop_device}"
         for name, route in routes
     ])
 
@@ -370,7 +374,7 @@ Wichtig:
 - Funnel-Stufe: {brief.funnel_stufe}
 - Kanal: {brief.kanal}
 
-**4 Kreative Routen:**
+**5 Kreative Routen:**
 
 {routes_text}
 

@@ -195,6 +195,19 @@ class ArtDirectionBoard(BaseModel):
     )
 
     # ─────────────────────────────────────────────────────────────────────────
+    # BRAND SIGNATURE (seit 2026-08-11)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    brand_signature: str = Field(
+        description="Wie wird HILO in DIESEM Motiv visuell spürbar - unabhängig von Logo/"
+                    "Slogan-Kreis (die kommen ohnehin deterministisch dazu)? Konkret benennen, "
+                    "z.B. 'Navy als große ruhige Hintergrundfläche, sattes Grün als einzelner "
+                    "Farbakzent am Focal Point, klarer Hell-Dunkel-Kontrast' - NICHT 'irgendwo "
+                    "Grün verwenden'. Ziel: Auch ohne die beiden Kreise sollte das Bild erkennbar "
+                    "aus derselben Bildwelt stammen wie andere HILO-Posts."
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
     # TECHNISCHE DETAILS
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -286,7 +299,7 @@ Kontext:
 - Marke: Vertrauenswürdig, professionell, warm
 - Ziel: Professionelle Bilder die auffallen aber nicht laut/aufdringlich sind
 
-Die 5 Kern-Achsen:
+Die 6 Kern-Achsen:
 
 1. **Focal Point**
    - Was zieht den Blick zuerst an?
@@ -315,6 +328,20 @@ Die 5 Kern-Achsen:
 5. **Emotion**
    - Welcher emotionale Moment?
    - Gesamtatmosphäre?
+
+6. **Brand Signature**
+   - Wie wird HILO in DIESEM Motiv spürbar - unabhängig von Logo-/Slogan-Kreis?
+   - Konkret: welche Fläche/welcher Akzent trägt Navy oder Grün? Welcher Kontrast, welches
+     Licht macht das Bild wiedererkennbar als Teil derselben Bildwelt wie andere HILO-Posts?
+   - Gedankenexperiment: Würde man das Bild OHNE Logo/Slogan/Überschrift noch als HILO
+     erkennen? Wenn nein, ist die Brand Signature zu schwach.
+
+THUMBNAIL-TEST (wichtig für Feed-Wirkung):
+Instagram/Facebook zeigen das Bild zuerst klein - ca. 180×180 Pixel zwischen vielen anderen
+Posts, nicht als 1080×1080-Kunstwerk. Der Focal Point muss auch in dieser Miniaturgröße sofort
+verständlich und dominant bleiben. Feine Details, kleine Requisiten oder subtile visuelle Gags
+dürfen NICHT nötig sein, um die Leitidee zu verstehen - das passt zur "ein dominantes Element"-
+Regel oben.
 
 SCROLL-STOP HOOK (wichtig für Feed-Wirkung):
 Der Focal Point entscheidet, ob jemand im Feed innehält oder weiterscrollt - das passiert in
@@ -354,6 +381,7 @@ Wichtig:
 - Visuelle Signatur: {winning_route.visuelle_signatur}
 - Emotionale Richtung: {winning_route.emotionale_richtung}
 - Beispiel-Szene: {winning_route.beispiel_szene}
+- Scroll-Stop-Device: {winning_route.scroll_stop_device}
 
 Erstelle präzise visuelle Anweisungen:
 - Focal Point (was + wo?)
@@ -361,6 +389,7 @@ Erstelle präzise visuelle Anweisungen:
 - Licht (Qualität + Richtung + Stimmung)
 - Farben (2-4 dominante + Temperatur + Kontrast)
 - Emotion (Moment + Atmosphäre)
+- Brand Signature (wie ist HILO im Motiv spürbar, auch ohne Logo/Slogan-Kreis?)
 - Kamera + Schärfe
 - Text-Zonen (wo ist Platz?)
 

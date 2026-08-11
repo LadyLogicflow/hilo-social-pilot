@@ -85,6 +85,13 @@ class CreativeRoute(BaseModel):
         description="Konkretes Beispiel wie das Bild aussehen könnte (1-2 Sätze)"
     )
 
+    scroll_stop_device: str = Field(
+        description="Was GENAU stoppt den Daumen beim Scrollen? Ein konkretes visuelles Element/"
+                    "Detail, kein allgemeines Stilwort. Schlecht: 'ungewöhnliches Stillleben mit "
+                    "Kuchen'. Gut: 'Ein Kuchen in Euro-Form, aus dem exakt ein Fünftel "
+                    "herausgeschnitten wurde - man fragt sich sofort, warum genau dieses Stück.'"
+    )
+
 
 class CreativeTerritories(BaseModel):
     """5 kreative Routen vom Creative Director.
@@ -126,20 +133,21 @@ def generate_creative_routes(
     brief: MessageBrief,
     model: str = "gpt-5.6-terra"
 ) -> CreativeTerritories:
-    """Generiert 4 kreative Routen aus einem Message Brief.
+    """Generiert 5 kreative Routen aus einem Message Brief.
 
-    Der Creative Director entwickelt 4 unterschiedliche visuelle Ansätze:
+    Der Creative Director entwickelt 5 unterschiedliche visuelle Ansätze:
     1. Emotionale Szene (Menschen in Situationen)
     2. Visuelle Metapher (Abstraktes bildlich)
     3. Objektmotiv (Fokus auf Objekt)
     4. Kontrast/Störmoment (Unerwartetes)
+    5. Unkonventionell (passt bewusst in keine der 4 Kategorien)
 
     Args:
         brief: Message Brief mit Kernaussage, Nutzen, Zielgruppe, etc.
         model: OpenAI-Modell (default: gpt-5.6-terra für kreative Aufgaben)
 
     Returns:
-        CreativeTerritories: 4 kreative Routen
+        CreativeTerritories: 5 kreative Routen
 
     Raises:
         ValueError: Wenn OpenAI API-Key fehlt
@@ -163,7 +171,7 @@ def generate_creative_routes(
 
     # System-Prompt: Creative Director Rolle
     system_prompt = """Du bist ein erfahrener Creative Director für Social-Media-Marketing.
-Deine Aufgabe: Entwickle 4 unterschiedliche kreative Routen für ein Social-Media-Bild.
+Deine Aufgabe: Entwickle 5 unterschiedliche kreative Routen für ein Social-Media-Bild.
 
 Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
@@ -223,6 +231,10 @@ Wichtig:
   unlesbar. Lieber ein einzelnes, klares Element mutig/großformatig inszenieren als eine
   Szene aus vielen kleinen Requisiten zusammenzustellen - das gilt besonders für "Visuelle
   Metapher" und "Kontrast/Störmoment".
+- **HILO-Farben nicht als erzwungene Requisiten.** Navy/Grün sollen über Licht, Flächen,
+  Hintergrund, Material oder Farbkontrast entstehen - nicht durch sachlich unnötige grüne/blaue
+  Gegenstände (grüner Ordner, blauer Stift, grüne Tasse ...). Das erzeugt sonst genau die
+  austauschbaren Wiederholungsmuster, die eine eigenständige Bildsprache verhindern.
 
 ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
 - generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
@@ -239,7 +251,7 @@ trägt, hat sie Vorrang vor dieser Liste.
 """
 
     # User-Prompt: Message Brief Daten
-    user_prompt = f"""Entwickle 4 kreative Routen für diesen Social-Media-Post:
+    user_prompt = f"""Entwickle 5 kreative Routen für diesen Social-Media-Post:
 
 **Message Brief:**
 - Kernaussage: {brief.kernaussage}
@@ -262,9 +274,10 @@ Jede Route braucht:
 - Visuelle Signatur (was macht sie erkennbar?)
 - Emotionale Richtung (welche Emotion?)
 - Beispiel-Szene (konkretes Bild-Beispiel)
+- Scroll-Stop-Device (was GENAU stoppt den Daumen? Ein konkretes Detail, kein Stilwort)
 """
 
-    log.info(f"Generiere 4 kreative Routen für: {brief.kernaussage}")
+    log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")
 
     try:
         # OpenAI API-Call mit Structured Output
@@ -283,11 +296,12 @@ Jede Route braucht:
             raise Exception("OpenAI API gab keine validen Creative Territories zurück")
 
         log.info(
-            f"✓ 4 kreative Routen generiert:\n"
+            f"✓ 5 kreative Routen generiert:\n"
             f"   1. {territories.route_1_emotionale_szene.titel}\n"
             f"   2. {territories.route_2_metapher.titel}\n"
             f"   3. {territories.route_3_objekt.titel}\n"
-            f"   4. {territories.route_4_kontrast.titel}"
+            f"   4. {territories.route_4_kontrast.titel}\n"
+            f"   5. {territories.route_5_unkonventionell.titel}"
         )
         return territories
 

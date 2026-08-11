@@ -16,6 +16,53 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Externe Kritik geprüft und teilweise umgesetzt (dritte Runde)
+
+**Anlass:** Externe Bewertung (ChatGPT) der gesamten Pipeline nach der zweiten Runde oben.
+Kritisch geprüft statt blind übernommen - siehe Chat-Protokoll für die vollständige
+Punkt-für-Punkt-Bewertung. Wichtigster Fund beim Gegenchecken: Die Kritik berief sich auf eine
+angeblich dokumentierte "Kernentscheidung" aus einer "Phase-1C-Architektur"/"Übernahmematrix" -
+das existiert nirgends in diesem Repo und wurde daher ignoriert. Der zugehörige Vorschlag
+("Pillow soll die Headline wieder rendern") wurde zusätzlich explizit vom Nutzer ausgeschlossen
+und widerspricht der in dieser Session bereits getroffenen, begründeten Entscheidung
+(GPT-integrierter Text statt Pillow-Karte).
+
+**Umgesetzt (7 von 9 Vorschlägen, 2 verworfen/reduziert):**
+
+1. `art_director.py`: neue 6. Achse **Brand Signature** (Freitext-Feld) - wie HILO im Motiv
+   spürbar wird, unabhängig von Logo-/Slogan-Kreis. Wird bis zum finalen Bildprompt
+   durchgereicht (`image_producer.py`).
+2. `creative_director.py`: neues Feld **`scroll_stop_device`** pro Route (nur 1 statt der
+   vorgeschlagenen 3 Felder - `first_500ms_read`/`visual_tension` wurden als redundant zu
+   `beispiel_szene` eingeschätzt, mehr Felder = mehr Tokens ohne klaren Mehrwert). Wird an
+   Jury, Art Director und Image Producer durchgereicht.
+3. `concept_jury.py`: Scroll-Stop-Skala (1-10) konkretisiert - "funktioniert als Thumbnail ohne
+   Text" statt "sofortiger Eye-Catcher".
+4. `art_director.py` + `visual_qa.py`: **Thumbnail-Test-Regel** ergänzt (Leitidee muss auch bei
+   ca. 180×180px sofort verständlich/dominant sein).
+5. `image_producer.py`: System-Prompt komplett konsolidiert - zwei fast identische
+   "Text-Regeln"-Blöcke (Dopplung, kein bewusstes Design) zu einer Prioritäts-Struktur
+   A (unverhandelbar) / B (visuelle Wirkung) / C (Marke/Stil) zusammengeführt. Kein Inhalt
+   verloren, nur entdoppelt und klarer hierarchisiert.
+6. `creative_director.py`: neue Regel "HILO-Farben nicht als erzwungene Requisiten" (kein
+   grüner Ordner/blauer Stift nur zur CI-Erfüllung).
+7. `visual_qa.py`: neues Gate-A-Kriterium **`scroll_stop_wirkung`** - verifizierte echte
+   Lücke: die Jury bewertet Scroll-Stop nur anhand der TEXT-Beschreibung der Route, bevor das
+   Bild existiert; bisher prüfte niemand nach der Generierung, ob der Effekt im fertigen Bild
+   tatsächlich ankommt.
+
+**Verworfen:**
+- Zusätzlicher Visual-QA-Score "Brand Distinctiveness" - ohne Referenzbilder einer
+  "HILO-Bildwelt" kann ein Vision-Modell das nicht seriös bewerten, hohes Risiko für
+  Schein-Präzision (Modell rät/rationalisiert). Überschneidet sich zudem stark mit
+  vorhandener Originalität (Jury) und Markenpassung (QA).
+- Pillow-Rückbau für Headline-Rendering - explizit ausgeschlossen (siehe oben).
+
+**Nicht geprüft:** Wie bei den vorherigen Runden nur statisch getestet (Syntax + bestehende
+Unit-Tests), keine echte Bildgenerierung möglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Kreative Freiheit vs. Regel-Dichte (Review-Runde)
 
 **Anlass:** Bild-Vergleich zeigte ein zu überladenes Waage-Motiv (schwach) gegen ein klares
