@@ -41,7 +41,7 @@ log = logging.getLogger("hilo.art_director")
 # es wird nur informiert, was zuletzt genutzt wurde, und um Abwechslung GEBETEN (kein Zwang),
 # damit die Kreativitaet nicht leidet, falls die letzte Wahl objektiv die beste bleibt.
 
-_VARIANZ_FELDER = ("kamera_perspektive", "komposition_prinzip")
+_VARIANZ_FELDER = ("kamera_perspektive", "komposition_prinzip", "hintergrund_typ")
 _VARIANZ_HISTORY_LEN = 3  # wie viele letzte Werte je Feld gemerkt werden
 
 
@@ -137,6 +137,21 @@ class ArtDirectionBoard(BaseModel):
 
     bildaufbau: str = Field(
         description="Beschreibung des Bildaufbaus (2-3 Sätze). Wo sind die Elemente platziert?"
+    )
+
+    hintergrund_typ: Literal[
+        "Echte fotografische Umgebung (Tiefe/Textur/Licht)",
+        "Freigestellt vor einfarbiger Fläche",
+        "Nahaufnahme/Textur-Detail (Hintergrund kaum sichtbar)",
+        "Illustrativ/grafisch (bewusst kein Foto-Look)"
+    ] = Field(
+        description="Welche Art Hintergrund/Umgebung traegt das Motiv? WICHTIG: 'Freigestellt vor "
+                    "einfarbiger Flaeche' ist NUR eine von vier gleichwertigen Optionen, nicht der "
+                    "Standardfall - ein durchgehend einfarbiger Studio-/Render-Hintergrund wirkt bei "
+                    "wiederholter Nutzung schnell langweilig und generisch, selbst wenn das Motiv "
+                    "selbst gut ist. Bevorzuge wo passend eine echte fotografische Umgebung mit "
+                    "Tiefe (z.B. ein Tisch mit Geschirr im Bokeh-Hintergrund, ein Raum mit Fenster-"
+                    "licht) - 'ein dominantes Element' bedeutet NICHT 'kein Umfeld'."
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -299,7 +314,7 @@ Kontext:
 - Marke: Vertrauenswürdig, professionell, warm
 - Ziel: Professionelle Bilder die auffallen aber nicht laut/aufdringlich sind
 
-Die 6 Kern-Achsen:
+Die 7 Kern-Achsen:
 
 1. **Focal Point**
    - Was zieht den Blick zuerst an?
@@ -331,10 +346,26 @@ Die 6 Kern-Achsen:
 
 6. **Brand Signature**
    - Wie wird HILO in DIESEM Motiv spürbar - unabhängig von Logo-/Slogan-Kreis?
-   - Konkret: welche Fläche/welcher Akzent trägt Navy oder Grün? Welcher Kontrast, welches
-     Licht macht das Bild wiedererkennbar als Teil derselben Bildwelt wie andere HILO-Posts?
+   - Das kann sehr unterschiedlich aussehen, je nach Motiv - nicht immer dieselbe Formel:
+     * Navy/Grün als Umgebungslicht in einer echten Szene (z.B. kühles Fensterlicht, blaue Stunde)
+     * Navy/Grün als Material eines realen Objekts IN einer echten Umgebung (nicht freigestellt)
+     * Navy/Grün als Farbe eines Details im Raum (Tür, Stoff, Wandfläche, Geschirr)
+     * Ein kräftiger Hell-Dunkel-Kontrast, der zur Marke passt, ganz ohne dass Navy/Grün
+       wörtlich als Fläche vorkommen muss
    - Gedankenexperiment: Würde man das Bild OHNE Logo/Slogan/Überschrift noch als HILO
      erkennen? Wenn nein, ist die Brand Signature zu schwach.
+
+7. **Hintergrund/Umgebung**
+   - Trägt eine ECHTE fotografische Umgebung das Motiv (Tiefe, Textur, Licht, evtl. leichtes
+     Bokeh) oder steht das Element freigestellt vor einer einfarbigen Fläche?
+   - **VORSICHT PRODUKTSHOT-REFLEX:** Ein durchgehend einfarbiger Studio-/Render-Hintergrund
+     ist NUR eine von mehreren gültigen Optionen - wird sie bei jedem Bild gewählt, wirkt die
+     ganze Bildserie schnell langweilig und generisch wie 3D-Renderings, egal wie gut das
+     einzelne Motiv ist. "Ein dominantes Element" (siehe Focal Point oben) bedeutet NICHT
+     "kein Umfeld" - ein Hero-Objekt auf einem echten Tisch mit Geschirr im unscharfen
+     Hintergrund ist genauso fokussiert wie ein freigestelltes Objekt, wirkt aber warm und
+     fotografisch statt steril.
+   - Bevorzuge wo es zur Route passt eine echte Umgebung mit Tiefe.
 
 THUMBNAIL-TEST (wichtig für Feed-Wirkung):
 Instagram/Facebook zeigen das Bild zuerst klein - ca. 180×180 Pixel zwischen vielen anderen
@@ -390,6 +421,9 @@ Erstelle präzise visuelle Anweisungen:
 - Farben (2-4 dominante + Temperatur + Kontrast)
 - Emotion (Moment + Atmosphäre)
 - Brand Signature (wie ist HILO im Motiv spürbar, auch ohne Logo/Slogan-Kreis?)
+- Hintergrund/Umgebung (echte fotografische Umgebung mit Tiefe, oder freigestellt vor
+  einfarbiger Fläche? Nicht standardmäßig freigestellt wählen - siehe VORSICHT
+  PRODUKTSHOT-REFLEX oben)
 - Kamera + Schärfe
 - Text-Zonen (wo ist Platz?)
 
@@ -401,6 +435,7 @@ Denk an:
 VARIANZ (Hinweis, kein Zwang):
 - Zuletzt genutzte Kameraperspektiven: {', '.join(variance_history['kamera_perspektive']) or 'keine'}
 - Zuletzt genutzte Kompositionsprinzipien: {', '.join(variance_history['komposition_prinzip']) or 'keine'}
+- Zuletzt genutzte Hintergrund-Typen: {', '.join(variance_history['hintergrund_typ']) or 'keine'}
 Wähle bevorzugt eine andere Option als zuletzt, WENN sie zur Route genauso gut oder besser passt.
 Wenn die zuletzt genutzte Option für dieses Motiv klar die stärkste Wahl ist, nimm sie trotzdem -
 die inhaltliche Passung zur Route hat immer Vorrang vor reiner Abwechslung.

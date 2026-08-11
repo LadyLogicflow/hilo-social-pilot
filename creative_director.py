@@ -202,7 +202,10 @@ Die 4 Routen-Typen:
 3. **Objektmotiv**
    - Fokus auf EIN zentrales Objekt
    - Beispiele: Dokument mit Stempel, Kalender mit markiertem Datum, Ordner, Sparschwein
-   - Still-Life-Fotografie-Stil
+   - Echte Still-Life-Fotografie (Materialtextur, Umgebungslicht, leichte Schärfentiefe) -
+     KEIN flacher Studio-/Render-Look mit dem Objekt freigestellt vor einfarbiger Fläche.
+     Ein Objekt auf einem echten Tisch/in einer echten Umgebung mit unscharfem Hintergrund
+     wirkt hochwertiger und wärmer als ein steriles Produktfoto.
    - Objekt muss klar erkennbar und relevant sein
 
 4. **Kontrast/Störmoment**

@@ -198,6 +198,12 @@ PRIORITÄT B - VISUELLE WIRKUNG (Scroll-Stop)
 - EIN dominantes Hero-Element trägt das Bild - alle anderen Objekte sind klar untergeordnet
   (kleiner, unscharf, im Hintergrund) oder fehlen ganz. Keine Ansammlung mehrerer
   gleichrangiger Requisiten.
+- **Kein Produktshot-Reflex:** "ein dominantes Element" heißt NICHT "freigestellt vor
+  einfarbiger Fläche". Setze das Art Direction Board's Hintergrund-Typ tatsächlich um - bei
+  "Echte fotografische Umgebung" MUSS eine echte Szene mit Tiefe/Textur/Licht entstehen (z.B.
+  ein Tisch mit Geschirr im unscharfen Hintergrund), nicht nur eine flache Farbfläche hinter
+  dem Objekt. Ein durchgehend einfarbiger Studio-Hintergrund wirkt in Serie schnell wie
+  austauschbares 3D-Rendering statt echter Fotografie.
 - Übersetze das Scroll-Stop-Device der Route konkret und sichtbar - nicht nur andeuten.
 - Kräftiger Hell-Dunkel-Kontrast am Focal Point + mindestens ein satter, klar erkennbarer
   Farbakzent. Vermeide flaue, blasse oder gleichförmig helle Bilder - "professionell und warm"
@@ -268,6 +274,7 @@ Freigegebene Creative Direction:
 Art Direction Board:
 - Hauptmotiv: {art_board.focal_point}
 - Umgebung: {art_board.bildaufbau}
+- Hintergrund-Typ: {art_board.hintergrund_typ}
 - Komposition: {art_board.komposition_prinzip}
 - Kameraperspektive: {art_board.kamera_perspektive}
 - Licht: {art_board.licht_qualitaet}, {art_board.licht_richtung}, {art_board.licht_stimmung}

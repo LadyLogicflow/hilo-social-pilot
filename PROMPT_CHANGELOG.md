@@ -16,6 +16,41 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Hintergrund-Vielfalt gegen "Produktshot-Reflex" (vierte Runde)
+
+**Anlass:** Nutzer verglich 3 Bilder derselben Pipeline-Entwicklungsstufe und bemängelte den
+Hintergrund als "langweilig trotz Wiedererkennungswert" - trotz unterschiedlicher Motive hatten
+alle drei denselben Aufbau: ein Objekt freigestellt vor einer flachen Navy-Fläche. Ursache
+identifiziert: Das eigene Brand-Signature-Beispiel aus der vorherigen Runde ("Navy als große
+ruhige Hintergrundfläche...") wurde vom Modell als Standardlösung übernommen statt als eine
+von mehreren Optionen - ein selbst verursachtes Problem.
+
+**Umgesetzt:**
+
+1. `art_director.py`: neues Enum-Feld **`hintergrund_typ`** (Echte fotografische Umgebung /
+   Freigestellt vor einfarbiger Fläche / Nahaufnahme-Textur / Illustrativ-grafisch) - macht die
+   bisher unausgesprochene Standardwahl explizit und damit steuerbar. In den Varianz-Mechanismus
+   aufgenommen (verhindert Wiederholung über mehrere Beiträge).
+2. `art_director.py`: neue 7. Achse "Hintergrund/Umgebung" mit expliziter
+   **VORSICHT-PRODUKTSHOT-REFLEX**-Warnung; Brand-Signature-Beispiel von einem auf vier
+   unterschiedliche, gleichwertige Umsetzungswege erweitert (Umgebungslicht in echter Szene,
+   Material eines Objekts in echter Umgebung, Farbdetail im Raum, reiner Kontrast ohne
+   wörtliche Farbfläche).
+3. `creative_director.py`: "Objektmotiv"-Route Richtung echter Still-Life-Fotografie
+   geschärft (Materialtextur, Umgebungslicht, Schärfentiefe) statt flachem Studio-/Render-Look.
+4. `image_producer.py`: gleiche Produktshot-Warnung in Priorität B verankert, Hintergrund-Typ
+   aus dem Art Board wird an den finalen Bildprompt durchgereicht.
+
+**Lehre für künftige Runden:** Ein einzelnes konkretes Beispiel in einem LLM-Prompt wird leicht
+als Standardlösung generalisiert, auch wenn es nur illustrativ gemeint war - bei neuen
+Beispielen künftig entweder mehrere stilistisch unterschiedliche Varianten angeben oder explizit
+als "eine von mehreren Optionen" markieren.
+
+**Nicht geprüft:** Wie bei allen vorherigen Runden nur statisch getestet, keine echte
+Bildgenerierung möglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Externe Kritik geprüft und teilweise umgesetzt (dritte Runde)
 
 **Anlass:** Externe Bewertung (ChatGPT) der gesamten Pipeline nach der zweiten Runde oben.
