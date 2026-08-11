@@ -190,6 +190,14 @@ PRIORITÄT A - UNVERHANDELBAR
 - Logo-Schutzzonen (unten links + oben rechts, Maße im User-Prompt) MÜSSEN frei von wichtigem
   Bildinhalt bleiben.
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen (außer HILO-Logo).
+- **KEINE echten oder erkennbar nachgebildeten Hoheitszeichen, Institutions- oder Marken-Logos**
+  (außer HILO) - Bundesadler, Bundeswehr-/Polizei-/Zoll-/Behörden-Abzeichen, Wappen,
+  Dienstsiegel, aber genauso Logos/Schriftzüge echter Behörden (z.B. "Agentur für Arbeit"),
+  Banken, Versicherungen oder anderer Firmen/Organisationen. Auch bei thematisch naheliegenden
+  Motiven (Uniform, Behördenbrief, Bankschreiben) NIEMALS ein echtes fremdes Logo/Emblem
+  abbilden, auch nicht stilisiert/angedeutet - das Objekt (Umschlag, Uniform, Dokument) darf
+  gezeigt werden, aber OHNE erkennbares fremdes Kennzeichen. Rechtliches Risiko, kein Stilfehler
+  - hat Vorrang vor jeder anderen Vorgabe.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRIORITÄT B - VISUELLE WIRKUNG (Scroll-Stop)

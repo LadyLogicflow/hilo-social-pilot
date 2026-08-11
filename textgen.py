@@ -443,7 +443,10 @@ def _build_prompt(thema, kanal=None):
         "Feldern:\n"
         '{"ueberschrift": "max 60 Zeichen", "subline": "max 90 Zeichen", '
         '"bullets": ["3 sehr kurze Stichpunkte, je max 5 Woerter"], "cta": "kurze Handlungsaufforderung", '
-        '"slogan": "max 3 Woerter oder leer", '
+        '"slogan": "kurzer Claim (max 3 Woerter), der zur Kernaussage/Emotion DIESES Beitrags '
+        'passt - keine austauschbare Standard-Floskel. Beispiele je nach Thema: bei '
+        'Unterstuetzungs-/Beratungsthemen etwa Fair beraten, bei Fristen/Terminen etwa Jetzt '
+        'handeln, bei Geld-Themen etwa Mehr fuer Sie. Oder leer, wenn nichts Passendes einfaellt", '
         '"szene_motiv": "INSZENIERTE Still-Life-Szene mit Objekten/Gegenstaenden - KEINE Personen! Symbolische Objekte zum Thema: Aktenordner, Kalender, Muenzen, Sparschwein, Taschenrechner, Dokumente, Stifte, Stempel, etc. Beschreibe AUSFUEHRLICH (2-3 Saetze): (1) Welche Objekte, (2) Wie arrangiert/inszeniert, (3) Licht/Atmosphaere/Farben. Sei KONKRET und DETAILLIERT - das Motiv ist die Grundlage fuer ein hochwertiges Foto.", '
         '"bild_motiv": "Alternatives Still-Life-Motiv - NUR Objekte, keine Menschen. Kurz beschreiben.", '
         '"hero": "kurze ECHTE Zahl/Datum/Betrag aus dem Inhalt oder leer", '
@@ -639,7 +642,12 @@ def _create_drafts(rows, kanal):
                     # Nur Logo-Kreise hinzufügen (GPT schreibt Text schon ins Bild!)
                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_raw:
                         result.image.save(tmp_raw.name, "PNG")
-                        slogan = _bildgen.pick_slogan("")
+                        # Bugfix: vorher wurde hier "" uebergeben, der von Claude gerade erst
+                        # generierte, zum Thema passende Slogan (data["slogan"]) ging verloren -
+                        # stattdessen wurde IMMER zufaellig aus der generischen Standard-Liste
+                        # gezogen. Jetzt wird der tatsaechliche Slogan respektiert (Fallback auf
+                        # die Standard-Liste bleibt erhalten, wenn slogan leer/zu lang ist).
+                        slogan = _bildgen.pick_slogan(data.get("slogan", ""))
 
                         from config import DATA_DIR as _DATA_DIR
                         _os.makedirs(_DATA_DIR, exist_ok=True)

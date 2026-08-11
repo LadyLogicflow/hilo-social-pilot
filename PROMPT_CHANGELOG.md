@@ -16,6 +16,115 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Hoheitszeichen-Regel auf fremde Logos erweitert (siebte Runde)
+
+**Anlass:** Ein Bild zu "Kindergeld weg" zeigte einen Brief-Umschlag mit deutlich lesbarem
+"Agentur für Arbeit"-Logo - ein echtes Behoerdenlogo, kein Hoheitszeichen im engeren Sinne
+(anders als der Bundesadler-Fall der fuenften Runde), aber derselbe Grundkonflikt: ein echtes
+fremdes Institutions-Kennzeichen im Bild.
+
+**Umgesetzt:** Die Regel aus der fuenften Runde in allen drei Dateien erweitert - nicht mehr
+nur "keine Hoheitszeichen", sondern "keine Hoheitszeichen UND keine echten Institutions-/
+Marken-Logos" (Behoerden, Banken, Versicherungen, andere Firmen), jeweils außer HILO:
+
+1. `image_producer.py`: Prioritaet-A-Regel erweitert.
+2. `creative_director.py`: Hinweis in der Konzeptphase erweitert.
+3. `visual_qa.py`: Pydantic-Feld umbenannt von `enthaelt_hoheitszeichen` zu
+   **`enthaelt_fremdes_kennzeichen`** (deckt jetzt beides ab), bleibt hartes
+   Ausschlusskriterium unabhaengig vom Score. System-Prompt, User-Prompt und Freigabe-Regel-
+   Text entsprechend nachgezogen.
+
+**Nicht geprueft:** Keine echte Bildgenerierung moeglich in dieser Umgebung - insbesondere
+nicht verifiziert, ob das Vision-Modell kleine/teilverdeckte Logos (wie auf einem Umschlag)
+zuverlaessig erkennt.
+
+---
+
+## 2026-08-11 – Themenbezogener Slogan (sechste Runde)
+
+**Anlass:** Nutzer bemaengelte, dass der Slogan im blauen Kreis nicht zum Thema des jeweiligen
+Beitrags passt. Zwei Ursachen gefunden:
+
+1. `textgen.py::_build_prompt()` (aktiver Text-Generierungs-Prompt fuer neue Beitraege) gab dem
+   Slogan-Feld keinerlei inhaltliche Vorgabe - nur "max 3 Woerter oder leer". Claude lieferte
+   dadurch beliebige austauschbare Floskeln unabhaengig vom Thema.
+2. **Bug:** `textgen.py::_create_drafts()` (Bilderzeugung fuer NEU erstellte Beitraege) rief
+   `bildgen.pick_slogan("")` mit hartcodiertem leeren String auf - der von Claude gerade erst
+   generierte, themenbezogene Slogan (`data["slogan"]`) wurde dadurch nie verwendet, stattdessen
+   IMMER zufaellig aus der generischen 6er-Standardliste gezogen. Nur beim spaeteren Klick auf
+   "Nur Foto neu erzeugen" (anderer Code-Pfad in `web.py`) wurde der echte Slogan respektiert -
+   das erklaerte die Inkonsistenz zwischen frisch erzeugten und neu generierten Bildern.
+
+**Umgesetzt:**
+
+1. `textgen.py::_build_prompt()`: Slogan-Feld-Vorgabe praezisiert - soll zur Kernaussage/Emotion
+   DIESES Beitrags passen, keine austauschbare Standard-Floskel, mit Beispielen je Themenart.
+2. `textgen.py::_create_drafts()`: Bug gefixt - `pick_slogan(data.get("slogan", ""))` statt
+   `pick_slogan("")`, der generierte Slogan wird jetzt tatsaechlich verwendet.
+
+**Nicht geprueft:** Keine echte Bildgenerierung moeglich in dieser Umgebung - insbesondere
+nicht verifiziert, ob Claude mit der neuen Vorgabe zuverlaessig thematisch passende Slogans
+liefert oder weiterhin oft leer/generisch bleibt.
+
+---
+
+## 2026-08-11 – Hoheitszeichen-Verbot (fünfte Runde)
+
+**Anlass:** Ein generiertes Bild zu "Freiwilliger Wehrdienst – kein Kindergeld?" zeigte ein
+erkennbares Bundesadler-Hoheitsabzeichen auf einer Uniformschulter. Das ist kein Gestaltungs-,
+sondern ein Compliance-Risiko (Wappenschutz/amtliche Kennzeichen) - unabhängig von der sonstigen
+Bildqualität nicht akzeptabel. Bewusst SOFORT gefixt, nicht erst gesammelt/abgewartet wie die
+anderen offenen Beobachtungen (Text/Kreis-Kollision, Zielgruppen-Darstellung).
+
+**Umgesetzt:**
+
+1. `image_producer.py`: neue PRIORITÄT-A-Regel (unverhandelbar) - keine echten oder erkennbar
+   nachgebildeten staatlichen Hoheitszeichen (Bundesadler, Bundeswehr-/Polizei-/Zoll-/Behörden-
+   Abzeichen, Wappen, Dienstsiegel). Auch bei Uniform-/Behörden-Themen: Umfeld ja, Emblem nein.
+2. `creative_director.py`: gleiche Regel als Hinweis für die Konzeptphase ergänzt, damit
+   Routen mit Uniform-Bezug das Problem gar nicht erst anlegen.
+3. `visual_qa.py`: neues **hartes Ausschlusskriterium** `enthaelt_hoheitszeichen` (analog zu
+   `headline_text_exakt`) - unabhängig vom Gesamtscore führt ein erkanntes Hoheitszeichen immer
+   zur Ablehnung. Sicherheitsnetz, falls Priorität A trotzdem mal nicht greift.
+
+**Nicht geprüft:** Wie bei allen vorherigen Runden nur statisch getestet, keine echte
+Bildgenerierung möglich in dieser Umgebung - insbesondere nicht verifiziert, ob das Vision-
+Modell bei Visual QA ein stilisiertes/unscharfes Hoheitszeichen zuverlässig erkennt.
+
+
+**Anlass:** Nutzer verglich 3 Bilder derselben Pipeline-Entwicklungsstufe und bemängelte den
+Hintergrund als "langweilig trotz Wiedererkennungswert" - trotz unterschiedlicher Motive hatten
+alle drei denselben Aufbau: ein Objekt freigestellt vor einer flachen Navy-Fläche. Ursache
+identifiziert: Das eigene Brand-Signature-Beispiel aus der vorherigen Runde ("Navy als große
+ruhige Hintergrundfläche...") wurde vom Modell als Standardlösung übernommen statt als eine
+von mehreren Optionen - ein selbst verursachtes Problem.
+
+**Umgesetzt:**
+
+1. `art_director.py`: neues Enum-Feld **`hintergrund_typ`** (Echte fotografische Umgebung /
+   Freigestellt vor einfarbiger Fläche / Nahaufnahme-Textur / Illustrativ-grafisch) - macht die
+   bisher unausgesprochene Standardwahl explizit und damit steuerbar. In den Varianz-Mechanismus
+   aufgenommen (verhindert Wiederholung über mehrere Beiträge).
+2. `art_director.py`: neue 7. Achse "Hintergrund/Umgebung" mit expliziter
+   **VORSICHT-PRODUKTSHOT-REFLEX**-Warnung; Brand-Signature-Beispiel von einem auf vier
+   unterschiedliche, gleichwertige Umsetzungswege erweitert (Umgebungslicht in echter Szene,
+   Material eines Objekts in echter Umgebung, Farbdetail im Raum, reiner Kontrast ohne
+   wörtliche Farbfläche).
+3. `creative_director.py`: "Objektmotiv"-Route Richtung echter Still-Life-Fotografie
+   geschärft (Materialtextur, Umgebungslicht, Schärfentiefe) statt flachem Studio-/Render-Look.
+4. `image_producer.py`: gleiche Produktshot-Warnung in Priorität B verankert, Hintergrund-Typ
+   aus dem Art Board wird an den finalen Bildprompt durchgereicht.
+
+**Lehre für künftige Runden:** Ein einzelnes konkretes Beispiel in einem LLM-Prompt wird leicht
+als Standardlösung generalisiert, auch wenn es nur illustrativ gemeint war - bei neuen
+Beispielen künftig entweder mehrere stilistisch unterschiedliche Varianten angeben oder explizit
+als "eine von mehreren Optionen" markieren.
+
+**Nicht geprüft:** Wie bei allen vorherigen Runden nur statisch getestet, keine echte
+Bildgenerierung möglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Hintergrund-Vielfalt gegen "Produktshot-Reflex" (vierte Runde)
 
 **Anlass:** Nutzer verglich 3 Bilder derselben Pipeline-Entwicklungsstufe und bemängelte den

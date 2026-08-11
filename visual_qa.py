@@ -96,6 +96,20 @@ class VisualQAVerdict(BaseModel):
         description="Der im Bild tatsächlich lesbare Überschriften-Text (exakt abgetippt, für Diagnose)"
     )
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # RECHTLICHES AUSSCHLUSSKRITERIUM (unabhaengig von Ueberschrift/Score)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    enthaelt_fremdes_kennzeichen: bool = Field(
+        default=False,
+        description="Zeigt das Bild ein echtes oder eindeutig erkennbares staatliches Hoheitszeichen "
+                     "(Bundesadler, Bundeswehr-/Polizei-/Zoll-/Behörden-Abzeichen, Wappen, Dienstsiegel) "
+                     "ODER ein echtes Institutions-/Marken-Logo (z.B. 'Agentur für Arbeit', Banken, "
+                     "Versicherungen, andere Firmen/Organisationen außer HILO)? Auch stilisierte/"
+                     "angedeutete Nachbildungen zählen. HARTES AUSSCHLUSSKRITERIUM - True führt IMMER "
+                     "zur Ablehnung, unabhängig vom Score."
+    )
+
     # Gesamtscore (wird CODE-seitig berechnet, nicht vom LLM - siehe _compute_score())
     gesamtscore: float = Field(ge=1.0, le=10.0, description="Durchschnitt aller Bewertungen")
 
@@ -150,6 +164,10 @@ def _compute_qa_score(verdict: "VisualQAVerdict", mit_headline: bool = False) ->
 
     # Hartes Ausschlusskriterium: falsch geschriebene Überschrift
     if mit_headline and not verdict.headline_text_exakt:
+        verdict.freigegeben = False
+
+    # Hartes Ausschlusskriterium: Hoheitszeichen oder fremdes Logo im Bild (rechtliches Risiko)
+    if verdict.enthaelt_fremdes_kennzeichen:
         verdict.freigegeben = False
 
 
@@ -226,6 +244,13 @@ GATE A CHECKS (vor Text-Rendering):
    - Bildqualität okay?
    - Keine Artefakte, strange Proportionen?
    - Bei Personen: anatomisch korrekt? (Hände, Finger, Gliedmaßen)
+   - enthaelt_fremdes_kennzeichen: Zeigt das Bild ein echtes oder eindeutig erkennbares
+     staatliches Hoheitszeichen (Bundesadler, Bundeswehr-/Polizei-/Zoll-/Behörden-Abzeichen,
+     Wappen, Dienstsiegel) ODER ein echtes Institutions-/Marken-Logo (z.B. "Agentur für
+     Arbeit", Banken, Versicherungen, andere Firmen/Organisationen außer HILO)? Auch
+     stilisierte/angedeutete Nachbildungen zählen als True. HARTES AUSSCHLUSSKRITERIUM -
+     unabhängig vom Score, führt IMMER zur Ablehnung. Prüfe das besonders bei Uniform-/
+     Behörden-/Bank-Motiven genau (Schulterklappen, Briefköpfe, Umschlag-Absender, Kragenspiegel).
 
 6. **Schutzzonen frei? (1-10)**
    - Die Logo-Kreise werden später unten links und oben rechts platziert
@@ -262,6 +287,7 @@ GATE A CHECKS (vor Text-Rendering):
 - Gesamtscore >= 8.0 → Freigegeben
 - Gesamtscore < 8.0 → Abgelehnt (neu generieren)
 - Falsch geschriebene Überschrift → IMMER abgelehnt
+- Erkennbares staatliches Hoheitszeichen oder fremdes Institutions-/Marken-Logo → IMMER abgelehnt
 
 Sei kritisch aber fair!
 Wichtig: Bewerte NUR die Einzelkriterien (1-10). Gesamtscore und Freigabe werden vom System
@@ -304,7 +330,7 @@ Bewerte (1-10):
 2. Focal Point vollständig?
 3. Textzonen nutzbar?
 4. Markenpassung (HILO: warm, professionell, persönlich - auffällig/kontraststark ist ERWÜNSCHT)?
-5. Technische Qualität (inkl. Anatomie bei Personen)?
+5. Technische Qualität (inkl. Anatomie bei Personen, KEINE Hoheitszeichen/fremden Logos)?
 6. Schutzzonen unten links + oben rechts frei (je ca. 22% × 28%)?
 7. Scroll-Stop-Wirkung (Thumbnail-Test: sofort verständlich/dominant auch bei ca. 180×180px)?
 
