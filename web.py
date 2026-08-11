@@ -785,6 +785,9 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
     </form>
     <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
+    <form method=post action="/bild-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Nur ein neues Foto erzeugen? Überschrift, Bullets, CTA und Begleittext bleiben unverändert.')">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <button style="background:#6b7280" title="Nur ein neues Foto über die volle ShareNext-Pipeline erzeugen - Text bleibt exakt gleich">&#x1F3B2; Nur Foto neu erzeugen</button></form>
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
         <button class=ok name=aktion value=freigeben>Freigeben</button>
@@ -2018,6 +2021,35 @@ def beitrag_neu(eid):
         flash("Beitrag %d: Text aktualisiert, aber das Bild schlug fehl - der Beitrag liegt jetzt wieder "
               "unter „3. Freigabe: Texte & Bilder“ zur Prüfung." % eid)
     return redirect(url_for("einplanung"))
+
+@app.route("/bild-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def bild_neu(eid):
+    """Erzeugt NUR ein neues Bild ueber die volle ShareNext-Pipeline (Message Brief -> Creative
+    Director -> Concept Jury -> Art Director -> Image Producer -> Visual QA + CI-Kreise). Text,
+    Ueberschrift, Bullets, CTA und Begleittext (Caption) bleiben UNVERAENDERT - es wird kein
+    einziges Wort neu generiert, nur ein neues Foto mit der bestehenden Ueberschrift."""
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+    try:
+        data = json.loads(e["text"])
+        out = _sharenext_bild_synchron(data, eid)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), out, eid))
+            audit_log(conn, session["user"], "bild_neu_erzeugt", eid, "sharenext")
+            conn.commit()
+        flash("Neues Bild für Beitrag %d erzeugt (Text/Begleittext unverändert)." % eid)
+    except Exception as ex:
+        flash("Bild konnte nicht erzeugt werden: %s" % ex)
+    return redirect(ziel)
 
 @app.route("/text-neu/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
