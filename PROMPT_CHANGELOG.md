@@ -16,6 +16,44 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-11 – Ursache statt Symptom: Kernaussage plattet auf "Geld sparen" (achte Runde)
+
+**Anlass:** Nutzer beobachtete, dass beim wiederholten Neu-Generieren AUS DEMSELBEN bereits
+erzeugten Text (Ueberschrift, Bullets, Begleittext unveraendert) immer wieder Euro-Symbol-
+Objekte entstanden (Euro-Kuchen, Euro-Schokolade, Schluessel mit Euro-Bart, 3D-Euro-Zeichen)
+und fragte, ob der TEXT selbst die Ursache ist - nicht nur die Bild-Prompts. Textabgleich
+bestaetigt das: beide betroffenen Texte sind durchgehend Geld-Vokabular ("bares Geld
+verschenken", "Steuergeld", "Gehaltsbonus", "spart... echtes Geld"). Das Message Brief
+reduziert das vermutlich auf eine generische "Geld sparen"-Kernaussage, die der Bildregie kaum
+einen anderen Ansatzpunkt laesst als ein Geld-Symbol - genau das Euro-Symbol, das wir in Runde 1
+selbst explizit als "kein Klischee" freigegeben hatten und das jetzt dadurch zum neuen Reflex
+wurde.
+
+**Umgesetzt:**
+
+1. `message_brief.py`: neue Regel "KERNAUSSAGE NICHT AUF GELD SPAREN PLATTDRUECKEN" - das
+   Modell soll den spezifischsten/ueberraschendsten inhaltlichen Aufhaenger aus dem Text
+   extrahieren (z.B. die rechtliche Unterscheidung eigene Eltern vs. Schwiegereltern, oder dass
+   Erholungsbeihilfe auch Ehegatte/Kinder einschliesst) statt die generische Geld-Ebene als
+   Kernaussage zu verwenden. Das ist der Fix an der WURZEL der Pipeline, nicht nur am Symptom.
+2. `creative_director.py`: NICHT geaendert wie urspruenglich geplant - der Nutzer hat die
+   Ruecknahme der "Euro-Symbol ist kein Klischee"-Freigabe aus Runde 1 ausdruecklich gestoppt
+   ("noch nicht zuruecknehmen"), um erst zu testen, ob der message_brief.py-Fix allein (Ursache
+   statt Symptom) das Problem schon behebt, bevor zusaetzlich am Symptom nachgeschaerft wird.
+   Nur ein Formatierungsfehler behoben (fehlender Zeilenumbruch nach der Ueberschrift
+   "ABGENUTZTE BILDSPRACHE") - inhaltlich unveraendert.
+
+**Lehre:** Diese Runde bestaetigt das Muster aus der vierten Runde nochmal auf einer anderen
+Ebene - nicht nur einzelne Beispiele werden vom Modell generalisiert, sondern auch eine ZU
+GENERISCHE vorgelagerte Kernaussage (Message Brief) zwingt alle nachfolgenden Stufen in
+denselben engen Loesungsraum, unabhaengig davon wie gut deren eigene Prompts sind. Der
+wirksamste Hebel gegen ein Wiederholungsmuster liegt manchmal nicht in der Stufe, die das
+Symptom zeigt (Image Producer), sondern eine oder mehrere Stufen davor (Message Brief).
+
+**Nicht geprueft:** Keine echte Bildgenerierung moeglich in dieser Umgebung.
+
+---
+
 ## 2026-08-11 – Hoheitszeichen-Regel auf fremde Logos erweitert (siebte Runde)
 
 **Anlass:** Ein Bild zu "Kindergeld weg" zeigte einen Brief-Umschlag mit deutlich lesbarem

@@ -150,6 +150,20 @@ Wichtig:
 - Reaktion: Realistisch (meist "Termin buchen", "Frist merken", "Artikel lesen")
 - Funnel-Stufe: Logisch aus Stream ableiten, aber flexibel
 
+KERNAUSSAGE NICHT AUF "GELD SPAREN" PLATTDRÜCKEN (WICHTIG!):
+
+Sehr viele HILO-Themen haben irgendwo einen Geld-/Steuervorteil - das macht "Geld sparen" oder
+"Steuervorteil nutzen" zur bequemsten, aber am wenigsten hilfreichen Kernaussage. Sie liefert der
+Bildregie keinen Ansatzpunkt außer generischen Geld-/Euro-Symbolen, die sich über fast jedes
+Thema stülpen lassen und dadurch austauschbar wirken. Suche stattdessen den SPEZIFISCHSTEN,
+überraschendsten Aufhänger im Text - meist eine konkrete Unterscheidung, Bedingung oder ein
+Detail, das die eigentliche Story ist:
+- "Unterhaltspflicht bei eigenen Eltern ja, bei Schwiegereltern rechtlich NICHT" ist die Story,
+  nicht "man kann Geld absetzen" - die rechtliche Unterscheidung ist der Aufhänger.
+- "Erholungsbeihilfe gilt auch für Ehegatte und Kinder, nicht nur den Arbeitnehmer selbst" ist
+  die Story, nicht "es gibt einen Steuervorteil beim Gehalt".
+Die Geld-Ebene ist fast immer der Hintergrund, nicht die eigentliche Nachricht - die Kernaussage
+sollte den konkreten Twist/die konkrete Bedingung benennen, nicht nur "spart Steuern".
 ZIELGRUPPE - PRÄZISE ABLEITEN (WICHTIG!):
 
 "Arbeitnehmer und Rentner" oder "Steuerzahler" ist KEINE brauchbare Zielgruppe - das trifft auf

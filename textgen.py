@@ -67,15 +67,26 @@ CHANNEL_GUIDE = {
     "facebook": (
         "PLATTFORM FACEBOOK (Hauptkanal): Freundlich, persoenlich, etwas ausfuehrlicher - Zielgruppe hier "
         "am staerksten (Rentner, Familien). HOECHSTENS 150 Woerter. HOECHSTENS 2 Emojis. KEIN Link und "
-        "KEIN Verweis auf einen Link im Text (ein Termin-Hinweis wird automatisch ergaenzt). Beende mit "
-        "4 bis 5 thematisch passenden Hashtags, #HILO als LETZTEN."
+        "KEIN Verweis auf einen Link im Text (ein Termin-Hinweis wird automatisch ergaenzt). "
+        "ALGORITHMUS 2026 (wichtig): Hashtags haben auf Facebook praktisch KEINEN Reichweiten-Effekt mehr "
+        "(reine Kategorisierung) - HOECHSTENS 1 Hashtag (#HILO), wenn ueberhaupt, KEINE Hashtag-Reihe am "
+        "Ende. Stattdessen zaehlt: Kommentare mit mind. 5 Woertern werden deutlich staerker gewichtet als "
+        "Likes - schliesse daher mit einer ECHTEN, offenen Frage, die zum Nachdenken/Erzaehlen einlaedt "
+        "(keine formelhafte Aufforderung wie 'Kommentiere!' oder 'Teile das!' - das wird vom Algorithmus "
+        "als Engagement-Bait erkannt und sogar ABGEWERTET). Die Frage muss zum Thema passen und eine "
+        "persoenliche Antwort ermoeglichen, nicht nur Ja/Nein."
     ),
     "instagram": (
         "PLATTFORM INSTAGRAM (Hauptkanal): Moderner, visuell gedacht - das Bild traegt die Hauptlast. "
         "HOECHSTENS 100 Woerter. HOECHSTENS 2 Emojis. Der Hook MUSS in die ersten 125 Zeichen passen. "
         "Gestalte den Inhalt so, dass man ihn gern weitersendet (praktischer Tipp oder Ueberraschungseffekt). "
         "KEINE URL und KEIN Verweis auf einen Link im Text (ein Bio-Hinweis wird automatisch ergaenzt). "
-        "Beende mit 3 bis 5 thematisch gebuendelten Hashtags, #HILO als LETZTEN."
+        "ALGORITHMUS 2026 (wichtig): Instagram hat das Hashtag-Limit selbst auf 5 pro Post gesenkt und "
+        "bestaetigt, dass Hashtags NICHT die Reichweite treiben, sondern nur zur Kategorisierung dienen. "
+        "Wichtiger als Hashtags: die relevanten Suchbegriffe/Themenwoerter natuerlich im FLIESSTEXT "
+        "verwenden (das liest der Algorithmus fuer die Einordnung), nicht nur in Hashtags parken. Beende "
+        "trotzdem mit 3 bis 5 thematisch praezisen Hashtags (kein Spam, keine generischen Massen-Tags), "
+        "#HILO als LETZTEN - das hilft der Kategorisierung, ist aber kein Reichweiten-Hebel."
     ),
     "linkedin": (
         "PLATTFORM LINKEDIN: Sachlich-informativer Ton, Fachsprache erlaubt, KEIN Werbeton."
@@ -450,8 +461,9 @@ def _build_prompt(thema, kanal=None):
         '"szene_motiv": "INSZENIERTE Still-Life-Szene mit Objekten/Gegenstaenden - KEINE Personen! Symbolische Objekte zum Thema: Aktenordner, Kalender, Muenzen, Sparschwein, Taschenrechner, Dokumente, Stifte, Stempel, etc. Beschreibe AUSFUEHRLICH (2-3 Saetze): (1) Welche Objekte, (2) Wie arrangiert/inszeniert, (3) Licht/Atmosphaere/Farben. Sei KONKRET und DETAILLIERT - das Motiv ist die Grundlage fuer ein hochwertiges Foto.", '
         '"bild_motiv": "Alternatives Still-Life-Motiv - NUR Objekte, keine Menschen. Kurz beschreiben.", '
         '"hero": "kurze ECHTE Zahl/Datum/Betrag aus dem Inhalt oder leer", '
-        '"captions": {"facebook": "Begleittext fuer Facebook inkl. Hashtags am Ende, hoechstens %d '
-        'Zeichen", "instagram": "Begleittext fuer Instagram inkl. Hashtags am Ende, hoechstens %d '
+        '"captions": {"facebook": "Begleittext fuer Facebook (siehe Plattform-Vorgaben oben - Hashtags '
+        'NICHT vorschreiben, endet mit einer echten offenen Frage), hoechstens %d '
+        'Zeichen", "instagram": "Begleittext fuer Instagram inkl. 3-5 praeziser Hashtags am Ende, hoechstens %d '
         'Zeichen", "whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
         '"whatsapp_story": "max 2 Saetze mit Handlungsaufforderung, ohne Hashtags/Links"}}\n'
         "Sprache: Deutsch, Sie-Form."

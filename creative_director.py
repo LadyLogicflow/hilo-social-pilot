@@ -245,7 +245,8 @@ Wichtig:
   Uniform, Formular) ja, ein echtes fremdes Kennzeichen darauf nein. Rechtliches Risiko, hat
   Vorrang vor Scroll-Stop-Überlegungen.
 
-ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):- generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
+ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
+- generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
   Händeschütteln vor Glaswand, Daumen hoch im Anzug)
 - sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
 - übertriebenes/unnatürliches Lächeln
