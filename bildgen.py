@@ -599,9 +599,11 @@ def render_slides(fields, photo_path, slogan, out_dir, prefix, max_slides=6, por
     return paths
 
 def render_drafts():
-    import bildmotiv
+    """Erzeugt Bilder fuer alle neuen Entwuerfe ohne bild_pfad - ueber die ShareNext-Pipeline
+    (GPT integriert die Ueberschrift direkt ins Foto, Pillow ergaenzt danach nur die beiden
+    CI-Kreise). Die alte Karten-Pipeline (Pille/Bullets/CTA per Pillow) wird nicht mehr verwendet."""
+    from sharenext_pipeline import run_sharenext_pipeline
     from db import get_conn
-    out_dir = os.path.join(DATA_DIR, "bilder")
     done = 0
     with get_conn() as conn:
         rows = conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' "
@@ -611,15 +613,24 @@ def render_drafts():
             fields = json.loads(r["text"])
         except Exception:
             continue
-        photo = bildmotiv.ensure_photo_fuer(fields)
-        slogan = pick_slogan(fields.get("slogan"))
-        out = os.path.join(out_dir, "entwurf_%d.png" % r["id"])
+        out = os.path.join(DATA_DIR, "entwurf_%d.png" % r["id"])
         try:
-            render(fields, photo, slogan, out)
+            headline = fields.get("ueberschrift", "")
+            bullets = fields.get("bullets", [])
+            text = "\n".join(bullets) if bullets else ""
+            kanal = fields.get("kanal", "Facebook")
+            result = run_sharenext_pipeline(
+                stream="radar", thema=headline, text=text, kanal=kanal,
+                headline=headline, size="1024x1024", quality="medium")
+            result.image.save(out)
+            slogan = pick_slogan(fields.get("slogan"))
+            tmp = out + ".tmp_logos.png"
+            add_logo_circles(out, slogan, tmp, pos="unten")
+            os.replace(tmp, out)
             with get_conn() as conn:
                 conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, r["id"]))
             done += 1
-            log.info("Bild erzeugt: Entwurf %s", r["id"])
+            log.info("Bild erzeugt (ShareNext): Entwurf %s", r["id"])
         except Exception as ex:
             log.warning("Bilderzeugung fehlgeschlagen (Entwurf %s): %s", r["id"], ex)
     return done

@@ -89,9 +89,9 @@ def _kanal_fuer(prefix, tid):
     return k if k in ("facebook", "instagram", "beide") else "facebook"
 
 def _format(name, default="einzelbild"):
-    """Liest ein Bildformat aus dem Formular (einzelbild|karussell), Default sonst."""
-    v = (request.form.get(name) or "").strip()
-    return v if v in ("einzelbild", "karussell") else default
+    """Liest ein Bildformat aus dem Formular. Karussell/Slides wurden entfernt (ShareNext liefert
+    nur noch Einzelbilder) - unabhaengig vom Formularwert wird IMMER 'einzelbild' geliefert."""
+    return "einzelbild"
 
 _QUELLE_LABELS = {
     "bvl_pm": "BVL-Pressemitteilungen", "bvl_dpa": "BVL / dpa-Themen", "hilo": "HILO-Meldungen",
@@ -313,7 +313,7 @@ def _publiziere_geplant(gpid):
     except Exception:
         f = {}
     fmt_fb = gp["format_fb"] or gp["format"] or "einzelbild"
-    fmt_ig = gp["format_ig"] or gp["format"] or "karussell"
+    fmt_ig = gp["format_ig"] or gp["format"] or "einzelbild"
     kanal = gp["kanal"] or "facebook"
     ziel_name = "?"
     with get_conn() as conn:
@@ -514,7 +514,7 @@ def _pool_tagesziehung(conn, datum=None, rng=None):
             z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
             conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
                          "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
-                         (eid, sid, kanal, "einzelbild", "einzelbild", "karussell", "%sT%s" % (datum, z)))
+                         (eid, sid, kanal, "einzelbild", "einzelbild", "einzelbild", "%sT%s" % (datum, z)))
             pool.markiere_verbraucht(conn, eid, sid, kanal)
             n += 1
     if n:
@@ -845,7 +845,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
       <button style="background:#0B2545;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
-    <p><a href="/beitrag/{{e.id}}" style="color:#0B2545;font-weight:bold;text-decoration:none">{% if e.format=='karussell' %}&#x1F5BC;&#xFE0F; Komplettes Karussell ansehen{% else %}&#x1F50D; Beitrag ansehen{% endif %} &amp; für WhatsApp &rarr;</a></p>
+    <p><a href="/beitrag/{{e.id}}" style="color:#0B2545;font-weight:bold;text-decoration:none">&#x1F50D; Beitrag ansehen &amp; für WhatsApp &rarr;</a></p>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:4px 0 10px" onsubmit="return confirm('Diesen zeitlosen Beitrag in den Zufalls-Pool aufnehmen?\n\nEr wird dann automatisch ausgespielt – je Beratungsstelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal. Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
       <button style="background:#4D7C0F" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
       <span class=hint>für zeitlose Beiträge – statt manuell einzuplanen</span></form>
@@ -857,8 +857,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
           <option value="instagram">Instagram</option>
           <option value="beide"{% if (s.fb_seite|string) in ig_seiten %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
       <span class=fmt>Facebook: <select name=format_fb title="Bildformat für Facebook">
-        <option value="einzelbild" selected>Einzelbild</option>
-        <option value="karussell">Karussell</option></select></span>
+        <option value="einzelbild" selected>Einzelbild</option></select></span>
       <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
         <option value="einzelbild" selected>Einzelbild</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
@@ -876,8 +875,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
           <option value="instagram">Instagram</option>
           <option value="beide"{% if p.ig_username %} selected{% endif %}>Facebook + Instagram</option></select></span>{% endfor %}</div>
       <span class=fmt>Facebook: <select name=format_fb title="Bildformat für Facebook">
-        <option value="einzelbild" selected>Einzelbild</option>
-        <option value="karussell">Karussell</option></select></span>
+        <option value="einzelbild" selected>Einzelbild</option></select></span>
       <span class=fmt>Instagram: <select name=format_ig title="Bildformat für Instagram">
         <option value="einzelbild" selected>Einzelbild</option></select></span>
       <label class=fmt style="font-weight:normal"><input type=checkbox name=story_ig value="1" checked> Bei Instagram zusätzlich als Story posten</label>
@@ -953,7 +951,7 @@ VORSCHAU = """<!doctype html><meta charset=utf-8><title>Vorschau vor Veröffentl
 <div class=bar><h2 style="margin:0">Vorschau vor Veröffentlichung</h2><a href="/einplanung">&larr; Einplanung</a></div>
 <div style="max-width:1200px;margin:0 auto 12px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-<p class=hint>Prüfe für jede Beratungsstelle, ob <b>Porträt-Kreis, Name, Ort und Begleittext</b> stimmen. Erst wenn alles passt, unten auf „Jetzt veröffentlichen" klicken.<br><i>Format &ndash; Facebook: {{'Karussell' if fmt_fb=='karussell' else 'Einzelbild'}}, Instagram: {{'Karussell' if fmt_ig=='karussell' else 'Einzelbild'}}. Die Vorschau zeigt die personalisierte Bildvariante; ein Karussell enthält beim Posten zusätzlich mehrere Slides.</i></p>
+<p class=hint>Prüfe für jede Beratungsstelle, ob <b>Porträt-Kreis, Name, Ort und Begleittext</b> stimmen. Erst wenn alles passt, unten auf „Jetzt veröffentlichen" klicken.<br><i>Die Vorschau zeigt die personalisierte Bildvariante.</i></p>
 </div>
 <div class=pv>
 {% for it in items %}
@@ -1032,7 +1030,7 @@ a.post{text-decoration:none;cursor:pointer}a.post:hover{filter:brightness(.94)}
 {% for c in woche %}<td class="{% if not c.im_monat %}out{% elif c.we %}we{% endif %}{% if c.heute %} heute{% endif %}">
 <span class=kt>{{c.tag}}</span>
 {% for b in c.besondere %}{% if 'Fristende' in b %}<span class=frist title="{{b}}">{{b}}</span>{% elif c.im_monat and not c.past %}<a class=anl href="/eigener?datum={{c.iso}}&anlass={{b|urlencode}}" title="Beitrag zu „{{b}}“ erstellen">{{b}}</a>{% else %}<span class=anl title="{{b}}">{{b}}</span>{% endif %}{% endfor %}
-{% for p in c.posts %}<a class="post{% if p.status=='veroeffentlicht' %} pub{% endif %}" href="/beitrag/{{p.id}}" title="{{p.titel}}{% if p.format=='karussell' %} – Karussell ansehen{% else %} – Beitrag ansehen{% endif %}">{% if p.format=='karussell' %}&#x1F5BC;&#xFE0F; {% endif %}{{p.titel}}</a>{% endfor %}
+{% for p in c.posts %}<a class="post{% if p.status=='veroeffentlicht' %} pub{% endif %}" href="/beitrag/{{p.id}}" title="{{p.titel}} – Beitrag ansehen">{{p.titel}}</a>{% endfor %}
 {% if c.im_monat and not c.past %}<a class=addpost href="/eigener?datum={{c.iso}}" title="Beitrag für diesen Tag erstellen">+ Beitrag</a>{% endif %}
 </td>{% endfor %}
 </tr>{% endfor %}
@@ -1058,14 +1056,8 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <h3 style="margin-top:0">{{e.f.ueberschrift}}</h3>
 <p class=meta>{{e.f.subline}}</p>
-<p><b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>{% if fmt=='karussell' %}Karussell ({{n_slides}} Slides){% else %}Einzelbild{% endif %} &middot; Status: {{status}}</span></p>
-{% if fmt=='karussell' and n_slides %}
-<div class=slides>{% for i in range(n_slides) %}<figure><img src="/beitrag-slide/{{e.id}}/{{i}}" alt="Slide {{i+1}}"><figcaption>Slide {{i+1}} von {{n_slides}}</figcaption></figure>{% endfor %}</div>
-{% elif fmt=='karussell' %}
-<p class=hint>Die Karussell-Slides konnten gerade nicht erzeugt werden – bitte später erneut öffnen.</p>
-{% else %}
+<p><b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>Einzelbild &middot; Status: {{status}}</span></p>
 <div class=single><img src="/bild/{{e.id}}" alt="Beitragsbild"></div>
-{% endif %}
 <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 {% if status in ('entwurf','freigegeben') %}
@@ -1100,7 +1092,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
   <textarea id=watext_s readonly>{{wa_allg_story}}</textarea>
   <div class=row>
     <button type=button onclick="copyId('watext_s',this)">Status-Text kopieren</button>
-    {% if fmt=='karussell' and n_slides %}{% for i in range(n_slides) %}<a class=dl href="/beitrag-slide/{{e.id}}/{{i}}" download="hilo_{{e.id}}_slide{{i+1}}.png">Slide {{i+1}} laden</a>{% endfor %}{% else %}<a class=dl href="/bild/{{e.id}}" download="hilo_{{e.id}}.png">Bild herunterladen</a>{% endif %}
+    <a class=dl href="/bild/{{e.id}}" download="hilo_{{e.id}}.png">Bild herunterladen</a>
     <a class="dl gn" href="/bild-status/{{e.id}}" title="Hochkant 9:16, ideal für Status/Story">Status-Version (hochkant) laden</a>
   </div>
   {% if wa_stellen %}
@@ -2057,19 +2049,15 @@ def text_neu(eid):
         # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
         for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
             neu.setdefault(k, prev.get(k, dflt))
-        # Bild an den überarbeiteten Text anpassen: Standard-Pipeline (bildmotiv + bildgen)
-        # verwendet Cache-Foto, daher keine zusätzlichen KI-Kosten.
-        import bildmotiv
-        photo = bildmotiv.ensure_photo_fuer(neu)
-        slogan = bildgen.pick_slogan(neu.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(neu, photo, slogan, out)
+        # Bild an den überarbeiteten Text anpassen: ShareNext-Pipeline (GPT integriert die
+        # Überschrift neu ins Foto, Pillow ergänzt die CI-Kreise) - ersetzt die alte Karten-Optik.
+        out = _sharenext_bild_synchron(neu, eid)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(neu, ensure_ascii=False), out, eid))
             audit_log(conn, session["user"], "text_ueberarbeitet", eid, feedback)
             conn.commit()
-        flash("Text von Beitrag %d überarbeitet (Bild an den neuen Text angepasst, kostenlos) - bitte prüfen." % eid)
+        flash("Text von Beitrag %d überarbeitet (Bild via ShareNext neu erzeugt) - bitte prüfen." % eid)
     except Exception as ex:
         flash("Text-Überarbeitung fehlgeschlagen: %s" % ex)
     return redirect(ziel)
@@ -2091,31 +2079,16 @@ def anderes_bild(eid):
         flash("Bild von Beitrag %d kann nicht gewechselt werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
-        import bildmotiv, stilwahl, textgen
         data = json.loads(e["text"])
-        with get_conn() as conn:
-            neu = stilwahl.anderen_stil_waehlen(conn, data)
-        if neu is None:
-            flash("Es ist nur ein Bild-Stil aktiv – bitte erst in der Verwaltung unter „Bild-Stil“ "
-                  "weitere Stile aktivieren, dann lässt sich ein anderes Bild würfeln.")
-            return redirect(ziel)
-        # Neuer Stil 'kreativ' und noch kein kreativ_motiv -> Art-Director-Motiv erzeugen (No-Op
-        # ohne Key; dann faellt kreativ auf die bestehende Szene zurueck).
-        if neu == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
-            textgen.art_director_motiv(data)
-        photo = bildmotiv.ensure_photo_fuer(data)   # neuer Stil -> ggf. neues KI-Foto
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(data, photo, slogan, out)
+        # Alte Stil-Logik (standard/ki_tafel/kreativ/comic) entfernt - es gibt nur noch ShareNext.
+        # "Anderes Bild" wuerfelt daher einfach eine frische ShareNext-Erzeugung (neues KI-Foto).
+        out = _sharenext_bild_synchron(data, eid)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(data, ensure_ascii=False), out, eid))
-            audit_log(conn, session["user"], "bild_stil_gewechselt", eid, neu)
+            audit_log(conn, session["user"], "bild_neu_erzeugt", eid, "sharenext")
             conn.commit()
-        _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ",
-                       "comic": "Comic"}
-        flash("Beitrag %d hat ein anderes Bild (Stil: %s, neues KI-Bild). Text und Termin bleiben."
-              % (eid, _stil_label.get(neu, neu)))
+        flash("Beitrag %d hat ein neues Bild (ShareNext, neues KI-Foto). Text und Termin bleiben." % eid)
     except Exception as ex:
         flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
@@ -2137,42 +2110,8 @@ def _premium_foto_hintergrund(eid, user):
         data = {}
 
     try:
-        from sharenext_pipeline import run_sharenext_pipeline
-        import uuid
-
-        # ShareNext Pipeline aufrufen
-        headline = data.get("ueberschrift", "")
-        bullets = data.get("bullets", [])
-        text = "\n".join(bullets) if bullets else ""
-        kanal = data.get("kanal", "Facebook")
-
-        result = run_sharenext_pipeline(
-            stream="radar",  # Default stream
-            thema=headline,
-            text=text,
-            kanal=kanal,
-            headline=headline,
-            size="1024x1024",
-            quality="medium"
-        )
-
-        # Bild speichern als entwurf_{eid}.png (ShareNext-Standard!)
-        # NICHT mehr premium_*.png - einheitliches Namens-Schema!
-        final_path = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
-        result.image.save(final_path)
-
-        # Logo-Kreise hinzufügen
-        slogan = bildgen.pick_slogan(data.get("slogan", ""))
-        temp_with_logos = final_path + ".tmp_logos.png"
-        bildgen.add_logo_circles(final_path, slogan, temp_with_logos, pos="unten")
-        os.replace(temp_with_logos, final_path)
-
-        # Daten aktualisieren
-        data["qa_approved"] = result.approved
-        data["qa_problems"] = [] if result.approved else ["ShareNext QA"]
-        data["bild_pfad"] = str(final_path)
+        final_path = _sharenext_bild_synchron(data, eid)
         data["bild_wird_erstellt"] = False
-        data["sharenext_used"] = True
 
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
@@ -2180,7 +2119,7 @@ def _premium_foto_hintergrund(eid, user):
             audit_log(conn, user, "premium_foto_neu", eid)
             conn.commit()
         log.info("premium_foto_neu (Hintergrund) fertig für Entwurf %d (QA: %s)",
-                  eid, "OK" if result.approved else "Probleme")
+                  eid, "OK" if data.get("qa_approved") else "Probleme")
     except Exception as ex:
         log.error("premium_foto_neu (Hintergrund) fehlgeschlagen für Entwurf %d: %s", eid, ex, exc_info=True)
         try:
@@ -2192,6 +2131,42 @@ def _premium_foto_hintergrund(eid, user):
                 conn.commit()
         except Exception:
             pass
+
+
+def _sharenext_bild_synchron(data, eid):
+    """Erzeugt SYNCHRON ein Bild ueber die ShareNext-Pipeline (GPT integriert die Ueberschrift
+    direkt ins Foto, Pillow ergaenzt danach nur noch die beiden CI-Kreise) und schreibt die
+    Ergebnisfelder in `data`. Ersetzt die alte 'Standard'-Pipeline (bildmotiv.ensure_photo_fuer +
+    bildgen.render mit Karte/Bullets/CTA), die nicht mehr verwendet wird.
+
+    Wirft bei Fehler eine Exception weiter (Aufrufer faengt/meldet). Rueckgabe: Pfad zum Bild."""
+    from sharenext_pipeline import run_sharenext_pipeline
+    headline = data.get("ueberschrift", "")
+    bullets = data.get("bullets", [])
+    text = "\n".join(bullets) if bullets else ""
+    kanal = data.get("kanal", "Facebook")
+    result = run_sharenext_pipeline(
+        stream="radar",
+        thema=headline,
+        text=text,
+        kanal=kanal,
+        headline=headline,
+        size="1024x1024",
+        quality="medium",
+    )
+    # Gleiches Pfad-Schema wie die uebrige ShareNext-Pipeline (regenerate_images.py, textgen.py):
+    # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.
+    out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
+    result.image.save(out)
+    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    tmp = out + ".tmp_logos.png"
+    bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
+    os.replace(tmp, out)
+    data["qa_approved"] = result.approved
+    data["qa_problems"] = [] if result.approved else ["ShareNext QA"]
+    data["bild_pfad"] = out
+    data["sharenext_used"] = True
+    return out
 
 
 @app.route("/bild-aktion/<int:eid>", methods=["POST"])
@@ -2216,7 +2191,6 @@ def bild_aktion(eid):
         return redirect(ziel)
 
     try:
-        import bildmotiv, stilwahl, textgen
         data = json.loads(e["text"])
 
         # Motiv aktualisieren falls geändert
@@ -2225,17 +2199,15 @@ def bild_aktion(eid):
             data["bild_motiv"] = motiv_neu  # Fallback
 
         if aktion == "layout_neu":
-            # Nur Layout neu rendern (kein KI-Call)
-            photo = bildmotiv.ensure_photo_fuer(data)
-            slogan = bildgen.pick_slogan(data.get("slogan"))
-            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.render(data, photo, slogan, out)
+            # Kein reines Layout-Re-Render mehr moeglich (alte Karten-Pipeline entfernt) - ShareNext
+            # braucht fuer ein neues Bild immer einen frischen KI-Lauf.
+            out = _sharenext_bild_synchron(data, eid)
             with get_conn() as conn:
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), out, eid))
                 audit_log(conn, session["user"], "layout_neu", eid)
                 conn.commit()
-            flash("Layout von Beitrag %d neu gerendert (kein KI-Call)." % eid)
+            flash("Bild von Beitrag %d neu erzeugt (ShareNext)." % eid)
 
         elif aktion == "premium_neu":
             # Premium-Bild via ShareNext Pipeline - LÄUFT IM HINTERGRUND
@@ -2254,25 +2226,15 @@ def bild_aktion(eid):
                   "Pipeline: dauert ca. 1-2 Minuten) - Seite gleich neu laden!" % eid)
 
         elif aktion == "stil_wechseln":
-            # Anderer Stil würfeln
-            with get_conn() as conn:
-                neu = stilwahl.anderen_stil_waehlen(conn, data)
-            if neu is None:
-                flash("Es ist nur ein Bild-Stil aktiv – bitte erst in der Verwaltung weitere Stile aktivieren.")
-                return redirect(ziel)
-            if neu == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
-                textgen.art_director_motiv(data)
-            photo = bildmotiv.ensure_photo_fuer(data)
-            slogan = bildgen.pick_slogan(data.get("slogan"))
-            out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-            bildgen.render(data, photo, slogan, out)
+            # Alte Bild-Stile (KI-Tafel/Kreativ/Comic) entfernt - es gibt nur noch ShareNext.
+            # "Stil wechseln" erzeugt daher ein frisches ShareNext-Bild.
+            out = _sharenext_bild_synchron(data, eid)
             with get_conn() as conn:
                 conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), out, eid))
-                audit_log(conn, session["user"], "stil_gewechselt", eid, neu)
+                audit_log(conn, session["user"], "stil_gewechselt", eid, "sharenext")
                 conn.commit()
-            _stil_label = {"standard": "Standard", "ki_tafel": "KI-Tafel", "kreativ": "Kreativ", "comic": "Comic"}
-            flash("Stil gewechselt zu %s (KI-Call, neues Foto)." % _stil_label.get(neu, neu))
+            flash("Neues ShareNext-Bild für Beitrag %d erzeugt (KI-Call)." % eid)
         else:
             flash("Ungültige Bild-Aktion.")
     except Exception as ex:
@@ -2282,146 +2244,29 @@ def bild_aktion(eid):
 @app.route("/bild-generieren/<int:eid>", methods=["POST"])
 @login_required
 def bild_generieren(eid):
-    """Comic-Workflow (entkoppelt): erzeugt AUF KLICK der Nutzerin das Bild eines Entwurfs im
-    von ihr GEWAEHLTEN Stil (Formularfeld bild_stil) - es gibt KEINE Stil-Vorauswahl. Ablauf
-    (Vorbild: anderes_bild): Stil validieren -> data['bild_stil'] setzen -> je nach Stil den noetigen
-    KI-Vorbereitungsschritt (comic: comic_brief, kreativ: art_director_motiv) -> ensure_photo_fuer ->
-    pick_slogan -> render -> bild_pfad speichern. Alle externen KI-/Bild-Aufrufe sind gekapselt
-    (kein 500 fuer die Nutzerin, sondern eine verstaendliche Meldung). Gilt fuer /entwuerfe UND /pool
-    (Rueckkehr ueber den zurueck-Parameter)."""
+    """Erzeugt AUF KLICK das Bild eines Entwurfs. Die alten Comic-/KI-Tafel-/Kreativ-Stile wurden
+    entfernt - es gibt nur noch die ShareNext-Pipeline (GPT integriert die Ueberschrift ins Foto,
+    Pillow ergaenzt die CI-Kreise). Ein evtl. mitgesendetes 'bild_stil'-Formularfeld (altes UI)
+    wird ignoriert. Gilt fuer /entwuerfe UND /pool (Rueckkehr ueber den zurueck-Parameter)."""
     zurueck = request.form.get("zurueck", "entwuerfe")
     ziel = (url_for("pool_seite") if zurueck == "pool"
             else url_for("einplanung") if zurueck == "einplanung"
             else url_for("entwuerfe"))
-    stil = (request.form.get("bild_stil") or "").strip()
-    if stil not in ("comic", "comic_beratung", "comic_strip", "ki_tafel", "kreativ"):
-        flash("Bitte einen Stil wählen.")
-        return redirect(ziel)
     with get_conn() as conn:
         e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
     try:
-        import bildmotiv, textgen
         data = json.loads(e["text"])
-        data["bild_stil"] = stil
-        # #157: strip_panels gehoeren ausschliesslich zum comic_strip. Wird ein ANDERER Stil
-        # generiert, die (ggf. alten) Panel-Verweise entfernen, damit die Vorschau nicht
-        # faelschlich weiter den alten 3er-Strip statt des neuen Einzelbilds zeigt.
-        if stil != "comic_strip":
-            data.pop("strip_panels", None)
-        # comic_strip (#154): 3-Felder-Comic-Karussell mit Sprechblasen, personalisiert pro Stelle.
-        # Fuer die stellenlose Vorschau REPRAESENTATIV mit dem Berater DER ERSTEN aktiven Stelle
-        # rendern, die eine Berater-Referenz hat (bibel_bild > berater_comic). Gibt es keine ->
-        # Hinweis + kein Bild. Die 3 rohen Panels werden erzeugt; als Einzel-Vorschau (bild_pfad)
-        # dient Panel 1, und das Format wird als 'karussell' festgehalten.
-        if stil == "comic_strip":
-            # #156: optionales Override fuer die Sprechblase in Feld 1. Nicht-leer -> ersetzt die
-            # Ueberschrift, leer -> Override entfernen (wieder Ueberschrift). Wird im Entwurf-JSON
-            # (data) persistiert und unten mitgeschrieben; so bleibt es bei erneutem Generieren
-            # erhalten und wird in JEDEM der drei Wege (Entwuerfe/Pool/Einplanung) bis in
-            # ensure_comic_strip_bilder als fields['strip_zeile1'] durchgereicht.
-            data["strip_zeile1"] = (request.form.get("strip_zeile1") or "").strip()
-            # #155: Bild-2-Auswahl (Aermelschoner) -> steuert den Archetyp. Eine KONKRETE Variante
-            # bestimmt den Archetyp direkt (aus COMIC_STRIP_VARIANTEN). "Automatisch" (leer) ->
-            # leichte KI-Vorauswahl (robust, Fallback ohne Key) waehlt Archetyp + Variante. Beides
-            # (strip_archetyp + strip_zeile2) wird unten im Entwurf-JSON persistiert, damit alle drei
-            # Wege (Entwuerfe/Pool/Einplanung) denselben Wert lesen und es beim erneuten Generieren
-            # erhalten bleibt; ensure_comic_strip_bilder loest daraus Szenen + Sprechblasen auf.
-            strip_zeile2 = (request.form.get("strip_zeile2") or "").strip()
-            if strip_zeile2:
-                arche = bildmotiv._comic_strip_variante_archetyp(strip_zeile2) or "vorteil"
-                data["strip_zeile2"] = strip_zeile2
-                data["strip_archetyp"] = arche
-            else:
-                vor = textgen.comic_strip_vorauswahl(data)
-                arche = (vor or {}).get("archetyp") or "vorteil"
-                idx = (vor or {}).get("variant_index") or 0
-                varianten = bildmotiv.COMIC_STRIP_VARIANTEN.get(arche, [])
-                data["strip_archetyp"] = arche
-                data["strip_zeile2"] = (varianten[idx] if 0 <= idx < len(varianten)
-                                        else (varianten[0] if varianten else ""))
-            with get_conn() as conn:
-                rows = conn.execute(
-                    "SELECT berater_comic, bibel_bild FROM beratungsstellen WHERE aktiv=1 "
-                    "AND ((berater_comic IS NOT NULL AND TRIM(berater_comic)<>'') "
-                    "OR (bibel_bild IS NOT NULL AND TRIM(bibel_bild)<>'')) ORDER BY id").fetchall()
-            berater_ref = None
-            for r in rows:
-                for feld in ("bibel_bild", "berater_comic"):
-                    p = (r[feld] or "").strip()
-                    if p and os.path.exists(p):
-                        berater_ref = p
-                        break
-                if berater_ref:
-                    break
-            if not berater_ref:
-                flash("Bitte zuerst mind. einen Comic-Berater in der Beratungsstellen-Verwaltung erzeugen.")
-                return redirect(ziel)
-            panels = bildmotiv.ensure_comic_strip_bilder(data, berater_ref)
-            if not panels:
-                flash("Comic-Strip konnte gerade nicht erzeugt werden (Bild-KI nicht erreichbar?).")
-                return redirect(ziel)
-            # #157: alle drei Panels zusaetzlich im Entwurf-JSON persistieren, damit die
-            # Beitrags-Vorschau (Entwuerfe/Pool/Einplanung) alle drei Bilder DIREKT zeigt.
-            # Gleiches Pfad-Format wie bild_pfad -> Auslieferung ueber die /strip-panel-Route.
-            # bild_pfad bleibt Panel 1 (Einzel-Fallback). Nur tatsaechlich vorhandene Pfade.
-            data["strip_panels"] = [p for p in panels if p and os.path.exists(p)]
-            with get_conn() as conn:
-                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=?, format='karussell' WHERE id=?",
-                             (json.dumps(data, ensure_ascii=False), panels[0], eid))
-                audit_log(conn, session["user"], "bild_generiert", eid, stil)
-                conn.commit()
-            flash("Comic-Strip (3-Felder-Karussell) für Beitrag %d erzeugt." % eid)
-            return redirect(ziel)
-        # comic_beratung ist personalisiert pro Stelle; in der stellenlosen Vorschau rendern wir
-        # REPRAESENTATIV mit dem Berater-Comic der ERSTEN aktiven Stelle, die einen hinterlegt hat.
-        # Gibt es keine -> Hinweis + kein Bild (der Berater-Comic wird in der Verwaltung erzeugt).
-        if stil == "comic_beratung":
-            with get_conn() as conn:
-                rows = conn.execute(
-                    "SELECT berater_comic, bibel_bild, bibel_text FROM beratungsstellen WHERE aktiv=1 "
-                    "AND ((berater_comic IS NOT NULL AND TRIM(berater_comic)<>'') "
-                    "OR (bibel_bild IS NOT NULL AND TRIM(bibel_bild)<>'')) ORDER BY id").fetchall()
-            # #151: Character-Bible (bibel_bild) hat Vorrang vor dem aus dem Foto abgeleiteten
-            # berater_comic; die erste Stelle mit einer vorhandenen Datei liefert die Vorschau.
-            gewaehlt = None
-            for r in rows:
-                for feld in ("bibel_bild", "berater_comic"):
-                    p = (r[feld] or "").strip()
-                    if p and os.path.exists(p):
-                        gewaehlt = r
-                        data["berater_comic"] = p
-                        break
-                if gewaehlt is not None:
-                    break
-            if gewaehlt is None:
-                flash("Bitte zuerst mind. einen Comic-Berater in der Beratungsstellen-Verwaltung erzeugen.")
-                return redirect(ziel)
-            if (gewaehlt["bibel_text"] or "").strip():
-                data["bibel_text"] = gewaehlt["bibel_text"].strip()
-        # Nur der jeweils noetige KI-Vorbereitungsschritt (on-demand, nur beim gewaehlten Stil):
-        if stil in ("comic", "comic_beratung"):
-            # Bei jedem expliziten Klick einen FRISCHEN Bild-Einfall wuerfeln: alten Brief verwerfen,
-            # damit (a) "Bild generieren" erneut eine NEUE Idee liefert und (b) der verbesserte Prompt
-            # + das hoehere Modell wirklich greifen (der Bild-Cache haengt am Prompt-String). Bei
-            # comic_beratung liefert der Brief das optionale Thema/Anlass (szene) fuer den Prompt.
-            data.pop("comic_brief", None)
-            textgen.comic_brief(data)          # neuer Einfall (Kunst/Metapher/Finanzamt-Typ)
-        elif stil == "kreativ" and not (data.get("kreativ_motiv") or "").strip():
-            textgen.art_director_motiv(data)   # kinoreifes Motiv (No-Op ohne Key)
-        photo = bildmotiv.ensure_photo_fuer(data)
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(data, photo, slogan, out)
+        data.pop("strip_panels", None)  # alte Comic-Strip-Panels (falls vorhanden) verwerfen
+        data.pop("bild_stil", None)
+        out = _sharenext_bild_synchron(data, eid)
         with get_conn() as conn:
-            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=?, format='einzelbild' WHERE id=?",
                          (json.dumps(data, ensure_ascii=False), out, eid))
-            audit_log(conn, session["user"], "bild_generiert", eid, stil)
+            audit_log(conn, session["user"], "bild_generiert", eid, "sharenext")
             conn.commit()
-        _stil_label = {"comic": "Comic", "comic_beratung": "Comic Beratung",
-                       "ki_tafel": "Tafel", "kreativ": "Kreativ"}
-        flash("Bild für Beitrag %d im Stil „%s“ erzeugt." % (eid, _stil_label.get(stil, stil)))
+        flash("Bild für Beitrag %d erzeugt (ShareNext)." % eid)
     except Exception as ex:
         flash("Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
@@ -2445,23 +2290,17 @@ def bild_typ(eid):
         flash("Bildtyp von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
-        import bildmotiv
         data = json.loads(e["text"])
-        if neuer_typ == "thema" and not (data.get("bild_motiv_thema") or "").strip():
-            flash("Für Beitrag %d gibt es kein Themenbild-Motiv. Bitte den Beitrag einmal neu erzeugen, "
-                  "dann steht das Themenbild zur Verfügung." % eid)
-            return redirect(ziel)
+        # Person-/Themenbild-Unterscheidung gehoerte zur alten Standard-Pipeline und existiert in
+        # ShareNext nicht mehr - stattdessen wird einfach ein frisches ShareNext-Bild erzeugt.
         data["bild_typ"] = neuer_typ
-        photo = bildmotiv.ensure_photo_fuer(data)
-        slogan = bildgen.pick_slogan(data.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(data, photo, slogan, out)
+        out = _sharenext_bild_synchron(data, eid)
         with get_conn() as conn:
             conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
                          (json.dumps(data, ensure_ascii=False), out, eid))
             audit_log(conn, session["user"], "bild_typ_%s" % neuer_typ, eid)
             conn.commit()
-        flash("Beitrag %d nutzt jetzt das %s." % (eid, "Themenbild" if neuer_typ == "thema" else "Personenbild"))
+        flash("Beitrag %d: neues ShareNext-Bild erzeugt." % eid)
     except Exception as ex:
         flash("Bildtyp konnte nicht umgestellt werden: %s" % ex)
     return redirect(ziel)
@@ -2633,19 +2472,8 @@ def beitrag(eid):
             t = conn.execute("SELECT url FROM themen WHERE id=?", (e["thema_id"],)).fetchone()
             quelle_url = (t["url"] or "").strip() if t else ""
     row = _parse(e)
-    fmt = row.get("format", "einzelbild")
+    fmt = "einzelbild"   # Karussell entfernt - es gibt nur noch Einzelbilder (ShareNext)
     n_slides = 0
-    if fmt == "karussell":
-        try:
-            import bildmotiv
-            data = row["f"]
-            photo = bildmotiv.ensure_photo_fuer(data)   # Cache -> kein neuer KI-Aufruf
-            slogan = bildgen.pick_slogan(data.get("slogan"))
-            out_dir = os.path.join(DATA_DIR, "preview", "karussell_%d" % eid)
-            n_slides = len(bildgen.render_slides(data, photo, slogan, out_dir, "slide"))
-        except Exception as ex:
-            log.warning("Karussell-Vorschau fehlgeschlagen (Beitrag %s): %s", eid, ex)
-            n_slides = 0
     # WhatsApp-Varianten: eigener Kanal-Text (max 3 Saetze) + Status-Text (max 2 Saetze),
     # je mit eingebettetem Quell-/Buchungslink. Allgemein + personalisiert je Beratungsstelle.
     import personalisierung
@@ -2664,15 +2492,6 @@ def beitrag(eid):
         wa_stellen = []
     return render_template_string(BEITRAG, **_ctx(e=row, fmt=fmt, status=e["status"], n_slides=n_slides,
                                   wa_stellen=wa_stellen, wa_allg_kanal=wa_allg_kanal, wa_allg_story=wa_allg_story))
-
-@app.route("/beitrag-slide/<int:eid>/<int:idx>")
-@login_required
-def beitrag_slide(eid, idx):
-    base = os.path.realpath(os.path.join(DATA_DIR, "preview", "karussell_%d" % eid))
-    p = os.path.realpath(os.path.join(base, "slide_%02d.png" % (idx + 1)))
-    if not (p == base or p.startswith(base + os.sep)) or not os.path.exists(p):
-        abort(404)
-    return send_file(p, mimetype="image/png", max_age=0)
 
 def _status_hochkant(square_path, out_path):
     """Komponiert ein quadratisches Bild zentriert auf einen HILO-Verlauf (9:16, 1080x1920) -
@@ -3232,14 +3051,10 @@ def _ensure_bild_pfad(conn, eid, fields):
     if pfad and os.path.exists(pfad):
         return pfad
     try:
-        import bildmotiv
-        photo = bildmotiv.ensure_photo_fuer(fields)
-        slogan = bildgen.pick_slogan(fields.get("slogan"))
-        out = os.path.join(DATA_DIR, "bilder", "entwurf_%d.png" % eid)
-        bildgen.render(fields, photo, slogan, out)
+        out = _sharenext_bild_synchron(fields, eid)
         conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (out, eid))
         conn.commit()
-        log.info("Bild on-demand gerendert (Veroeffentlichungs-Fallback) fuer Beitrag %s", eid)
+        log.info("Bild on-demand ueber ShareNext erzeugt (Veroeffentlichungs-Fallback) fuer Beitrag %s", eid)
         return out
     except Exception as ex:
         log.warning("On-demand-Bild (Veroeffentlichungs-Fallback) fuer Beitrag %s fehlgeschlagen: %s",
@@ -3496,7 +3311,7 @@ def veroeffentlichen(eid):
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen."); return redirect(url_for("einplanung"))
     fmt_fb = _format("format_fb", "einzelbild")
-    fmt_ig = _format("format_ig", "karussell")
+    fmt_ig = _format("format_ig", "einzelbild")
     story = request.form.get("story_ig") == "1"
     story_fb = request.form.get("story_fb") == "1"
     haupt_fmt = "karussell" if "karussell" in (fmt_fb, fmt_ig) else "einzelbild"
@@ -3545,7 +3360,7 @@ def auto_einplanen(eid):
     stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
     page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
     fmt_fb = _format("format_fb", "einzelbild")
-    fmt_ig = _format("format_ig", "karussell")
+    fmt_ig = _format("format_ig", "einzelbild")
     haupt_fmt = "karussell" if "karussell" in (fmt_fb, fmt_ig) else "einzelbild"
     if not stelle_ids and not page_ids:
         flash("Bitte mindestens eine Beratungsstelle bzw. Facebook-Seite wählen.")
@@ -3606,7 +3421,7 @@ def geplant():
             t = parts[1][:5] if len(parts) > 1 else ""
             rows.append({"id": gp["id"], "eid": gp["entwurf_id"], "titel": titel, "ziel": ziel,
                          "kanal": _KANAL_DE.get(gp["kanal"], gp["kanal"]),
-                         "format": "Karussell" if gp["format"] == "karussell" else "Einzelbild",
+                         "format": "Einzelbild",
                          "datum": d, "zeit": t, "geplant_de": _de_datum(d),
                          "status": gp["status"], "info": gp["info"]})
     return render_template_string(GEPLANT, **_ctx(posts=rows))
@@ -3645,7 +3460,7 @@ def vorschau(eid):
     stelle_ids = [s.strip() for s in request.form.getlist("stelle_id") if s.strip()]
     page_ids = [p.strip() for p in request.form.getlist("page_id") if p.strip()]
     fmt_fb = _format("format_fb", "einzelbild")
-    fmt_ig = _format("format_ig", "karussell")
+    fmt_ig = _format("format_ig", "einzelbild")
     story = request.form.get("story_ig") == "1"
     story_fb = request.form.get("story_fb") == "1"
     if not stelle_ids and not page_ids:

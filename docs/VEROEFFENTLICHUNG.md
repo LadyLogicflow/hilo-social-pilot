@@ -1,8 +1,10 @@
 # Veröffentlichung (Facebook & Instagram)
 
 Diese Datei beschreibt, wie ein freigegebener Beitrag technisch auf **Facebook** und
-**Instagram** veröffentlicht wird – als **Feed-Beitrag** (Einzelbild oder Karussell) und
-optional zusätzlich als **Story** (9:16, verschwindet nach 24 Stunden).
+**Instagram** veröffentlicht wird – als **Feed-Beitrag (Einzelbild)** und optional zusätzlich
+als **Story** (9:16, verschwindet nach 24 Stunden). *(Stand 2026-08-11: Das Karussell-Feed-Format
+wurde entfernt – die Formatauswahl in der Vorschau liefert nur noch „Einzelbild", die
+Carousel-Funktionen unten sind toter Code.)*
 
 Alle Meta-Aufrufe laufen über die **Graph API** (`https://graph.facebook.com/v26.0`).
 Die HTTP-Schicht liegt in **`publish.py`**, die Orchestrierung (welches Bild, welcher Kanal,
@@ -65,13 +67,10 @@ getauscht werden, sofern `meta_app_id` und `meta_app_secret` gesetzt sind.
   automatisch **ohne** Ort erneut versucht, damit der Beitrag trotzdem erscheint.
 - `alt_text` = optionaler Alt-Text für Barrierefreiheit (Feld `alt_text_custom`).
 
-### 3.2 Feed – Karussell (mehrere Bilder)
-`publish_facebook_carousel(page_id, image_paths, caption, place=None, alt_texts=None)`
-
-- Jedes Foto wird zunächst **unveröffentlicht** hochgeladen (`published=false`), danach werden
-  alle Foto-IDs in **einem** Feed-Beitrag zusammengeführt
-  (`POST /{page_id}/feed` mit `attached_media[i]`).
-- Scheitert ein Schritt, werden bereits hochgeladene Fotos wieder gelöscht (kein „Waisen-Foto").
+### 3.2 Feed – Karussell *(abgeschaltet, Stand 2026-08-11)*
+`publish_facebook_carousel(page_id, image_paths, caption, place=None, alt_texts=None)` existiert
+weiterhin in `publish.py`, wird aber von `web.py` nicht mehr aufgerufen – das Karussell-Feed-
+Format wurde entfernt.
 
 ### 3.3 Story
 `publish_facebook_story(page_id, image_path, alt_text=None)`
@@ -105,11 +104,10 @@ schlägt das Veröffentlichen fehl („Media ID is not available").
 - **(c)** `POST /{ig_user_id}/media_publish`
 - `location_id` = optionaler Geotag; `alt_text` = Alt-Text (bei Instagram-Feed unterstützt).
 
-### 4.2 Feed – Karussell
+### 4.2 Feed – Karussell *(abgeschaltet, Stand 2026-08-11)*
 `publish_instagram_carousel(ig_user_id, image_urls, caption, location_id=None, alt_texts=None)`
-
-- Je Bild ein **Kind-Container** (`is_carousel_item=true`) → jeweils auf `FINISHED` warten,
-  dann ein **Eltern-Container** (`media_type=CAROUSEL`, `children=…`) → `FINISHED` → publish.
+existiert weiterhin in `publish.py`, wird aber von `web.py` nicht mehr aufgerufen – das
+Karussell-Feed-Format wurde entfernt.
 
 ### 4.3 Story
 `publish_instagram_story(ig_user_id, image_url)`
@@ -134,7 +132,9 @@ Story-Bilder werden aus den vorhandenen (quadratischen, 1080×1080) Beitragsbild
 - **`_status_hochkant`** (`web.py`) komponiert jedes quadratische Bild zentriert auf einen
   HILO-Farbverlauf (Blau → Grün) im Format **9:16 / 1080×1920**.
 - **`_publish_story`** (`web.py`) postet die aufbereiteten Bilder **nacheinander als einzelne
-  Story-Frames**. Ein Karussell wird so zu einer **mehrteiligen Story** (ein Frame pro Slide).
+  Story-Frames** – das ist die letzte verbliebene Mehrbild-Funktion im Tool (unabhängig vom
+  entfernten Karussell-Feed-Format, siehe Abschnitt 3.2/4.2). `bildgen.render_slides()` erzeugt
+  bei Bedarf mehrere Frames aus einem Beitrag.
   - `do_ig=True`: Frame per `uploader.upload` öffentlich machen → `publish_instagram_story`.
   - `do_fb=True`: direkt `publish_facebook_story` (kein Upload nötig).
 - Erfolg = mindestens **ein** Frame wurde irgendwo gepostet; Teilfehler werden gesammelt
@@ -151,9 +151,8 @@ In der Einplanungs-/Veröffentlichungsseite gibt es zwei Kontrollkästchen:
 | „Bei Instagram zusätzlich als Story posten" | `story_ig` | **an** | IG-Story nach IG-Feed-Post |
 | „Bei Facebook zusätzlich als Story posten" | `story_fb` | **aus** | FB-Story nach FB-Feed-Post |
 
-Der Kanal selbst (`facebook`, `instagram`, `beide`) und das Bildformat je Kanal
-(`einzelbild`/`karussell`) werden separat gewählt. Die Story übernimmt immer alle Slides des
-Karussells als Frames – unabhängig vom gewählten Feed-Format.
+Der Kanal selbst (`facebook`, `instagram`, `beide`) wird separat gewählt. Das Feed-Bildformat
+ist seit 2026-08-11 immer `einzelbild`; nur die Story kann weiterhin mehrere Frames zeigen.
 
 ---
 
@@ -165,7 +164,7 @@ Karussells als Frames – unabhängig vom gewählten Feed-Format.
   verbucht (flüchtig).
 - Fehlermeldungen zeigen die **echte** Meta-Fehlermeldung aus dem JSON-Body
   (z.B. „Invalid OAuth access token"), nicht nur den HTTP-Statuscode (`_err`).
-- Teil-Uploads (Karussell, Story) werden bei Abbruch wieder aufgeräumt.
+- Teil-Uploads (Story-Frames) werden bei Abbruch wieder aufgeräumt.
 
 ---
 
@@ -186,9 +185,9 @@ Für Stories werden keine Insights abgerufen (flüchtig).
 | Funktion | Datei |
 |----------|-------|
 | Graph-API-Basis, Token-Handling, Langzeit-Token | `publish.py` |
-| Facebook Feed (Einzelbild / Karussell) | `publish.py` (`publish_facebook`, `publish_facebook_carousel`) |
+| Facebook Feed (Einzelbild) | `publish.py` (`publish_facebook`); `publish_facebook_carousel` ungenutzt seit 2026-08-11 |
 | Facebook Story | `publish.py` (`publish_facebook_story`) |
-| Instagram Feed (Einzelbild / Karussell) | `publish.py` (`publish_instagram`, `publish_instagram_carousel`) |
+| Instagram Feed (Einzelbild) | `publish.py` (`publish_instagram`); `publish_instagram_carousel` ungenutzt seit 2026-08-11 |
 | Instagram Story | `publish.py` (`publish_instagram_story`) |
 | Container-Warteschleife | `publish.py` (`_wait_ig_container`) |
 | Insights | `publish.py` (`post_insights`) |

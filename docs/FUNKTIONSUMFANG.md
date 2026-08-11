@@ -1,4 +1,4 @@
-# HISOME – Technischer Funktionsumfang (Stand 2026-08-06)
+# HISOME – Technischer Funktionsumfang (Stand 2026-08-11)
 
 Technische Zusammenfassung dessen, was **HISOME (HILO Social Media Tool)** aktuell kann.
 
@@ -51,8 +51,9 @@ automatisch in einzelne Themen.
   (kein Auto-Retry – kostet bei jedem Klick). Das erzeugte Bild wird für die Personalisierung je
   Beratungsstelle wiederverwendet (kein neuer KI-Call nötig); ungenutzte Cache-Dateien werden
   automatisch aufgeräumt. *(Die alte Pipeline mit den drei Stilen Standard/KI-Tafel/Kreativ +
-  Ideogram-Option bleibt als Fallback für Alt-Entwürfe, ist für neue Beiträge aber nicht mehr
-  aktiv.)*
+  Comic-Varianten wurde am 2026-08-11 vollständig entfernt – auch aus allen Bild-Buttons wie
+  „Text überarbeiten", „Anderes Bild", „Stil wechseln"; es gibt keinen Fallback mehr, ausnahmslos
+  jedes neue Bild kommt aus ShareNext.)*
 - **Überarbeiten:** auf Knopfdruck mit Änderungswunsch („Bild freundlicher") neu erzeugen.
 
 ## 4. Freigabe-Workflow (Dashboard)
@@ -81,10 +82,10 @@ KI-Token. Die Veröffentlichung läuft auf die hinterlegte Facebook-Seite der St
 
 ## 7. Veröffentlichung
 
-- **Facebook:** Feed-Beitrag direkt auf die Seite – als Einzelbild oder Karussell; optional
-  zusätzlich als **Story** (9:16). Bei Beratungsstellen kommt der Termin-Link automatisch als
-  erster Kommentar.
-- **Instagram:** Feed-Beitrag (Einzelbild oder Karussell) und optional zusätzlich als **Story**
+- **Facebook:** Feed-Beitrag direkt auf die Seite als **Einzelbild**; optional zusätzlich als
+  **Story** (9:16, mehrere Frames möglich). Bei Beratungsstellen kommt der Termin-Link
+  automatisch als erster Kommentar.
+- **Instagram:** Feed-Beitrag (**Einzelbild**) und optional zusätzlich als **Story** (9:16).
   (9:16). Zweistufig über Bild-Container → Veröffentlichung; benötigt eine öffentliche Bild-URL
   (automatischer SFTP-Upload) und ein verknüpftes Instagram-Business-Konto.
 - **Story-Regel:** Eine Story wird nur **zusätzlich zu einem erfolgreichen Feed-Post** gepostet
@@ -155,7 +156,7 @@ Die menschliche Endkontrolle bleibt gewahrt – sie liegt beim **einmaligen Pool
 **Funktionsfähig:** komplette Inhaltspipeline (Quellen → Text → Bild → Freigabe → Kalender →
 Facebook & Instagram), 4 Content-Streams, Personalisierung, Verwaltung, Automatik.
 Die Veröffentlichung ist für **Facebook und Instagram** implementiert und im Dashboard
-verdrahtet – jeweils als Feed (Einzelbild/Karussell) und optional als Story.
+verdrahtet – jeweils als Feed (Einzelbild) und optional als Story.
 
 **Noch offen / nächste Schritte:**
 - Facebook-Langzeit-Token (App-Zugangsdaten) für den Dauerbetrieb.

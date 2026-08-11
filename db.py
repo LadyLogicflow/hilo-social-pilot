@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS geplante_posts (
     kanal TEXT NOT NULL DEFAULT 'facebook',
     format TEXT NOT NULL DEFAULT 'einzelbild',     -- Zusammenfassung (Karussell, wenn ein Kanal Karussell)
     format_fb TEXT DEFAULT 'einzelbild',           -- Bildformat fuer Facebook
-    format_ig TEXT DEFAULT 'karussell',            -- Bildformat fuer Instagram
+    format_ig TEXT DEFAULT 'einzelbild',            -- Bildformat fuer Instagram (Karussell entfernt)
     geplant_am TEXT NOT NULL,          -- lokale deutsche Zeit "YYYY-MM-DDTHH:MM"
     status TEXT NOT NULL DEFAULT 'geplant',   -- geplant | laeuft | veroeffentlicht | fehler
     info TEXT,
@@ -358,7 +358,7 @@ def migrate(conn):
     if gcols and "format_fb" not in gcols:
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_fb TEXT DEFAULT 'einzelbild'")
     if gcols and "format_ig" not in gcols:
-        conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_ig TEXT DEFAULT 'karussell'")
+        conn.execute("ALTER TABLE geplante_posts ADD COLUMN format_ig TEXT DEFAULT 'einzelbild'")
     # Zufalls-Pool: Markierung, dass ein geplanter Post aus dem Topf stammt (Beitrag bleibt wiederverwendbar)
     if gcols and "pool" not in gcols:
         conn.execute("ALTER TABLE geplante_posts ADD COLUMN pool INTEGER NOT NULL DEFAULT 0")

@@ -38,9 +38,9 @@ Wissens-Serie ───┘
 | `visual_qa.py` | ShareNext-Stufe 6: prüft das Rohbild (Score/Freigabe, Vision-`gpt-5.6-terra`) |
 | `sharenext_integration.py`, `prompt_builder.py`, `image_pipeline/` | Separates, template-basiertes Prompt-Builder-System – im aktuellen Produktionspfad **nicht** aktiv (experimentell/Legacy) |
 | `text_renderer.py` | Pillow-Text-Rendering der alten Pipeline – **im Normalpfad ungenutzt** (ShareNext schreibt den Text per `gpt-image-2` direkt ins Bild) |
-| `bildgen.py` | **Nur noch Fallback + CI-Kreise**: `add_logo_circles` (Logo/Portrait-Kreis, wird von allen Streams genutzt) läuft weiter aktiv; `render_drafts`/die 3 alten Stile (Standard/KI-Tafel/Kreativ) sind nur Absicherung für Altfälle, im Normalbetrieb ungenutzt |
-| `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) - bleibt im Repo für spätere Wiederverwendung, wird aktuell von keinem der vier Content-Ströme mehr automatisch aufgerufen |
-| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline – setzt nur noch Metadaten am Entwurf (`fields['bild_stil']`); das ShareNext-Bild ignoriert diese Felder |
+| `bildgen.py` | **Nur noch CI-Kreise + ShareNext-Aufruf** (Stand 2026-08-11): `add_logo_circles` setzt Logo-/Portrait-Kreis auf JEDES Bild; `render_drafts()` ruft für neue Entwürfe direkt `run_sharenext_pipeline` auf. Die alte Karten-Pipeline (`render()` mit Pille/Bullets/CTA per Pillow, drei Stile Standard/KI-Tafel/Kreativ) ist vollständig entfernt – auch aus allen `web.py`-Routen (Text überarbeiten, Anderes Bild, Bild-Aktion, Bildtyp, Veröffentlichungs-Fallback). `render_slides()` (Multi-Slide) existiert nur noch für die **Story-Frames**-Funktion, nicht mehr für ein Karussell-Postformat. |
+| `bildmotiv.py` | Alte Foto-Erzeugung (inkl. Comic-Stile) – wird von KEINER Route/keinem Button mehr aufgerufen (Stand 2026-08-11); bleibt nur als totes Modul im Repo, falls Einzelfunktionen später wiederverwendet werden sollen |
+| `stilwahl.py` | Bild-Stil-Zufallslogik der alten Pipeline – wird von keiner Route mehr aufgerufen (Stand 2026-08-11), totes Modul |
 | `schauplatz.py` | Schauplätze der alten Pipeline (nur noch für Altfälle) |
 | `traeger.py` | Botschafts-Träger der alten Pipeline (nur noch für Altfälle) |
 | `wartung.py` | Cache-Aufräumung: `aufraeumen_motive` (KI-Foto-Cache `DATA_DIR/motive/` der alten Pipeline) und die Legacy-Funktion `aufraeumen_legacy_kampagne` (`DATA_DIR/kampagne/`, nur noch für alte Vor-ShareNext-Entwürfe mit `kampagne_motiv_pfad`) |
@@ -50,7 +50,7 @@ Wissens-Serie ───┘
 | `wissen.py` | Wissens-Serie (zeitlose Themen, füllt leere Tage) |
 | `personalisierung.py` | Beitrag je Beratungsstelle anpassen (CTA + Begleittext) |
 | `pool.py` | Zufalls-Pool: Kanäle, „nie doppelt"-Logik je Stelle/Kanal, tägliche Ziehung, Restbestand/Warnung |
-| `publish.py` | Meta-Graph-API: Veröffentlichung auf **Facebook** (Feed-Einzelbild/Karussell + Story) und **Instagram** (Feed-Einzelbild/Karussell + Story) sowie Reichweiten-Insights und Token-Handling – siehe [VEROEFFENTLICHUNG.md](VEROEFFENTLICHUNG.md) |
+| `publish.py` | Meta-Graph-API: Veröffentlichung auf **Facebook** (Feed-Einzelbild + Story) und **Instagram** (Feed-Einzelbild + Story) sowie Reichweiten-Insights und Token-Handling – siehe [VEROEFFENTLICHUNG.md](VEROEFFENTLICHUNG.md). Die Carousel-Funktionen (`publish_facebook_carousel`/`publish_instagram_carousel`) bleiben im Code, werden aber seit Entfernung des Karussell-Postformats (2026-08-11) nicht mehr aufgerufen. |
 | `uploader.py` | Lädt ein Bild per SFTP auf den Webspace (IONOS) und liefert die **öffentliche URL** – nötig, weil Instagram Bilder nur über öffentliche URLs zieht |
 | `logging_setup.py` | Logging nach `logs/hilo.log` |
 
@@ -101,8 +101,9 @@ der KI kommt (die feste Überschrift wird der Pipeline als `headline` übergeben
 - `wissensthemen` – zeitlose Themen (Titel, Aufhänger, zuletzt genutzt).
 - `einstellungen` – globale Schlüssel-Wert-Einstellungen (z.B. `bild_tool` = openai/ideogram,
   `bild_stil_standard`/`_ki_tafel`/`_kreativ` = welche Bild-Stile im Zufalls-Topf sind).
-  *Hinweis:* `bild_tool` und die `bild_stil_*`-Schalter wirken nur noch auf die **alte**
-  `bildmotiv.py`-Pipeline (Fallback); der aktive ShareNext-Weg nutzt immer `gpt-image-2`.
+  *Hinweis (Stand 2026-08-11):* `bild_tool` und die `bild_stil_*`-Schalter wirken auf **gar
+  nichts** mehr – die alte `bildmotiv.py`-Pipeline wird von keiner Route mehr aufgerufen; der
+  ShareNext-Weg nutzt immer `gpt-image-2` und ignoriert diese Einstellungen vollständig.
 - `schauplaetze` – pflegbare Liste schöner Umgebungen (Beschreibung, Jahreszeit, aktiv, zuletzt_genutzt);
   je Beitrag wird einer gezogen (Rotation, nie doppelt im Zyklus).
 - `traeger` – pflegbare Liste der Botschafts-Träger (Name, prompt_snippet, aktiv, zuletzt_genutzt).
@@ -181,10 +182,16 @@ Beitrag zunächst ohne Bild (er kann später manuell/erneut erzeugt werden).
   ShareNext-Bild (`entwuerfe.bild_pfad` bzw. `fields['bild_pfad']`) wird wiederverwendet – nur der
   personalisierte CTA/Logo-Kreis + der Stellen-Porträt-Kreis werden neu aufgesetzt. **KEIN neuer
   GPT-Image-Call** nötig.
-- **Alte Pipeline** (`bildmotiv.py`/`bildgen.render_drafts`/`stilwahl.py`, drei Stile
-  Standard/KI-Tafel/Kreativ + Comic-Varianten, Bild-KI wählbar über `bild_tool`): bleibt im Repo,
-  wird aber von keinem der vier Content-Ströme mehr automatisch aufgerufen – nur noch Fallback für
-  Alt-Entwürfe. Die Comic-Stile (inkl. personalisiertem Berater-Comic je Stelle) sind für einen
-  späteren, gezielten Einsatz vorgesehen, aktuell aber nicht aktiv.
+- **Alte Pipeline entfernt** (Stand 2026-08-11): `bildmotiv.py`/die alte `bildgen.render()`
+  (Pille/Bullets/CTA per Pillow)/`stilwahl.py` – drei Stile Standard/KI-Tafel/Kreativ +
+  Comic-Varianten, Bild-KI wählbar über `bild_tool` – werden von **keiner** Route/keinem Button
+  mehr aufgerufen, auch nicht als Fallback. Alle Bild-Buttons (Neu erzeugen, Text überarbeiten,
+  Anderes Bild, Layout neu, Stil wechseln, Bildtyp wechseln, Veröffentlichungs-Fallback) laufen
+  über `run_sharenext_pipeline`. Die Module bleiben nur als totes Repo-Gepäck stehen.
+- **Karussell-Postformat entfernt** (Stand 2026-08-11): Facebook/Instagram-Feed-Posts sind nur
+  noch Einzelbild; die Formatauswahl (`format_fb`/`format_ig`) wurde aus der Vorschau entfernt
+  und liefert serverseitig immer `einzelbild`. `render_slides()` existiert nur noch für die
+  Story-Frames-Funktion (mehrere 9:16-Frames beim Story-Posten), nicht mehr für ein
+  Karussell-Feed-Format.
 
 Das bisherige Banderdesign v10 ist über den Git-Tag `design-backup-2026-06-23` wiederherstellbar.
