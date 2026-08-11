@@ -2961,8 +2961,7 @@ def aktion(eid):
                                 "role": "user",
                                 "content": f"Schreibe eine Caption für folgenden Artikel:\n\n{article}"
                             }],
-                            max_tokens=300,
-                            temperature=0.7
+                            max_tokens=300
                         )
                         caption = response.choices[0].message.content.strip()
 

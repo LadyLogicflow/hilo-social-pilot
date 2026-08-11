@@ -241,8 +241,7 @@ Jede Route braucht:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=CreativeTerritories,
-            temperature=0.9  # Hohe Kreativität!
+            response_format=CreativeTerritories
         )
 
         territories = completion.choices[0].message.parsed

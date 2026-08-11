@@ -381,8 +381,7 @@ die inhaltliche Passung zur Route hat immer Vorrang vor reiner Abwechslung.
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=ArtDirectionBoard,
-            temperature=0.7  # Balance: Kreativ aber fokussiert
+            response_format=ArtDirectionBoard
         )
 
         board = completion.choices[0].message.parsed

@@ -379,8 +379,7 @@ Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du mus
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=ConceptJuryVerdict,
-            temperature=0.3  # Objektive Bewertung, wenig Kreativität
+            response_format=ConceptJuryVerdict
         )
 
         verdict = completion.choices[0].message.parsed

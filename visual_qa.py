@@ -311,8 +311,7 @@ Gib nur die Einzelbewertungen an - Gesamtscore und Freigabe berechnet das System
                     ]
                 }
             ],
-            response_format=VisualQAVerdict,
-            temperature=0.3  # Objektiv
+            response_format=VisualQAVerdict
         )
 
         verdict = completion.choices[0].message.parsed

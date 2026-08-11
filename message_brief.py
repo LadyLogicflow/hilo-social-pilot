@@ -205,8 +205,7 @@ Erstelle ein strukturiertes Message Brief mit:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=MessageBrief,
-            temperature=0.7  # Etwas Kreativität, aber konsistent
+            response_format=MessageBrief
         )
 
         brief = completion.choices[0].message.parsed
@@ -297,8 +296,7 @@ RECHTLICH KRITISCH:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        response_format=GeneratedHeadline,
-        temperature=0.7
+        response_format=GeneratedHeadline
     )
 
     result = completion.choices[0].message.parsed

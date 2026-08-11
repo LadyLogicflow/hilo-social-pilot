@@ -305,8 +305,7 @@ WICHTIG:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_format=ImageProductionBrief,
-            temperature=0.5  # Balance: Kreativ aber präzise
+            response_format=ImageProductionBrief
         )
 
         production_brief = completion.choices[0].message.parsed
