@@ -176,9 +176,13 @@ def _insights_aktualisieren():
     ok, fehler = 0, 0
     fehler_kategorien = {"zu_alt": 0, "zu_neu": 0, "kein_zugriff": 0, "api_fehler": 0}
     fehler_beispiele = []
+    # Seiten-Tokens EINMAL vorab holen (ein /me/accounts-Aufruf) statt pro Beitrag - vermeidet das
+    # Facebook-Anfrage-Limit (#4) bei vielen Beitraegen. Leeres Dict -> post_insights faellt zurueck.
+    tokmap = publish.page_token_map()
     for r in rows:
         try:
-            reichweite, interakt = publish.post_insights(r["kanal"], r["plattform_post_id"], r["seite"])
+            reichweite, interakt = publish.post_insights(r["kanal"], r["plattform_post_id"], r["seite"],
+                                                          page_token=tokmap.get(str(r["seite"])))
             with get_conn() as conn:
                 conn.execute("UPDATE posts SET reichweite=?, interaktionen=?, "
                              "insights_am=datetime('now') WHERE id=?", (reichweite, interakt, r["id"]))

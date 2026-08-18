@@ -117,6 +117,24 @@ def _page_token(page_id):
     raise RuntimeError("Keine Berechtigung fuer Seite %s (nicht in /me/accounts)." % page_id)
 
 
+def page_token_map():
+    """Holt ALLE Seiten-Tokens in EINEM /me/accounts-Aufruf und liefert {seiten_id: token}.
+    Fuer Massen-Operationen (z.B. Insights ueber viele Beitraege), damit NICHT pro Beitrag
+    einzeln /me/accounts aufgerufen wird (das treibt sonst das Facebook-Anfrage-Limit hoch, #4).
+    Bei Fehler: leeres Dict (die Aufrufer fallen dann auf _page_token/User-Token zurueck)."""
+    try:
+        r = requests.get(GRAPH + "/me/accounts", timeout=30, params={
+            "fields": "id,access_token", "limit": 100, "access_token": _user_token(),
+        })
+        if r.status_code != 200:
+            log.warning("page_token_map: /me/accounts fehlgeschlagen (%s).", _scrub(_err(r)))
+            return {}
+        return {str(p["id"]): p.get("access_token") for p in r.json().get("data", []) if p.get("access_token")}
+    except Exception as ex:
+        log.warning("page_token_map fehlgeschlagen (%s).", _scrub(ex))
+        return {}
+
+
 # ---------------------------------------------------------------------------
 # Facebook: Foto-Beitrag
 # ---------------------------------------------------------------------------
@@ -400,13 +418,15 @@ def _insight_value(node, metric):
     return 0
 
 
-def post_insights(kanal, plattform_post_id, page_id):
+def post_insights(kanal, plattform_post_id, page_id, page_token=None):
     """Ruft Reichweite + Interaktionen eines veroeffentlichten Beitrags ab.
     Reichweite ist die Zahl der erreichten Personen (eindeutig). Rueckgabe: (reichweite, interaktionen).
-    Wirft bei fehlender ID oder API-Fehler eine RuntimeError-Ausnahme."""
+    page_token: optional bereits ermitteltes Seiten-Token (z.B. aus page_token_map()) - dann wird
+    KEIN eigener /me/accounts-Aufruf gemacht (spart Anfragen bei Massen-Abrufen). Wirft bei fehlender
+    ID oder API-Fehler eine RuntimeError-Ausnahme."""
     if not plattform_post_id:
         raise RuntimeError("Keine Plattform-Post-ID hinterlegt.")
-    token = _page_token(page_id) if page_id else _user_token()
+    token = page_token or (_page_token(page_id) if page_id else _user_token())
     if kanal == "instagram":
         # Instagram-Media: Reichweite + Speichern (Insights) sowie Likes/Kommentare (Felder)
         r = requests.get(GRAPH + "/%s" % plattform_post_id, timeout=30, params={
