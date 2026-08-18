@@ -647,7 +647,7 @@ button:hover{filter:brightness(1.15)}
 <div class=eyebrow>Anmeldung</div>
 <div class=body>
 {% with m=get_flashed_messages() %}{% if m %}<p class=err>{{m[0]}}</p>{% endif %}{% endwith %}
-<form method=post><input name=name placeholder="Benutzer" autofocus><input name=passwort type=password placeholder="Passwort"><button>Anmelden</button></form>
+<form method=post><input name=name placeholder="Benutzer" autofocus><div style="position:relative"><input id=pw name=passwort type=password placeholder="Passwort" style="padding-right:42px"><span onclick="var p=document.getElementById('pw');var s=p.type==='password';p.type=s?'text':'password';this.textContent=s?'🙈':'👁'" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;font-size:18px" title="Passwort anzeigen/verbergen">👁</span></div><button>Anmelden</button></form>
 </div></div>"""
 
 _TOP = _FONTS + """body{font-family:'Inter',system-ui,Arial,sans-serif;background:var(--paper);margin:0;padding:18px;color:var(--ink)}
