@@ -201,14 +201,19 @@ def _insights_aktualisieren():
             # Media-Views-Metrik nicht unterstuetzt). Einmalig markieren -> kuenftig ueberspringen, nicht
             # mehr als Fehler zaehlen. Der Alter-Schutz (>30 Tage) verhindert, dass ein voruebergehendes
             # Problem bei aktuellen Beitraegen faelschlich dauerhaft markiert wird.
-            _alt_genug = False
             try:
-                _vd = datetime.datetime.strptime(str(r["veroeffentlicht_am"])[:10], "%Y-%m-%d")
-                _alt_genug = (datetime.datetime.utcnow() - _vd).days > 30
+                _tage = (datetime.datetime.utcnow()
+                         - datetime.datetime.strptime(str(r["veroeffentlicht_am"])[:10], "%Y-%m-%d")).days
             except Exception:
-                _alt_genug = False
-            if _alt_genug and "#10)" in err_str and ("does not exist" in err_str
-                                                     or "does not support this operation" in err_str):
+                _tage = 999
+            # Zwei Facebook-Fehlerformate bedeuten dasselbe "Objekt gibt es nicht mehr":
+            #   (#10) Object does not exist ... does not support this operation   (FB-Seitenbeitraege)
+            #   Unsupported get request. Object with ID '...' does not exist ...  (alte IG-Medien)
+            _weg = ("does not exist" in err_str or "unsupported get request" in err_str
+                    or "does not support this operation" in err_str)
+            # Definitiv weg UND nicht brandneu (>3 Tage - Schutz gegen Propagations-Verzoegerung bei
+            # ganz frischen Beitraegen) -> dauerhaft markieren.
+            if _weg and _tage > 3:
                 with get_conn() as conn:
                     conn.execute("UPDATE posts SET insights_status='nicht_verfuegbar' WHERE id=?", (r["id"],))
                     conn.commit()
