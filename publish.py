@@ -418,6 +418,45 @@ def _insight_value(node, metric):
     return 0
 
 
+# Facebook-Reichweiten-Metrik: Meta hat 'post_impressions_unique' zum 15.11.2025 deprecatet -> die
+# Abfrage wirft seither (#100) 'The value must be a valid insights metric'. Meta ersetzt Reach durch
+# das "Media Views/Viewers"-Framework (z.B. post_media_view). Weil Meta die Namen laufend aendert,
+# probieren wir die Kandidaten durch und merken uns den ersten gueltigen (Cache je Prozess) - so
+# ueberlebt der Abruf kuenftige Umbenennungen ohne Code-Aenderung.
+_FB_REACH_CANDIDATES = ["post_impressions_unique", "post_media_view_unique", "post_media_view",
+                        "post_views", "post_impressions"]
+_fb_reach_metric_cache = None   # None = noch nicht ermittelt, "" = probiert/keiner gueltig
+
+
+def _fb_reach_metric(post_id, token):
+    """Liefert den aktuell gueltigen Facebook-Reichweiten-Metriknamen (einmal ermittelt, dann gecacht).
+    Probiert die Kandidaten am gegebenen Post; nutzt den ersten, der KEIN (#100) 'invalid metric' wirft.
+    Bei anderem Fehler (z.B. Rate-Limit) wird NICHT gecacht (spaeter erneut versuchen). Rueckgabe:
+    Metrikname oder None (dann wird nur die Interaktion, keine Reichweite ermittelt)."""
+    global _fb_reach_metric_cache
+    if _fb_reach_metric_cache is not None:
+        return _fb_reach_metric_cache or None
+    for metric in _FB_REACH_CANDIDATES:
+        try:
+            r = requests.get(GRAPH + "/%s/insights" % post_id, timeout=30,
+                             params={"metric": metric, "access_token": token})
+        except Exception:
+            continue
+        if r.status_code == 200:
+            _fb_reach_metric_cache = metric
+            return metric
+        code = None
+        try:
+            code = (r.json().get("error") or {}).get("code")
+        except Exception:
+            pass
+        if code != 100:
+            # kein "Metrik ungueltig" (z.B. (#4) Rate-Limit / Rechteproblem) -> nicht cachen, spaeter erneut
+            return None
+    _fb_reach_metric_cache = ""   # alle Kandidaten (#100) -> nicht bei jedem Post neu probieren
+    return None
+
+
 def post_insights(kanal, plattform_post_id, page_id, page_token=None):
     """Ruft Reichweite + Interaktionen eines veroeffentlichten Beitrags ab.
     Reichweite ist die Zahl der erreichten Personen (eindeutig). Rueckgabe: (reichweite, interaktionen).
@@ -439,15 +478,19 @@ def post_insights(kanal, plattform_post_id, page_id, page_token=None):
         interaktionen = (int(j.get("like_count") or 0) + int(j.get("comments_count") or 0)
                          + _insight_value(j, "saved"))
         return reichweite, interaktionen
-    # Facebook-Seitenbeitrag: eindeutige Reichweite (Insight) + Reaktionen/Kommentare/Teilen
+    # Facebook-Seitenbeitrag: Reichweite (aktuell gueltige Metrik) + Reaktionen/Kommentare/Teilen.
+    # Reaktionen/Kommentare/Teilen sind KEINE Insights-Metriken und bleiben immer gueltig; die
+    # Reichweiten-Metrik wird dynamisch ermittelt (Meta-Deprecation, siehe _fb_reach_metric).
+    metric = _fb_reach_metric(plattform_post_id, token)
+    fields = "reactions.summary(true),comments.summary(true),shares"
+    if metric:
+        fields = "insights.metric(%s)," % metric + fields
     r = requests.get(GRAPH + "/%s" % plattform_post_id, timeout=30, params={
-        "fields": "insights.metric(post_impressions_unique),reactions.summary(true),"
-                  "comments.summary(true),shares",
-        "access_token": token})
+        "fields": fields, "access_token": token})
     if r.status_code != 200:
         raise RuntimeError(_err(r))
     j = r.json()
-    reichweite = _insight_value(j, "post_impressions_unique")
+    reichweite = _insight_value(j, metric) if metric else 0
     reaktionen = ((j.get("reactions") or {}).get("summary") or {}).get("total_count") or 0
     kommentare = ((j.get("comments") or {}).get("summary") or {}).get("total_count") or 0
     teilen = (j.get("shares") or {}).get("count") or 0
