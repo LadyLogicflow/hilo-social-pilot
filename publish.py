@@ -12,6 +12,7 @@ Secrets (aus secrets_store):
 Tokens werden NIE geloggt oder ausgegeben.
 """
 import json
+import re
 import time
 import logging
 import requests
@@ -20,6 +21,16 @@ from secrets_store import get_secret, set_secret
 log = logging.getLogger("hilo.publish")
 
 GRAPH = "https://graph.facebook.com/v26.0"
+
+
+def _scrub(text):
+    """Maskiert Zugangs-Tokens in beliebigen Strings (z.B. Fehlermeldungen/URLs), damit sie
+    NIE im Klartext in Logs landen. Trifft ?access_token=..., fb_exchange_token=... und rohe
+    EAA...-Tokens. Vgl. Doc-Zusage oben: 'Tokens werden NIE geloggt oder ausgegeben.'"""
+    s = str(text)
+    s = re.sub(r"((?:access_token|fb_exchange_token|client_secret)=)[^&\s\"']+", r"\1<REDACTED>", s)
+    s = re.sub(r"EAA[A-Za-z0-9]{20,}", "<REDACTED>", s)
+    return s
 
 
 # ---------------------------------------------------------------------------
@@ -95,12 +106,13 @@ def _page_token(page_id):
         r = requests.get(GRAPH + "/me/accounts", timeout=30, params={
             "fields": "id,access_token", "limit": 100, "access_token": user_tok,
         })
-        r.raise_for_status()
+        if r.status_code != 200:
+            raise RuntimeError(_err(r))   # _err liefert nur die Facebook-Meldung, NICHT die Token-URL
         for p in r.json().get("data", []):
             if p["id"] == str(page_id):
                 return p.get("access_token")
     except Exception as ex:
-        log.warning("Page-Token konnte nicht geholt werden (%s), verwende User-Token als Fallback.", ex)
+        log.warning("Page-Token konnte nicht geholt werden (%s), verwende User-Token als Fallback.", _scrub(ex))
         return user_tok
     raise RuntimeError("Keine Berechtigung fuer Seite %s (nicht in /me/accounts)." % page_id)
 

@@ -185,10 +185,13 @@ def _insights_aktualisieren():
                 conn.commit()
             ok += 1
         except Exception as ex:
-            log.warning("Insights-Abruf fehlgeschlagen (Post %s): %s", r["id"], ex)
+            # _scrub: Fehlermeldungen koennen die Graph-URL inkl. access_token enthalten -> maskieren,
+            # damit NIE ein Token in logs/hilo.log landet (Sicherheitsfix).
+            sex = publish._scrub(ex)
+            log.warning("Insights-Abruf fehlgeschlagen (Post %s): %s", r["id"], sex)
             fehler += 1
             # Kategorisiere Fehler
-            err_str = str(ex).lower()
+            err_str = sex.lower()
             if "permission" in err_str or "access" in err_str or "token" in err_str:
                 fehler_kategorien["kein_zugriff"] += 1
                 if len(fehler_beispiele) < 3:
@@ -200,7 +203,7 @@ def _insights_aktualisieren():
             else:
                 fehler_kategorien["api_fehler"] += 1
                 if len(fehler_beispiele) < 3:
-                    fehler_beispiele.append(f"Post {r['id']}: {str(ex)[:50]}")
+                    fehler_beispiele.append(f"Post {r['id']}: {sex[:50]}")
     return ok, fehler, {"kategorien": fehler_kategorien, "beispiele": fehler_beispiele}
 
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
@@ -572,6 +575,27 @@ def _cache_cleanup_scheduler():
         except Exception:
             log.exception("Cache-Aufraeumung: Scheduler-Fehler")
         time.sleep(120)
+
+def _insights_scheduler():
+    """Aktualisiert einmal taeglich automatisch die Reichweiten-/Interaktionszahlen (Insights),
+    damit die 'Was funktioniert'-Seite nicht mehr von Hand aktualisiert werden muss.
+    Datums-getaktet ueber eine Marker-Datei (analog _cache_cleanup_scheduler); laeuft ab 8 Uhr,
+    also nach dem 7-Uhr-Tageslauf. Faengt jeden Fehler ab - der Thread darf nie sterben."""
+    import datetime
+    marker = os.path.join(DATA_DIR, "last_insights.txt")
+    while True:
+        try:
+            now = datetime.datetime.now()
+            heute = now.strftime("%Y-%m-%d")
+            last = open(marker, encoding="utf-8").read().strip() if os.path.exists(marker) else ""
+            if now.hour >= 8 and last != heute:
+                ok, fehler, _ = _insights_aktualisieren()
+                os.makedirs(DATA_DIR, exist_ok=True)
+                open(marker, "w", encoding="utf-8").write(heute)
+                log.info("Auto-Insights: %d aktualisiert, %d fehlgeschlagen (%s)", ok, fehler, heute)
+        except Exception:
+            log.exception("Auto-Insights: Scheduler-Fehler")
+        time.sleep(300)
 
 # --- Zugriffsschutz ---------------------------------------------------------
 def login_required(f):
@@ -2356,6 +2380,7 @@ table.aw td{padding:4px 0;vertical-align:middle}
 <div class=awbox>
 <p class=hint>Ausgewertet nach <b>Reichweite</b> – wie viele Personen den Beitrag gesehen haben. {% if stand %}Letzter Abruf: {{stand}} (UTC).{% endif %}</p>
 <form method=post action="/insights-abrufen"><button>Zahlen jetzt aktualisieren</button>{% if offen %} <span class=hint>&nbsp;{{offen}} Beitrag(e) noch ohne Zahlen</span>{% endif %}</form>
+<p class=hint>Die Zahlen werden zusätzlich einmal täglich automatisch aktualisiert – der Button ist nur für den sofortigen Abruf zwischendurch.</p>
 </div>
 {% if not gesamt %}
 <div class="box awbox"><p>Noch keine ausgewerteten Beiträge. Sobald Beiträge veröffentlicht sind, hier auf <b>„Zahlen jetzt aktualisieren"</b> klicken – dann holt das Tool die Reichweite von Facebook und Instagram.</p>
@@ -4358,10 +4383,11 @@ def serve(host="0.0.0.0", port=None):
         if publish.ensure_long_lived():
             log.info("Meta-Langzeit-Token erneuert (~60 Tage).")
     except Exception as ex:
-        log.info("Token-Verlaengerung beim Start uebersprungen: %s", ex)
+        log.info("Token-Verlaengerung beim Start uebersprungen: %s", publish._scrub(ex))
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
     threading.Thread(target=_pool_scheduler, daemon=True).start()      # Taegliche Auto-Ziehung aus dem Topf (#126)
     threading.Thread(target=_cache_cleanup_scheduler, daemon=True).start()  # Taegliches Cache-Aufraeumen (#134)
+    threading.Thread(target=_insights_scheduler, daemon=True).start()  # Taegliche Auto-Aktualisierung der Insights
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))
     app.run(host=host, port=port, threaded=True)
