@@ -475,6 +475,9 @@ def _pool_tagesziehung(conn, datum=None, rng=None):
         wochentag = datetime.date.fromisoformat(datum).weekday()   # 0=Montag .. 6=Sonntag
     except Exception:
         wochentag = now.weekday()
+    # Wochenende: keine Veroeffentlichungen (auch kein Pool) - Vorgabe catrin 2026-08-18.
+    if _ist_wochenende(wochentag):
+        return 0
     # Nur postbare, aktive Stellen (Facebook-Seite hinterlegt) kommen fuer die Ziehung infrage.
     stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
                            "AND fb_seite!='' ORDER BY id").fetchall()
