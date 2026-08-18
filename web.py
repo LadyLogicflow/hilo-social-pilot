@@ -166,14 +166,17 @@ def _rang(items, keyfn):
 def _insights_aktualisieren():
     """Ruft fuer alle veroeffentlichten Posts mit Plattform-ID die aktuellen Insights ab und
     speichert Reichweite + Interaktionen. Rueckgabe: (aktualisiert, fehlgeschlagen, fehler_details)."""
-    import publish
+    import publish, datetime
     with get_conn() as conn:
         # seite IS NOT NULL: nur Posts mit hinterlegter Seiten-ID - das Seiten-Token kann die
         # Insights lesen. Alte Posts ohne Seiten-ID werden uebersprungen (kein Fehl-Call).
+        # insights_status='nicht_verfuegbar' -> von Facebook dauerhaft nicht mehr lieferbar (alt/geloescht),
+        # wird uebersprungen (kein vergeblicher API-Call, zaehlt nicht mehr als Fehler).
         rows = conn.execute("SELECT id, kanal, plattform_post_id, seite, veroeffentlicht_am FROM posts "
                             "WHERE status='veroeffentlicht' AND plattform_post_id IS NOT NULL "
-                            "AND plattform_post_id!='' AND seite IS NOT NULL AND seite!=''").fetchall()
-    ok, fehler = 0, 0
+                            "AND plattform_post_id!='' AND seite IS NOT NULL AND seite!='' "
+                            "AND (insights_status IS NULL OR insights_status!='nicht_verfuegbar')").fetchall()
+    ok, fehler, nicht_verfuegbar = 0, 0, 0
     fehler_kategorien = {"zu_alt": 0, "zu_neu": 0, "kein_zugriff": 0, "api_fehler": 0}
     fehler_beispiele = []
     # Seiten-Tokens EINMAL vorab holen (ein /me/accounts-Aufruf) statt pro Beitrag - vermeidet das
@@ -192,10 +195,28 @@ def _insights_aktualisieren():
             # _scrub: Fehlermeldungen koennen die Graph-URL inkl. access_token enthalten -> maskieren,
             # damit NIE ein Token in logs/hilo.log landet (Sicherheitsfix).
             sex = publish._scrub(ex)
+            err_str = sex.lower()
+            # Dauerhaft nicht mehr abrufbar: aeltere Beitraege, die Facebook mit (#10) 'Object does not
+            # exist / does not support this operation' quittiert (geloescht bzw. von der aktuellen
+            # Media-Views-Metrik nicht unterstuetzt). Einmalig markieren -> kuenftig ueberspringen, nicht
+            # mehr als Fehler zaehlen. Der Alter-Schutz (>30 Tage) verhindert, dass ein voruebergehendes
+            # Problem bei aktuellen Beitraegen faelschlich dauerhaft markiert wird.
+            _alt_genug = False
+            try:
+                _vd = datetime.datetime.strptime(str(r["veroeffentlicht_am"])[:10], "%Y-%m-%d")
+                _alt_genug = (datetime.datetime.utcnow() - _vd).days > 30
+            except Exception:
+                _alt_genug = False
+            if _alt_genug and "#10)" in err_str and ("does not exist" in err_str
+                                                     or "does not support this operation" in err_str):
+                with get_conn() as conn:
+                    conn.execute("UPDATE posts SET insights_status='nicht_verfuegbar' WHERE id=?", (r["id"],))
+                    conn.commit()
+                nicht_verfuegbar += 1
+                continue
+            # _scrub schuetzt vor Token-Leak im Log (Fehlermeldungen koennen die Graph-URL enthalten).
             log.warning("Insights-Abruf fehlgeschlagen (Post %s): %s", r["id"], sex)
             fehler += 1
-            # Kategorisiere Fehler
-            err_str = sex.lower()
             if "permission" in err_str or "access" in err_str or "token" in err_str:
                 fehler_kategorien["kein_zugriff"] += 1
                 if len(fehler_beispiele) < 3:
@@ -208,7 +229,8 @@ def _insights_aktualisieren():
                 fehler_kategorien["api_fehler"] += 1
                 if len(fehler_beispiele) < 3:
                     fehler_beispiele.append(f"Post {r['id']}: {sex[:50]}")
-    return ok, fehler, {"kategorien": fehler_kategorien, "beispiele": fehler_beispiele}
+    return ok, fehler, {"kategorien": fehler_kategorien, "beispiele": fehler_beispiele,
+                        "nicht_verfuegbar": nicht_verfuegbar}
 
 def _vorschlag_zeit(belegt=(), min_m=7 * 60):
     """Schlaegt eine gestreute Uhrzeit zwischen 07:00 und 19:00 vor (deutsche Zeit), die moeglichst
@@ -2416,9 +2438,12 @@ def insights_abrufen():
     """Holt die aktuellen Reichweiten-/Interaktionszahlen aller veroeffentlichten Beitraege."""
     try:
         ok, fehler, details = _insights_aktualisieren()
-        if ok or fehler:
-            msg = "Zahlen aktualisiert: %d Beitrag/Beitraege abgerufen%s." % (
-                ok, (", %d fehlgeschlagen" % fehler) if fehler else "")
+        nv = (details or {}).get("nicht_verfuegbar", 0)
+        if ok or fehler or nv:
+            msg = "Zahlen aktualisiert: %d Beitrag/Beitraege abgerufen%s%s." % (
+                ok,
+                (", %d fehlgeschlagen" % fehler) if fehler else "",
+                (", %d nicht mehr auswertbar (alt/geloescht)" % nv) if nv else "")
             flash(msg)
 
             # Detaillierte Fehler-Kategorien anzeigen
@@ -2454,7 +2479,8 @@ def auswertung():
             "ORDER BY p.reichweite DESC").fetchall()
         offen = conn.execute("SELECT COUNT(*) FROM posts WHERE status='veroeffentlicht' "
                              "AND plattform_post_id IS NOT NULL AND plattform_post_id!='' "
-                             "AND seite IS NOT NULL AND seite!='' AND reichweite IS NULL").fetchone()[0]
+                             "AND seite IS NOT NULL AND seite!='' AND reichweite IS NULL "
+                             "AND (insights_status IS NULL OR insights_status!='nicht_verfuegbar')").fetchone()[0]
     items = []
     for r in rows:
         bildtyp, titel = "Personenbild", ""

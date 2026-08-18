@@ -373,6 +373,10 @@ def migrate(conn):
         conn.execute("ALTER TABLE posts ADD COLUMN interaktionen INTEGER")
     if "insights_am" not in pcols:
         conn.execute("ALTER TABLE posts ADD COLUMN insights_am TEXT")
+    if "insights_status" not in pcols:
+        # NULL = normal abrufbar; 'nicht_verfuegbar' = von Facebook dauerhaft nicht mehr lieferbar
+        # (geloescht / von der aktuellen Metrik nicht unterstuetzt) -> nicht mehr abfragen/als Fehler zaehlen.
+        conn.execute("ALTER TABLE posts ADD COLUMN insights_status TEXT")
     # BVL- und HILO-Meldungen gehoeren nicht in Stufe 1 -> bestehende Eintraege heilen
     conn.execute("UPDATE themen SET status='ausgewaehlt' "
                  "WHERE status='vorgeschlagen' AND quelle IN ('bvl_pm','bvl_dpa','hilo')")
