@@ -325,8 +325,11 @@ def _publiziere_geplant(gpid):
                 ziel_name, erfolg, ergebnisse = _veroeffentliche_whatsapp(
                     conn, e, gp["entwurf_id"], f, kanal, stelle, "scheduler")
             else:
+                # Pool/Automatik hat kein Story-Haekchen: alles, was in den Feed geht, soll auch in die
+                # jeweilige Story (Facebook UND Instagram). Vorgabe catrin 2026-08-18.
                 ziel_name, erfolg, ergebnisse = _veroeffentliche_ziel(
-                    conn, e, gp["entwurf_id"], f, fmt_fb, fmt_ig, kanal, stelle, gp["page_id"], "scheduler", publish)
+                    conn, e, gp["entwurf_id"], f, fmt_fb, fmt_ig, kanal, stelle, gp["page_id"], "scheduler", publish,
+                    story=True, story_fb=True)
         except Exception as ex:
             erfolg, ergebnisse = False, [("-", False, str(ex))]
         info = " | ".join("%s: %s" % (k, ("OK" if ok else "Fehler – %s" % i)) for k, ok, i in ergebnisse)
