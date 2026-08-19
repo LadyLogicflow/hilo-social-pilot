@@ -27,10 +27,11 @@ MOTIV_DIR = os.path.join(DATA_DIR, "motive")
 # v5.2 = Kein "HILO" Text in der Typografie (nur supplied text)
 PROMPT_VERSION = "v5.2"
 
-# Default-Bildmodell fuer den OpenAI-Pfad. gpt-image-1 = genau das Modell, das ChatGPT fuer die
-# Bilderzeugung nutzt und mit dem unsere genehmigten Comic-Referenzen entstanden sind - deutlich
-# reicher/plastischer als gpt-image-2. Per Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ueberschreibbar.
-OPENAI_IMAGE_MODEL_DEFAULT = "gpt-image-1"
+# Default-Bildmodell fuer den OpenAI-Pfad. Stand 2026-08: gpt-image-2 (April 2026) ist OpenAIs
+# aktuelles Flaggschiff (bestbewertetes Text-zu-Bild-Modell, deutlich bessere Textdarstellung, bis 4K,
+# schneller). gpt-image-1 wird von OpenAI am 23.10.2026 abgeschaltet. Ueber die Verwaltung -> KI-Modelle
+# (Einstellung 'bild_modell') bzw. Umgebungsvariable HILO_OPENAI_IMAGE_MODEL ueberschreibbar.
+OPENAI_IMAGE_MODEL_DEFAULT = "gpt-image-2"
 # Ideogram v4 Generate-Endpoint (Text-Spezialist). Quadratisches Format per Default; per
 # Umgebungsvariable HILO_IDEOGRAM_RESOLUTION ueberschreibbar, falls der Enum-Name abweicht.
 IDEOGRAM_URL = "https://api.ideogram.ai/v1/ideogram-v4/generate"

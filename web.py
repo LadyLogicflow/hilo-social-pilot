@@ -1481,12 +1481,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div></form>
 
 <h3 style="margin-top:26px">Bild-Modell <span class=hint style="font-weight:normal">(OpenAI, für die Comic-Bilder)</span></h3>
-<p class=hint>Legt fest, <b>welches OpenAI-Bildmodell</b> die Comic-Bilder erzeugt. <b>gpt-image-1</b> ist die bewährte Standard-Wahl (wirkt oft reicher und plastischer). <b>gpt-image-2</b> ist ein Testmodell zum Vergleichen. Nach dem Umschalten erzeugt „Neu erzeugen“ ein <b>frisches</b> Bild mit dem gewählten Modell – so lassen sich beide am selben Beitrag vergleichen (A/B). Schlägt das Testmodell fehl, wird automatisch auf gpt-image-1 zurückgefallen.</p>
+<p class=hint>Legt fest, <b>welches OpenAI-Bildmodell</b> die Bilder erzeugt. Empfohlen ist <b>gpt-image-2</b> (Stand 2026 das aktuelle Standard-/Spitzenmodell). <b>gpt-image-1</b> ist die Vorgängerversion und wird von OpenAI am 23.10.2026 abgeschaltet. Bei einem künftigen OpenAI-Update einfach den neuen Modellnamen eintragen. Leer lassen = aktuelles Standardmodell.</p>
 <form method=post><input type=hidden name=formular value=bildmodell_save>
 <div style="max-width:560px">
   <label style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
     <span><b>Bild-Modell:</b></span>
-    <input type=text name=bild_modell value="{{bild_modell}}" placeholder="gpt-image-1" style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;min-width:220px" title="OpenAI-Bildmodell eintragen (z. B. gpt-image-1 oder gpt-image-2)">
+    <input type=text name=bild_modell value="{{bild_modell}}" placeholder="gpt-image-2" style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;min-width:220px" title="OpenAI-Bildmodell eintragen (empfohlen: gpt-image-2)">
   </label>
   <button>Bild-Modell speichern</button>
 </div></form>
@@ -3925,7 +3925,7 @@ def verwaltung():
                 # Freier Wert: bei OpenAI-Updates neuen Modellnamen eintragen. Leer -> Standard.
                 modell = request.form.get("bild_modell", "").strip()
                 if not modell:
-                    modell = "gpt-image-1"
+                    modell = "gpt-image-2"
                 conn.execute(
                     "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_modell', ?) "
                     "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (modell,))
@@ -4035,7 +4035,7 @@ def verwaltung():
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
         # OpenAI-Bild-Modell: aktueller Stand fuer das Eingabefeld (freier Wert). Leer -> Standard.
         _bm = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_modell'").fetchone()
-        bild_modell = ((_bm["wert"] or "").strip() if _bm else "") or "gpt-image-1"
+        bild_modell = ((_bm["wert"] or "").strip() if _bm else "") or "gpt-image-2"
         # Anthropic-Text-Modell: aktueller Stand fuer das Eingabefeld (freier Wert). Leer -> Standard.
         _tm = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='text_modell'").fetchone()
         text_modell = ((_tm["wert"] or "").strip() if _tm else "") or "claude-sonnet-4-6"
