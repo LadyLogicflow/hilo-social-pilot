@@ -105,6 +105,16 @@ CHANNEL_GUIDE = {
 }
 
 def _model():
+    # Vorrang: globale Einstellung 'text_modell' (Verwaltung -> Modelle). So kann Catrin bei einem
+    # Anthropic-Update einfach den neuen Modellnamen eintragen, ohne Code-Aenderung. Leer/DB-Fehler
+    # -> Env HILO_CLAUDE_MODEL bzw. der bewaehrte Default (kein Crash).
+    try:
+        import db
+        wert = (db.get_einstellung("text_modell") or "").strip()
+        if wert:
+            return wert
+    except Exception:
+        pass
     return os.environ.get("HILO_CLAUDE_MODEL", "claude-sonnet-4-6")
 
 # --- #143: Art-Director-Schritt (NUR im Bild-Stil 'kreativ') -----------------------------------

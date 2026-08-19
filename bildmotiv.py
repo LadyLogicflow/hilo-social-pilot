@@ -65,7 +65,9 @@ def openai_image_model():
     if wert is None:
         return default
     wert = str(wert).strip()
-    return wert if wert in ("gpt-image-1", "gpt-image-2") else default
+    # Freier Wert (Verwaltung -> Modelle): bei einem OpenAI-Update kann der neue Modellname direkt
+    # eingetragen werden. Nur ein LEERER Wert faellt auf den Default zurueck.
+    return wert or default
 
 def _prompt(fields_or_motiv):
     """Masterprompt v5: Werbe-Design mit integrierter Typografie (ChatGPT-optimiert).

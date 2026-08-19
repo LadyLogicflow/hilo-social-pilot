@@ -1485,12 +1485,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div style="max-width:560px">
   <label style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
     <span><b>Bild-Modell:</b></span>
-    <select name=bild_modell style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff" title="OpenAI-Bildmodell für die Comic-Bilder wählen">
-      <option value="gpt-image-1"{% if bild_modell=='gpt-image-1' %} selected{% endif %}>gpt-image-1 (Standard)</option>
-      <option value="gpt-image-2"{% if bild_modell=='gpt-image-2' %} selected{% endif %}>gpt-image-2 (Test)</option>
-    </select>
+    <input type=text name=bild_modell value="{{bild_modell}}" placeholder="gpt-image-1" style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;min-width:220px" title="OpenAI-Bildmodell eintragen (z. B. gpt-image-1 oder gpt-image-2)">
   </label>
   <button>Bild-Modell speichern</button>
+</div></form>
+
+<h3 style="margin-top:26px">Text-Modell <span class=hint style="font-weight:normal">(Anthropic/Claude, für Texte &amp; Captions)</span></h3>
+<p class=hint>Trage hier den Namen des <b>Anthropic-Textmodells</b> ein (aktuell z.&nbsp;B. <code>claude-sonnet-4-6</code>). Bei einem Anthropic-Update einfach den <b>neuen Modellnamen</b> eintippen. Leer lassen = bewährtes Standardmodell.</p>
+<form method=post><input type=hidden name=formular value=textmodell_save>
+<div style="max-width:560px">
+  <label style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #ccd3df;border-radius:8px;margin-bottom:10px">
+    <span><b>Text-Modell:</b></span>
+    <input type=text name=text_modell value="{{text_modell}}" placeholder="claude-sonnet-4-6" style="padding:8px;border-radius:8px;border:1px solid #ccd3df;color:#15191F;background:#fff;min-width:220px" title="Anthropic-Textmodell eintragen">
+  </label>
+  <button>Text-Modell speichern</button>
 </div></form>
 
 <h3 style="margin-top:26px">Finanzamt-Bible <span class=hint style="font-weight:normal">(global, für den Stil „Comic Beratung")</span></h3>
@@ -3909,14 +3917,24 @@ def verwaltung():
                 # 'gpt-image-2' (Test). Umschaltbar fuer den A/B-Vergleich am selben Beitrag; ein
                 # Modellwechsel erzeugt frische Comic-Bilder (Modell-Praefix im Cache). Der Default
                 # (gpt-image-1) aendert sich NICHT; unbekannte Werte fallen darauf zurueck.
-                modell = request.form.get("bild_modell", "gpt-image-1").strip().lower()
-                if modell not in ("gpt-image-1", "gpt-image-2"):
+                # Freier Wert: bei OpenAI-Updates neuen Modellnamen eintragen. Leer -> Standard.
+                modell = request.form.get("bild_modell", "").strip()
+                if not modell:
                     modell = "gpt-image-1"
                 conn.execute(
                     "INSERT INTO einstellungen(schluessel, wert) VALUES ('bild_modell', ?) "
                     "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (modell,))
                 audit_log(conn, session["user"], "bild_modell_gesetzt", None, modell)
                 flash("Bild-Modell gespeichert: %s." % modell)
+            elif formular == "textmodell_save":
+                # Globales Text-Modell (Anthropic/Claude). Freier Wert -> bei einem Modell-Update
+                # einfach den neuen Namen eintragen. Leer -> Standard (textgen._model()).
+                tmod = request.form.get("text_modell", "").strip()
+                conn.execute(
+                    "INSERT INTO einstellungen(schluessel, wert) VALUES ('text_modell', ?) "
+                    "ON CONFLICT(schluessel) DO UPDATE SET wert=excluded.wert", (tmod,))
+                audit_log(conn, session["user"], "text_modell_gesetzt", None, tmod or "(Standard)")
+                flash("Text-Modell gespeichert: %s." % (tmod or "Standard (claude-sonnet-4-6)"))
             elif formular == "finanzamt_bibel":
                 # Globale Finanzamt-Bible (#151): optionaler Bild-Upload (Comic-/Stylesheet-Vorlage des
                 # wiederkehrenden Finanzamt-Charakters) + Charakter-Beschreibung. Key/Value in
@@ -4009,9 +4027,12 @@ def verwaltung():
             traeger = []
         _bt = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_tool'").fetchone()
         bild_tool = (_bt["wert"] if _bt and _bt["wert"] else "openai")
-        # OpenAI-Bild-Modell (#161): aktueller Stand fuers Dropdown. Unbekannt/leer -> Standard.
+        # OpenAI-Bild-Modell: aktueller Stand fuer das Eingabefeld (freier Wert). Leer -> Standard.
         _bm = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='bild_modell'").fetchone()
-        bild_modell = (_bm["wert"] if _bm and _bm["wert"] in ("gpt-image-1", "gpt-image-2") else "gpt-image-1")
+        bild_modell = ((_bm["wert"] or "").strip() if _bm else "") or "gpt-image-1"
+        # Anthropic-Text-Modell: aktueller Stand fuer das Eingabefeld (freier Wert). Leer -> Standard.
+        _tm = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='text_modell'").fetchone()
+        text_modell = ((_tm["wert"] or "").strip() if _tm else "") or "claude-sonnet-4-6"
         # Globale Finanzamt-Bible (#151): aktueller Stand fuer die Anzeige im Bild-Stil-Bereich.
         _fab = conn.execute("SELECT wert FROM einstellungen WHERE schluessel='finanzamt_bibel_bild'").fetchone()
         finanzamt_bibel_bild = (_fab["wert"] if _fab and _fab["wert"] else "")
@@ -4071,6 +4092,7 @@ def verwaltung():
                                                      any_wa_pending=any_wa_pending,
                                                      bild_tool=bild_tool,
                                                      bild_modell=bild_modell,
+                                                     text_modell=text_modell,
                                                      finanzamt_bibel_bild=finanzamt_bibel_bild,
                                                      finanzamt_bibel_text=finanzamt_bibel_text,
                                                      **speicher))
