@@ -2593,21 +2593,25 @@ def beitrag(eid):
                                   wa_stellen=wa_stellen, wa_allg_kanal=wa_allg_kanal, wa_allg_story=wa_allg_story))
 
 def _status_hochkant(square_path, out_path):
-    """Komponiert ein quadratisches Bild zentriert auf einen HILO-Verlauf (9:16, 1080x1920) -
-    fuer WhatsApp-Status / Instagram-Story. Liefert out_path."""
-    from PIL import Image
+    """Bringt ein quadratisches Bild auf 9:16 (1080x1920) OHNE Beschnitt des Motivs (fuer
+    WhatsApp-Status / Instagram-/Facebook-Story): Derselbe Bildinhalt fuellt als weich unscharfer,
+    formatfuellender Hintergrund die ganze Flaeche; das scharfe Originalbild sitzt in voller Breite
+    mittig darueber. Kein Farbbalken, kein zusaetzlicher KI-Token. Liefert out_path."""
+    from PIL import Image, ImageFilter
     W, H = 1080, 1920
-    top, bot = (31, 66, 141), (96, 163, 60)
-    grad = Image.new("RGB", (1, H)); gp = grad.load()
-    for y in range(H):
-        t = y / (H - 1)
-        gp[0, y] = (int(top[0] + (bot[0]-top[0])*t), int(top[1] + (bot[1]-top[1])*t),
-                    int(top[2] + (bot[2]-top[2])*t))
-    canvas = grad.resize((W, H), Image.BILINEAR)
-    sq = Image.open(square_path).convert("RGB").resize((W, W), Image.LANCZOS)
-    canvas.paste(sq, (0, (H - W) // 2))
+    src = Image.open(square_path).convert("RGB")
+    # Hintergrund: Bild formatfuellend (cover) skalieren, mittig auf 1080x1920 zuschneiden, weichzeichnen.
+    scale = max(W / src.width, H / src.height)
+    bw, bh = max(W, int(round(src.width * scale))), max(H, int(round(src.height * scale)))
+    resized = src.resize((bw, bh), Image.LANCZOS)
+    left, top = (bw - W) // 2, (bh - H) // 2
+    bg = resized.crop((left, top, left + W, top + H)).filter(ImageFilter.GaussianBlur(40))
+    # dezent abdunkeln, damit das scharfe Bild vorne besser abhebt
+    bg = Image.blend(bg, Image.new("RGB", (W, H), (0, 0, 0)), 0.20)
+    # Vordergrund: scharfes Originalbild in voller Breite (1080), mittig
+    bg.paste(src.resize((W, W), Image.LANCZOS), (0, (H - W) // 2))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    canvas.save(out_path)
+    bg.save(out_path)
     return out_path
 
 def _render_stelle_bild(eid, sid):
