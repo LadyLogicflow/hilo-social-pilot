@@ -1241,6 +1241,7 @@ VERWALTUNG_HOME = """<!doctype html><meta charset=utf-8><title>Verwaltung</title
   <a class=tile href="/verwaltung?bereich=schauplatz"><h3>&#x1F5BC; Schaupl&auml;tze</h3><p>Sch&ouml;ne saisonale Umgebungen f&uuml;r den KI-Tafel-Look (mit Bilderrahmen-Botschaft).</p></a>
   <a class=tile href="/verwaltung?bereich=traeger"><h3>&#x1FAA7; Tr&auml;ger</h3><p>Wie die Botschaft pr&auml;sentiert wird (Tafel, Rahmen, Holzschild &hellip;) &ndash; abwechselnd gew&auml;hlt.</p></a>
   <a class=tile href="/verwaltung?bereich=bildstil"><h3>&#x1F5BC; Bild-Stil</h3><p>Standard (v11) oder Testmodus „KI schreibt den Text selbst auf eine Tafel".</p></a>
+  <a class=tile href="/verwaltung?bereich=modelle"><h3>&#x1F916; KI-Modelle</h3><p>Text- und Bild-Modell (Anthropic &amp; OpenAI) sowie das Bild-Tool w&auml;hlen &ndash; bei Updates neuen Modellnamen eintragen.</p></a>
   <a class=tile href="/verwaltung?bereich=speicher"><h3>&#x1F4BE; Speicher</h3><p>Foto-Cache und freien Plattenplatz ansehen, ungenutzte KI-Fotos aufr&auml;umen.</p></a>
 </div>"""
 
@@ -1463,8 +1464,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button>Träger anlegen</button></form>
 {% endif %}
 
-{% if bereich=='bildstil' %}
-<p class=hint>Alle Bilder werden im klassischen HILO-Stil gerendert: Foto als Hintergrund, Text programmatisch darüber (Überschrift, Bullets, CTA).</p>
+{% if bereich=='modelle' %}
+<p class=hint>Hier waehlst du, <b>welche KI-Modelle</b> ShareNext nutzt (Texte ueber Anthropic/Claude, Bilder ueber OpenAI) und welches Bild-Tool. Bei einem Modell-Update einfach den <b>neuen Modellnamen</b> eintragen und speichern. Leeres Feld = bewaehrtes Standardmodell.</p>
 
 <h3 style="margin-top:26px">Bild-Tool</h3>
 <p class=hint>Legt fest, <b>welche KI</b> das Foto erzeugt (unabhängig vom Bild-Stil oben). <b>OpenAI</b> ist die bewährte Standard-Wahl. <b>Ideogram</b> ist ein Text-Spezialist – die Schrift im Bild (z.&nbsp;B. auf der KI-Tafel) wird deutlich genauer; benötigt aber einen <b>eigenen API-Schlüssel</b> (in den Secrets als <code>ideogram_api_key</code> hinterlegen). So lassen sich beide am selben Beitrag vergleichen.</p>
@@ -1500,6 +1501,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </label>
   <button>Text-Modell speichern</button>
 </div></form>
+{% endif %}
+
+{% if bereich=='bildstil' %}
+<p class=hint>Alle Bilder werden im klassischen HILO-Stil gerendert: Foto als Hintergrund, Text programmatisch darüber (Überschrift, Bullets, CTA).</p>
 
 <h3 style="margin-top:26px">Finanzamt-Bible <span class=hint style="font-weight:normal">(global, für den Stil „Comic Beratung")</span></h3>
 <p class=hint>Globale Comic-/Stylesheet-Vorlage des wiederkehrenden Finanzamt-Charakters. Ist ein Bild hinterlegt, wird es beim Rendern <b>statt</b> der eingebauten Standard-Referenz als Finanzamt-Vorlage genutzt; die Beschreibung fließt zusätzlich in den Bild-Prompt ein. Ohne Eintrag bleibt alles wie bisher. Anzeige nur nach Login (Datenschutz).</p>
@@ -4007,7 +4012,8 @@ def verwaltung():
         bereich_titel = {"benutzer": "Benutzer", "stellen": "Beratungsstellen",
                          "anlass": "Anlass-Tage", "wissen": "Wissens-Serie",
                          "schauplatz": "Schauplätze", "traeger": "Träger",
-                         "bildstil": "Bild-Stil", "speicher": "Speicher"}.get(bereich)
+                         "bildstil": "Bild-Stil", "modelle": "KI-Modelle",
+                         "speicher": "Speicher"}.get(bereich)
         if not bereich_titel:
             return redirect(url_for("verwaltung"))
         users = conn.execute("SELECT name, rolle, aktiv FROM benutzer ORDER BY name").fetchall()
