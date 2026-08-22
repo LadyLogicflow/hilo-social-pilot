@@ -212,6 +212,9 @@ PRIORITÄT B - VISUELLE WIRKUNG (Scroll-Stop)
   ein Tisch mit Geschirr im unscharfen Hintergrund), nicht nur eine flache Farbfläche hinter
   dem Objekt. Ein durchgehend einfarbiger Studio-Hintergrund wirkt in Serie schnell wie
   austauschbares 3D-Rendering statt echter Fotografie.
+- **Grundhelligkeit:** Das Bild soll insgesamt HELL und FRISCH wirken. Tiefes Navy nur als
+  Fläche/Akzent einsetzen, NICHT als ganzflächig dunklen Hintergrund über das ganze Bild. Der
+  kräftige Kontrast entsteht am Focal Point, nicht durch ein durchgehend dunkles Bild.
 - Übersetze das Scroll-Stop-Device der Route konkret und sichtbar - nicht nur andeuten.
 - Kräftiger Hell-Dunkel-Kontrast am Focal Point + mindestens ein satter, klar erkennbarer
   Farbakzent. Vermeide flaue, blasse oder gleichförmig helle Bilder - "professionell und warm"

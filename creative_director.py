@@ -242,8 +242,10 @@ Die 4 Routen-Typen:
 1. **Emotionale Szene**
    - Menschen in realistischen Situationen
    - Emotionen: Erleichterung, Stress, Freude, Zufriedenheit
-   - Beispiele: Erleichterter Unternehmer am Schreibtisch, Familie beim Ausfüllen von Formularen
-   - NICHT: Stock-Foto-Klischees vermeiden!
+   - Beispiele: jemand reagiert sichtbar erleichtert/freudig auf eine Nachricht am Smartphone,
+     eine Übergabe-Geste zwischen zwei Personen, ein Vorher/Nachher-Moment derselben Person
+   - NICHT: Stock-Foto-Klischees vermeiden! KEINE Steuerberater-/Beratungsszene, niemand der
+     über Unterlagen oder am Schreibtisch sitzt, keine gestellte Pose - die Person muss ETWAS TUN.
    - BRAUCHT EINE KONKRETE HANDLUNG ODER BEZIEHUNG, nicht nur eine Person mit einem Gegenstand.
      "Eine Frau hält ein Dokument und schaut aus dem Bild" ist keine Szene, sondern eine Pose -
      das ist dieselbe Schwäche wie eine reine Objekt-Illustration, nur mit Person statt Gegenstand.
@@ -291,6 +293,9 @@ Wichtig:
 - Visuell erkennbare Signaturen (Licht, Farbe, Komposition)
 - Alle 4 müssen zur Kernaussage passen
 - Scroll-Stop-Potenzial beachten
+- **Mindestens EINE der Routen MUSS eine klare Transformation oder einen sichtbaren Widerspruch
+  als Scroll-Stop tragen** - kein bloßes Abbilden des Themen-Objekts (Illustration eines Begriffs
+  ist die schwächste Lösung).
 - **EIN dominantes Bildelement pro Route, keine Requisiten-Ansammlung.** Mehrere kleine Objekte
   (+ Labels/Beschriftungen darauf) konkurrieren um Aufmerksamkeit und werden im Feed-Thumbnail
   unlesbar. Lieber ein einzelnes, klares Element mutig/großformatig inszenieren als eine
@@ -324,6 +329,8 @@ ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
   Händeschütteln vor Glaswand, Daumen hoch im Anzug)
 - sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
 - übertriebenes/unnatürliches Lächeln
+- Steuerberater-/Beratungsszene: Person(en) sitzen über Unterlagen/am Schreibtisch, klassische
+  Beratungsgespräch-Situation - ausdrücklich unerwünscht (Owner-Vorgabe)
 - wörtlicher Geldregen (fallende Scheine/Münzen als Klischee-Symbol für "Geld")
 - **ein Steuerformular/Dokument, das zu einem anderen Objekt gefaltet/verformt wird** (Papierflieger,
   Brücke, Boot o.ä.) als Standardlösung für "Visuelle Metapher" - war ursprünglich eine starke,

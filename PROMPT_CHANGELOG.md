@@ -16,6 +16,27 @@ Datum, betroffene Datei(en), konkretes Bildproblem das behoben wird, Kurzbeschre
 
 ---
 
+## 2026-08-22 – Radar-Bild-Tuning: heller, aktive Personen erlaubt, kein Berater-Klischee (Owner catrin)
+
+**Anlass:** Vier Radar-Vergleichsbilder. Owner-Feedback: Bilder oft zu dunkel und zu wenig
+aussagekraeftig; Scroll-Stop ist oberstes Ziel. Personen und Wortwolken sind ausdruecklich
+erwuenscht - aber KEINE typische Steuerberater-/Beratungsszene ("ueber den Unterlagen sitzen").
+Die bisherige harte "KEINE Personen"-Regel arbeitete gegen den Owner-Geschmack; ein Positiv-
+Beispiel im Prompt ("Unternehmer am Schreibtisch, Familie beim Formulare-Ausfuellen") war genau
+die unerwuenschte Szene. QA (Gate A) bewusst NICHT angefasst - dort ist das Bild schon fertig.
+
+**Umgesetzt (4 Dateien, eng begrenzt):**
+
+1. `textgen.py` (`szene_motiv`/`bild_motiv`): Personen in AKTIVEN Szenen erlaubt (nicht nur
+   Still-Life); explizites Verbot Berater-/Schreibtischszene + Stockpose; Standard-Licht (hell,
+   warmes Tageslicht) ergaenzt.
+2. `creative_director.py`: Route "Emotionale Szene" - unerwuenschtes Beispiel ersetzt durch aktive
+   Alltagsmomente; Berater-/Schreibtischszene auf die "abgenutzte Bildsprache"-Liste; neue Pflicht:
+   mind. eine Route MUSS Transformation/Widerspruch als Scroll-Stop tragen (kein blosses Abbilden).
+3. `image_producer.py` (PRIORITAET B): Grundhelligkeit - Bild hell/frisch, Navy nur Flaeche/Akzent,
+   nicht ganzflaechig dunkel; Kontrast am Focal Point.
+4. `art_director.py`: Navy nicht als Voll-Hintergrund; Standard-Licht hell/luftig ergaenzt.
+
 ## 2026-08-11 – Emotionale Szene braucht konkrete Handlung (elfte Runde)
 
 **Anlass:** Vier frische Vergleichsbilder, kritisch mit einer weiteren externen Kritik (ChatGPT)

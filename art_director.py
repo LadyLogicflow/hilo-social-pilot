@@ -348,7 +348,8 @@ Die 7 Kern-Achsen:
    - Wie wird HILO in DIESEM Motiv spürbar - unabhängig von Logo-/Slogan-Kreis?
    - Bevorzugte visuelle Grammatik (KEIN starres Template - nicht jedes Bild muss alle Punkte
      erfüllen, das sind Bausteine zur Auswahl, nicht eine Checkliste):
-     * tiefes Navy als starke Bühne oder strukturierende Fläche
+     * tiefes Navy als Fläche/Akzent oder strukturierende Bühne - NICHT als ganzflächig dunkler
+       Voll-Hintergrund über das ganze Bild (das macht die Serie dunkel und schwer)
      * sattes HILO-Grün als bewusster, prägnanter Akzent (nicht als erzwungene Requisite)
      * Weiß/helle Materialien für starken Kontrast
      * ein dominantes Hero-Element statt vieler Requisiten
@@ -398,6 +399,8 @@ Plus:
 
 Wichtig:
 - Sei KONKRET (nicht "schönes Licht", sondern "weiches Licht von links")
+- Standard-Licht: helle, luftige Ausleuchtung / warmes Tageslicht - der Gesamteindruck soll hell
+  und frisch sein; dunkel/dramatisch nur, wenn die Route es bewusst braucht
 - Denk an Text-Zonen (Text muss später drauf passen!)
 - HILO-CI beachten: Navy (#1f428d), Grün (#60a33c), Weiß - Akzente gerne in diesen Markenfarben
 - SIGNALFARBEN (Rot, Orange, Neon o.ä.) sind erlaubt, wenn sie semantisch begründet sind (z.B.
