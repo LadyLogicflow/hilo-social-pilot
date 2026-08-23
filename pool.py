@@ -82,9 +82,13 @@ def markiere_verbraucht(conn, entwurf_id, stelle_id, kanal):
                  (entwurf_id, stelle_id, kanal))
 
 
-def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None):
+def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None, tabu=None):
     """Zieht fuer EINEN Kanal je Stelle einen zufaelligen, noch offenen Topf-Beitrag - so, dass an
     EINEM Tag keine zwei Stellen denselben Beitrag bekommen ('fuer jede Stelle ein anderer').
+
+    tabu (optional): Menge von entwurf_ids, die an diesem Tag bereits (auf einem ANDEREN Kanal)
+    vergeben wurden und deshalb nicht nochmal gezogen werden duerfen - so erscheint derselbe Beitrag
+    pro Tag garantiert nur bei EINER Stelle, auch kanaluebergreifend (Vorgabe catrin 2026-08-23).
 
     Greedy ohne Zuruecklegen: Stellen mit dem kleinsten Vorrat zuerst bedienen (die haben die
     wenigsten Ausweichmoeglichkeiten). rng ist eine random.Random-Instanz (Aufrufer steuert den Seed
@@ -102,7 +106,7 @@ def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None):
         erlaubt = set(erlaubte_eids)
         offen = {sid: [eid for eid in lst if eid in erlaubt] for sid, lst in offen.items()}
     auswahl = {}
-    schon_vergeben = set()
+    schon_vergeben = set(tabu) if tabu else set()
     for sid in sorted(stelle_ids, key=lambda s: len(offen[s])):
         kandidaten = [eid for eid in offen[sid] if eid not in schon_vergeben]
         if not kandidaten:

@@ -532,6 +532,12 @@ def _pool_tagesziehung(conn, datum=None, rng=None):
         "SELECT geplant_am FROM geplante_posts WHERE geplant_am LIKE ? AND status='geplant'", (datum + "T%",))]
     min_m = (now.hour * 60 + now.minute + 2) if heute else 7 * 60
     n = 0
+    # Kanaluebergreifende Tages-Sperre (Vorgabe catrin 2026-08-23): ein Beitrag, der HEUTE schon (auf
+    # irgendeinem Kanal, bei irgendeiner Stelle) gezogen wurde, wird am selben Tag NICHT erneut gezogen.
+    # So erscheint derselbe Beitrag pro Tag garantiert nur bei EINER Stelle. Seed aus evtl. bereits
+    # vorhandenen Tages-Eintraegen (Schutz bei mehrfachem Lauf am selben Tag).
+    heute_vergeben = {int(r[0]) for r in conn.execute(
+        "SELECT DISTINCT entwurf_id FROM geplante_posts WHERE pool=1 AND geplant_am LIKE ?", (datum + "T%",))}
     for kanal in POOL_SCHEDULER_KANAELE:
         # Frequenz-Regel (#127): manche Kanaele (z.B. whatsapp_kanal) nur an bestimmten Wochentagen.
         if not _kanal_heute_faellig(kanal, wochentag):
@@ -549,13 +555,14 @@ def _pool_tagesziehung(conn, datum=None, rng=None):
             continue
         # Je Stelle ein ANDERER Beitrag am selben Tag (Phase-1-Logik uebernimmt das Verteilen).
         auswahl = pool.ziehe_tagesauswahl(conn, offene_stellen, kanal, rng,
-                                          erlaubte_eids=erlaubte_eids)
+                                          erlaubte_eids=erlaubte_eids, tabu=heute_vergeben)
         for sid, eid in auswahl.items():
             z = _vorschlag_zeit(belegt, min_m); belegt.append(z)
             conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
                          "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
                          (eid, sid, kanal, "einzelbild", "einzelbild", "einzelbild", "%sT%s" % (datum, z)))
             pool.markiere_verbraucht(conn, eid, sid, kanal)
+            heute_vergeben.add(eid)   # ab jetzt fuer alle weiteren Kanaele/Stellen heute gesperrt
             n += 1
     if n:
         audit_log(conn, "system", "pool_tagesziehung", None, "%d Pool-Beitrag/-Beitraege fuer %s" % (n, datum))
