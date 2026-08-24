@@ -172,8 +172,11 @@ class ArtDirectionBoard(BaseModel):
     ] = Field(description="Hauptrichtung des Lichts")
 
     licht_stimmung: str = Field(
-        description="Lichtstimmung / Tageszeit (z.B. 'Warmes Morgenlicht', 'Kühles Bürolicht', "
-                    "'Dramatisches Abendlicht', 'Neutrales Studio-Licht')"
+        description="Lichtstimmung / Tageszeit. STANDARD ist helles, warmes Tageslicht mit "
+                    "freundlicher, einladender Stimmung (z.B. 'Helles, warmes Tageslicht', "
+                    "'Freundliches Morgenlicht', 'Sonniges Nachmittagslicht'). Dunkle oder "
+                    "dramatische Stimmung (Abend, Nacht, kühl) NUR, wenn die Creative Route sie "
+                    "zwingend braucht."
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -334,6 +337,9 @@ Die 7 Kern-Achsen:
    - Qualität: Soft/Hart/Dramatisch?
    - Richtung: Von wo kommt das Licht?
    - Stimmung: Welche Tageszeit/Atmosphäre?
+   - STANDARD ist helles, warmes Tageslicht mit freundlicher, einladender Stimmung. Dunkle oder
+     dramatische Abend-/Nacht-Stimmung NUR, wenn die Creative Route sie zwingend erfordert - die
+     Bildserie soll insgesamt hell und frisch wirken.
 
 4. **Farbdramaturgie**
    - 2-4 dominante Farben
@@ -374,6 +380,14 @@ Die 7 Kern-Achsen:
      Hintergrund ist genauso fokussiert wie ein freigestelltes Objekt, wirkt aber warm und
      fotografisch statt steril.
    - Bevorzuge wo es zur Route passt eine echte Umgebung mit Tiefe.
+
+CREATIVE IDEA PRESERVATION (verbindlich):
+Die vom Concept Jury ausgewählte Creative Route ist die verbindliche Leitidee. Deine Aufgabe ist,
+GENAU DIESE EINE Idee zu VERSTÄRKEN - über Licht, Perspektive, Crop, Silhouette, Negative Space,
+Größenrelation und Blickführung. Führe KEINE zusätzlichen Metaphern, Symbole oder Icons ein, die
+nicht Teil der Route sind (z.B. kein Kreuz, kein Warnschild, keine Extra-Requisiten). Das zentrale
+Hero-Element bzw. die Transformation muss in ca. 0,5 Sekunden erfassbar sein. Ein starker Hero mit
+einer klaren Aussage ist besser als mehrere „passende" Symbole - im Zweifel reduzieren.
 
 THUMBNAIL-TEST (wichtig für Feed-Wirkung):
 Instagram/Facebook zeigen das Bild zuerst klein - ca. 180×180 Pixel zwischen vielen anderen

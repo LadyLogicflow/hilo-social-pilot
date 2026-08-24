@@ -7,7 +7,7 @@ Image Producer - Generiert Premium-Bild MIT deutscher Überschrift für ShareNex
 
 WICHTIG:
 - Text NUR auf DEUTSCH (NIEMALS Englisch!)
-- Überschrift natürlich ins Bild integriert
+- Überschrift als klare Schrift direkt auf dem Bild (Navy/Weiß nach Kontrast, keine Platte, kein Schild)
 - EURO (€) verwenden, NIEMALS Dollar ($)
 - Zielgruppe: konkret aus Message Brief (nicht pauschal "Steuerzahler")
 
@@ -176,14 +176,13 @@ PRIORITÄT A - UNVERHANDELBAR
   Interpretation, die vom Board abweicht.
 - Ist eine Überschrift vorgegeben: MUSS sie EXAKT (wortgenau, keine Änderung/Übersetzung),
   GROß, LESBAR und PROMINENT im Bild erscheinen - das wichtigste Text-Element im Bild.
-- Text natürlich integrieren (auf Schildern, Wänden, Tafeln, Anzeigen, Plakaten) - NICHT
-  schwebend.
-- Braucht die Überschrift eine eigene Fläche für Kontrast: bevorzugt Navy (#1f428d) oder Grün
-  (#60a33c) mit weißer Schrift (oder umgekehrt). Eine neutrale Fläche ist nur erlaubt, wenn sie
-  erkennbar besser zur Szene passt UND zusätzlich ein sichtbares HILO-Farbelement (Rand,
-  Streifen, Akzent) in der Nähe liegt - nie eine Fläche komplett ohne Markenfarbbezug. Wo
-  möglich lieber ganz ohne separate Fläche, direkt auf einer dunklen Bildfläche im Motiv mit
-  Halo/Kontrast.
+- Die Überschrift steht als klare, gut lesbare Schrift DIREKT auf dem Bild - NICHT als Schild,
+  Tafel, Plakat, Anzeige oder Wandbild in die Szene gemalt, und NICHT auf einer farbigen Fläche/
+  einem Kasten/Balken dahinter.
+- Schriftfarbe nach Lesbarkeit: Navy (#1f428d) auf hellem Grund, Weiß auf dunklem/kräftigem Grund
+  - je nachdem, was sich besser vor dem Hintergrund liest. Komponiere die Szene so, dass es einen
+  ruhigen, gleichmäßigen Bildbereich (z.B. oben) gibt, der die Schrift ohne Platte gut lesbar
+  trägt (bei Bedarf dezenter Schatten/Halo für Kontrast, aber keine Fläche).
 - NUR DEUTSCHE SPRACHE - absolut kein Englisch.
 - EURO (€) - NIEMALS Dollar ($) oder USD.
 - Zielgruppe strikt beachten - siehe konkrete Zielgruppe im User-Prompt, nicht pauschalisieren.
