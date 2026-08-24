@@ -1,9 +1,32 @@
 # -*- coding: utf-8 -*-
 """M3 - Texterstellung mit Claude. Erzeugt aus einem Thema einen HILO-Beitrag (strukturiert)."""
-import json, logging, os
+import json, logging, os, re
 from secrets_store import get_secret
 
 log = logging.getLogger("hilo.textgen")
+
+# Feste Begriffs-Sperre (Vorgabe catrin 2026-08-24): irrefuehrende Umgangsbegriffe werden IMMER durch den
+# korrekten Fachbegriff ersetzt - deterministisch, damit ein verbotenes Wort GARANTIERT nicht im Text oder
+# Bild landet (eine reine KI-Anweisung reicht nicht, die KI hielt sich schon nicht daran). Erweiterbar.
+_BEGRIFFE_TABU = [
+    (re.compile(r"Bankstrafen?", re.IGNORECASE), "Vorfälligkeitsentschädigung"),
+]
+
+
+def _korrigiere_begriffe(data):
+    """Ersetzt in ALLEN Textfeldern (auch verschachtelt: Listen wie bullets, dict captions) verbotene
+    Umgangsbegriffe durch den korrekten Fachbegriff. Gibt data zurueck."""
+    def fix(v):
+        if isinstance(v, str):
+            for rx, repl in _BEGRIFFE_TABU:
+                v = rx.sub(repl, v)
+            return v
+        if isinstance(v, list):
+            return [fix(x) for x in v]
+        if isinstance(v, dict):
+            return {k: fix(x) for k, x in v.items()}
+        return v
+    return fix(data) if isinstance(data, dict) else data
 
 SYSTEM = (
     "Du bist Social-Media-Redakteur fuer den Lohnsteuerhilfeverein HILO.\n\n"
@@ -18,6 +41,9 @@ SYSTEM = (
     "Das gilt fuer JEDES Feld (Ueberschrift, Caption, Bullets, CTA). "
     "Richtig: 'für', 'Überschrift', 'persönlich', 'Grüße', 'Steuererklärung'. "
     "Falsch: 'fuer', 'Ueberschrift', 'persoenlich', 'Gruesse', 'Steuererklaerung'.\n\n"
+    "FACHBEGRIFFE: Verwende IMMER die korrekten steuerlichen Fachbegriffe, NIEMALS irrefuehrende "
+    "Umgangssprache. Insbesondere ist das Wort 'Bankstrafe' VERBOTEN - der korrekte Begriff ist "
+    "'Vorfaelligkeitsentschaedigung' (bzw. kurz 'Vorfaelligkeit').\n\n"
     "AUFBAU JEDES BEITRAGS:\n"
     "1) UEBERSCHRIFT (erscheint gross auf dem Bild): kurze, knackige Schlagzeile mit Hook-Charakter, die "
     "sofort neugierig macht - kein allgemeiner Einstieg. Hoechstens 60 Zeichen.\n"
@@ -594,7 +620,7 @@ def generate(thema, kanal=None):
         messages=[{"role": "user", "content": _build_prompt(thema)}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _normalize_bild(_normalize_captions(_parse_json(raw)))
+    return _korrigiere_begriffe(_normalize_bild(_normalize_captions(_parse_json(raw))))
 
 
 def _create_drafts(rows, kanal):
@@ -781,4 +807,4 @@ def regenerate(thema, previous, feedback, kanal="google"):
     msg = client.messages.create(model=_model(), max_tokens=1600, system=SYSTEM,
                                  messages=[{"role": "user", "content": prompt}])
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _normalize_captions(_parse_json(raw))
+    return _korrigiere_begriffe(_normalize_captions(_parse_json(raw)))
