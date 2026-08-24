@@ -34,4 +34,12 @@ SCRAPE_SOURCES = {
     "bvl_pm":  os.environ.get("HILO_SOURCES_BVL_PM",  "https://www.bvl-verband.de/presse/pressemeldungen"),
     "bvl_dpa": os.environ.get("HILO_SOURCES_BVL_DPA", "https://www.bvl-verband.de/presse/dpa-presseinformationen"),
     "steuerrat24": os.environ.get("HILO_SOURCES_STEUERRAT24", "https://www.steuerrat24.de/steuerrat-aktuell/steuertipp-der-woche.html"),
+    # steuertipps.de-Suchseite: 50 Artikel ueber alle relevanten Kategorien, nach Datum sortiert
+    # (deckt ~3 Monate ab). Neue Artikel holt der taegliche Radar automatisch nach (Dublettenschutz).
+    "steuertipps": os.environ.get("HILO_SOURCES_STEUERTIPPS",
+        "https://www.steuertipps.de/suche?query=&size=50&sort=date&type=article&category=all-categories"
+        "&category=altersvorsorge-rente-finanzen%2Fthemen&category=finanzamt-formalitaeten%2Fthemen"
+        "&category=krankheit-betreuung-pflege%2Fthemen&category=wohnen-haus-vermietung%2Fthemen"
+        "&category=beruf-ausbildung%2Fthemen&category=eltern-familie-ehe%2Fthemen"
+        "&category=erben-vererben-schenken%2Fthemen&category=steuern-rente"),
 }

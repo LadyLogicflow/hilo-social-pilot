@@ -22,6 +22,11 @@ def scrape(url):
         import scraper_steuerrat24
         return scraper_steuerrat24.scrape(url)
 
+    # steuertipps.de (Suchseite / Themenliste, nach Datum) - eigener Scraper
+    if "steuertipps.de" in url.lower():
+        import scraper_steuertipps
+        return scraper_steuertipps.scrape(url)
+
     # BVL (Default)
     return scrape_bvl(url)
 
