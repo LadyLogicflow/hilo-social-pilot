@@ -2121,15 +2121,16 @@ def bild_neu(eid):
         return redirect(ziel)
     try:
         data = json.loads(e["text"])
-        out = _sharenext_bild_synchron(data, eid)
+        data["bild_wird_erstellt"] = True
+        data.pop("bild_fehler", None)
         with get_conn() as conn:
-            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
-                         (json.dumps(data, ensure_ascii=False), out, eid))
-            audit_log(conn, session["user"], "bild_neu_erzeugt", eid, "sharenext")
+            conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
             conn.commit()
-        flash("Neues Bild für Beitrag %d erzeugt (Text/Begleittext unverändert)." % eid)
+        # Im Hintergrund erzeugen (voller ShareNext-Bildlauf) - UI blockiert nicht, direkt weiterarbeiten.
+        _bg_start(_premium_foto_hintergrund, eid, session["user"])
+        flash("Neues Bild für Beitrag %d wird im Hintergrund erzeugt – du kannst direkt weiterarbeiten." % eid)
     except Exception as ex:
-        flash("Bild konnte nicht erzeugt werden: %s" % ex)
+        flash("Bild konnte nicht gestartet werden: %s" % ex)
     return redirect(ziel)
 
 @app.route("/text-neu/<int:eid>", methods=["POST"])
@@ -2205,6 +2206,51 @@ def anderes_bild(eid):
     except Exception as ex:
         flash("Anderes Bild konnte nicht erzeugt werden: %s" % ex)
     return redirect(ziel)
+
+# Hintergrund-Ausfuehrung: hoechstens 2 gleichzeitige Bild-/Text-Jobs, damit der Pi bei vielen schnell
+# hintereinander ausgeloesten "Ueberarbeiten"/"Foto neu"-Klicks nicht ueberlastet wird. Die UI blockiert
+# NIE - weitere Auftraege warten im Hintergrund und werden nacheinander abgearbeitet.
+_bg_sem = threading.Semaphore(2)
+
+
+def _bg_start(fn, *args):
+    """Startet fn(*args) in einem Daemon-Thread (max. 2 gleichzeitig via _bg_sem)."""
+    def runner():
+        with _bg_sem:
+            fn(*args)
+    threading.Thread(target=runner, daemon=True).start()
+
+
+def _ueberarbeiten_hintergrund(eid, thema, prev, feedback, kanal, user):
+    """Ueberarbeitet Text (Claude) + rendert das Bild neu - im Hintergrund, damit die UI nicht wartet.
+    Solange 'bild_wird_erstellt' True ist, zeigt die Entwuerfe-Seite den Wird-erstellt-Hinweis."""
+    try:
+        neu = textgen.regenerate(thema, prev, feedback, kanal)
+        for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
+            neu.setdefault(k, prev.get(k, dflt))
+        neu["bild_wird_erstellt"] = False
+        neu.pop("bild_fehler", None)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(neu, ensure_ascii=False), None, eid))
+            conn.commit()
+        bildgen.render_drafts()   # Bild neu rendern (aus Cache, keine KI-Kosten)
+        with get_conn() as conn:
+            audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
+        log.info("Ueberarbeitung (Hintergrund) fertig fuer Entwurf %d", eid)
+    except Exception as ex:
+        log.error("Ueberarbeitung (Hintergrund) fehlgeschlagen fuer Entwurf %d: %s", eid, ex, exc_info=True)
+        try:
+            with get_conn() as conn:
+                row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+                d = json.loads(row["text"]) if row and row["text"] else {}
+                d["bild_wird_erstellt"] = False
+                d["bild_fehler"] = "Ueberarbeitung fehlgeschlagen: %s" % ex
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(d, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
 
 def _premium_foto_hintergrund(eid, user):
     """Erzeugt Premium-Bild via ShareNext Pipeline im Hintergrund-Thread.
@@ -2334,8 +2380,7 @@ def bild_aktion(eid):
                 conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
                              (json.dumps(data, ensure_ascii=False), eid))
                 conn.commit()
-            threading.Thread(target=_premium_foto_hintergrund, args=(eid, session["user"]),
-                              daemon=True).start()
+            _bg_start(_premium_foto_hintergrund, eid, session["user"])
             flash("Neues PREMIUM-Bild für Beitrag %d wird im Hintergrund erstellt (ShareNext "
                   "Pipeline: dauert ca. 1-2 Minuten) - Seite gleich neu laden!" % eid)
 
@@ -3011,22 +3056,14 @@ def aktion(eid):
                 prev = json.loads(e["text"])
             except Exception:
                 prev = {}
-            try:
-                neu = textgen.regenerate(thema, prev, feedback, e["kanal"])
-                # Slogan und Bild-Felder aus dem vorherigen Beitrag uebernehmen (regenerate liefert sie nicht)
-                for k, dflt in (("slogan", ""), ("bild_motiv", ""), ("bild_motiv_thema", ""), ("bild_typ", "person")):
-                    neu.setdefault(k, prev.get(k, dflt))
-                # Bild an den überarbeiteten Text anpassen: bild_pfad auf None setzen und
-                # bildgen.render_drafts() aufrufen (rendert aus Cache, keine KI-Kosten).
-                out = None
-                conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
-                             (json.dumps(neu, ensure_ascii=False), out, eid))
-                conn.commit()
-                bildgen.render_drafts()  # Bild neu rendern aus Cache
-                audit_log(conn, user, "ueberarbeitet", eid, feedback); conn.commit()
-                flash("Entwurf %d überarbeitet (neuer Vorschlag erstellt)." % eid)
-            except Exception as ex:
-                flash("Überarbeitung fehlgeschlagen: %s" % ex)
+            # Status-Flag setzen (Wird-erstellt-Hinweis), dann im HINTERGRUND ueberarbeiten - die Seite
+            # blockiert NICHT, mehrere Beitraege koennen direkt nacheinander ausgeloest werden.
+            prev["bild_wird_erstellt"] = True
+            prev.pop("bild_fehler", None)
+            conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(prev, ensure_ascii=False), eid))
+            conn.commit()
+            _bg_start(_ueberarbeiten_hintergrund, eid, thema, prev, feedback, e["kanal"], user)
+            flash("Entwurf %d wird im Hintergrund überarbeitet – du kannst direkt weiterarbeiten." % eid)
         elif aktion == "caption_erstellen":
             # Caption nachträglich erstellen für Bestandsposts
             if e["thema_id"]:
