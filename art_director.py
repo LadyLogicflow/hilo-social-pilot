@@ -106,7 +106,7 @@ class ArtDirectionBoard(BaseModel):
 
     focal_point: str = Field(
         description="Wo liegt der visuelle Schwerpunkt? Was zieht den Blick zuerst an? "
-                    "(z.B. 'Sanduhr im Vordergrund', 'Gesicht der Person', 'Rote Zahl')"
+                    "(z.B. 'Gesicht der Person', 'das zentrale Objekt im Vordergrund')"
     )
 
     focal_point_position: Literal[
@@ -297,7 +297,7 @@ def create_art_direction_board(
     Example:
         >>> board = create_art_direction_board(brief, winning_route)
         >>> print(board.focal_point)
-        'Sanduhr im Vordergrund'
+        '<zentrales Motiv im Vordergrund>'
         >>> print(board.licht_stimmung)
         'Helles, warmes Tageslicht'
         >>> print(board.dominante_farben)

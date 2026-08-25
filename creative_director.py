@@ -87,9 +87,9 @@ class CreativeRoute(BaseModel):
 
     scroll_stop_device: str = Field(
         description="Was GENAU stoppt den Daumen beim Scrollen? Ein konkretes visuelles Element/"
-                    "Detail, kein allgemeines Stilwort. Schlecht: 'ungewöhnliches Stillleben mit "
-                    "Kuchen'. Gut: 'Ein Kuchen in Euro-Form, aus dem exakt ein Fünftel "
-                    "herausgeschnitten wurde - man fragt sich sofort, warum genau dieses Stück.'"
+                    "Detail, kein allgemeines Stilwort. Schlecht: ein vages Stilwort ('ungewöhnliches "
+                    "Stillleben'). Gut: ein präzise beschriebenes, überraschendes Detail, das sofort "
+                    "eine konkrete Frage im Kopf auslöst."
     )
 
     headline_dependency: Literal["low", "medium", "high"] = Field(
@@ -97,9 +97,9 @@ class CreativeRoute(BaseModel):
                     "'low' = die visuelle Idee funktioniert bereits für sich allein, ganz ohne Text "
                     "(z.B. ein Objekt, das unerwartet seine Form/Funktion ändert). 'medium' = das Motiv "
                     "ist interessant, aber der volle Sinn erschließt sich erst mit der Überschrift. "
-                    "'high' = ohne Überschrift ist das Motiv nur ein austauschbares Alltagsobjekt (z.B. "
-                    "ein Briefumschlag, ein Koffer) - das ist ein Warnsignal für eine schwache visuelle "
-                    "Idee, nicht nur eine neutrale Eigenschaft."
+                    "'high' = ohne Überschrift ist das Motiv nur ein austauschbares Alltagsobjekt - das "
+                    "ist ein Warnsignal für eine schwache visuelle Idee, nicht nur eine neutrale "
+                    "Eigenschaft."
     )
 
 
@@ -115,12 +115,12 @@ class CreativeTerritories(BaseModel):
     )
 
     route_2_metapher: CreativeRoute = Field(
-        description="Route 2: Visuelle Metapher - Abstraktes Konzept bildlich (Wegweiser, Puzzle, Sanduhr) - "
+        description="Route 2: Visuelle Metapher - Abstraktes Konzept bildlich dargestellt - "
                      "EIN Bildelement, keine Requisiten-Ansammlung"
     )
 
     route_3_objekt: CreativeRoute = Field(
-        description="Route 3: Objektmotiv - Fokus auf ein zentrales Objekt (Dokument, Ordner, Stempel, Kalender)"
+        description="Route 3: Objektmotiv - Fokus auf ein zentrales, greifbares Objekt"
     )
 
     route_4_kontrast: CreativeRoute = Field(
@@ -175,7 +175,7 @@ def generate_creative_routes(
         ... )
         >>> routes = generate_creative_routes(brief)
         >>> print(routes.route_2_metapher.titel)
-        'Sanduhr mit rotem Sand'
+        '<prägnanter Titel der Metapher-Route>'
     """
     client = _get_client()
 
@@ -196,27 +196,22 @@ VISUELLE ÜBERSETZUNG STATT ILLUSTRATION (WICHTIGSTES PRINZIP - vor allen Routen
 Zeige nicht einfach einen Gegenstand, der im Thema vorkommt. Übersetze die Kernaussage in einen
 EIGENSTÄNDIGEN visuellen Gedanken. Ein Gegenstand, der nur benennt worum es geht, ist eine
 Illustration - keine Idee. Bevorzuge:
-- **Transformation**: Ein bekanntes Objekt verändert unerwartet Form, Material oder Funktion
-  (Beispiel: ein Steuerformular wird zum Papierflugzeug).
+- **Transformation**: Ein bekanntes Objekt verändert unerwartet Form, Material oder Funktion.
 - **Visueller Widerspruch**: Zwei normalerweise nicht zusammengehörende Dinge bilden EIN Motiv.
 - **Editorial Intervention**: Eine starke grafische Intervention verändert die Wahrnehmung einer
-  realistischen Szene (Beispiel: ein riesiges "AUSNAHME?" durchschneidet das Motiv).
+  realistischen Szene.
 - **Narrative Situation**: Ein einzelner ungewöhnlicher Moment erzeugt eine Frage im Kopf.
 - **Bedeutungsvolle Größenrelation**: Ein Element wird ungewöhnlich groß/klein, wenn das die
   Aussage trägt.
 
-Schwächer sind Motive, die lediglich einen Begriff aus dem Thema abbilden - "Erholungsbeihilfe"
-→ ein Koffer, "Arbeitsuchend" → ein Brief, "Schenkung" → ein Haustürschlüssel, "Steuer" → ein
-Ordner. Das sind austauschbare Symbole, keine eigenständigen Bildideen. Aus einem Gegenstand aus
+Schwächer sind Motive, die lediglich einen Begriff aus dem Thema als naheliegenden Gegenstand
+abbilden. Das sind austauschbare Symbole, keine eigenständigen Bildideen. Aus einem Gegenstand aus
 dem Thema muss eine NEUE visuelle Idee entstehen, nicht nur seine Abbildung.
 
 ONE-IDEA-TEST: Die visuelle Leitidee muss in einem kurzen Satz mit möglichst nur EINEM
 Hauptmotiv beschreibbar sein. Je kürzer und bildlicher dieser Satz, desto stärker die Route.
-- Stark: "Ein Steuerformular wird zum Papierflugzeug." / "Ein riesiges AUSNAHME? durchschneidet
-  das Motiv."
-- Schwach: "Eine Waage zeigt links Schlüssel mit Unterstützungsschild, rechts einen
-  Steuerordner und in der Mitte ein Gewicht." / "Auf einem Tisch liegen ein Brief und eine
-  Karte zum Thema."
+- Stark: ein Satz mit einem einzigen, klaren Hauptmotiv.
+- Schwach: ein Satz voller "und", der mehrere gleichrangige Requisiten aufzählt.
 Dieser Test zwingt dazu, Idee von bloßer Ausstattung zu unterscheiden - wenn die Route nur mit
 einem Nebensatz voller "und" beschreibbar ist, ist sie noch keine Idee, sondern eine Szene.
 
@@ -225,17 +220,16 @@ möglichst eng mit der Kernaussage verbunden ist - nicht nur überraschend, sond
 Frage bei jeder Route: "Welche anderen Bedeutungen könnte ein Betrachter diesem Motiv OHNE
 Headline geben?" Je mehr naheliegende Alternativ-Deutungen bestehen, desto schwächer die Route -
 die Headline soll die visuelle Idee PRÄZISIEREN, nicht erst ERKLÄREN müssen.
-- Stark: eine Straße, deren Lichtspur sich zu einem Haken formt, bei "Heimfahrten steuerlich
-  absetzen" - ein Haken bedeutet kulturell fast immer "bestätigt/richtig", kaum Fehldeutung.
-- Schwächer: eine überdimensionierte Uhr bei "Teilzeitstudium" - eine Uhr steht für "Zeit" ganz
-  allgemein und könnte genauso gut Frist, Zeitdruck oder Arbeitszeit bedeuten; die Verbindung zum
-  KONKRETEN Thema bleibt vage.
+- Stark: ein transformiertes Motiv, dessen symbolische Bedeutung kulturell eindeutig und eng mit
+  der KONKRETEN Kernaussage verknüpft ist.
+- Schwächer: ein Mehrzweck-Symbol, das nur ganz allgemein für einen Oberbegriff steht und genauso
+  gut für viele andere Themen passen würde - die Verbindung zum konkreten Thema bleibt vage.
 WICHTIG - keine Verwechslung mit "möglichst wörtlich": Das Ziel ist NICHT, Mehrdeutigkeit durch
 pure Abbildung zu vermeiden (ein Foto vom Gegenstand aus dem Thema hat kaum Fehldeutungen, ist
 aber wieder reine Illustration, siehe oben). Das Ziel ist ein TRANSFORMIERTES Motiv, dessen
-symbolische Bedeutung kulturell eindeutig ist (wie der Haken), statt eines Mehrzweck-Symbols mit
-vielen möglichen Lesarten (wie die Uhr). Beide Prinzipien - Transformation UND semantische
-Präzision - gelten gemeinsam, keins ersetzt das andere.
+symbolische Bedeutung kulturell eindeutig ist, statt eines Mehrzweck-Symbols mit vielen möglichen
+Lesarten. Beide Prinzipien - Transformation UND semantische Präzision - gelten gemeinsam, keins
+ersetzt das andere.
 
 WÄRME & ECHTHEIT (gleichrangiges Leitprinzip - genauso wichtig wie die visuelle Übersetzung oben):
 Die stärksten HILO-Bilder wirken wie echte, warme Fotografie: ein ehrlicher menschlicher Moment
@@ -258,30 +252,23 @@ Die 4 Routen-Typen:
 1. **Emotionale Szene**
    - Menschen in realistischen Situationen
    - Emotionen: Erleichterung, Stress, Freude, Zufriedenheit
-   - Beispiele: jemand reagiert sichtbar erleichtert/freudig auf eine Nachricht am Smartphone,
-     eine Übergabe-Geste zwischen zwei Personen, ein Vorher/Nachher-Moment derselben Person
    - NICHT: Stock-Foto-Klischees vermeiden! KEINE Steuerberater-/Beratungsszene, niemand der
      über Unterlagen oder am Schreibtisch sitzt, keine gestellte Pose - die Person muss ETWAS TUN.
    - BRAUCHT EINE KONKRETE HANDLUNG ODER BEZIEHUNG, nicht nur eine Person mit einem Gegenstand.
-     "Eine Frau hält ein Dokument und schaut aus dem Bild" ist keine Szene, sondern eine Pose -
-     das ist dieselbe Schwäche wie eine reine Objekt-Illustration, nur mit Person statt Gegenstand.
-     Stark ist eine sichtbare Handlung ZWISCHEN Menschen oder ein Moment mit klarem Vorher/Nachher
-     (z.B. eine Übergabe-Geste zwischen zwei Personen, ein Vergleich zweier Zustände derselben
-     Person). Die Szene muss auch ohne Headline erkennbar "etwas passiert hier gerade" vermitteln.
+     Eine Person, die nur ein Objekt hält und aus dem Bild schaut, ist keine Szene, sondern eine
+     Pose - dieselbe Schwäche wie eine reine Objekt-Illustration, nur mit Person statt Gegenstand.
+     Stark ist eine sichtbare Handlung ZWISCHEN Menschen oder ein Moment mit klarem Vorher/Nachher.
+     Die Szene muss auch ohne Headline erkennbar "etwas passiert hier gerade" vermitteln.
 
 2. **Visuelle Metapher**
    - Abstraktes Konzept bildlich dargestellt
-   - Beispiele: Sanduhr (Zeit läuft ab), Wegweiser (Orientierung), Puzzle (Komplexität),
-     ein verformtes/umgestaltetes Alltagsobjekt (z.B. ein Kuchen in Symbolform)
    - Muss zur Kernaussage passen
    - Darf nicht zu abstrakt sein (Zielgruppe muss es verstehen)
    - EIN Bildelement trägt die Metapher – NICHT mehrere Requisiten zu einem Arrangement
-     kombinieren (z.B. keine Waage-Szene mit zusätzlichen Objekten auf beiden Schalen plus
-     Beschriftungen). Eine Metapher, die man in einem Wort erklären kann, nicht in einem Satz.
+     kombinieren. Eine Metapher, die man in einem Wort erklären kann, nicht in einem Satz.
 
 3. **Objektmotiv**
-   - Fokus auf EIN zentrales Objekt
-   - Beispiele: Dokument mit Stempel, Kalender mit markiertem Datum, Ordner, Sparschwein
+   - Fokus auf EIN zentrales, greifbares Objekt
    - Echte Still-Life-Fotografie (Materialtextur, Umgebungslicht, leichte Schärfentiefe) -
      KEIN flacher Studio-/Render-Look mit dem Objekt freigestellt vor einfarbiger Fläche.
      Ein Objekt auf einem echten Tisch/in einer echten Umgebung mit unscharfem Hintergrund
@@ -290,15 +277,13 @@ Die 4 Routen-Typen:
 
 4. **Kontrast/Störmoment**
    - Unerwartetes Element das Aufmerksamkeit erzeugt
-   - Beispiele: Große rote "31" in ruhigem Büro, leerer Schreibtisch mit EINEM auffälligen Element
    - Pattern-Interrupt - bricht Erwartungen
    - NICHT willkürlich - muss zur Botschaft passen
 
 5. **Unkonventionell**
    - Passt bewusst in KEINE der 4 Kategorien oben - Freiraum für eine Idee, die sich nicht in
-     ein Schema pressen lässt
-   - Beispiele: grafisch/typografische Lösung statt Foto, Doppelbelichtung, Collage-Ästhetik,
-     surreale Verfremdung eines Alltagsobjekts, ungewöhnliches Bildformat/Cropping als Konzept
+     ein Schema pressen lässt (z.B. eine grafisch/typografische oder collagenhafte Lösung statt
+     eines klassischen Fotos)
    - Muss trotzdem zur Kernaussage passen und umsetzbar sein - "unkonventionell" heißt nicht
      "beliebig"
    - Diese Route existiert explizit, damit gute Ideen nicht in eine unpassende Schublade
@@ -319,8 +304,8 @@ Wichtig:
   Metapher" und "Kontrast/Störmoment".
 - **HILO-Farben nicht als erzwungene Requisiten.** Navy/Grün sollen über Licht, Flächen,
   Hintergrund, Material oder Farbkontrast entstehen - nicht durch sachlich unnötige grüne/blaue
-  Gegenstände (grüner Ordner, blauer Stift, grüne Tasse ...). Das erzeugt sonst genau die
-  austauschbaren Wiederholungsmuster, die eine eigenständige Bildsprache verhindern.
+  Gegenstände. Das erzeugt sonst genau die austauschbaren Wiederholungsmuster, die eine
+  eigenständige Bildsprache verhindern.
 - **KEINE echten Hoheitszeichen, Institutions- oder Marken-Logos** (Bundesadler, Bundeswehr-/
   Polizei-/Behörden-Abzeichen, Wappen, aber auch Logos echter Behörden wie "Agentur für Arbeit",
   Banken, Versicherungen, anderer Firmen) vorschlagen - auch nicht bei Themen mit Uniform-/
@@ -328,12 +313,10 @@ Wichtig:
   Uniform, Formular) ja, ein echtes fremdes Kennzeichen darauf nein. Rechtliches Risiko, hat
   Vorrang vor Scroll-Stop-Überlegungen.
 - **KEINE ERKLÄR-LABELS.** Beschrifte Gegenstände nicht mit Begriffen, nur damit eine Metapher
-  verständlich wird (z.B. ein Etikett "Unterstützung" an einem Schlüssel, ein Schild
-  "gesetzliche Unterhaltspflicht" an einem Gewicht, ein Label "Erholungszeit" an einem Handtuch).
-  Wenn ein Gegenstand ein Label braucht, um seine Bedeutung zu erklären, ist das ein Signal, dass
-  die visuelle Idee selbst noch nicht trägt - überarbeite dann bevorzugt die Idee, statt sie mit
-  Text zu erklären. Ausnahme: Schrift ist ein natürlicher, fachlich notwendiger Bestandteil des
-  Motivs selbst (z.B. echter Aufdruck auf einem Dokument, eine Headline-Fläche).
+  verständlich wird. Wenn ein Gegenstand ein Label braucht, um seine Bedeutung zu erklären, ist
+  das ein Signal, dass die visuelle Idee selbst noch nicht trägt - überarbeite dann bevorzugt die
+  Idee, statt sie mit Text zu erklären. Ausnahme: Schrift, die ein natürlicher, fachlich
+  notwendiger Bestandteil des Motivs selbst ist (ein echter Aufdruck, der ohnehin dort stünde).
 - **SIGNALFARBEN kontrolliert einsetzen.** Rot, Orange, Neon oder andere markenfremde
   Signalfarben sind erlaubt, wenn sie semantisch begründet sind (z.B. eine Warnung/ein Risiko-
   Thema). Sie dürfen aber NICHT der alleinige Grund für Scroll-Stop-Wirkung sein und die
@@ -341,23 +324,15 @@ Wichtig:
   spürbar bleiben, auch wenn eine Signalfarbe den Akzent setzt.
 
 ABGENUTZTE BILDSPRACHE (eher vermeiden, kein starres Verbot):
-- generische Businessperson-Klischees (Person zeigt lächelnd auf Laptop-Bildschirm,
-  Händeschütteln vor Glaswand, Daumen hoch im Anzug)
-- sichtlich gestellte Stockfoto-Posen, grundlos breit in die Kamera grinsend
-- übertriebenes/unnatürliches Lächeln
+- generische Businessperson-/Stockfoto-Klischees und sichtlich gestellte Posen
+- übertriebenes/unnatürliches Lächeln, grundlos breit in die Kamera grinsen
 - Steuerberater-/Beratungsszene: Person(en) sitzen über Unterlagen/am Schreibtisch, klassische
   Beratungsgespräch-Situation - ausdrücklich unerwünscht (Owner-Vorgabe)
-- wörtlicher Geldregen (fallende Scheine/Münzen als Klischee-Symbol für "Geld")
-- **ein Steuerformular/Dokument, das zu einem anderen Objekt gefaltet/verformt wird** (Papierflieger,
-  Brücke, Boot o.ä.) als Standardlösung für "Visuelle Metapher" - war ursprünglich eine starke,
-  frische Idee, ist inzwischen bei mehreren unterschiedlichen Themen wiederholt aufgetaucht und
-  droht zur neuen Formel zu werden. Eine Formular-Transformation ist nicht per se abgenutzt, aber
-  sollte nicht die naheliegende Standardantwort auf jedes Thema sein - prüfe, ob eine andere
-  Transformation (siehe VISUELLE ÜBERSETZUNG oben) besser zur KONKRETEN Kernaussage passt.
-Das sind abgenutzte Muster, keine verbotenen Themen. Ein einzelnes, mutig inszeniertes
-Euro-Symbol oder ein in Euro-Form verformtes Alltagsobjekt (z.B. ein Kuchen, ein Gegenstand)
-ist AUSDRÜCKLICH KEIN Klischee, sondern ein starkes Kontrast/Störmoment-Motiv - das ist
-etwas anderes als Geldregen und soll nicht vermieden werden. Echte Emotionen, ungewöhnliche
+- wörtliche Klischee-Symbole für "Geld"
+- dieselbe Objekt-Transformation immer wieder als Standardlösung für jedes Thema - wenn eine
+  Bildidee bei mehreren unterschiedlichen Themen wiederholt auftaucht, droht sie zur Formel zu
+  werden; prüfe dann, ob eine andere, zur KONKRETEN Kernaussage passende Idee stärker ist.
+Das sind abgenutzte Muster, keine verbotenen Themen. Echte Emotionen, ungewöhnliche
 Perspektiven und starke Farbkontraste sind ausdrücklich erwünscht - wenn eine Idee wirklich
 trägt, hat sie Vorrang vor dieser Liste.
 """

@@ -290,8 +290,8 @@ Bewertungskriterien (Skala 1-10):
 
 1. **Botschaftsklarheit (20%)**: Ist die Kernaussage klar und sofort verständlich?
    Prüfe konkret: Welche anderen Bedeutungen könnte ein Betrachter dem Motiv OHNE Headline
-   geben? Je mehr naheliegende Alternativ-Deutungen bestehen (z.B. eine Uhr, die genauso gut
-   Frist, Zeitdruck oder Arbeitszeit statt des KONKRETEN Themas bedeuten könnte), desto
+   geben? Je mehr naheliegende Alternativ-Deutungen bestehen (ein Mehrzweck-Symbol, das genauso
+   gut für mehrere andere Themen stehen könnte statt für das KONKRETE Thema), desto
    niedriger der Score - auch wenn das Motiv selbst klar und eindeutig aussieht. Die Headline
    soll die visuelle Idee präzisieren, nicht erst erklären müssen.
    - 9-10: Kristallklar, unmissverständlich - kaum plausible Alternativ-Deutungen zum
