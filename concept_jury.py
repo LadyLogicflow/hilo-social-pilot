@@ -62,6 +62,31 @@ class RouteEvaluation(BaseModel):
     route_name: str = Field(description="Name/Typ der Route (z.B. 'Emotionale Szene')")
     route_titel: str = Field(description="Titel der Route")
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # SEMANTIC BRIDGE TEST (PRUEFMODUS) - ZUERST ausfuellen, DANN bewerten.
+    # Zwingt aus dem Pitch-Modus in den Pruefmodus: erst pruefen, ob die Idee wirklich
+    # ankommt, dann Punkte vergeben. Nicht die Marketing-Vorteile aufzaehlen.
+    # ─────────────────────────────────────────────────────────────────────────
+    read_500ms: str = Field(
+        description="500-ms-Read: Was sieht ein Betrachter beim ganz schnellen Blick ZUERST? "
+                    "Nur das offensichtlich Sichtbare beschreiben, noch keine Deutung."
+    )
+    spontane_bedeutung: str = Field(
+        description="Was bedeutet dieses Motiv OHNE jede Erklärung und OHNE die Headline - die erste, "
+                    "naheliegendste Assoziation eines normalen Betrachters? Ehrlich, nicht die "
+                    "gewünschte Wunsch-Deutung."
+    )
+    kernbotschaft_bruecke: str = Field(
+        description="Führt diese spontane Bedeutung von selbst zur Kernaussage des Posts? Beschreibe "
+                    "den gedanklichen Weg. Wenn dafür eine konstruierte Erklärung nötig ist (die ein "
+                    "normaler Betrachter nie hätte), sag das klar - dann trägt die Idee NICHT."
+    )
+    fehlinterpretations_risiko: Literal["niedrig", "mittel", "hoch"] = Field(
+        description="Wie hoch ist das Risiko, dass das Motiv spontan ETWAS ANDERES bedeutet als die "
+                    "Kernaussage (besonders ein anderes, themennah plausibles Steuer-/Finanzthema)? "
+                    "'hoch', wenn die gewünschte Bedeutung nur mit Erklärung entsteht."
+    )
+
     # Bewertungen (Skala 1-10)
     botschaftsklarheit: float = Field(
         ge=1.0, le=10.0,
@@ -128,7 +153,11 @@ class ConceptJuryVerdict(BaseModel):
 
     # Begründung für Auswahl
     begruendung: str = Field(
-        description="Warum diese Route gewonnen hat (2-3 Sätze)"
+        description="Warum diese Route gewonnen hat, in 2-3 Sätzen - FAKTISCH über den Semantic "
+                    "Bridge Test, NICHT im Marketing-Ton: Was sieht man zuerst, was bedeutet es "
+                    "spontan, wie führt das zur Kernbotschaft, und warum ist das "
+                    "Fehlinterpretationsrisiko vertretbar. KEINE Pitch-Floskeln wie 'starke "
+                    "Markenpassung', 'emotionale Wirkung', 'ideal für Awareness', 'kanalfähiges Paket'."
     )
 
     # Warnung falls Score zu niedrig
@@ -287,14 +316,25 @@ Kontext:
   maßgeblich für das Kriterium "Zielgruppenrelevanz", nicht eine pauschale Annahme
 - Ziel: Scroll-Stop-Potenzial + Markenpassung
 
+SEMANTIC BRIDGE TEST (PRÜFMODUS - verbindlich, VOR der Bewertung):
+Fülle für JEDE Route zuerst die vier Prüf-Felder aus (read_500ms, spontane_bedeutung,
+kernbotschaft_bruecke, fehlinterpretations_risiko). Sei dabei im PRÜFMODUS, nicht im Pitch-Modus:
+Zähle NICHT die Marketing-Vorteile auf ("starke Markenpassung", "ideal für Awareness", "kanalfähiges
+Paket"), sondern prüfe ehrlich, ob ein normaler Betrachter die gewünschte Bedeutung in 0,5 Sekunden
+OHNE Erklärung bekommt. Eine Idee ist NICHT gut, nur weil ihre Bedeutung im Konzepttext erklärbar
+ist - sie muss beim schnellen Betrachten von selbst entstehen. ERST danach die Kriterien-Scores.
+
 Bewertungskriterien (Skala 1-10):
 
 1. **Botschaftsklarheit (20%)**: Ist die Kernaussage klar und sofort verständlich?
-   Prüfe konkret: Welche anderen Bedeutungen könnte ein Betrachter dem Motiv OHNE Headline
-   geben? Je mehr naheliegende Alternativ-Deutungen bestehen (ein Mehrzweck-Symbol, das genauso
-   gut für mehrere andere Themen stehen könnte statt für das KONKRETE Thema), desto
-   niedriger der Score - auch wenn das Motiv selbst klar und eindeutig aussieht. Die Headline
-   soll die visuelle Idee präzisieren, nicht erst erklären müssen.
+   Leite diesen Score DIREKT aus deinen Prüf-Feldern ab: Wenn die spontane_bedeutung NICHT die
+   Kernaussage ist, ODER kernbotschaft_bruecke eine konstruierte Erklärung braucht, ODER
+   fehlinterpretations_risiko "hoch" ist, dann Botschaftsklarheit 1-4 - egal wie schön oder clever
+   das Konzept klingt. fehlinterpretations_risiko "mittel" -> höchstens 5-6.
+   Je mehr naheliegende Alternativ-Deutungen bestehen (ein Mehrzweck-Symbol, das genauso gut für
+   mehrere andere Themen stehen könnte statt für das KONKRETE Thema), desto niedriger der Score -
+   auch wenn das Motiv selbst klar und eindeutig aussieht. Die Headline soll die visuelle Idee
+   präzisieren, nicht erst erklären müssen.
    - 9-10: Kristallklar, unmissverständlich - kaum plausible Alternativ-Deutungen zum
      konkreten Thema.
    - 7-8: Klar erkennbar, aber ein bis zwei naheliegende Alternativ-Deutungen denkbar.

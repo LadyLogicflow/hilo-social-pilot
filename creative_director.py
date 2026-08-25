@@ -230,6 +230,10 @@ möglichst eng mit der Kernaussage verbunden ist - nicht nur überraschend, sond
 Frage bei jeder Route: "Welche anderen Bedeutungen könnte ein Betrachter diesem Motiv OHNE
 Headline geben?" Je mehr naheliegende Alternativ-Deutungen bestehen, desto schwächer die Route -
 die Headline soll die visuelle Idee PRÄZISIEREN, nicht erst ERKLÄREN müssen.
+Die Bedeutung des visuellen Hooks muss aus allgemein verständlicher visueller Logik entstehen und
+OHNE konstruierte Erklärung zur Kernbotschaft führen. Eine Metapher ist NICHT deshalb intuitiv, weil
+ihre Bedeutung im Konzepttext erklärt werden kann - sie muss beim schnellen Betrachten von selbst
+entstehen, sonst trägt sie nicht.
 BESONDERS kritisch sind Fehldeutungen im GLEICHEN Themenfeld: Wenn ein Motiv genauso gut ein
 ANDERES Steuer-/Finanzthema meinen könnte (eine fachlich naheliegende Verwechslung), ist die Route
 zu unpräzise - dann trägt selbst ein technisch schönes Bild die gewünschte Aussage nicht. Die
