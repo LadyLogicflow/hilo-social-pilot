@@ -854,7 +854,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}<br>
         <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
         {% if e.f.pipeline_info.bruecke %}<b>Semantik-Check:</b> spontan lesbar als &ndash; {{e.f.pipeline_info.spontane_bedeutung}} &middot; Br&uuml;cke zur Botschaft: <b>{{e.f.pipeline_info.bruecke}}</b> &middot; Fehldeutungs-Risiko: <b>{{e.f.pipeline_info.risiko}}</b>{% if e.f.pipeline_info.botschaftsklarheit is not none %} &middot; Botschaftsklarheit: {{e.f.pipeline_info.botschaftsklarheit}}/10{% endif %}<br>{% endif %}
-        <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }})<br>
+        <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }}){% if e.f.pipeline_info.versuche and e.f.pipeline_info.versuche > 1 %} &nbsp;&middot;&nbsp; <b>Auto-Retry:</b> {{e.f.pipeline_info.versuche}} Versuche{% endif %}<br>
         <b>Focal Point:</b> {{e.f.pipeline_info.focal_point}}<br>
         <b>Licht &amp; Farben:</b> {{e.f.pipeline_info.licht}}{% if e.f.pipeline_info.farben %} &middot; {{e.f.pipeline_info.farben}}{% endif %}
         {% if e.f.pipeline_info.gemieden %}<br><b>Vielfalt &ndash; zuletzt gemiedene Kategorien:</b> {{ e.f.pipeline_info.gemieden|join(', ') }}{% endif %}
@@ -2315,7 +2315,7 @@ def _premium_foto_hintergrund(eid, user):
         data = {}
 
     try:
-        final_path = _sharenext_bild_synchron(data, eid)
+        final_path = _sharenext_bild_mit_retry(data, eid)
         data["bild_wird_erstellt"] = False
 
         with get_conn() as conn:
@@ -2413,6 +2413,7 @@ def _sharenext_bild_synchron(data, eid):
             "licht": result.art_board.licht_stimmung,
             "farben": ", ".join(result.art_board.dominante_farben),
             "qa_score": round(result.qa_verdict.gesamtscore, 1),
+            "concept_fidelity": round(getattr(result.qa_verdict, "concept_fidelity", 0.0), 1),
             "freigegeben": bool(result.approved),
             "gemieden": list(getattr(result, "recent_heroes", []) or []),
         }
@@ -2444,6 +2445,76 @@ def _sharenext_bild_synchron(data, eid):
     data["bild_pfad"] = out
     data["sharenext_used"] = True
     data.pop("bild_fehler", None)   # alte Fehlermeldung nach erfolgreichem Retry entfernen
+    return out
+
+
+# Auto-Retry (catrin 2026-08-25): bei QA-Ablehnung bis zu N Laeufe, BESTES Ergebnis behalten -
+# bevor der Nutzer das Bild ueberhaupt sieht. Weniger "Review empfohlen"-Bilder landen manuell bei ihr.
+_SHARENEXT_MAX_VERSUCHE = 3
+_CONCEPT_FIDELITY_OK = 7.0   # ab hier gilt die Idee als gut umgesetzt -> nur Umsetzung neu rendern
+
+
+def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
+    """Erzeugt ein Bild und rendert bei QA-Ablehnung automatisch nach (Best of N).
+    Kombinierte Logik je Nachlauf:
+    - Idee laut Concept Fidelity gut umgesetzt (>= _CONCEPT_FIDELITY_OK), aber QA abgelehnt
+      -> NUR Umsetzung neu (gleiche Idee, via sharenext_state).
+    - sonst -> voller Lauf (neue Idee, nutzt Vielfalt-Memory + Duplikat-Gate).
+    Der erste freigegebene Versuch gewinnt; gibt keiner frei, wird der mit dem hoechsten QA-Score
+    behalten. Vermerkt die Versuchszahl in data['pipeline_info']['versuche']."""
+    import copy as _copy
+    import shutil as _shutil
+    out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
+    best_path = out + ".best"
+    best_qa = -1.0
+    best_snapshot = None
+    versuche = 0
+    approved = False
+
+    def _snapshot():
+        return {k: _copy.deepcopy(data.get(k)) for k in
+                ("pipeline_info", "qa_approved", "qa_problems", "sharenext_state", "bild_pfad")}
+
+    while versuche < max_versuche and not approved:
+        versuche += 1
+        if versuche == 1:
+            _sharenext_bild_synchron(data, eid)
+        else:
+            info = data.get("pipeline_info") or {}
+            cf = info.get("concept_fidelity")
+            if cf is not None and cf >= _CONCEPT_FIDELITY_OK and data.get("sharenext_state"):
+                _sharenext_rerender_synchron(data, eid)   # gute Idee -> gleiche Idee neu rendern
+            else:
+                _sharenext_bild_synchron(data, eid)       # schwaches Konzept -> neue Idee
+        approved = bool(data.get("qa_approved"))
+        qa_score = (data.get("pipeline_info") or {}).get("qa_score") or 0.0
+        log.info("Auto-Retry Entwurf %d: Versuch %d/%d, QA=%.1f, freigegeben=%s",
+                 eid, versuche, max_versuche, qa_score, approved)
+        if approved or qa_score > best_qa:
+            best_qa = qa_score
+            try:
+                _shutil.copy(out, best_path)
+                best_snapshot = _snapshot()
+            except Exception:
+                best_snapshot = None
+
+    # Falls der letzte Versuch nicht das beste war: bestes Ergebnis wiederherstellen.
+    if not approved and best_snapshot is not None:
+        try:
+            if os.path.exists(best_path):
+                os.replace(best_path, out)
+            for k, v in best_snapshot.items():
+                data[k] = v
+        except Exception:
+            pass
+    try:
+        if os.path.exists(best_path):
+            os.remove(best_path)
+    except Exception:
+        pass
+
+    if isinstance(data.get("pipeline_info"), dict):
+        data["pipeline_info"]["versuche"] = versuche
     return out
 
 
@@ -2502,6 +2573,7 @@ def _sharenext_rerender_synchron(data, eid):
         "licht": art_board.licht_stimmung,
         "farben": ", ".join(art_board.dominante_farben),
         "qa_score": round(qa.gesamtscore, 1),
+        "concept_fidelity": round(getattr(qa, "concept_fidelity", 0.0), 1),
         "freigegeben": bool(qa.freigegeben),
         "gemieden": alt.get("gemieden", []),
     }
