@@ -865,7 +865,10 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <button class=re name=aktion value=ueberarbeiten form="feedback-form-{{e.id}}" title="Änderungswunsch oben eintragen, dann hier klicken (ruft Claude auf)">Überarbeiten</button>
     <form method=post action="/bild-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Nur ein neues Foto erzeugen? Überschrift, Bullets, CTA und Begleittext bleiben unverändert.')">
       <input type=hidden name=zurueck value=entwuerfe>
-      <button style="background:#6b7280" title="Nur ein neues Foto über die volle ShareNext-Pipeline erzeugen - Text bleibt exakt gleich">&#x1F3B2; Nur Foto neu erzeugen</button></form>
+      <button style="background:#6b7280" title="Nur ein neues Foto über die volle ShareNext-Pipeline erzeugen (neue Idee möglich) - Text bleibt exakt gleich">&#x1F3B2; Nur Foto neu erzeugen</button></form>
+    {% if e.f.sharenext_state %}<form method=post action="/umsetzung-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Gleiche Idee behalten und nur das Bild neu rendern? Route und Art-Direction bleiben, es entsteht nur eine frische Umsetzung.')">
+      <input type=hidden name=zurueck value=entwuerfe>
+      <button style="background:#4b5563" title="Dieselbe Gewinner-Idee behalten und nur das Bild neu rendern (Route/Art-Direction bleiben gleich)">&#x1F504; Nur Umsetzung neu (Idee behalten)</button></form>{% endif %}
     <div style="margin-top:12px">
       <form method=post action="/aktion/{{e.id}}" style="display:inline-block">
         <button class=ok name=aktion value=freigeben>Freigeben</button>
@@ -2143,6 +2146,38 @@ def bild_neu(eid):
         flash("Bild konnte nicht gestartet werden: %s" % ex)
     return redirect(ziel)
 
+@app.route("/umsetzung-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def umsetzung_neu(eid):
+    """"Nur Umsetzung neu (Idee behalten)": rendert das Bild mit der GESPEICHERTEN Gewinner-Idee
+    (Route + Art Direction) neu - gleiche Idee, frische Ausfuehrung. Laeuft im Hintergrund."""
+    zurueck = request.form.get("zurueck", "entwuerfe")
+    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("freigegeben", "entwurf"):
+        flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
+        return redirect(ziel)
+    try:
+        data = json.loads(e["text"])
+        if not data.get("sharenext_state"):
+            flash("Für diesen Beitrag ist noch keine Idee gespeichert – bitte einmal 'Nur Foto neu' "
+                  "nutzen, danach steht 'Idee behalten' zur Verfügung.")
+            return redirect(ziel)
+        data["bild_wird_erstellt"] = True
+        data.pop("bild_fehler", None)
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
+            conn.commit()
+        _bg_start(_umsetzung_neu_hintergrund, eid, session["user"])
+        flash("Bild für Beitrag %d wird mit DERSELBEN Idee neu gerendert (im Hintergrund) – "
+              "du kannst direkt weiterarbeiten." % eid)
+    except Exception as ex:
+        flash("Neue Umsetzung konnte nicht gestartet werden: %s" % ex)
+    return redirect(ziel)
+
 @app.route("/text-neu/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
 def text_neu(eid):
@@ -2302,6 +2337,40 @@ def _premium_foto_hintergrund(eid, user):
             pass
 
 
+def _umsetzung_neu_hintergrund(eid, user):
+    """Rendert das Bild mit der gespeicherten Idee neu (Hintergrund-Thread) - siehe umsetzung_neu()."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        log.warning("umsetzung_neu (Hintergrund): Entwurf %d existiert nicht mehr.", eid)
+        return
+    try:
+        data = json.loads(e["text"]) if e["text"] else {}
+    except Exception:
+        data = {}
+    try:
+        final_path = _sharenext_rerender_synchron(data, eid)
+        data["bild_wird_erstellt"] = False
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(data, ensure_ascii=False), str(final_path), eid))
+            audit_log(conn, user, "umsetzung_neu", eid)
+            conn.commit()
+        log.info("umsetzung_neu (Hintergrund) fertig für Entwurf %d (QA: %s)",
+                 eid, "OK" if data.get("qa_approved") else "Probleme")
+    except Exception as ex:
+        log.error("umsetzung_neu (Hintergrund) fehlgeschlagen für Entwurf %d: %s", eid, ex, exc_info=True)
+        try:
+            data["bild_wird_erstellt"] = False
+            data["bild_fehler"] = str(ex)
+            with get_conn() as conn:
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                             (json.dumps(data, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
+
 def _sharenext_bild_synchron(data, eid):
     """Erzeugt SYNCHRON ein Bild ueber die ShareNext-Pipeline (GPT integriert die Ueberschrift
     direkt ins Foto, Pillow ergaenzt danach nur noch die beiden CI-Kreise) und schreibt die
@@ -2342,6 +2411,18 @@ def _sharenext_bild_synchron(data, eid):
     except Exception as _e:
         log.debug("pipeline_info konnte nicht erfasst werden: %s", _e)
 
+    # Gewinner-IDEE serialisiert ablegen, damit "Nur Umsetzung neu (Idee behalten)" spaeter
+    # NUR das Bild neu rendern kann, ohne die Route/Art-Direction neu zu wuerfeln.
+    try:
+        data["sharenext_state"] = {
+            "brief": result.message_brief.model_dump(),
+            "route": result.winning_route.model_dump(),
+            "art_board": result.art_board.model_dump(),
+            "headline": headline,
+        }
+    except Exception as _e:
+        log.debug("sharenext_state konnte nicht gespeichert werden: %s", _e)
+
     # Gleiches Pfad-Schema wie die uebrige ShareNext-Pipeline (regenerate_images.py, textgen.py):
     # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
@@ -2355,6 +2436,62 @@ def _sharenext_bild_synchron(data, eid):
     data["bild_pfad"] = out
     data["sharenext_used"] = True
     data.pop("bild_fehler", None)   # alte Fehlermeldung nach erfolgreichem Retry entfernen
+    return out
+
+
+def _sharenext_rerender_synchron(data, eid):
+    """"Nur Umsetzung neu (Idee behalten)": rendert das Bild NEU, aber mit der GESPEICHERTEN
+    Gewinner-Idee (Route + Art Direction) - laeuft also NUR Image Producer + Visual QA, nicht die
+    volle Pipeline. Faellt auf den vollen Lauf zurueck, wenn keine gespeicherte Idee vorliegt."""
+    state = data.get("sharenext_state")
+    if not state:
+        # Keine gespeicherte Idee (alter Entwurf) -> voller Lauf als Fallback.
+        return _sharenext_bild_synchron(data, eid)
+
+    from message_brief import MessageBrief
+    from creative_director import CreativeRoute
+    from art_director import ArtDirectionBoard
+    from image_producer import produce_image
+    from visual_qa import check_raw_image
+
+    brief = MessageBrief.model_validate(state["brief"])
+    route = CreativeRoute.model_validate(state["route"])
+    art_board = ArtDirectionBoard.model_validate(state["art_board"])
+    headline = state.get("headline") or data.get("ueberschrift", "")
+
+    # NUR Stufe 5 (Image Producer) + Stufe 6 (Visual QA) - Idee bleibt unveraendert.
+    image, _production_brief = produce_image(
+        brief, route, art_board, headline=headline, size="1024x1024", quality="medium"
+    )
+    qa = check_raw_image(image, brief, route, art_board, headline=headline)
+
+    out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
+    image.save(out)
+    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    tmp = out + ".tmp_logos.png"
+    bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
+    os.replace(tmp, out)
+
+    # pipeline_info aktualisieren: Idee/Jury bleiben, nur QA + Focal Point (aus Board) frisch.
+    alt = data.get("pipeline_info", {}) or {}
+    data["pipeline_info"] = {
+        "route_typ": getattr(route, "typ", ""),
+        "route_titel": getattr(route, "titel", ""),
+        "hero_kurz": getattr(route, "hero_kurz", ""),
+        "score": alt.get("score"),
+        "begruendung": alt.get("begruendung"),
+        "focal_point": art_board.focal_point,
+        "licht": art_board.licht_stimmung,
+        "farben": ", ".join(art_board.dominante_farben),
+        "qa_score": round(qa.gesamtscore, 1),
+        "freigegeben": bool(qa.freigegeben),
+        "gemieden": alt.get("gemieden", []),
+    }
+    data["qa_approved"] = qa.freigegeben
+    data["qa_problems"] = [] if qa.freigegeben else ["ShareNext QA"]
+    data["bild_pfad"] = out
+    data["sharenext_used"] = True
+    data.pop("bild_fehler", None)
     return out
 
 
