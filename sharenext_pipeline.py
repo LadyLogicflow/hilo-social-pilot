@@ -57,12 +57,14 @@ class ShareNextResult:
         qa_verdict: VisualQAVerdict,
         # Output
         image: Image.Image,
-        approved: bool
+        approved: bool,
+        recent_heroes: "list[str] | None" = None
     ):
         self.stream = stream
         self.thema = thema
         self.text = text
         self.kanal = kanal
+        self.recent_heroes = list(recent_heroes or [])  # Kategorien, die die Jury gemieden hat
 
         self.message_brief = message_brief
         self.creative_territories = creative_territories
@@ -251,7 +253,8 @@ def run_sharenext_pipeline(
         production_brief=production_brief,
         qa_verdict=qa_verdict,
         image=image,
-        approved=qa_verdict.freigegeben
+        approved=qa_verdict.freigegeben,
+        recent_heroes=recent_heroes
     )
 
     log.info(f"🎉 ShareNext Pipeline COMPLETE!")

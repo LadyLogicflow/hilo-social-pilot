@@ -848,6 +848,16 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% endif %}
+    {% if e.f.pipeline_info %}<details style="margin-top:4px"><summary style="cursor:pointer;color:#0B2545;font-weight:bold">&#x1F9E0; Warum dieses Bild?</summary>
+      <div style="font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 11px;margin-top:6px;line-height:1.55">
+        <b>Gew&auml;hlte Idee:</b> {{e.f.pipeline_info.route_typ}} &ndash; {{e.f.pipeline_info.route_titel}}<br>
+        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}<br>
+        <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
+        <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }})<br>
+        <b>Focal Point:</b> {{e.f.pipeline_info.focal_point}}<br>
+        <b>Licht &amp; Farben:</b> {{e.f.pipeline_info.licht}}{% if e.f.pipeline_info.farben %} &middot; {{e.f.pipeline_info.farben}}{% endif %}
+        {% if e.f.pipeline_info.gemieden %}<br><b>Vielfalt &ndash; zuletzt gemiedene Kategorien:</b> {{ e.f.pipeline_info.gemieden|join(', ') }}{% endif %}
+      </div></details>{% endif %}
     <form method=post action="/aktion/{{e.id}}" id="feedback-form-{{e.id}}">
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
@@ -2313,6 +2323,25 @@ def _sharenext_bild_synchron(data, eid):
         size="1024x1024",
         quality="medium",
     )
+    # "Warum dieses Bild?" - Entscheidungen der Pipeline fuer die Dashboard-Anzeige festhalten.
+    try:
+        wr = result.winning_route
+        data["pipeline_info"] = {
+            "route_typ": getattr(wr, "typ", ""),
+            "route_titel": getattr(wr, "titel", ""),
+            "hero_kurz": getattr(wr, "hero_kurz", ""),
+            "score": round(result.concept_verdict.winning_score, 1),
+            "begruendung": result.concept_verdict.begruendung,
+            "focal_point": result.art_board.focal_point,
+            "licht": result.art_board.licht_stimmung,
+            "farben": ", ".join(result.art_board.dominante_farben),
+            "qa_score": round(result.qa_verdict.gesamtscore, 1),
+            "freigegeben": bool(result.approved),
+            "gemieden": list(getattr(result, "recent_heroes", []) or []),
+        }
+    except Exception as _e:
+        log.debug("pipeline_info konnte nicht erfasst werden: %s", _e)
+
     # Gleiches Pfad-Schema wie die uebrige ShareNext-Pipeline (regenerate_images.py, textgen.py):
     # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
