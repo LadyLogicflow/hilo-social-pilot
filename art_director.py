@@ -299,9 +299,9 @@ def create_art_direction_board(
         >>> print(board.focal_point)
         'Sanduhr im Vordergrund'
         >>> print(board.licht_stimmung)
-        'Dramatisches Abendlicht'
+        'Helles, warmes Tageslicht'
         >>> print(board.dominante_farben)
-        ['Rot', 'Schwarz', 'Gold']
+        ['Navy', 'Weiß', 'Grün-Akzent']
     """
     client = _get_client()
 
@@ -316,6 +316,10 @@ Kontext:
 - HILO ist eine Hilfsorganisation für Lohnsteuerhilfe
 - Marke: Vertrauenswürdig, professionell, warm
 - Ziel: Professionelle Bilder die auffallen aber nicht laut/aufdringlich sind
+- Bevorzugter Look: warme, echte Fotografie - ein ehrlicher menschlicher Moment oder ein
+  greifbares Objekt in warmem Tageslicht, mit Tiefe und Textur. Das HILO-Grün wirkt als
+  gezielter, kräftiger Akzent am Focal Point, nicht als große grafische Fläche. Flache, kühl-
+  grafische Symbol-Bilder auf einfarbigem Grund sind die Ausnahme, nicht der Normalfall.
 
 Die 7 Kern-Achsen:
 

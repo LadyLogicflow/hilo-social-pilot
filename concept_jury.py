@@ -5,16 +5,16 @@ Concept Jury - Bewertung und Auswahl der besten kreativen Route.
 
 Bewertet die 5 kreativen Routen nach gewichteten Kriterien und wählt den Gewinner.
 
-Bewertungskriterien:
+Bewertungskriterien (Gewichte, Summe = 100%):
 - Botschaftsklarheit (20%)
-- Scroll-Stop-Potenzial (20%)
+- Scroll-Stop-Potenzial (25%)
 - Markenpassung (15%)
 - Originalität (15%)
-- Umsetzbarkeit (10%)
-- Emotionale Wirkung (10%)
-- Zielgruppenrelevanz (10%)
+- Umsetzbarkeit (5%)
+- Emotionale Wirkung (15%)
+- Zielgruppenrelevanz (5%)
 
-Mindestwerte: 7-8/10 für finale Auswahl
+Mindestwert: 7.0/10 für finale Auswahl (sonst Qualitätswarnung)
 
 Teil von Issue #3: ShareNext MVP
 """
@@ -148,13 +148,18 @@ MINDEST_SCORE = 7.0
 # Angepasst 2026-08-11: scroll_stop_potenzial + originalitaet hoeher gewichtet,
 # umsetzbarkeit + zielgruppenrelevanz reduziert - diese beiden Kriterien werteten mutige/
 # originelle Konzepte am haeufigsten ab (siehe PROMPT_CHANGELOG.md).
+# Angepasst 2026-08-25: emotionale_wirkung 0.10 -> 0.15, originalitaet 0.20 -> 0.15. Die alte
+# Gewichtung (Scroll-Stop 25% + Originalitaet 20% = 45%) hat abstrakte Transformationen/Symbole
+# systematisch ueber warme, echte, menschliche Szenen gestellt - genau die Drift, die weg von den
+# starken fruehen Motiven (warme Familienszene, echtes Objekt) fuehrte. Emotionale Wirkung hebt
+# warm-echt-konkrete Routen; Originalitaet bleibt wichtig, dominiert aber nicht mehr.
 _GEWICHTE = {
     "botschaftsklarheit": 0.20,
     "scroll_stop_potenzial": 0.25,
     "markenpassung": 0.15,
-    "originalitaet": 0.20,
+    "originalitaet": 0.15,
     "umsetzbarkeit": 0.05,
-    "emotionale_wirkung": 0.10,
+    "emotionale_wirkung": 0.15,
     "zielgruppenrelevanz": 0.05,
 }
 
@@ -232,12 +237,12 @@ def evaluate_routes(
 
     Die Concept Jury bewertet jede Route nach 7 gewichteten Kriterien:
     - Botschaftsklarheit (20%)
-    - Scroll-Stop-Potenzial (20%)
+    - Scroll-Stop-Potenzial (25%)
     - Markenpassung (15%)
     - Originalität (15%)
-    - Umsetzbarkeit (10%)
-    - Emotionale Wirkung (10%)
-    - Zielgruppenrelevanz (10%)
+    - Umsetzbarkeit (5%)
+    - Emotionale Wirkung (15%)
+    - Zielgruppenrelevanz (5%)
 
     Mindestwert für Gewinner: 7.0/10
 
@@ -303,7 +308,10 @@ Bewertungskriterien (Skala 1-10):
    hauptsächlich Farbe/Größe?
    - 9-10: Das Motiv funktioniert bereits als kleines Thumbnail OHNE Text UND ohne aggressive
      Signalfarbe. Ein dominanter visueller Gedanke erzeugt innerhalb von <1 Sekunde Neugier,
-     Überraschung oder Spannung - headline_dependency ist dabei meist 'low'.
+     Überraschung oder Spannung - headline_dependency ist dabei meist 'low'. GENAUSO stark ist ein
+     warmer, echter menschlicher Moment oder ein real fotografiertes Objekt in kräftigem Licht, das
+     sofort Nähe und Interesse erzeugt - Scroll-Stop entsteht nicht nur durch abstrakte Überraschung,
+     sondern ebenso durch echte emotionale Sogwirkung. Beides verdient hier 9-10.
    - 7-8: Klarer visueller Hook, aber für vollständiges Verständnis wird die Headline teilweise
      benötigt (headline_dependency 'medium').
    - 5-6: Professionell und attraktiv, aber überwiegend thematische Illustration oder bekanntes
@@ -324,8 +332,12 @@ Bewertungskriterien (Skala 1-10):
    - WICHTIG: "Vertrauenswürdig" heißt NICHT "brav". Auffällige, kontraststarke oder
      ungewöhnliche Konzepte NICHT abwerten, nur weil sie mutig sind - werte nur ab, wenn es
      reißerisch wird oder die Seriosität eines Lohnsteuerhilfevereins beschädigt.
+   - Warme, echte Fotografie - ein ehrlicher menschlicher Moment oder ein greifbares Objekt in
+     echtem, warmem Licht - ist besonders markentypisch für HILO (nahbar, seriös, menschlich) und
+     soll hier hoch bewertet werden. Ein flaches, kühl-grafisches Symbol auf einfarbiger Fläche ist
+     dagegen weniger markentypisch.
 
-4. **Originalität (20%)**: Hebt sich das Konzept ab?
+4. **Originalität (15%)**: Hebt sich das Konzept ab?
    - 9-10: Echte Transformation, überraschende Kombination oder visuelle Analogie trägt die
      Aussage (siehe VISUELLE ÜBERSETZUNG im Creative-Director-Prompt) - völlig neu, unerwartet.
    - 7-8: Eigenständige Interpretation des Themas, vermeidet Klischees.
@@ -333,6 +345,11 @@ Bewertungskriterien (Skala 1-10):
      erkennbar, aber kaum verändert/neu kombiniert.
    - 1-4: Ein Gegenstand aus dem Thema wird lediglich abgebildet (Stock-Klischee) - keine
      eigenständige visuelle Idee, nur Illustration eines Begriffs.
+   - HINWEIS: Originalität heißt NICHT zwingend abstrakte Transformation. Auch ein frischer, echter
+     menschlicher Moment oder eine ungewöhnlich ehrliche, warme Alltagsszene, wie man sie im
+     Steuer-Umfeld selten sieht, ist eine eigenständige Idee und verdient 7-8+. Werte eine warme,
+     echte Szene NICHT automatisch als "wenig Transformation" ab - Klischee meint die gestellte
+     Stockfoto-Pose, nicht einen authentisch eingefangenen Moment.
 
 5. **Umsetzbarkeit (5%)**: Kann man das realistisch umsetzen?
    - 9-10: Einfach umsetzbar
@@ -340,7 +357,7 @@ Bewertungskriterien (Skala 1-10):
    - 5-6: Herausfordernd
    - 1-4: Unrealistisch
 
-6. **Emotionale Wirkung (10%)**: Erzeugt es die gewünschte Emotion?
+6. **Emotionale Wirkung (15%)**: Erzeugt es die gewünschte Emotion?
    - 9-10: Starke emotionale Resonanz
    - 7-8: Emotion erkennbar
    - 5-6: Etwas flach
@@ -354,8 +371,8 @@ Bewertungskriterien (Skala 1-10):
 
 **Gesamtscore Berechnung:**
 Der gewichtete Gesamtscore und die Auswahl des Gewinners werden VOM SYSTEM berechnet
-(Gewichte: Botschaftsklarheit 20%, Scroll-Stop 25%, Markenpassung 15%, Originalität 20%,
-Umsetzbarkeit 5%, Emotionale Wirkung 10%, Zielgruppenrelevanz 5%).
+(Gewichte: Botschaftsklarheit 20%, Scroll-Stop 25%, Markenpassung 15%, Originalität 15%,
+Umsetzbarkeit 5%, Emotionale Wirkung 15%, Zielgruppenrelevanz 5%).
 Du musst NICHT rechnen - konzentriere dich auf präzise Einzelbewertungen (1-10) und gute
 Begründungen. Deine Angaben zu gesamtscore/winning_route werden überschrieben.
 

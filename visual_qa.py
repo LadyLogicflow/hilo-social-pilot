@@ -77,12 +77,13 @@ class VisualQAVerdict(BaseModel):
     )
     composition_integrity: float = Field(
         ge=1.0, le=10.0, default=5.0,
-        description="Bilden Hero-Element, Headline-Flaeche und Gesamtkomposition eine gemeinsame, "
-                    "durchdachte Gestaltung - oder wirkt das Ergebnis wie drei separate Teile "
-                    "('Foto + aufgesetzter Textkasten + Logo')? Hoher Score: Text und Motiv sind "
-                    "sichtbar aufeinander abgestimmt (z.B. Text auf einer Flaeche IM Motiv, "
-                    "Farbbezug zwischen Text und Bildelement). Niedriger Score: Text-Box wirkt wie "
-                    "ein Werbe-Template ueber ein beliebiges Foto gelegt."
+        description="Bilden Hero-Element, Schrift und Gesamtkomposition eine gemeinsame, durchdachte "
+                    "Gestaltung? Hoher Score: die Schrift steht klar und gut lesbar DIREKT auf einem "
+                    "ruhigen Bildbereich, harmonisch in die Komposition eingebettet (Platzierung, "
+                    "Farb-/Kontrastbezug zur Szene) - OHNE aufgesetzte farbige Textplatte/Kasten. "
+                    "Niedriger Score: eine aufgesetzte farbige Platte/ein Kasten hinter der Schrift "
+                    "(wirkt wie ein Werbe-Template ueber ein beliebiges Foto gelegt) ODER Schrift "
+                    "unruhig/schlecht lesbar ohne Bezug zum Motiv."
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -250,6 +251,13 @@ GATE A CHECKS (vor Text-Rendering):
      ERWÜNSCHT und dürfen NICHT abgewertet werden - sie sind bewusste Vorgabe der Art Direction.
      Werte nur ab, wenn das Bild reißerisch/effekthascherisch wirkt oder die Seriosität eines
      Lohnsteuerhilfevereins beschädigt - nicht, weil es auffällig ist.
+   - GLEICHZEITIG gilt: Der bevorzugte HILO-Look ist warme, helle, echte Fotografie (ein ehrlicher
+     menschlicher Moment oder ein greifbares Objekt in warmem Tageslicht). Ein warmes, ruhiges,
+     echt wirkendes Foto ist genauso markentypisch wie ein kontraststarkes und darf NICHT
+     abgewertet werden, nur weil es nicht dramatisch/dunkel ist. Warme, echte, konkrete Motive
+     (Mensch/Objekt) und abstrakte grafische Ideen sind gleichwertig - ein flaches, kühl-grafisches
+     Symbol auf einfarbiger Fläche ist eher weniger markentypisch. HILO-Grün wirkt als gezielter
+     Akzent, nicht als große grafische Fläche.
    - SIGNALFARBEN (Rot, Orange, Neon o.ä.): bei Warnungs-/Risiko-Themen erlaubt, aber die
      HILO-Farbdramaturgie (Navy/Grün) muss weiterhin spürbar bleiben - eine Signalfarbe, die
      Navy/Grün komplett verdrängt, drückt diesen Score.
@@ -288,24 +296,24 @@ GATE A CHECKS (vor Text-Rendering):
    - 1-4: Visuell austauschbar, kein dominanter Reiz.
 
 8. **Composition Integrity? (1-10)**
-   - Bilden Hero-Element, Headline-Fläche und Gesamtkomposition eine gemeinsame, durchdachte
-     Gestaltung - oder wirkt das Ergebnis wie drei separate Teile ("Foto + aufgesetzter
-     Textkasten + Logo")?
-   - 9-10: Text und Motiv sind sichtbar aufeinander abgestimmt (z.B. Text auf einer Fläche
-     IM Motiv platziert, Farbbezug zwischen Textfläche und Bildelement, Text folgt der
-     Bildkomposition).
-   - 5-6: Ordentlich getrennt, aber nicht unangenehm - Text und Foto koexistieren neutral.
-   - 1-4: Wirkt wie ein Werbe-Template, das über ein beliebiges Foto gelegt wurde - keine
-     erkennbare Verzahnung zwischen Text und Motiv.
+   - Bilden Hero-Element, Schrift und Gesamtkomposition eine gemeinsame, durchdachte
+     Gestaltung - oder wirkt das Ergebnis wie ein aufgesetztes Werbe-Template?
+   - 9-10: Die Schrift steht klar und gut lesbar DIREKT auf einem ruhigen Bildbereich und ist
+     harmonisch in die Komposition eingebettet (Platzierung, Farb-/Kontrastbezug zur Szene, Text
+     folgt der Bildkomposition) - OHNE aufgesetzte farbige Textplatte/Kasten dahinter.
+   - 5-6: Ordentlich, aber nicht besonders verzahnt - Text und Foto koexistieren neutral.
+   - 1-4: Eine aufgesetzte farbige Textplatte/ein Kasten hinter der Schrift (wirkt wie ein
+     Werbe-Template über ein beliebiges Foto gelegt) ODER gar keine erkennbare Verzahnung
+     zwischen Schrift und Motiv.
 
 9. **Überschrift (nur wenn im User-Prompt eine Überschrift vorgegeben ist!)**
    - headline_vorhanden (1-10): Ist die Überschrift im Bild sichtbar und prominent?
    - headline_lesbar (1-10): Auf dem Smartphone gut lesbar? Groß genug, genug Kontrast,
-     nicht vom Motiv überlagert oder angeschnitten? Falls eine eigene Fläche/Tafel/Banner hinter
-     dem Text liegt: bevorzugt HILO-Farben (Navy #1f428d oder Grün #60a33c, mit weißer Schrift)
-     oder Weiß mit Navy-Schrift. Eine neutrale Fläche (Creme/Beige/Grau) ist NUR dann kein
-     Abzug, wenn zusätzlich ein sichtbares Markenfarb-Element (Rand/Akzent) in der Nähe liegt -
-     eine Fläche ganz ohne jeden Markenfarbbezug drückt den Score.
+     nicht vom Motiv überlagert oder angeschnitten? Die Schrift soll DIREKT auf dem Bild stehen -
+     Navy (#1f428d) auf hellem Grund, Weiß auf dunklem/kräftigem Grund, je nach Lesbarkeit. Ein
+     dezenter Schatten/Halo für Kontrast ist in Ordnung. Eine aufgesetzte farbige Platte/Tafel/
+     ein Banner hinter dem Text ist NICHT erwünscht und drückt den Score (die klare, plattenfreie
+     Schrift direkt auf einem ruhigen Bildbereich ist der Soll-Zustand).
    - gefundener_text: Tippe den im Bild lesbaren Überschriften-Text EXAKT ab, so wie er
      dasteht - inklusive eventueller Fehler. Nicht korrigieren, nicht glätten!
    - headline_text_exakt (true/false): Stimmt der abgetippte Text ZEICHENGENAU mit der Vorgabe

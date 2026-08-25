@@ -237,6 +237,22 @@ symbolische Bedeutung kulturell eindeutig ist (wie der Haken), statt eines Mehrz
 vielen möglichen Lesarten (wie die Uhr). Beide Prinzipien - Transformation UND semantische
 Präzision - gelten gemeinsam, keins ersetzt das andere.
 
+WÄRME & ECHTHEIT (gleichrangiges Leitprinzip - genauso wichtig wie die visuelle Übersetzung oben):
+Die stärksten HILO-Bilder wirken wie echte, warme Fotografie: ein ehrlicher menschlicher Moment
+oder ein greifbares, real fotografiertes Objekt in warmem Tageslicht - mit Tiefe, Textur und
+Atmosphäre. Diese Wärme ist eine Kernqualität der Marke; eine emotional wahre, real wirkende Szene
+ist ein Spitzen-Ergebnis und ein vollwertiger Gewinner, kein Rückfall auf "nur ein Foto". Eine gute
+visuelle Übersetzung entsteht genauso über einen warmen echten Moment wie über eine abstrakte
+Transformation - beide Wege sind erstklassig und gleichwertig. Bevorzuge echte fotografische Tiefe,
+echtes Licht und echtes Material gegenüber einer flachen, rein grafischen Bildfläche. Auch hier
+gilt die visuelle Übersetzung: ein echter Moment trägt eine klare Emotion oder Handlung (nicht eine
+sterile Abbildung des Themen-Gegenstands). Das HILO-Grün wirkt am stärksten als gezielter, kräftiger
+Akzent innerhalb eines warmen, echten Bildes - eine kleine leuchtende Fläche, ein Lichtreflex, ein
+markanter Farbtupfer -, nicht als großflächiger grafischer Block über das ganze Bild.
+Faustregel für die Serie: Menschen und echte Szenen dürfen ruhig häufiger vorkommen als abstrakte
+Symbol-Grafiken - ein warmer, konkreter Alltagsmoment ist im Feed sympathischer und markentypischer
+als ein weiteres schwebendes Icon.
+
 Die 4 Routen-Typen:
 
 1. **Emotionale Szene**
