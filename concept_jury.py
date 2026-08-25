@@ -72,9 +72,13 @@ class RouteEvaluation(BaseModel):
                     "Nur das offensichtlich Sichtbare beschreiben, noch keine Deutung."
     )
     spontane_bedeutung: str = Field(
-        description="Was bedeutet dieses Motiv OHNE jede Erklärung und OHNE die Headline - die erste, "
-                    "naheliegendste Assoziation eines normalen Betrachters? Ehrlich, nicht die "
-                    "gewünschte Wunsch-Deutung."
+        description="Beschreibe AUSSCHLIESSLICH die unmittelbare Alltagsbedeutung des SICHTBAREN - "
+                    "die erste, naheliegendste Assoziation eines normalen Betrachters OHNE Headline "
+                    "und OHNE Konzeptbeschreibung. Verwende dabei KEINE Fach-, Kampagnen- oder "
+                    "Briefingbegriffe (z.B. NICHT 'freiwillige Veranlagung', 'rueckwirkend', "
+                    "'Erstattung') - solche Begriffe sind bereits Wissen aus dem Briefing, nicht das, "
+                    "was man spontan sieht. Erlaubt ist nur die rohe Alltags-Lesart (z.B. 'ein Papier "
+                    "kommt zurueck', 'eine Uhr laeuft', 'jemand oeffnet etwas')."
     )
     kernbotschaft_bruecke: Literal["direkt", "teilweise", "nein"] = Field(
         description="Führt die spontane_bedeutung DIREKT zur Kernaussage des Posts? 'direkt' = ohne "
@@ -91,6 +95,14 @@ class RouteEvaluation(BaseModel):
                     "Kernaussage gehört (z.B. ein Umfeld, das im Steuer-/Finanzkontext sofort ein "
                     "ANDERES Thema auslöst). Nicht als 'gering' schönreden, egal wie clever die "
                     "geplante Metapher klingt."
+    )
+    serien_duplikat: bool = Field(
+        default=False,
+        description="true, wenn diese Route INHALTLICH nahezu identisch zu einer bereits verwendeten/"
+                    "zuletzt gemiedenen Leitidee ist - dieselbe Grundidee/Form/Metapher/Creative-Mechanik/"
+                    "Bedeutungswelt, AUCH wenn sie anders benannt ist. Umbenennen macht eine Route nicht "
+                    "neu (z.B. 'gefaltetes Papierobjekt' vs. 'transformiertes Papierobjekt', oder ein "
+                    "zweiter Papier-Bumerang). true-Routen sind NICHT siegfaehig - hartes Ausschlusskriterium."
     )
 
     # Bewertungen (Skala 1-10)
@@ -258,8 +270,16 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
         evaluation.gesamtscore = _weighted_score(evaluation)
         evaluation.empfehlung = _empfehlung_fuer(evaluation.gesamtscore)
 
-    # Gewinner = hoechster Score (bei Gleichstand niedrigste Routennummer)
-    gewinner_nr = max(evaluations, key=lambda nr: (evaluations[nr].gesamtscore, -nr))
+    # HARTES DIVERSITY-GATE: Serien-Duplikate (inhaltlich nahezu identisch zu einer zuletzt genutzten
+    # Leitidee - auch nach Umbenennung) sind NICHT siegfaehig. Nur wenn ALLE Routen Duplikate waeren,
+    # faellt die Auswahl aufs Gesamtfeld zurueck (besser als gar kein Bild).
+    kandidaten = [nr for nr, ev in evaluations.items() if not getattr(ev, "serien_duplikat", False)]
+    if not kandidaten:
+        log.warning("Alle Routen als Serien-Duplikat markiert - Diversity-Gate faellt aufs Gesamtfeld zurueck.")
+        kandidaten = list(evaluations.keys())
+
+    # Gewinner = hoechster Score unter den siegfaehigen (bei Gleichstand niedrigste Routennummer)
+    gewinner_nr = max(kandidaten, key=lambda nr: (evaluations[nr].gesamtscore, -nr))
     gewinner = evaluations[gewinner_nr]
 
     if verdict.winning_route != gewinner_nr:
@@ -349,15 +369,20 @@ Kontext:
 SEMANTIK-CHECK - ZUERST je Route ausfüllen (Prüfmodus, NICHT Pitch - keine Marketing-Vorteile
 aufzählen, sondern ehrlich prüfen, ob die Bedeutung wirklich ankommt):
 1. read_500ms: Was sieht ein UNVORBEREITETER Betrachter zuerst? Nur Sichtbares, keine Interpretation.
-2. spontane_bedeutung: Was ist OHNE Headline und OHNE Konzeptbeschreibung die wahrscheinlichste ERSTE
-   Bedeutung des Motivs? Die naheliegendste, nicht die gewünschte.
+2. spontane_bedeutung: Nur die unmittelbare ALLTAGSbedeutung des Sichtbaren OHNE Headline/Konzept.
+   KEINE Fach-, Kampagnen- oder Briefingbegriffe ('freiwillige Veranlagung', 'rückwirkend' usw. sind
+   Briefing-Wissen, nicht das spontan Sichtbare) - nur die rohe Lesart (z.B. 'ein Papier kommt zurück').
 3. kernbotschaft_bruecke: Führt diese spontane Bedeutung DIREKT zur Kernaussage? -> direkt / teilweise
    / nein. Eine erst nachträglich erklärbare Metapher gilt NICHT als "direkt".
 4. fehlinterpretations_risiko: niedrig / mittel / hoch. "hoch", wenn eine andere naheliegende Deutung
    mindestens ebenso plausibel ist wie die gewünschte - insbesondere wenn die Bildwelt eine starke,
    allgemein bekannte oder fachlich naheliegende Bedeutung aktiviert, die nicht zur Kernaussage gehört.
-5. Serienähnlichkeit: Prüfe Hero-Kategorie UND übergeordnete Bedeutungswelt. Technisch verschiedene
-   Motive aus derselben visuellen oder semantischen Familie sind KEINE echte Vielfalt.
+5. serien_duplikat (true/false): Prüfe INHALTLICH, nicht sprachlich, gegen die zuletzt verwendeten
+   Motive/Bedeutungswelten. Das Umbenennen einer bereits verwendeten Hero-Kategorie, Metapher, Form,
+   Bedeutungswelt oder Creative-Mechanik macht sie NICHT neu ('gefaltetes Papierobjekt' und
+   'transformiertes Papierobjekt' = dieselbe Familie; ein zweiter Papier-Bumerang = 100% Wiederholung).
+   Setze true, wenn die Leitidee einer bereits verwendeten NAHEZU IDENTISCH ist. Eine nahezu identische
+   Leitidee darf NICHT gewinnen - das System schliesst true-Routen von der Auswahl aus.
 
 Grundregeln dabei: Du kennst Thema, Route und Absicht - der Facebook-Nutzer kennt NUR das Bild.
 Bewerte, was das Motiv TATSÄCHLICH kommuniziert, nicht was der Creative Director sagen wollte. Nutze
