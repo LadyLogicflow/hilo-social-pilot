@@ -231,7 +231,8 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
 def evaluate_routes(
     brief: MessageBrief,
     territories: CreativeTerritories,
-    model: str = "gpt-5-nano"
+    model: str = "gpt-5-nano",
+    recent_heroes: "list[str] | None" = None
 ) -> ConceptJuryVerdict:
     """Bewertet 5 kreative Routen und wählt die beste aus.
 
@@ -399,9 +400,27 @@ Wichtig:
         f"Emotion: {route.emotionale_richtung}\n"
         f"Beispiel: {route.beispiel_szene}\n"
         f"Scroll-Stop-Device: {route.scroll_stop_device}\n"
+        f"Hero-Kategorie: {route.hero_kurz}\n"
         f"Headline-Abhängigkeit: {route.headline_dependency}"
         for name, route in routes
     ])
+
+    # Serien-Vielfalt: zuletzt genutzte Hero-Kategorien (aus der Creative Memory) - dienen
+    # ausschliesslich der Novelty-Abwertung in der Jury, werden NICHT dem Creative Director gezeigt.
+    recent_heroes = [h for h in (recent_heroes or []) if h and h.strip()]
+    if recent_heroes:
+        novelty_block = (
+            "\n\n**SERIEN-VIELFALT (Novelty-Prüfung):**\n"
+            "Diese Hero-Kategorien wurden in den ZULETZT veröffentlichten Bildern der Serie schon "
+            "verwendet (neueste zuletzt):\n- " + "\n- ".join(recent_heroes) + "\n"
+            "Werte eine Route bei Originalität UND Scroll-Stop-Potenzial DEUTLICH ab (etwa 2-3 Punkte), "
+            "wenn ihre Hero-Kategorie einer davon entspricht oder sehr ähnlich ist (gleiche Grundart/"
+            "gleiches Material, z.B. schon wieder ein Papierdokument). Ziel ist echte Abwechslung über "
+            "die Serie - eine frische, andersartige Grundidee soll gewinnen. Eine inhaltlich klar "
+            "bessere Route darf trotzdem gewinnen; die Abwertung greift bei annähernd gleichwertigen."
+        )
+    else:
+        novelty_block = ""
 
     user_prompt = f"""Bewerte diese 5 kreativen Routen und wähle die beste aus.
 
@@ -416,6 +435,7 @@ Wichtig:
 **5 Kreative Routen:**
 
 {routes_text}
+{novelty_block}
 
 Bewerte jede Route nach den 7 Kriterien (1-10).
 Begründe Stärken und Schwächen je Route.

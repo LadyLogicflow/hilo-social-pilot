@@ -92,6 +92,16 @@ class CreativeRoute(BaseModel):
                     "eine konkrete Frage im Kopf auslöst."
     )
 
+    hero_kurz: str = Field(
+        max_length=40,
+        description="Kurz-KATEGORIE des Hero-Motivs in 2-4 Wörtern, für die Serien-Vielfalt-Prüfung "
+                    "(NICHT der Titel, sondern die Grundart des Motivs + Material). Beschreibe die "
+                    "TYPE, nicht die konkrete Idee: z.B. 'Papierdokument-Objekt', 'Mensch in "
+                    "Alltagsszene', 'Kalender/Datum-Objekt', 'typografische Form', 'Haushalts-"
+                    "gegenstand', 'Lebensmittel-Motiv'. So kann das System erkennen, wenn dieselbe "
+                    "Grundart in der Serie zu oft vorkommt."
+    )
+
     headline_dependency: Literal["low", "medium", "high"] = Field(
         description="Wie sehr braucht diese Route die Überschrift, um verstanden zu werden? "
                     "'low' = die visuelle Idee funktioniert bereits für sich allein, ganz ohne Text "
@@ -376,6 +386,8 @@ Jede Route braucht:
 - Beispiel-Szene (konkretes Bild-Beispiel)
 - Scroll-Stop-Device (was GENAU stoppt den Daumen? Ein konkretes Detail, kein Stilwort)
 - Headline-Abhängigkeit (low/medium/high - funktioniert die Idee auch ganz ohne Überschrift?)
+- Hero-Kurz (2-4 Wörter Kategorie des Hero-Motivs, für die Serien-Vielfalt - Grundart + Material,
+  nicht die konkrete Idee)
 """
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")

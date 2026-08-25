@@ -544,7 +544,8 @@ if __name__ == "__main__":
                      "symbolisiert ablaufende Zeit. Dunkler Hintergrund.",
         visuelle_signatur="Dramatisches Licht von links, Rot-Kontrast",
         emotionale_richtung="Dringlichkeit (aber nicht Panik)",
-        beispiel_szene="Sanduhr groß im Vordergrund, fast leer, roter Sand"
+        beispiel_szene="Sanduhr groß im Vordergrund, fast leer, roter Sand",
+        hero_kurz="Zeit-Objekt"
     )
 
     print(f"\nMessage Brief: {brief.kernaussage}")

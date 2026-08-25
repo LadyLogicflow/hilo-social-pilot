@@ -26,6 +26,7 @@ from message_brief import MessageBrief, generate_message_brief, generate_headlin
 from creative_director import CreativeTerritories, generate_creative_routes
 from concept_jury import ConceptJuryVerdict, evaluate_routes
 from art_director import ArtDirectionBoard, create_art_direction_board
+from creative_memory import load_recent_heroes, remember_hero
 from image_producer import ImageProductionBrief, produce_image
 from visual_qa import VisualQAVerdict, check_raw_image
 
@@ -176,7 +177,12 @@ def run_sharenext_pipeline(
     # STUFE 3: Concept Jury - Gewinner wählen
     # ─────────────────────────────────────────────────────────────────────────
     log.info("🏆 Stufe 3/6: Concept Jury")
-    concept_verdict = evaluate_routes(message_brief, creative_territories)
+    # Serien-Vielfalt: zuletzt genutzte Hero-Kategorien laden und der Jury (NICHT dem Creative
+    # Director) fuer die Novelty-Abwertung mitgeben.
+    recent_heroes = load_recent_heroes()
+    if recent_heroes:
+        log.info(f"   ℹ Creative Memory (zuletzt): {', '.join(recent_heroes)}")
+    concept_verdict = evaluate_routes(message_brief, creative_territories, recent_heroes=recent_heroes)
     log.info(f"   ✓ Gewinner: Route {concept_verdict.winning_route} - {concept_verdict.winning_titel}")
     log.info(f"   Score: {concept_verdict.winning_score:.1f}/10")
 
@@ -189,6 +195,13 @@ def run_sharenext_pipeline(
         5: creative_territories.route_5_unkonventionell,
     }
     winning_route = route_map[concept_verdict.winning_route]
+
+    # Gewinner-Hero-Kategorie in die Creative Memory schreiben (steuert die naechste Novelty-Pruefung).
+    try:
+        remember_hero(getattr(winning_route, "hero_kurz", ""))
+        log.info(f"   ✓ Creative Memory aktualisiert: {getattr(winning_route, 'hero_kurz', '')}")
+    except Exception as e:
+        log.warning(f"   Creative Memory-Update uebersprungen: {e}")
 
     # ─────────────────────────────────────────────────────────────────────────
     # STUFE 4: Art Director Board

@@ -627,7 +627,8 @@ if __name__ == "__main__":
         beschreibung="Dramatische Sanduhr im Fokus, roter Sand rinnt durch",
         visuelle_signatur="Dramatisches Licht von links, Rot-Kontrast",
         emotionale_richtung="Dringlichkeit",
-        beispiel_szene="Sanduhr groß im Vordergrund, fast leer"
+        beispiel_szene="Sanduhr groß im Vordergrund, fast leer",
+        hero_kurz="Zeit-Objekt"
     )
 
     # Test Art Board
