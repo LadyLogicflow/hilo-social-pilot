@@ -233,6 +233,9 @@ PRIORITÄT C - MARKE & STIL
 - Übersetze die Brand Signature aus dem Art Direction Board konkret (Navy als Fläche, Grün als
   Akzent, o.ä.) - HILO-Farben sollen über Licht/Flächen/Material/Kontrast entstehen, nicht
   durch sachlich unnötige grüne/blaue Requisiten (kein "grüner Ordner, blauer Stift").
+- KEIN künstlicher Neon-/Leucht-Glow an einem Objekt, nur um Grün ins Bild zu bringen. Ein
+  natürlicher, glaubwürdiger grüner Akzent ist besser als ein aufgesetztes Leuchten - lieber gar
+  kein Grün im Motiv als ein erzwungenes.
 - Professionell, warm, vertrauenswürdig - aber nicht steril oder langweilig.
 - Authentisch statt Stock-Foto-Klischee. Eher vermeiden (kein starres Verbot, wenn eine Idee
   wirklich trägt hat sie Vorrang): generische Businessperson-Klischees (Person zeigt lächelnd

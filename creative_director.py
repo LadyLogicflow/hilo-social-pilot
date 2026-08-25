@@ -230,6 +230,10 @@ möglichst eng mit der Kernaussage verbunden ist - nicht nur überraschend, sond
 Frage bei jeder Route: "Welche anderen Bedeutungen könnte ein Betrachter diesem Motiv OHNE
 Headline geben?" Je mehr naheliegende Alternativ-Deutungen bestehen, desto schwächer die Route -
 die Headline soll die visuelle Idee PRÄZISIEREN, nicht erst ERKLÄREN müssen.
+BESONDERS kritisch sind Fehldeutungen im GLEICHEN Themenfeld: Wenn ein Motiv genauso gut ein
+ANDERES Steuer-/Finanzthema meinen könnte (eine fachlich naheliegende Verwechslung), ist die Route
+zu unpräzise - dann trägt selbst ein technisch schönes Bild die gewünschte Aussage nicht. Die
+gewünschte Bedeutung muss die mit Abstand naheliegendste sein, auch ohne Headline.
 - Stark: ein transformiertes Motiv, dessen symbolische Bedeutung kulturell eindeutig und eng mit
   der KONKRETEN Kernaussage verknüpft ist.
 - Schwächer: ein Mehrzweck-Symbol, das nur ganz allgemein für einen Oberbegriff steht und genauso
@@ -269,6 +273,9 @@ Mindestens eine zentrale Eigenschaft des Hero-Motivs oder seiner unmittelbaren I
 HILO-Farbwelt organisch tragen - Navy, Grün und Weiß sollen Teil der visuellen Idee selbst sein, nicht
 nur über Headline, Logo oder Slogan entstehen. ABER: Markenfarben niemals sachlich unbegründet
 erzwingen - eine hochwertige, natürliche Bildidee hat Vorrang vor künstlicher Einfärbung.
+Insbesondere KEIN künstlicher Neon-/Leucht-Glow an einem Objekt, nur um Grün unterzubringen - ein
+natürlicher grüner Akzent an einer sinnvollen, glaubwürdigen Stelle ist besser als ein aufgesetztes
+Leuchten. Lieber gar kein Grün im Motiv als ein erzwungenes.
 
 Die 4 Routen-Typen:
 

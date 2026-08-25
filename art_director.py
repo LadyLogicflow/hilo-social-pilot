@@ -389,9 +389,14 @@ CREATIVE IDEA PRESERVATION (verbindlich):
 Die vom Concept Jury ausgewählte Creative Route ist die verbindliche Leitidee. Deine Aufgabe ist,
 GENAU DIESE EINE Idee zu VERSTÄRKEN - über Licht, Perspektive, Crop, Silhouette, Negative Space,
 Größenrelation und Blickführung. Führe KEINE zusätzlichen Metaphern, Symbole oder Icons ein, die
-nicht Teil der Route sind (z.B. kein Kreuz, kein Warnschild, keine Extra-Requisiten). Das zentrale
-Hero-Element bzw. die Transformation muss in ca. 0,5 Sekunden erfassbar sein. Ein starker Hero mit
-einer klaren Aussage ist besser als mehrere „passende" Symbole - im Zweifel reduzieren.
+nicht Teil der Route sind. Das zentrale Hero-Element bzw. die Transformation muss in ca. 0,5
+Sekunden erfassbar sein. Ein starker Hero mit einer klaren Aussage ist besser als mehrere
+„passende" Symbole - im Zweifel reduzieren.
+KEINE NEUE BEDEUTUNGSEBENE: Deine konkrete Inszenierung (welches Objekt, welche Szene, welcher Ort)
+darf keine Bedeutung hinzufügen, die nicht aus der Creative Route hervorgeht. Prüfe bei deiner Wahl:
+Aktiviert das konkrete Objekt/die Szene beim schnellen Betrachten ungewollt ein ANDERES - womöglich
+sogar themennah plausibleres - Thema? Wenn ja, wähle eine Umsetzung, die die Bedeutung der Route
+eindeutig trägt, statt eine sachfremde Nebenbedeutung einzuschleusen.
 
 THUMBNAIL-TEST (wichtig für Feed-Wirkung):
 Instagram/Facebook zeigen das Bild zuerst klein - ca. 180×180 Pixel zwischen vielen anderen
