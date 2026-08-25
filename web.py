@@ -851,7 +851,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     {% if e.f.pipeline_info %}<details style="margin-top:4px"><summary style="cursor:pointer;color:#0B2545;font-weight:bold">&#x1F9E0; Warum dieses Bild?</summary>
       <div style="font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 11px;margin-top:6px;line-height:1.55">
         <b>Gew&auml;hlte Idee:</b> {{e.f.pipeline_info.route_typ}} &ndash; {{e.f.pipeline_info.route_titel}}<br>
-        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}<br>
+        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}{% if e.f.pipeline_info.message_angle %} &nbsp;&middot;&nbsp; <b>Nutzen-Angle:</b> {{e.f.pipeline_info.message_angle}}{% endif %}<br>
         <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
         {% if e.f.pipeline_info.bruecke %}<b>Semantik-Check:</b> spontan lesbar als &ndash; {{e.f.pipeline_info.spontane_bedeutung}} &middot; Br&uuml;cke zur Botschaft: <b>{{e.f.pipeline_info.bruecke}}</b> &middot; Fehldeutungs-Risiko: <b>{{e.f.pipeline_info.risiko}}</b>{% if e.f.pipeline_info.botschaftsklarheit is not none %} &middot; Botschaftsklarheit: {{e.f.pipeline_info.botschaftsklarheit}}/10{% endif %}<br>{% endif %}
         <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }}){% if e.f.pipeline_info.versuche and e.f.pipeline_info.versuche > 1 %} &nbsp;&middot;&nbsp; <b>Auto-Retry:</b> {{e.f.pipeline_info.versuche}} Versuche{% endif %}<br>
@@ -2403,6 +2403,7 @@ def _sharenext_bild_synchron(data, eid):
             "route_titel": getattr(wr, "titel", ""),
             "hero_kurz": getattr(wr, "hero_kurz", ""),
             "semantic_environment": getattr(wr, "semantic_environment", ""),
+            "message_angle": getattr(wr, "message_angle", ""),
             "score": round(cv.winning_score, 1),
             "begruendung": cv.begruendung,
             "spontane_bedeutung": getattr(we, "spontane_bedeutung", "") if we else "",
@@ -2538,6 +2539,7 @@ def _sharenext_rerender_synchron(data, eid):
     # damit die Rekonstruktion (Pflichtfeld) nicht scheitert.
     _route_data = dict(state.get("route") or {})
     _route_data.setdefault("semantic_environment", "")
+    _route_data.setdefault("message_angle", "")
     route = CreativeRoute.model_validate(_route_data)
     art_board = ArtDirectionBoard.model_validate(state["art_board"])
     headline = state.get("headline") or data.get("ueberschrift", "")
@@ -2562,6 +2564,7 @@ def _sharenext_rerender_synchron(data, eid):
         "route_titel": getattr(route, "titel", ""),
         "hero_kurz": getattr(route, "hero_kurz", ""),
         "semantic_environment": getattr(route, "semantic_environment", "") or alt.get("semantic_environment", ""),
+        "message_angle": getattr(route, "message_angle", "") or alt.get("message_angle", ""),
         "score": alt.get("score"),
         "begruendung": alt.get("begruendung"),
         # Idee/Jury unveraendert -> Pruef-Werte aus dem vorigen Lauf uebernehmen

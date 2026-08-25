@@ -632,7 +632,8 @@ if __name__ == "__main__":
         emotionale_richtung="Dringlichkeit",
         beispiel_szene="Sanduhr groß im Vordergrund, fast leer",
         hero_kurz="Zeit-Objekt",
-        semantic_environment="Zeit"
+        semantic_environment="Zeit",
+        message_angle="Frist/Zeitdruck"
     )
 
     # Test Art Board

@@ -26,7 +26,8 @@ from message_brief import MessageBrief, generate_message_brief, generate_headlin
 from creative_director import CreativeTerritories, generate_creative_routes
 from concept_jury import ConceptJuryVerdict, evaluate_routes
 from art_director import ArtDirectionBoard, create_art_direction_board
-from creative_memory import load_recent_heroes, load_recent_environments, remember
+from creative_memory import (load_recent_heroes, load_recent_environments,
+                             load_recent_message_angles, remember)
 from image_producer import ImageProductionBrief, produce_image
 from visual_qa import VisualQAVerdict, check_raw_image
 
@@ -183,13 +184,17 @@ def run_sharenext_pipeline(
     # Director) fuer die Novelty-Abwertung mitgeben.
     recent_heroes = load_recent_heroes()
     recent_environments = load_recent_environments()
+    recent_message_angles = load_recent_message_angles()
     if recent_heroes:
         log.info(f"   ℹ Creative Memory Motive (zuletzt): {', '.join(recent_heroes)}")
     if recent_environments:
         log.info(f"   ℹ Creative Memory Bedeutungswelten (zuletzt): {', '.join(recent_environments)}")
+    if recent_message_angles:
+        log.info(f"   ℹ Creative Memory Message-Angles (zuletzt): {', '.join(recent_message_angles)}")
     concept_verdict = evaluate_routes(
         message_brief, creative_territories,
-        recent_heroes=recent_heroes, recent_environments=recent_environments
+        recent_heroes=recent_heroes, recent_environments=recent_environments,
+        recent_message_angles=recent_message_angles
     )
     log.info(f"   ✓ Gewinner: Route {concept_verdict.winning_route} - {concept_verdict.winning_titel}")
     log.info(f"   Score: {concept_verdict.winning_score:.1f}/10")
@@ -209,8 +214,10 @@ def run_sharenext_pipeline(
     try:
         _hero = getattr(winning_route, "hero_kurz", "")
         _env = getattr(winning_route, "semantic_environment", "")
-        remember(_hero, _env)
-        log.info(f"   ✓ Creative Memory aktualisiert: Motiv='{_hero}', Bedeutungswelt='{_env}'")
+        _angle = getattr(winning_route, "message_angle", "")
+        remember(_hero, _env, _angle)
+        log.info(f"   ✓ Creative Memory aktualisiert: Motiv='{_hero}', Bedeutungswelt='{_env}', "
+                 f"Angle='{_angle}'")
     except Exception as e:
         log.warning(f"   Creative Memory-Update uebersprungen: {e}")
 

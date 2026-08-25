@@ -551,7 +551,8 @@ if __name__ == "__main__":
         emotionale_richtung="Dringlichkeit (aber nicht Panik)",
         beispiel_szene="Sanduhr groß im Vordergrund, fast leer, roter Sand",
         hero_kurz="Zeit-Objekt",
-        semantic_environment="Zeit"
+        semantic_environment="Zeit",
+        message_angle="Frist/Zeitdruck"
     )
 
     print(f"\nMessage Brief: {brief.kernaussage}")

@@ -142,8 +142,10 @@ class RouteEvaluation(BaseModel):
     )
 
     # Begründung
-    staerken: str = Field(description="Was macht diese Route stark?")
-    schwaechen: str = Field(description="Was könnte besser sein?")
+    staerken: str = Field(description="Die Hauptstärke der Route in EINEM kurzen, sachlichen Halbsatz "
+                                       "(keine Marketing-Floskeln wie 'Blickführung', 'Markenvertrauen').")
+    schwaechen: str = Field(description="Die Hauptschwäche der Route in EINEM kurzen, sachlichen Halbsatz "
+                                        "(z.B. 'Bezug zur Aussage nur teilweise sichtbar').")
     empfehlung: Literal["Stark empfohlen", "Empfohlen", "Bedingt empfohlen", "Nicht empfohlen"] = Field(
         description="Gesamtempfehlung basierend auf Score"
     )
@@ -293,6 +295,16 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
     verdict.winning_titel = gewinner.route_titel
     verdict.quality_warning = gewinner.gesamtscore < MINDEST_SCORE
 
+    # "Warum gewaehlt" CODE-seitig aus festen Bausteinen bauen - verhindert Pitch-Sprache und
+    # nachtraegliches Schoenreden (der LLM-Freitext wird bewusst verworfen).
+    _st = (gewinner.staerken or "").strip().rstrip(".")
+    _sw = (gewinner.schwaechen or "").strip().rstrip(".")
+    verdict.begruendung = (
+        "Höchster Gesamtscore nach Semantik-, Scroll-Stop-, Marken- und Diversity-Prüfung."
+        + (f" Hauptstärke: {_st}." if _st else "")
+        + (f" Hauptschwäche: {_sw}." if _sw else "")
+    )
+
     # Fallback: Beste Route auch wenn < MINDEST_SCORE (besser als Fehler!)
     if verdict.quality_warning:
         log.warning(
@@ -311,7 +323,8 @@ def evaluate_routes(
     territories: CreativeTerritories,
     model: str = "gpt-5-nano",
     recent_heroes: "list[str] | None" = None,
-    recent_environments: "list[str] | None" = None
+    recent_environments: "list[str] | None" = None,
+    recent_message_angles: "list[str] | None" = None
 ) -> ConceptJuryVerdict:
     """Bewertet 5 kreative Routen und wählt die beste aus.
 
@@ -510,6 +523,7 @@ Wichtig:
         f"Scroll-Stop-Device: {route.scroll_stop_device}\n"
         f"Hero-Kategorie: {route.hero_kurz}\n"
         f"Bedeutungswelt: {route.semantic_environment}\n"
+        f"Message-Angle (visualisierter Nutzen): {route.message_angle}\n"
         f"Headline-Abhängigkeit: {route.headline_dependency}"
         for name, route in routes
     ])
@@ -518,7 +532,8 @@ Wichtig:
     # ausschliesslich der Novelty-Abwertung in der Jury, werden NICHT dem Creative Director gezeigt.
     recent_heroes = [h for h in (recent_heroes or []) if h and h.strip()]
     recent_environments = [e for e in (recent_environments or []) if e and e.strip()]
-    if recent_heroes or recent_environments:
+    recent_message_angles = [a for a in (recent_message_angles or []) if a and a.strip()]
+    if recent_heroes or recent_environments or recent_message_angles:
         teile = ["\n\n**SERIEN-VIELFALT (Novelty-Prüfung):**"]
         if recent_heroes:
             teile.append("Zuletzt verwendete Hero-Kategorien (neueste zuletzt):\n- "
@@ -526,14 +541,19 @@ Wichtig:
         if recent_environments:
             teile.append("Zuletzt verwendete Bedeutungswelten/Umfelder (neueste zuletzt):\n- "
                          + "\n- ".join(recent_environments))
+        if recent_message_angles:
+            teile.append("Zuletzt visualisierte Kernnutzen/Message-Angles (neueste zuletzt):\n- "
+                         + "\n- ".join(recent_message_angles))
         teile.append(
             "Werte eine Route bei Originalität UND Scroll-Stop-Potenzial DEUTLICH ab (etwa 2-3 Punkte), "
-            "wenn ihre Hero-Kategorie ODER ihre Bedeutungswelt einer der obigen entspricht oder sehr "
-            "ähnlich ist. WICHTIG: Die Bedeutungswelt zählt besonders - mehrere technisch verschiedene "
-            "Motive aus DERSELBEN Welt (z.B. Fahrrad, Bahnhof, Auto, Straße = alles 'Pendeln/Mobilität') "
-            "sind KEINE echte Abwechslung, sondern Wiederholung. Ziel ist Vielfalt auch auf Bedeutungs"
-            "ebene. Eine inhaltlich klar bessere Route darf trotzdem gewinnen; die Abwertung greift bei "
-            "annähernd gleichwertigen."
+            "wenn ihre Hero-Kategorie ODER ihre Bedeutungswelt ODER ihr Message-Angle einer der obigen "
+            "entspricht oder sehr ähnlich ist. WICHTIG auf ZWEI Ebenen: (1) Bedeutungswelt - mehrere "
+            "technisch verschiedene Motive aus DERSELBEN Welt (z.B. Fahrrad, Bahnhof, Auto = alles "
+            "'Pendeln/Mobilität') sind KEINE Abwechslung. (2) Message-Angle - wenn die Serie optisch "
+            "variiert, aber IMMER denselben Kernnutzen zeigt (z.B. staendig 'rückwirkend/Jahre zurück'), "
+            "ist auch das Monotonie; bevorzuge eine Route, die einen NOCH NICHT gezeigten Nutzen "
+            "(freiwillig, Erstattung, rücknehmbar ...) visualisiert. Eine inhaltlich klar bessere Route "
+            "darf trotzdem gewinnen; die Abwertung greift bei annähernd gleichwertigen."
         )
         novelty_block = "\n".join(teile)
     else:

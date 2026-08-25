@@ -112,6 +112,16 @@ class CreativeRoute(BaseModel):
                     "dieselbe Bedeutungswelt zeigt (z.B. immer wieder Verkehr/Pendeln)."
     )
 
+    message_angle: str = Field(
+        max_length=40,
+        description="Welchen KERNNUTZEN / welche Teilbotschaft des Themas visualisiert diese Route? "
+                    "In 1-3 Woertern - fuer die Serien-Vielfalt auf ARGUMENT-Ebene. Ein Thema hat oft "
+                    "mehrere Nutzen (z.B. 'freiwillig/keine Pflicht', 'rueckwirkend/Jahre zurueck', "
+                    "'Erstattung/Geld zurueck', 'ruecknehmbar/flexibel'). So erkennt das System, wenn "
+                    "die Serie optisch variiert, aber staendig DIESELBE Teilbotschaft zeigt (z.B. immer "
+                    "'rueckwirkend/zurueck')."
+    )
+
     headline_dependency: Literal["low", "medium", "high"] = Field(
         description="Wie sehr braucht diese Route die Überschrift, um verstanden zu werden? "
                     "'low' = die visuelle Idee funktioniert bereits für sich allein, ganz ohne Text "
@@ -411,6 +421,8 @@ Jede Route braucht:
   nicht die konkrete Idee)
 - Semantic-Environment (1-3 Wörter übergeordnete Bedeutungswelt, z.B. Pendeln/Mobilität,
   Dokument/Formular, Zeit, Geld/Erstattung)
+- Message-Angle (1-3 Wörter: welcher Kernnutzen wird visualisiert? z.B. freiwillig/keine Pflicht,
+  rückwirkend/Jahre zurück, Erstattung/Geld zurück, rücknehmbar/flexibel)
 """
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")

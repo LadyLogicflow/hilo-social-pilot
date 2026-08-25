@@ -48,6 +48,11 @@ def load_recent_environments() -> list[str]:
     return _load_list("recent_environments")
 
 
+def load_recent_message_angles() -> list[str]:
+    """Laedt die letzten visualisierten Kernnutzen/Message-Angles. Leere Liste bei Fehler."""
+    return _load_list("recent_message_angles")
+
+
 def _append(werte: list[str], neu: str) -> list[str]:
     neu = (neu or "").strip()
     if not neu:
@@ -56,21 +61,23 @@ def _append(werte: list[str], neu: str) -> list[str]:
     return werte[-_HISTORY_LEN:]
 
 
-def remember(hero_kurz: str, semantic_environment: str = "") -> None:
-    """Haengt Gewinner-Hero-Kategorie UND Bedeutungswelt an die Historie an (je dedupliziert,
-    auf _HISTORY_LEN begrenzt)."""
+def remember(hero_kurz: str, semantic_environment: str = "", message_angle: str = "") -> None:
+    """Haengt Gewinner-Hero-Kategorie, Bedeutungswelt UND Message-Angle an die Historie an
+    (je dedupliziert, auf _HISTORY_LEN begrenzt)."""
     heroes = _append(load_recent_heroes(), hero_kurz)
     envs = _append(load_recent_environments(), semantic_environment)
-    if not heroes and not envs:
+    angles = _append(load_recent_message_angles(), message_angle)
+    if not heroes and not envs and not angles:
         return
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(_MEMORY_PATH, "w", encoding="utf-8") as f:
-            json.dump({"recent_heroes": heroes, "recent_environments": envs}, f, ensure_ascii=False)
+            json.dump({"recent_heroes": heroes, "recent_environments": envs,
+                       "recent_message_angles": angles}, f, ensure_ascii=False)
     except Exception as e:
         log.warning("Creative Memory konnte nicht gespeichert werden: %s", e)
 
 
 def remember_hero(hero_kurz: str) -> None:
-    """Rueckwaertskompatibel: merkt nur die Hero-Kategorie (ohne Bedeutungswelt)."""
-    remember(hero_kurz, "")
+    """Rueckwaertskompatibel: merkt nur die Hero-Kategorie (ohne Bedeutungswelt/Angle)."""
+    remember(hero_kurz, "", "")
