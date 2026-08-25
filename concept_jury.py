@@ -84,7 +84,12 @@ class RouteEvaluation(BaseModel):
     fehlinterpretations_risiko: Literal["niedrig", "mittel", "hoch"] = Field(
         description="Wie hoch ist das Risiko, dass das Motiv spontan ETWAS ANDERES bedeutet als die "
                     "Kernaussage (besonders ein anderes, themennah plausibles Steuer-/Finanzthema)? "
-                    "'hoch', wenn die gewünschte Bedeutung nur mit Erklärung entsteht."
+                    "'hoch', wenn die gewünschte Bedeutung nur mit Erklärung entsteht. "
+                    "ZWINGEND 'hoch': Ein Verkehrs-/Mobilitäts-/Pendel-Setting (Fahrrad, Auto, Straße, "
+                    "Zebrastreifen, Bahnsteig, pendelnde Person o.ä.) bei einem Thema, das NICHT von "
+                    "Pendeln/Fahrtkosten handelt - solche Motive aktivieren beim schnellen Blick sofort "
+                    "Pendlerpauschale/Entfernungspauschale/Fahrtkosten statt der eigentlichen Aussage. "
+                    "Redet euch das NICHT als 'gering' schön, egal wie schön die Metapher klingt."
     )
 
     # Bewertungen (Skala 1-10)
@@ -323,6 +328,11 @@ Zähle NICHT die Marketing-Vorteile auf ("starke Markenpassung", "ideal für Awa
 Paket"), sondern prüfe ehrlich, ob ein normaler Betrachter die gewünschte Bedeutung in 0,5 Sekunden
 OHNE Erklärung bekommt. Eine Idee ist NICHT gut, nur weil ihre Bedeutung im Konzepttext erklärbar
 ist - sie muss beim schnellen Betrachten von selbst entstehen. ERST danach die Kriterien-Scores.
+HÄUFIGE FALLE - Mobilitäts-Settings: Fahrrad, Auto, Straße, Zebrastreifen, Bahnsteig oder eine
+pendelnde Person lesen sich sofort als Pendeln/Fahrtkosten (Pendlerpauschale, Entfernungspauschale).
+Bei einem Thema, das NICHT davon handelt, ist das ein Fehlinterpretations-Risiko von 'hoch' - auch
+wenn die geplante Metapher (z.B. 'Umkehr = freiwillig') im Text noch so klar klingt. Solche Routen
+gehören bei der Botschaftsklarheit klar abgewertet, nicht mit einer cleveren Erklärung gerettet.
 
 Bewertungskriterien (Skala 1-10):
 
