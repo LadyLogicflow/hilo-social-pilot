@@ -334,6 +334,16 @@ Bei einem Thema, das NICHT davon handelt, ist das ein Fehlinterpretations-Risiko
 wenn die geplante Metapher (z.B. 'Umkehr = freiwillig') im Text noch so klar klingt. Solche Routen
 gehören bei der Botschaftsklarheit klar abgewertet, nicht mit einer cleveren Erklärung gerettet.
 
+BLIND SEMANTIC TEST (verbindlich - gegen den Curse-of-Knowledge-Effekt):
+Bewerte AUSSCHLIESSLICH, was ein unvorbereiteter Betrachter aus dem visuellen Konzept erkennen
+würde. Du kennst Thema, Route, Absicht und Metapher - der Facebook-Nutzer kennt NUR das Bild.
+Nutze die erklärte Intention (Route-Begründung, gewünschte Metapher) NIEMALS als Beweis dafür,
+dass diese Bedeutung sichtbar IST. Eine Bedeutung gilt nur dann als intuitiv, wenn sie aus den
+SICHTBAREN Elementen selbst entsteht. Beschreibe KEINE Elemente, Beziehungen oder Bedeutungen, die
+im Konzept gar nicht vorhanden sind (erfinde z.B. keine "Weggabelung", wenn nur eine Straße da ist).
+FAUSTREGEL: Wenn du einen ganzen Absatz brauchst, um zu "beweisen", dass eine Metapher intuitiv
+ist, ist sie es wahrscheinlich NICHT - dann Botschaftsklarheit niedrig.
+
 Bewertungskriterien (Skala 1-10):
 
 1. **Botschaftsklarheit (20%)**: Ist die Kernaussage klar und sofort verständlich?
