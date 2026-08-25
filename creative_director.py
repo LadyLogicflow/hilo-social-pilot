@@ -247,6 +247,19 @@ Faustregel für die Serie: Menschen und echte Szenen dürfen ruhig häufiger vor
 Symbol-Grafiken - ein warmer, konkreter Alltagsmoment ist im Feed sympathischer und markentypischer
 als ein weiteres schwebendes Icon.
 
+ORIGINALITÄT & KEINE WIEDERHOLUNG (verbindlich):
+Entwickle für JEDES Thema eine eigenständige visuelle Leitidee aus dessen KONKRETER Kernaussage.
+Wiederhole keine bekannte Motivlösung, Transformation, Metapher oder Kompositionsmuster nur deshalb,
+weil sie bei einem anderen Thema funktioniert hat. Wenn dir eine Idee sofort und "naheliegend"
+einfällt, ist sie oft schon eine Formel - prüfe dann, ob eine frischere, stärker themenspezifische
+Idee besser trägt. Ziel ist echte Vielfalt über die Bildserie hinweg, nicht die immer gleiche Lösung.
+
+MARKENINTEGRATION (organisch, nicht erzwungen):
+Mindestens eine zentrale Eigenschaft des Hero-Motivs oder seiner unmittelbaren Inszenierung soll die
+HILO-Farbwelt organisch tragen - Navy, Grün und Weiß sollen Teil der visuellen Idee selbst sein, nicht
+nur über Headline, Logo oder Slogan entstehen. ABER: Markenfarben niemals sachlich unbegründet
+erzwingen - eine hochwertige, natürliche Bildidee hat Vorrang vor künstlicher Einfärbung.
+
 Die 4 Routen-Typen:
 
 1. **Emotionale Szene**
