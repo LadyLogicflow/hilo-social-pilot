@@ -800,6 +800,20 @@ document.addEventListener('change',function(e){if(e.target&&e.target.name==='the
 {% endif %}
 </div>"""
 
+# Wiederverwendbares "Warum dieses Bild?"-Panel (Entwuerfe, Einplanung, Beitrag-Detail).
+# Erwartet die Kontext-/Loop-Variable e mit e.f.pipeline_info.
+_WARUM_PANEL = """{% if e.f.pipeline_info %}<details style="margin-top:4px"><summary style="cursor:pointer;color:#0B2545;font-weight:bold">&#x1F9E0; Warum dieses Bild?</summary>
+      <div style="font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 11px;margin-top:6px;line-height:1.55">
+        <b>Gew&auml;hlte Idee:</b> {{e.f.pipeline_info.route_typ}} &ndash; {{e.f.pipeline_info.route_titel}}<br>
+        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}{% if e.f.pipeline_info.message_angle %} &nbsp;&middot;&nbsp; <b>Nutzen-Angle:</b> {{e.f.pipeline_info.message_angle}}{% endif %}<br>
+        <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
+        {% if e.f.pipeline_info.bruecke %}<b>Semantik-Check:</b> spontan lesbar als &ndash; {{e.f.pipeline_info.spontane_bedeutung}} &middot; Br&uuml;cke zur Botschaft: <b>{{e.f.pipeline_info.bruecke}}</b> &middot; Fehldeutungs-Risiko: <b>{{e.f.pipeline_info.risiko}}</b>{% if e.f.pipeline_info.botschaftsklarheit is not none %} &middot; Botschaftsklarheit: {{e.f.pipeline_info.botschaftsklarheit}}/10{% endif %}<br>{% endif %}
+        <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }}){% if e.f.pipeline_info.versuche and e.f.pipeline_info.versuche > 1 %} &nbsp;&middot;&nbsp; <b>Auto-Retry:</b> {{e.f.pipeline_info.versuche}} Versuche{% endif %}<br>
+        <b>Focal Point:</b> {{e.f.pipeline_info.focal_point}}<br>
+        <b>Licht &amp; Farben:</b> {{e.f.pipeline_info.licht}}{% if e.f.pipeline_info.farben %} &middot; {{e.f.pipeline_info.farben}}{% endif %}
+        {% if e.f.pipeline_info.gemieden %}<br><b>Vielfalt &ndash; zuletzt gemiedene Kategorien:</b> {{ e.f.pipeline_info.gemieden|join(', ') }}{% endif %}
+      </div></details>{% endif %}"""
+
 EIGENER = """<!doctype html><meta charset=utf-8><title>Eigenen Beitrag erstellen</title>
 <style>""" + _TOP + """
 .card{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:22px}
@@ -848,17 +862,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
     <p><span class=cta>{{e.f.cta}}</span></p>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% endif %}
-    {% if e.f.pipeline_info %}<details style="margin-top:4px"><summary style="cursor:pointer;color:#0B2545;font-weight:bold">&#x1F9E0; Warum dieses Bild?</summary>
-      <div style="font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 11px;margin-top:6px;line-height:1.55">
-        <b>Gew&auml;hlte Idee:</b> {{e.f.pipeline_info.route_typ}} &ndash; {{e.f.pipeline_info.route_titel}}<br>
-        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}{% if e.f.pipeline_info.message_angle %} &nbsp;&middot;&nbsp; <b>Nutzen-Angle:</b> {{e.f.pipeline_info.message_angle}}{% endif %}<br>
-        <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
-        {% if e.f.pipeline_info.bruecke %}<b>Semantik-Check:</b> spontan lesbar als &ndash; {{e.f.pipeline_info.spontane_bedeutung}} &middot; Br&uuml;cke zur Botschaft: <b>{{e.f.pipeline_info.bruecke}}</b> &middot; Fehldeutungs-Risiko: <b>{{e.f.pipeline_info.risiko}}</b>{% if e.f.pipeline_info.botschaftsklarheit is not none %} &middot; Botschaftsklarheit: {{e.f.pipeline_info.botschaftsklarheit}}/10{% endif %}<br>{% endif %}
-        <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }}){% if e.f.pipeline_info.versuche and e.f.pipeline_info.versuche > 1 %} &nbsp;&middot;&nbsp; <b>Auto-Retry:</b> {{e.f.pipeline_info.versuche}} Versuche{% endif %}<br>
-        <b>Focal Point:</b> {{e.f.pipeline_info.focal_point}}<br>
-        <b>Licht &amp; Farben:</b> {{e.f.pipeline_info.licht}}{% if e.f.pipeline_info.farben %} &middot; {{e.f.pipeline_info.farben}}{% endif %}
-        {% if e.f.pipeline_info.gemieden %}<br><b>Vielfalt &ndash; zuletzt gemiedene Kategorien:</b> {{ e.f.pipeline_info.gemieden|join(', ') }}{% endif %}
-      </div></details>{% endif %}
+    """ + _WARUM_PANEL + """
     <form method=post action="/aktion/{{e.id}}" id="feedback-form-{{e.id}}">
       {% if not e.f.caption %}<button name=aktion value=caption_erstellen>📝 Caption erstellen</button>{% endif %}
       <textarea name=feedback placeholder="Änderungswunsch (z.B. 'Bild freundlicher') &ndash; dann 'Überarbeiten'"></textarea>
@@ -930,6 +934,7 @@ button{border:0;background:#4D7C0F;color:#fff;cursor:pointer}
       <input name=feedback placeholder="Was am Text stört (z.B. „kürzer", „weniger werblich")" style="padding:6px;width:330px;border:1px solid #ccd3df;border-radius:6px">
       <button style="background:#0B2545;padding:6px 10px" title="Nur den Text mit Ihrem Hinweis überarbeiten; Bild wird an den neuen Text angepasst (Text-KI, Bild kostenlos)">&#x270E; Text überarbeiten</button></form>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
+    """ + _WARUM_PANEL + """
     <p><a href="/beitrag/{{e.id}}" style="color:#0B2545;font-weight:bold;text-decoration:none">&#x1F50D; Beitrag ansehen &amp; für WhatsApp &rarr;</a></p>
     <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:4px 0 10px" onsubmit="return confirm('Diesen zeitlosen Beitrag in den Zufalls-Pool aufnehmen?\n\nEr wird dann automatisch ausgespielt – je Beratungsstelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal. Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
       <button style="background:#4D7C0F" title="Zeitlosen Beitrag in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool (alle Stellen, automatisch)</button>
@@ -998,6 +1003,7 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
     <p class=meta>Im Topf seit {{e.freigegeben_de}} · bereits ausgespielt: <b>{{e.bespielt}}</b> von {{slots}} möglichen ({{n_stellen}} Stellen × {{n_kanaele}} Kanäle)</p>
     {% if e.f.caption %}<details><summary>Begleittext anzeigen</summary><p>{{e.f.caption}}</p></details>{% else %}<form method=post action="/aktion/{{e.id}}" style="margin:6px 0"><button name=aktion value=caption_erstellen style="background:#4a8c5c;padding:6px 10px">📝 Caption erstellen</button></form>{% endif %}
+    """ + _WARUM_PANEL + """
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
     <details style="margin-top:8px">
@@ -1143,6 +1149,7 @@ BEITRAG = """<!doctype html><meta charset=utf-8><title>Beitrag-Detail</title><st
 <p class=meta>{{e.f.subline}}</p>
 <p><b style="color:#0B2545">&#x1F4C5; Geplant: {{e.geplant_de}}</b> &middot; <span class=hint>Einzelbild &middot; Status: {{status}}</span></p>
 <div class=single><img src="/bild/{{e.id}}" alt="Beitragsbild"></div>
+""" + _WARUM_PANEL + """
 <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
 <p><b>Aufruf:</b> {{e.f.cta}}</p>
 {% if status in ('entwurf','freigegeben') %}
@@ -2094,6 +2101,11 @@ def beitrag_neu(eid):
             data["qa_approved"] = result.approved
             data["qa_problems"] = [] if result.approved else [result.qa_verdict.schwaechen]
             data["alt_text"] = result.production_brief.alt_text or ""
+            try:
+                data["pipeline_info"] = result.to_panel_info()
+                data["sharenext_state"] = result.to_state()
+            except Exception:
+                pass
             out = final_path
     except Exception as ex:
         flash("Neu-Erzeugung fehlgeschlagen: %s" % ex)
@@ -2393,45 +2405,13 @@ def _sharenext_bild_synchron(data, eid):
         size="1024x1024",
         quality="medium",
     )
-    # "Warum dieses Bild?" - Entscheidungen der Pipeline fuer die Dashboard-Anzeige festhalten.
+    # "Warum dieses Bild?"-Panel-Daten + Gewinner-Idee (fuer "Idee behalten") zentral aus dem
+    # Result uebernehmen - dieselbe Quelle wie alle anderen Erzeugungs-Wege.
     try:
-        wr = result.winning_route
-        cv = result.concept_verdict
-        we = getattr(cv, f"evaluation_{cv.winning_route}", None)  # Bewertung der Gewinner-Route
-        data["pipeline_info"] = {
-            "route_typ": getattr(wr, "typ", ""),
-            "route_titel": getattr(wr, "titel", ""),
-            "hero_kurz": getattr(wr, "hero_kurz", ""),
-            "semantic_environment": getattr(wr, "semantic_environment", ""),
-            "message_angle": getattr(wr, "message_angle", ""),
-            "score": round(cv.winning_score, 1),
-            "begruendung": cv.begruendung,
-            "spontane_bedeutung": getattr(we, "spontane_bedeutung", "") if we else "",
-            "bruecke": getattr(we, "kernbotschaft_bruecke", "") if we else "",
-            "risiko": getattr(we, "fehlinterpretations_risiko", "") if we else "",
-            "botschaftsklarheit": round(getattr(we, "botschaftsklarheit", 0.0), 1) if we else None,
-            "focal_point": result.art_board.focal_point,
-            "licht": result.art_board.licht_stimmung,
-            "farben": ", ".join(result.art_board.dominante_farben),
-            "qa_score": round(result.qa_verdict.gesamtscore, 1),
-            "concept_fidelity": round(getattr(result.qa_verdict, "concept_fidelity", 0.0), 1),
-            "freigegeben": bool(result.approved),
-            "gemieden": list(getattr(result, "recent_heroes", []) or []),
-        }
+        data["pipeline_info"] = result.to_panel_info()
+        data["sharenext_state"] = result.to_state()
     except Exception as _e:
-        log.debug("pipeline_info konnte nicht erfasst werden: %s", _e)
-
-    # Gewinner-IDEE serialisiert ablegen, damit "Nur Umsetzung neu (Idee behalten)" spaeter
-    # NUR das Bild neu rendern kann, ohne die Route/Art-Direction neu zu wuerfeln.
-    try:
-        data["sharenext_state"] = {
-            "brief": result.message_brief.model_dump(),
-            "route": result.winning_route.model_dump(),
-            "art_board": result.art_board.model_dump(),
-            "headline": headline,
-        }
-    except Exception as _e:
-        log.debug("sharenext_state konnte nicht gespeichert werden: %s", _e)
+        log.debug("Panel-Daten konnten nicht erfasst werden: %s", _e)
 
     # Gleiches Pfad-Schema wie die uebrige ShareNext-Pipeline (regenerate_images.py, textgen.py):
     # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.

@@ -708,6 +708,13 @@ def _create_drafts(rows, kanal):
                         # render_fuer_stelle() liest aus dem JSON, nicht aus der DB Spalte!
                         data["bild_pfad"] = bild_pfad
                         data["alt_text"] = result.production_brief.alt_text or ""
+                        # "Warum dieses Bild?"-Panel-Daten + Gewinner-Idee auch bei der (taeglichen)
+                        # Auto-Erzeugung festhalten.
+                        try:
+                            data["pipeline_info"] = result.to_panel_info()
+                            data["sharenext_state"] = result.to_state()
+                        except Exception:
+                            pass
                         conn.execute("UPDATE entwuerfe SET bild_pfad=?, text=? WHERE id=?",
                                    (bild_pfad, json.dumps(data, ensure_ascii=False), entwurf_id))
                         log.info("✓ ShareNext Bild generiert: %s", bild_pfad)

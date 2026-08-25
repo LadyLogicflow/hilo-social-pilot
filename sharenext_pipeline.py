@@ -59,12 +59,14 @@ class ShareNextResult:
         # Output
         image: Image.Image,
         approved: bool,
-        recent_heroes: "list[str] | None" = None
+        recent_heroes: "list[str] | None" = None,
+        headline: str = ""
     ):
         self.stream = stream
         self.thema = thema
         self.text = text
         self.kanal = kanal
+        self.headline = headline
         self.recent_heroes = list(recent_heroes or [])  # Kategorien, die die Jury gemieden hat
 
         self.message_brief = message_brief
@@ -88,6 +90,46 @@ class ShareNextResult:
             5: self.creative_territories.route_5_unkonventionell,
         }
         return route_map[self.concept_verdict.winning_route]
+
+    def to_panel_info(self, versuche: int = 1) -> dict:
+        """Baut die 'Warum dieses Bild?'-Panel-Daten fuer die Dashboard-Anzeige aus dem Result.
+        Zentrale Quelle - von allen Erzeugungs-Wegen genutzt (Nur Foto neu, Neu erzeugen, taeglich)."""
+        wr = self.winning_route
+        cv = self.concept_verdict
+        we = getattr(cv, f"evaluation_{cv.winning_route}", None)
+        ab = self.art_board
+        info = {
+            "route_typ": getattr(wr, "typ", ""),
+            "route_titel": getattr(wr, "titel", ""),
+            "hero_kurz": getattr(wr, "hero_kurz", ""),
+            "semantic_environment": getattr(wr, "semantic_environment", ""),
+            "message_angle": getattr(wr, "message_angle", ""),
+            "score": round(cv.winning_score, 1),
+            "begruendung": cv.begruendung,
+            "spontane_bedeutung": getattr(we, "spontane_bedeutung", "") if we else "",
+            "bruecke": getattr(we, "kernbotschaft_bruecke", "") if we else "",
+            "risiko": getattr(we, "fehlinterpretations_risiko", "") if we else "",
+            "botschaftsklarheit": round(getattr(we, "botschaftsklarheit", 0.0), 1) if we else None,
+            "focal_point": ab.focal_point,
+            "licht": ab.licht_stimmung,
+            "farben": ", ".join(ab.dominante_farben),
+            "qa_score": round(self.qa_verdict.gesamtscore, 1),
+            "concept_fidelity": round(getattr(self.qa_verdict, "concept_fidelity", 0.0), 1),
+            "freigegeben": bool(self.approved),
+            "gemieden": list(self.recent_heroes or []),
+        }
+        if versuche and versuche > 1:
+            info["versuche"] = versuche
+        return info
+
+    def to_state(self) -> dict:
+        """Serialisiert die Gewinner-Idee (fuer 'Nur Umsetzung neu / Idee behalten')."""
+        return {
+            "brief": self.message_brief.model_dump(),
+            "route": self.winning_route.model_dump(),
+            "art_board": self.art_board.model_dump(),
+            "headline": self.headline,
+        }
 
     def __repr__(self):
         status = "✓ APPROVED" if self.approved else "⚠ NEEDS REVIEW"
@@ -270,7 +312,8 @@ def run_sharenext_pipeline(
         qa_verdict=qa_verdict,
         image=image,
         approved=qa_verdict.freigegeben,
-        recent_heroes=recent_heroes
+        recent_heroes=recent_heroes,
+        headline=headline
     )
 
     log.info(f"🎉 ShareNext Pipeline COMPLETE!")
