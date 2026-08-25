@@ -851,8 +851,9 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     {% if e.f.pipeline_info %}<details style="margin-top:4px"><summary style="cursor:pointer;color:#0B2545;font-weight:bold">&#x1F9E0; Warum dieses Bild?</summary>
       <div style="font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 11px;margin-top:6px;line-height:1.55">
         <b>Gew&auml;hlte Idee:</b> {{e.f.pipeline_info.route_typ}} &ndash; {{e.f.pipeline_info.route_titel}}<br>
-        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}<br>
+        <b>Motiv-Kategorie:</b> {{e.f.pipeline_info.hero_kurz}}{% if e.f.pipeline_info.semantic_environment %} &nbsp;&middot;&nbsp; <b>Bedeutungswelt:</b> {{e.f.pipeline_info.semantic_environment}}{% endif %}<br>
         <b>Warum gew&auml;hlt:</b> {{e.f.pipeline_info.begruendung}}<br>
+        {% if e.f.pipeline_info.bruecke %}<b>Semantik-Check:</b> spontan lesbar als &ndash; {{e.f.pipeline_info.spontane_bedeutung}} &middot; Br&uuml;cke zur Botschaft: <b>{{e.f.pipeline_info.bruecke}}</b> &middot; Fehldeutungs-Risiko: <b>{{e.f.pipeline_info.risiko}}</b>{% if e.f.pipeline_info.botschaftsklarheit is not none %} &middot; Botschaftsklarheit: {{e.f.pipeline_info.botschaftsklarheit}}/10{% endif %}<br>{% endif %}
         <b>Jury-Score:</b> {{e.f.pipeline_info.score}}/10 &nbsp;&middot;&nbsp; <b>Bild-QA:</b> {{e.f.pipeline_info.qa_score}}/10 ({{ 'freigegeben' if e.f.pipeline_info.freigegeben else 'Review empfohlen' }})<br>
         <b>Focal Point:</b> {{e.f.pipeline_info.focal_point}}<br>
         <b>Licht &amp; Farben:</b> {{e.f.pipeline_info.licht}}{% if e.f.pipeline_info.farben %} &middot; {{e.f.pipeline_info.farben}}{% endif %}
@@ -2395,12 +2396,19 @@ def _sharenext_bild_synchron(data, eid):
     # "Warum dieses Bild?" - Entscheidungen der Pipeline fuer die Dashboard-Anzeige festhalten.
     try:
         wr = result.winning_route
+        cv = result.concept_verdict
+        we = getattr(cv, f"evaluation_{cv.winning_route}", None)  # Bewertung der Gewinner-Route
         data["pipeline_info"] = {
             "route_typ": getattr(wr, "typ", ""),
             "route_titel": getattr(wr, "titel", ""),
             "hero_kurz": getattr(wr, "hero_kurz", ""),
-            "score": round(result.concept_verdict.winning_score, 1),
-            "begruendung": result.concept_verdict.begruendung,
+            "semantic_environment": getattr(wr, "semantic_environment", ""),
+            "score": round(cv.winning_score, 1),
+            "begruendung": cv.begruendung,
+            "spontane_bedeutung": getattr(we, "spontane_bedeutung", "") if we else "",
+            "bruecke": getattr(we, "kernbotschaft_bruecke", "") if we else "",
+            "risiko": getattr(we, "fehlinterpretations_risiko", "") if we else "",
+            "botschaftsklarheit": round(getattr(we, "botschaftsklarheit", 0.0), 1) if we else None,
             "focal_point": result.art_board.focal_point,
             "licht": result.art_board.licht_stimmung,
             "farben": ", ".join(result.art_board.dominante_farben),
@@ -2482,8 +2490,14 @@ def _sharenext_rerender_synchron(data, eid):
         "route_typ": getattr(route, "typ", ""),
         "route_titel": getattr(route, "titel", ""),
         "hero_kurz": getattr(route, "hero_kurz", ""),
+        "semantic_environment": getattr(route, "semantic_environment", "") or alt.get("semantic_environment", ""),
         "score": alt.get("score"),
         "begruendung": alt.get("begruendung"),
+        # Idee/Jury unveraendert -> Pruef-Werte aus dem vorigen Lauf uebernehmen
+        "spontane_bedeutung": alt.get("spontane_bedeutung", ""),
+        "bruecke": alt.get("bruecke", ""),
+        "risiko": alt.get("risiko", ""),
+        "botschaftsklarheit": alt.get("botschaftsklarheit"),
         "focal_point": art_board.focal_point,
         "licht": art_board.licht_stimmung,
         "farben": ", ".join(art_board.dominante_farben),
