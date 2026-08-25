@@ -266,7 +266,8 @@ def evaluate_routes(
     brief: MessageBrief,
     territories: CreativeTerritories,
     model: str = "gpt-5-nano",
-    recent_heroes: "list[str] | None" = None
+    recent_heroes: "list[str] | None" = None,
+    recent_environments: "list[str] | None" = None
 ) -> ConceptJuryVerdict:
     """Bewertet 5 kreative Routen und wählt die beste aus.
 
@@ -343,6 +344,16 @@ SICHTBAREN Elementen selbst entsteht. Beschreibe KEINE Elemente, Beziehungen ode
 im Konzept gar nicht vorhanden sind (erfinde z.B. keine "Weggabelung", wenn nur eine Straße da ist).
 FAUSTREGEL: Wenn du einen ganzen Absatz brauchst, um zu "beweisen", dass eine Metapher intuitiv
 ist, ist sie es wahrscheinlich NICHT - dann Botschaftsklarheit niedrig.
+
+VISUAL ≠ MESSAGE CLARITY (verbindlich):
+Bewerte diese beiden GETRENNT und verwechsle sie nicht:
+- VISUAL CLARITY: Ist der visuelle Hook sofort erkennbar/auffällig? -> fließt in Scroll-Stop-Potenzial.
+- MESSAGE CLARITY: Ist die BEABSICHTIGTE Bedeutung ebenso unmittelbar erkennbar? -> fließt in
+  Botschaftsklarheit.
+Ein auffälliges, ungewöhnliches oder leicht erkennbares Motiv ist NICHT automatisch semantisch klar.
+Ein hoher Scroll-Stop rechtfertigt KEINE hohe Botschaftsklarheit - leite die Botschaftsklarheit NIE
+aus der visuellen Auffälligkeit ab. Werte nur Bedeutungen, die aus dem sichtbaren Konzept selbst
+entstehen; die Routenbezeichnung oder Konzeptbegründung darf fehlende Bildsemantik nicht ersetzen.
 
 Bewertungskriterien (Skala 1-10):
 
@@ -461,6 +472,7 @@ Wichtig:
         f"Beispiel: {route.beispiel_szene}\n"
         f"Scroll-Stop-Device: {route.scroll_stop_device}\n"
         f"Hero-Kategorie: {route.hero_kurz}\n"
+        f"Bedeutungswelt: {route.semantic_environment}\n"
         f"Headline-Abhängigkeit: {route.headline_dependency}"
         for name, route in routes
     ])
@@ -468,17 +480,25 @@ Wichtig:
     # Serien-Vielfalt: zuletzt genutzte Hero-Kategorien (aus der Creative Memory) - dienen
     # ausschliesslich der Novelty-Abwertung in der Jury, werden NICHT dem Creative Director gezeigt.
     recent_heroes = [h for h in (recent_heroes or []) if h and h.strip()]
-    if recent_heroes:
-        novelty_block = (
-            "\n\n**SERIEN-VIELFALT (Novelty-Prüfung):**\n"
-            "Diese Hero-Kategorien wurden in den ZULETZT veröffentlichten Bildern der Serie schon "
-            "verwendet (neueste zuletzt):\n- " + "\n- ".join(recent_heroes) + "\n"
+    recent_environments = [e for e in (recent_environments or []) if e and e.strip()]
+    if recent_heroes or recent_environments:
+        teile = ["\n\n**SERIEN-VIELFALT (Novelty-Prüfung):**"]
+        if recent_heroes:
+            teile.append("Zuletzt verwendete Hero-Kategorien (neueste zuletzt):\n- "
+                         + "\n- ".join(recent_heroes))
+        if recent_environments:
+            teile.append("Zuletzt verwendete Bedeutungswelten/Umfelder (neueste zuletzt):\n- "
+                         + "\n- ".join(recent_environments))
+        teile.append(
             "Werte eine Route bei Originalität UND Scroll-Stop-Potenzial DEUTLICH ab (etwa 2-3 Punkte), "
-            "wenn ihre Hero-Kategorie einer davon entspricht oder sehr ähnlich ist (gleiche Grundart/"
-            "gleiches Material, z.B. schon wieder ein Papierdokument). Ziel ist echte Abwechslung über "
-            "die Serie - eine frische, andersartige Grundidee soll gewinnen. Eine inhaltlich klar "
-            "bessere Route darf trotzdem gewinnen; die Abwertung greift bei annähernd gleichwertigen."
+            "wenn ihre Hero-Kategorie ODER ihre Bedeutungswelt einer der obigen entspricht oder sehr "
+            "ähnlich ist. WICHTIG: Die Bedeutungswelt zählt besonders - mehrere technisch verschiedene "
+            "Motive aus DERSELBEN Welt (z.B. Fahrrad, Bahnhof, Auto, Straße = alles 'Pendeln/Mobilität') "
+            "sind KEINE echte Abwechslung, sondern Wiederholung. Ziel ist Vielfalt auch auf Bedeutungs"
+            "ebene. Eine inhaltlich klar bessere Route darf trotzdem gewinnen; die Abwertung greift bei "
+            "annähernd gleichwertigen."
         )
+        novelty_block = "\n".join(teile)
     else:
         novelty_block = ""
 

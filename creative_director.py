@@ -102,6 +102,16 @@ class CreativeRoute(BaseModel):
                     "Grundart in der Serie zu oft vorkommt."
     )
 
+    semantic_environment: str = Field(
+        max_length=40,
+        description="Die uebergeordnete BEDEUTUNGSWELT/das Umfeld des Motivs in 1-3 Woertern, fuer die "
+                    "Serien-Vielfalt auf Bedeutungsebene. Abstrakter als hero_kurz: z.B. 'Pendeln/"
+                    "Mobilitaet' (Fahrrad, Auto, Strasse, Bahnhof, Bahnsteig zaehlen ALLE hierzu), "
+                    "'Dokument/Formular', 'Zeit', 'Geld/Erstattung', 'Zuhause/Familie', 'Buero'. So "
+                    "erkennt das System, wenn die Serie zwar unterschiedliche Motive, aber staendig "
+                    "dieselbe Bedeutungswelt zeigt (z.B. immer wieder Verkehr/Pendeln)."
+    )
+
     headline_dependency: Literal["low", "medium", "high"] = Field(
         description="Wie sehr braucht diese Route die Überschrift, um verstanden zu werden? "
                     "'low' = die visuelle Idee funktioniert bereits für sich allein, ganz ohne Text "
@@ -399,6 +409,8 @@ Jede Route braucht:
 - Headline-Abhängigkeit (low/medium/high - funktioniert die Idee auch ganz ohne Überschrift?)
 - Hero-Kurz (2-4 Wörter Kategorie des Hero-Motivs, für die Serien-Vielfalt - Grundart + Material,
   nicht die konkrete Idee)
+- Semantic-Environment (1-3 Wörter übergeordnete Bedeutungswelt, z.B. Pendeln/Mobilität,
+  Dokument/Formular, Zeit, Geld/Erstattung)
 """
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")

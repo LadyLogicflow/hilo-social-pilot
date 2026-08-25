@@ -2455,7 +2455,11 @@ def _sharenext_rerender_synchron(data, eid):
     from visual_qa import check_raw_image
 
     brief = MessageBrief.model_validate(state["brief"])
-    route = CreativeRoute.model_validate(state["route"])
+    # aeltere gespeicherte Zustaende kennen semantic_environment noch nicht -> Default ergaenzen,
+    # damit die Rekonstruktion (Pflichtfeld) nicht scheitert.
+    _route_data = dict(state.get("route") or {})
+    _route_data.setdefault("semantic_environment", "")
+    route = CreativeRoute.model_validate(_route_data)
     art_board = ArtDirectionBoard.model_validate(state["art_board"])
     headline = state.get("headline") or data.get("ueberschrift", "")
 

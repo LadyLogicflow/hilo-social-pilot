@@ -26,7 +26,7 @@ from message_brief import MessageBrief, generate_message_brief, generate_headlin
 from creative_director import CreativeTerritories, generate_creative_routes
 from concept_jury import ConceptJuryVerdict, evaluate_routes
 from art_director import ArtDirectionBoard, create_art_direction_board
-from creative_memory import load_recent_heroes, remember_hero
+from creative_memory import load_recent_heroes, load_recent_environments, remember
 from image_producer import ImageProductionBrief, produce_image
 from visual_qa import VisualQAVerdict, check_raw_image
 
@@ -182,9 +182,15 @@ def run_sharenext_pipeline(
     # Serien-Vielfalt: zuletzt genutzte Hero-Kategorien laden und der Jury (NICHT dem Creative
     # Director) fuer die Novelty-Abwertung mitgeben.
     recent_heroes = load_recent_heroes()
+    recent_environments = load_recent_environments()
     if recent_heroes:
-        log.info(f"   ℹ Creative Memory (zuletzt): {', '.join(recent_heroes)}")
-    concept_verdict = evaluate_routes(message_brief, creative_territories, recent_heroes=recent_heroes)
+        log.info(f"   ℹ Creative Memory Motive (zuletzt): {', '.join(recent_heroes)}")
+    if recent_environments:
+        log.info(f"   ℹ Creative Memory Bedeutungswelten (zuletzt): {', '.join(recent_environments)}")
+    concept_verdict = evaluate_routes(
+        message_brief, creative_territories,
+        recent_heroes=recent_heroes, recent_environments=recent_environments
+    )
     log.info(f"   ✓ Gewinner: Route {concept_verdict.winning_route} - {concept_verdict.winning_titel}")
     log.info(f"   Score: {concept_verdict.winning_score:.1f}/10")
 
@@ -198,10 +204,13 @@ def run_sharenext_pipeline(
     }
     winning_route = route_map[concept_verdict.winning_route]
 
-    # Gewinner-Hero-Kategorie in die Creative Memory schreiben (steuert die naechste Novelty-Pruefung).
+    # Gewinner-Hero-Kategorie + Bedeutungswelt in die Creative Memory schreiben (steuert die naechste
+    # Novelty-Pruefung - auch auf Bedeutungsebene, nicht nur beim konkreten Motiv).
     try:
-        remember_hero(getattr(winning_route, "hero_kurz", ""))
-        log.info(f"   ✓ Creative Memory aktualisiert: {getattr(winning_route, 'hero_kurz', '')}")
+        _hero = getattr(winning_route, "hero_kurz", "")
+        _env = getattr(winning_route, "semantic_environment", "")
+        remember(_hero, _env)
+        log.info(f"   ✓ Creative Memory aktualisiert: Motiv='{_hero}', Bedeutungswelt='{_env}'")
     except Exception as e:
         log.warning(f"   Creative Memory-Update uebersprungen: {e}")
 

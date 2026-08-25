@@ -631,7 +631,8 @@ if __name__ == "__main__":
         visuelle_signatur="Dramatisches Licht von links, Rot-Kontrast",
         emotionale_richtung="Dringlichkeit",
         beispiel_szene="Sanduhr groß im Vordergrund, fast leer",
-        hero_kurz="Zeit-Objekt"
+        hero_kurz="Zeit-Objekt",
+        semantic_environment="Zeit"
     )
 
     # Test Art Board
