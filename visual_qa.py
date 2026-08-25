@@ -12,6 +12,7 @@ Prüft:
 - Textzonen nutzbar?
 - Markenpassung?
 - Technische Qualität?
+- Concept Fidelity (ist die geplante Idee im Bild sichtbar umgesetzt?)
 
 Teil von Issue #6: ShareNext MVP
 """
@@ -85,6 +86,15 @@ class VisualQAVerdict(BaseModel):
                     "(wirkt wie ein Werbe-Template ueber ein beliebiges Foto gelegt) ODER Schrift "
                     "unruhig/schlecht lesbar ohne Bezug zum Motiv."
     )
+    concept_fidelity: float = Field(
+        ge=1.0, le=10.0, default=5.0,
+        description="Hat das TATSAECHLICH erzeugte Bild die zentrale Mechanik der geplanten Idee "
+                    "(die 'Erwartungen' im User-Prompt: Route, Focal Point, Scroll-Stop-Device) "
+                    "SICHTBAR umgesetzt? Bewerte NUR, was im Bild wirklich zu sehen ist - nicht, was "
+                    "Art Direction oder Prompt beabsichtigt haben. Fehlt die zentrale Transformation/"
+                    "Handlung/semantische Mechanik oder ist sie nur schwach angedeutet, ist dieser "
+                    "Score niedrig (1-5), auch wenn das Bild handwerklich schoen ist."
+    )
 
     # ─────────────────────────────────────────────────────────────────────────
     # ÜBERSCHRIFT (nur relevant, wenn eine Überschrift ins Bild gerendert wurde)
@@ -149,6 +159,7 @@ _QA_KRITERIEN = (
     "schutzzonen_frei",
     "scroll_stop_wirkung",
     "composition_integrity",
+    "concept_fidelity",
 )
 
 # Zusaetzliche Kriterien, die nur zaehlen, wenn eine Überschrift ins Bild gerendert wurde
@@ -306,7 +317,22 @@ GATE A CHECKS (vor Text-Rendering):
      Werbe-Template über ein beliebiges Foto gelegt) ODER gar keine erkennbare Verzahnung
      zwischen Schrift und Motiv.
 
-9. **Überschrift (nur wenn im User-Prompt eine Überschrift vorgegeben ist!)**
+9. **Concept Fidelity? (1-10) - prüft Umsetzung gegen Absicht**
+   - Hat das TATSÄCHLICH erzeugte Bild die zentrale Mechanik der geplanten Idee (siehe
+     "Erwartungen" im User-Prompt: Route, Focal Point, Scroll-Stop-Device) SICHTBAR umgesetzt?
+   - Bewerte NUR das Sichtbare, nicht die Absicht. Beispiel: Wenn geplant war "Papier rollt sich
+     zurück / Zeit läuft rückwärts", im Bild aber nur "eine Rolle mit aufgedruckten Zahlen" zu
+     sehen ist (ohne erkennbare Rückwärts-/Rückspul-Mechanik), dann ist die zentrale Idee NICHT
+     umgesetzt.
+   - 9-10: die entscheidende Transformation/Handlung/Mechanik ist klar und eindeutig sichtbar.
+   - 5-6: angedeutet, aber nicht überzeugend umgesetzt.
+   - 1-4: die zentrale Mechanik fehlt; das Bild zeigt etwas Vageres/anderes als geplant.
+   - REGEL: "Leitidee erkennbar" (1) und "Scroll-Stop-Wirkung" (7) dürfen NICHT höher sein als die
+     Concept Fidelity - alle drei bewerten das SICHTBARE Ergebnis, nicht die geplante Idee. Eine
+     gute Idee, die das Bild nicht sichtbar umsetzt, ist IM BILD keine gute Idee. Begründe die
+     Creative-Qualität also nie mit der Absicht der Art Direction, sondern nur mit dem, was da ist.
+
+10. **Überschrift (nur wenn im User-Prompt eine Überschrift vorgegeben ist!)**
    - headline_vorhanden (1-10): Ist die Überschrift im Bild sichtbar und prominent?
    - headline_lesbar (1-10): Auf dem Smartphone gut lesbar? Groß genug, genug Kontrast,
      nicht vom Motiv überlagert oder angeschnitten? Die Schrift soll DIREKT auf dem Bild stehen -
@@ -358,7 +384,9 @@ berechnet - du musst nicht rechnen.
 - Route: {route.typ} - {route.titel}
 - Gewünschte Emotion: {art_board.emotionaler_moment}
 
-**Erwartungen:**
+**Erwartungen (die GEPLANTE Idee - fuer die Concept-Fidelity-Pruefung):**
+- Geplante Leitidee/Mechanik: {route.beschreibung}
+- Geplantes Scroll-Stop-Device: {route.scroll_stop_device}
 - Focal Point: {art_board.focal_point} ({art_board.focal_point_position})
 - Negativraum: {art_board.negativraum_text}
 - Atmosphäre: {art_board.atmosphaere}
@@ -372,6 +400,7 @@ Bewerte (1-10):
 6. Schutzzonen unten links + oben rechts frei (je ca. 22% × 28%)?
 7. Scroll-Stop-Wirkung (Thumbnail-Test: sofort verständlich/dominant auch bei ca. 180×180px; Farbe/Größe allein zählt nicht, die IDEE muss auffallen)?
 8. Composition Integrity (wirkt Text+Motiv wie EINE Gestaltung, oder wie 'Foto + Textkasten + Logo'?)
+9. Concept Fidelity (ist die zentrale MECHANIK der geplanten Idee oben im Bild WIRKLICH sichtbar umgesetzt? Nur das Sichtbare zählt, nicht die Absicht; Leitidee und Scroll-Stop nicht höher als dieser Wert)
 
 {headline_block}
 
