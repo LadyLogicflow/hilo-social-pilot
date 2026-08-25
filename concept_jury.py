@@ -76,20 +76,21 @@ class RouteEvaluation(BaseModel):
                     "naheliegendste Assoziation eines normalen Betrachters? Ehrlich, nicht die "
                     "gewünschte Wunsch-Deutung."
     )
-    kernbotschaft_bruecke: str = Field(
-        description="Führt diese spontane Bedeutung von selbst zur Kernaussage des Posts? Beschreibe "
-                    "den gedanklichen Weg. Wenn dafür eine konstruierte Erklärung nötig ist (die ein "
-                    "normaler Betrachter nie hätte), sag das klar - dann trägt die Idee NICHT."
+    kernbotschaft_bruecke: Literal["direkt", "teilweise", "nein"] = Field(
+        description="Führt die spontane_bedeutung DIREKT zur Kernaussage des Posts? 'direkt' = ohne "
+                    "gedanklichen Umweg. 'teilweise' = die Verbindung ist da, aber man muss einen "
+                    "Schritt selbst ergänzen. 'nein' = es braucht eine konstruierte Erklärung, die ein "
+                    "normaler Betrachter nie hätte. Eine erst nachträglich erklärbare Metapher ist "
+                    "NICHT 'direkt'."
     )
     fehlinterpretations_risiko: Literal["niedrig", "mittel", "hoch"] = Field(
         description="Wie hoch ist das Risiko, dass das Motiv spontan ETWAS ANDERES bedeutet als die "
-                    "Kernaussage (besonders ein anderes, themennah plausibles Steuer-/Finanzthema)? "
-                    "'hoch', wenn die gewünschte Bedeutung nur mit Erklärung entsteht. "
-                    "ZWINGEND 'hoch': Ein Verkehrs-/Mobilitäts-/Pendel-Setting (Fahrrad, Auto, Straße, "
-                    "Zebrastreifen, Bahnsteig, pendelnde Person o.ä.) bei einem Thema, das NICHT von "
-                    "Pendeln/Fahrtkosten handelt - solche Motive aktivieren beim schnellen Blick sofort "
-                    "Pendlerpauschale/Entfernungspauschale/Fahrtkosten statt der eigentlichen Aussage. "
-                    "Redet euch das NICHT als 'gering' schön, egal wie schön die Metapher klingt."
+                    "Kernaussage? 'hoch', wenn eine andere naheliegende Deutung mindestens ebenso "
+                    "plausibel ist wie die gewünschte - INSBESONDERE, wenn die Bildwelt eine starke, "
+                    "allgemein bekannte oder fachlich naheliegende Bedeutung aktiviert, die nicht zur "
+                    "Kernaussage gehört (z.B. ein Umfeld, das im Steuer-/Finanzkontext sofort ein "
+                    "ANDERES Thema auslöst). Nicht als 'gering' schönreden, egal wie clever die "
+                    "geplante Metapher klingt."
     )
 
     # Bewertungen (Skala 1-10)
@@ -213,6 +214,22 @@ def _empfehlung_fuer(score: float) -> str:
     return "Nicht empfohlen"
 
 
+def _botschaftsklarheit_cap(evaluation: "RouteEvaluation") -> float:
+    """Harter Deckel fuer die Botschaftsklarheit, abgeleitet aus den strukturierten Pruef-Feldern
+    (Semantik-Check). Verhindert, dass ein starker Hook fehlende Bildsemantik ueberdeckt:
+    - Bruecke 'nein'  ODER Risiko 'hoch'   -> max 4
+    - Bruecke 'teilweise' ODER Risiko 'mittel' -> max 6
+    - Bruecke 'direkt' UND Risiko 'niedrig'    -> 10 (kein Deckel)
+    """
+    bruecke = getattr(evaluation, "kernbotschaft_bruecke", "direkt")
+    risiko = getattr(evaluation, "fehlinterpretations_risiko", "niedrig")
+    if bruecke == "nein" or risiko == "hoch":
+        return 4.0
+    if bruecke == "teilweise" or risiko == "mittel":
+        return 6.0
+    return 10.0
+
+
 def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
     """Rechnet Scores nach und bestimmt den Gewinner CODE-seitig.
 
@@ -228,6 +245,13 @@ def _recompute_verdict(verdict: "ConceptJuryVerdict") -> None:
         4: verdict.evaluation_4,
         5: verdict.evaluation_5,
     }
+
+    # HARTES SEMANTIK-GATE: Botschaftsklarheit code-seitig deckeln, damit die Jury ihre eigene
+    # Bruecken-/Risiko-Einschaetzung NICHT durch einen hohen Message-Score ueberstimmen kann.
+    for evaluation in evaluations.values():
+        cap = _botschaftsklarheit_cap(evaluation)
+        if evaluation.botschaftsklarheit > cap:
+            evaluation.botschaftsklarheit = cap
 
     # Einzelscores + Empfehlungen neu berechnen
     for evaluation in evaluations.values():
@@ -322,50 +346,38 @@ Kontext:
   maßgeblich für das Kriterium "Zielgruppenrelevanz", nicht eine pauschale Annahme
 - Ziel: Scroll-Stop-Potenzial + Markenpassung
 
-SEMANTIC BRIDGE TEST (PRÜFMODUS - verbindlich, VOR der Bewertung):
-Fülle für JEDE Route zuerst die vier Prüf-Felder aus (read_500ms, spontane_bedeutung,
-kernbotschaft_bruecke, fehlinterpretations_risiko). Sei dabei im PRÜFMODUS, nicht im Pitch-Modus:
-Zähle NICHT die Marketing-Vorteile auf ("starke Markenpassung", "ideal für Awareness", "kanalfähiges
-Paket"), sondern prüfe ehrlich, ob ein normaler Betrachter die gewünschte Bedeutung in 0,5 Sekunden
-OHNE Erklärung bekommt. Eine Idee ist NICHT gut, nur weil ihre Bedeutung im Konzepttext erklärbar
-ist - sie muss beim schnellen Betrachten von selbst entstehen. ERST danach die Kriterien-Scores.
-HÄUFIGE FALLE - Mobilitäts-Settings: Fahrrad, Auto, Straße, Zebrastreifen, Bahnsteig oder eine
-pendelnde Person lesen sich sofort als Pendeln/Fahrtkosten (Pendlerpauschale, Entfernungspauschale).
-Bei einem Thema, das NICHT davon handelt, ist das ein Fehlinterpretations-Risiko von 'hoch' - auch
-wenn die geplante Metapher (z.B. 'Umkehr = freiwillig') im Text noch so klar klingt. Solche Routen
-gehören bei der Botschaftsklarheit klar abgewertet, nicht mit einer cleveren Erklärung gerettet.
+SEMANTIK-CHECK - ZUERST je Route ausfüllen (Prüfmodus, NICHT Pitch - keine Marketing-Vorteile
+aufzählen, sondern ehrlich prüfen, ob die Bedeutung wirklich ankommt):
+1. read_500ms: Was sieht ein UNVORBEREITETER Betrachter zuerst? Nur Sichtbares, keine Interpretation.
+2. spontane_bedeutung: Was ist OHNE Headline und OHNE Konzeptbeschreibung die wahrscheinlichste ERSTE
+   Bedeutung des Motivs? Die naheliegendste, nicht die gewünschte.
+3. kernbotschaft_bruecke: Führt diese spontane Bedeutung DIREKT zur Kernaussage? -> direkt / teilweise
+   / nein. Eine erst nachträglich erklärbare Metapher gilt NICHT als "direkt".
+4. fehlinterpretations_risiko: niedrig / mittel / hoch. "hoch", wenn eine andere naheliegende Deutung
+   mindestens ebenso plausibel ist wie die gewünschte - insbesondere wenn die Bildwelt eine starke,
+   allgemein bekannte oder fachlich naheliegende Bedeutung aktiviert, die nicht zur Kernaussage gehört.
+5. Serienähnlichkeit: Prüfe Hero-Kategorie UND übergeordnete Bedeutungswelt. Technisch verschiedene
+   Motive aus derselben visuellen oder semantischen Familie sind KEINE echte Vielfalt.
 
-BLIND SEMANTIC TEST (verbindlich - gegen den Curse-of-Knowledge-Effekt):
-Bewerte AUSSCHLIESSLICH, was ein unvorbereiteter Betrachter aus dem visuellen Konzept erkennen
-würde. Du kennst Thema, Route, Absicht und Metapher - der Facebook-Nutzer kennt NUR das Bild.
-Nutze die erklärte Intention (Route-Begründung, gewünschte Metapher) NIEMALS als Beweis dafür,
-dass diese Bedeutung sichtbar IST. Eine Bedeutung gilt nur dann als intuitiv, wenn sie aus den
-SICHTBAREN Elementen selbst entsteht. Beschreibe KEINE Elemente, Beziehungen oder Bedeutungen, die
-im Konzept gar nicht vorhanden sind (erfinde z.B. keine "Weggabelung", wenn nur eine Straße da ist).
-FAUSTREGEL: Wenn du einen ganzen Absatz brauchst, um zu "beweisen", dass eine Metapher intuitiv
-ist, ist sie es wahrscheinlich NICHT - dann Botschaftsklarheit niedrig.
+Grundregeln dabei: Du kennst Thema, Route und Absicht - der Facebook-Nutzer kennt NUR das Bild.
+Bewerte, was das Motiv TATSÄCHLICH kommuniziert, nicht was der Creative Director sagen wollte. Nutze
+Routenname, Begründung oder geplante Metapher NIEMALS als Beweis, dass eine Bedeutung sichtbar ist.
+Erfinde keine nicht sichtbaren Elemente oder Beziehungen. Wenn du die Bedeutung erst ausführlich
+erklären musst, ist sie nicht intuitiv. VISUAL ≠ MESSAGE: ein spektakulärer Hook (Scroll-Stop) darf
+fehlende Botschaftsklarheit NICHT kompensieren - beide sind unabhängig.
 
-VISUAL ≠ MESSAGE CLARITY (verbindlich):
-Bewerte diese beiden GETRENNT und verwechsle sie nicht:
-- VISUAL CLARITY: Ist der visuelle Hook sofort erkennbar/auffällig? -> fließt in Scroll-Stop-Potenzial.
-- MESSAGE CLARITY: Ist die BEABSICHTIGTE Bedeutung ebenso unmittelbar erkennbar? -> fließt in
-  Botschaftsklarheit.
-Ein auffälliges, ungewöhnliches oder leicht erkennbares Motiv ist NICHT automatisch semantisch klar.
-Ein hoher Scroll-Stop rechtfertigt KEINE hohe Botschaftsklarheit - leite die Botschaftsklarheit NIE
-aus der visuellen Auffälligkeit ab. Werte nur Bedeutungen, die aus dem sichtbaren Konzept selbst
-entstehen; die Routenbezeichnung oder Konzeptbegründung darf fehlende Bildsemantik nicht ersetzen.
+SCORE-KOPPLUNG (Botschaftsklarheit) - das System deckelt dies zusätzlich HART code-seitig:
+- direkte Brücke + niedriges Risiko  -> 7-10 möglich
+- teilweise Brücke ODER mittleres Risiko -> max. 6
+- Brücke "nein" ODER hohes Risiko -> max. 4
 
 Bewertungskriterien (Skala 1-10):
 
-1. **Botschaftsklarheit (20%)**: Ist die Kernaussage klar und sofort verständlich?
-   Leite diesen Score DIREKT aus deinen Prüf-Feldern ab: Wenn die spontane_bedeutung NICHT die
-   Kernaussage ist, ODER kernbotschaft_bruecke eine konstruierte Erklärung braucht, ODER
-   fehlinterpretations_risiko "hoch" ist, dann Botschaftsklarheit 1-4 - egal wie schön oder clever
-   das Konzept klingt. fehlinterpretations_risiko "mittel" -> höchstens 5-6.
-   Je mehr naheliegende Alternativ-Deutungen bestehen (ein Mehrzweck-Symbol, das genauso gut für
-   mehrere andere Themen stehen könnte statt für das KONKRETE Thema), desto niedriger der Score -
-   auch wenn das Motiv selbst klar und eindeutig aussieht. Die Headline soll die visuelle Idee
-   präzisieren, nicht erst erklären müssen.
+1. **Botschaftsklarheit (20%)**: Ist die BEABSICHTIGTE Bedeutung sofort erkennbar?
+   Dieser Score folgt direkt aus dem SEMANTIK-CHECK oben (kernbotschaft_bruecke + fehlinterpretations_
+   risiko) - siehe SCORE-KOPPLUNG; das System deckelt ihn zusätzlich hart. Ein Mehrzweck-Symbol, das
+   genauso gut für ein anderes Thema stehen könnte, ist NICHT klar - auch wenn es selbst eindeutig
+   aussieht. Die Headline soll die visuelle Idee präzisieren, nicht erst erklären müssen.
    - 9-10: Kristallklar, unmissverständlich - kaum plausible Alternativ-Deutungen zum
      konkreten Thema.
    - 7-8: Klar erkennbar, aber ein bis zwei naheliegende Alternativ-Deutungen denkbar.
