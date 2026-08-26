@@ -412,8 +412,11 @@ Gib nur die Einzelbewertungen an - Gesamtscore und Freigabe berechnet das System
         system_prompt = system_prompt + (
             "\n\nKAMPAGNE RECRUITING: Dieses Bild wirbt selbstständige Beratungsstellenleiter (m/w/d) an. "
             "Sind im Bild die Wörter 'Steuerberater' oder 'Kanzlei' sichtbar, ist das ein AUTOMATISCHER "
-            "Ablehnungsgrund. Prüfe zudem, ob das Bild Lust auf Selbständigkeit/Aufbruch macht statt ein "
-            "Steuer- oder Schreibtisch-/Büro-Klischee zu zeigen.")
+            "Ablehnungsgrund. Zeigt das Bild eine Prozentzahl (z.B. 80 %) OHNE das Durchschnittszeichen 'ø' "
+            "direkt davor, ist das EBENFALLS ein automatischer Ablehnungsgrund - die 80 % sind ein "
+            "Durchschnitt und müssen im Bild als 'ø 80 %' erscheinen, nie als bare '80 %'. Prüfe zudem, ob "
+            "das Bild Lust auf Selbständigkeit/Aufbruch macht (aktive Menschen-Szene) statt ein Steuer-, "
+            "Schreibtisch-/Büro-Klischee oder ein reines Objekt-Stillleben zu zeigen.")
 
     log.info(f"Visual QA prüft Rohmotiv: {route.titel}")
 

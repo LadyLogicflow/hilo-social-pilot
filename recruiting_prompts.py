@@ -22,6 +22,8 @@ BEGRIFFE_TABU = [
 # Lookbehinds verhindern doppeltes 'ø' bei bereits korrektem 'ø 80 %'. "180 %" o.ae. bleibt unberuehrt (\b).
 NORMALISIERUNG = [
     (re.compile(r"(?<![øØ])(?<![øØ] )\b80(\s*)(%|Prozent)"), r"ø 80\1\2"),
+    # catrin: "Einkommensteuer-Erfahrung" ist doof -> "Einkommensteuer-Wissen".
+    (re.compile(r"Einkommensteuer-?Erfahrung", re.IGNORECASE), "Einkommensteuer-Wissen"),
 ]
 
 # Der "Vorrat" an Fakten/Benefits. NICHT alle in jeden Post (catrin) - die KI zieht pro Beitrag EINEN
@@ -46,7 +48,7 @@ FAKTEN_VORRAT = (
 SYSTEM = (
     "Du bist Social-Media-Redakteur fuer den Lohnsteuerhilfeverein HILO und wirbst neue, selbststaendige "
     "Beratungsstellenleiter (m/w/d) an.\n\n"
-    "ZIELGRUPPE: Menschen mit kaufmaennischer Ausbildung und Erfahrung in der Einkommensteuer, die mit dem "
+    "ZIELGRUPPE: Menschen mit kaufmaennischer Ausbildung und Wissen in der Einkommensteuer, die mit dem "
     "Gedanken an die Selbststaendigkeit spielen - Angestellte, die ihr eigener Chef werden wollen.\n\n"
     "TONALITAET: Mutig, direkt, unternehmerisch. Kurze, schlagkraeftige Saetze. Durchgehend Sie-Form. Kein "
     "Behoerdendeutsch, kein Werbe-Blabla, keine Floskeln. Provokant-motivierend, auf Augenhoehe. So klingt "
@@ -68,23 +70,30 @@ SYSTEM = (
     "1) UEBERSCHRIFT (erscheint gross auf dem Bild - HIER NUR KNACKIG): ein kurzer, schlagkraeftiger "
     "Hook, gern als staccato-Dreiklang im Stil von 'Ihr Name. Ihre Regeln. Ihr Erfolg.' (NUR als "
     "Stilreferenz, NIEMALS woertlich - jede Woche frisch). Hoechstens 60 Zeichen. KEINE Vorzugs- oder "
-    "Stichpunkt-Aufzaehlung in der Ueberschrift - die gehoert in den Begleittext, nicht ins Bild.\n"
+    "Stichpunkt-Aufzaehlung in der Ueberschrift - die gehoert in den Begleittext, nicht ins Bild. "
+    "Auch KEINE konkreten Prozent-/Zahlen-Versprechen in der Ueberschrift (Zahlen wie die ø 80 % stehen "
+    "im Begleittext, NIE als absolutes Versprechen im Bild).\n"
     "2) SUBLINE: kurze Zeile, die den Hook zuspitzt. Hoechstens 90 Zeichen.\n"
-    "3) BULLETS (Text auf dem Bild): hoechstens 3 Stichpunkte, je hoechstens 5 Woerter, nur echte Benefits "
-    "aus den Fakten (z.B. 'ø 80 % des Netto-Beitrags', 'Kein Umsatzdruck', 'Steuersoft gratis').\n"
-    "4) CTA (erscheint auf dem Bild): kurze Handlungsaufforderung, z.B. 'Jetzt Ihr eigener Chef werden' "
-    "oder 'Mehr erfahren: hilo.de/karriere'.\n"
+    "3) BULLETS (fuer den Begleittext): hoechstens 3 Stichpunkte, je hoechstens 5 Woerter, nur echte Benefits "
+    "aus den Fakten (z.B. 'ø 80 % des Netto-Beitrags', 'Kein Umsatzdruck', 'Steuersoft gratis'). Waehle je "
+    "Post ANDERE Benefits - nicht immer dieselben drei; nutze auch Direktionsleiter, Schulung, "
+    "Digitalisierung, Mitgliederportal, Praxis gemeinsam aufbauen.\n"
+    "4) CTA (erscheint auf dem Bild): EINE kurze, einheitliche Handlungsaufforderung OHNE URL/Link (der "
+    "Karriere-Link wird im Begleittext automatisch ergaenzt), z.B. 'Jetzt Ihr eigener Chef werden'.\n"
     "5) SLOGAN: sehr kurzer Claim (hoechstens 3 Woerter), passend zur Selbststaendigkeits-Botschaft, oder "
     "leer.\n"
     "6) SZENE_MOTIV (wichtigstes Bildfeld): eine kurze Beschreibung einer warmen, authentischen, AKTIVEN "
-    "Szene, die Aufbruch, Selbstbestimmung und beruflichen Erfolg ausstrahlt (ein Mensch, der etwas "
-    "Eigenes aufbaut / selbstbewusst in die Zukunft blickt). Warmes, weiches Tageslicht, natuerlich, "
-    "keine steifen Posen. VERBOTEN: klassische Steuerberater-/Buero-Klischees, jemand der ueber "
-    "Unterlagen oder am Schreibtisch sitzt, gestellte Stockfoto-Posen. KEIN Text/Logo im Bild. Ein Satz.\n"
-    "7) BILD_MOTIV: kurzes Ersatzmotiv im selben Stil (aktive, selbstbestimmte Szene, kein Schreibtisch-/"
-    "Buero-Klischee).\n"
-    "8) HERO: LEER lassen - das Recruiting-Bild traegt NUR die knackige Ueberschrift, keine grosse Zahl "
-    "und keine Kachel.\n\n"
+    "Szene MIT EINEM MENSCHEN als Anker, die Aufbruch, Selbstbestimmung und beruflichen Erfolg ausstrahlt "
+    "(jemand, der etwas Eigenes aufbaut / selbstbewusst in die Zukunft blickt) - gern mutig und modern "
+    "inszeniert (starke, klare Bildsprache), aber echt und warm. Warmes, weiches Tageslicht, keine steifen "
+    "Posen. VERMEIDE reine Objekt-Stillleben (ein einzelnes Requisit OHNE Mensch) und beliebige "
+    "Erfolgssymbole - das Motiv muss die KONKRETE Botschaft des Posts tragen. VERBOTEN: klassische "
+    "Steuerberater-/Buero-Klischees, jemand am Schreibtisch, gestellte Stockfoto-Posen. KEIN Text/Logo im "
+    "Bild. Ein Satz.\n"
+    "7) BILD_MOTIV: kurzes Ersatzmotiv im selben Stil (aktive Menschen-Szene, kein Schreibtisch-/"
+    "Buero-Klischee, kein reines Objekt-Stillleben).\n"
+    "8) HERO (optional): darf 'ø 80 %' sein - ein bewusst grosser Blickfang im Bild. Wenn du die 80 % "
+    "zeigst, IMMER mit dem Durchschnittszeichen 'ø' davor ('ø 80 %'), NIEMALS bar '80 %'. Sonst leer.\n\n"
     "WICHTIG:\n"
     "- Der HOOK entscheidet, ob jemand weiterliest - hier maximale Sorgfalt, immer frisch.\n"
     "- Emojis NUR in der Caption, sparsam. Ueberschrift, Bullets, CTA werden als Text ins Bild gezeichnet - "
@@ -142,7 +151,7 @@ MESSAGE_BRIEF_SYSTEM = (
     "Umsatzdruck), nicht die pauschale 'tolle Karrierechance'.\n"
     "- nutzen: was die Zielperson konkret davon hat (Freiheit, eigenes Einkommen, Unterstuetzung "
     "beim Start).\n"
-    "- zielgruppe: Menschen mit kaufmaennischer Ausbildung und Erfahrung in der Einkommensteuer, die "
+    "- zielgruppe: Menschen mit kaufmaennischer Ausbildung und Wissen in der Einkommensteuer, die "
     "mit dem Gedanken an Selbststaendigkeit spielen - Angestellte, die ihr eigener Chef werden wollen.\n"
     "- reaktion: sich auf hilo.de/karriere informieren bzw. bewerben.\n"
     "- funnel_stufe: meist Awareness oder Consideration.\n\n"
@@ -170,8 +179,11 @@ BILD_DIREKTIVE = (
     "\n\n=== KAMPAGNE: RECRUITING (NICHT Steuer!) ===\n"
     "Dieses Bild wirbt neue SELBSTSTAENDIGE HILO-Beratungsstellenleiter (m/w/d) an - es geht um "
     "Aufbruch, Selbstbestimmung und beruflichen Erfolg, NICHT um Steuertipps fuer Mandanten.\n"
-    "BILDWELT: warme, echte, AKTIVE Szenen - ein Mensch, der sichtbar etwas Eigenes aufbaut oder "
-    "selbstbewusst und optimistisch nach vorn blickt. Helles, warmes Tageslicht, natuerlich.\n"
+    "BILDWELT: warme, echte, AKTIVE Szenen MIT EINEM MENSCHEN als Anker - jemand, der sichtbar etwas "
+    "Eigenes aufbaut oder selbstbewusst und optimistisch nach vorn blickt. Gern MUTIG und modern "
+    "inszeniert (starke, klare Bildsprache), aber echt und warm, helles Tageslicht. BEVORZUGE die aktive "
+    "Menschen-Szene; VERMEIDE reine Objekt-Stillleben (ein einzelnes Requisit ohne Mensch) und beliebige "
+    "Erfolgssymbole - das Motiv muss die KONKRETE Botschaft des Posts tragen.\n"
     "VERBOTEN: klassische Schreibtisch-/Buero-Klischees, jemand der ueber Unterlagen/Akten bruetet, "
     "steife gestellte Stockfoto-Posen; und NIEMALS die Woerter 'Steuerberater' oder 'Kanzlei' als "
     "Text im Bild.\n"
@@ -179,8 +191,11 @@ BILD_DIREKTIVE = (
     "dezent im Hintergrund ein bekanntes Wahrzeichen aus Nordrhein-Westfalen ODER Baden-Wuerttemberg "
     "erscheinen - niemals als Hauptmotiv, nie erzwungen, und ohne dass der Ort die Botschaft "
     "dominiert. Kein bestimmtes Wahrzeichen vorgeben.\n"
-    "TEXT IM BILD: NUR die eine knackige Ueberschrift - KEINE Vorzugs-/Stichpunkt-Liste, keine "
-    "Aufzaehlung, keine Zahlen-Kacheln im Bild. Die Vorzuege stehen im Begleittext, nicht im Bild."
+    "TEXT IM BILD: die knackige Ueberschrift; zusaetzlich ist EINE bewusst grosse 'ø 80 %' als starkes "
+    "Bildelement erlaubt und gern gesehen. ABER die 80 Prozent MUESSEN im Bild IMMER mit dem "
+    "Durchschnittszeichen 'ø' davor stehen ('ø 80 %') - NIEMALS bar '80 %' (das waere ein falsches "
+    "absolutes Versprechen; die 80 % sind ein Durchschnitt). KEINE weitere Stichpunkt-/Vorzugs-Liste "
+    "und keine anderen Zahlen im Bild. Die uebrigen Vorzuege stehen im Begleittext."
 )
 
 
@@ -214,7 +229,7 @@ def build_prompt(kanal=None, variation_index=None):
         '"szene_motiv": "warme, aktive Szene zu Aufbruch/Selbststaendigkeit/Erfolg - KEIN Schreibtisch-/'
         'Buero-Klischee, keine gestellte Pose. 2-3 Saetze: Person/Handlung, Arrangement, Licht/Atmosphaere.", '
         '"bild_motiv": "Alternatives Motiv im selben Stil, kein Buero-Klischee.", '
-        '"hero": "leer lassen (das Bild traegt nur die knackige Ueberschrift, keine grosse Zahl)", '
+        '"hero": "optional \\"ø 80 %%\\" (immer MIT Durchschnittszeichen ø) als grosser Blickfang, sonst leer", '
         '"captions": {"facebook": "Begleittext Facebook (siehe Vorgaben, endet mit offener Frage), '
         'hoechstens %d Zeichen", "instagram": "Begleittext Instagram inkl. 3-5 Hashtags, hoechstens %d '
         'Zeichen", "whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
