@@ -39,14 +39,22 @@ SYSTEM = (
     "4) CTA (im Bild): kurze Aufforderung OHNE URL, z.B. 'Jetzt Kanal folgen' (der Link kommt im "
     "Begleittext automatisch dazu).\n"
     "5) SLOGAN: sehr kurzer Claim (max 3 Woerter) oder leer.\n"
-    "6) SZENE_MOTIV (wichtigstes Bildfeld): eine warme, moderne, ECHTE Szene zum Thema 'informiert "
-    "bleiben / gute Nachricht aufs Smartphone' - z.B. ein Mensch schaut zufrieden/erleichtert aufs Handy. "
-    "Warmes, weiches Tageslicht, kein steifes Stockfoto. KEIN Text/Logo im Bild. Ein Satz.\n"
-    "7) BILD_MOTIV: kurzes Ersatzmotiv im selben Stil.\n"
+    "6) SZENE_MOTIV (wichtigstes Bildfeld): PFLICHT ist eine glaubwuerdige ALLTAGS-PERSONENSZENE der "
+    "Zielgruppe (Arbeitnehmer, Rentnerin, Familie), in der der NUTZEN durch Handlung, Reaktion oder "
+    "Situation sichtbar wird - z.B. jemand ist erleichtert/gut gelaunt, weil er rechtzeitig Bescheid "
+    "wusste; entspannt statt gestresst mit dem Steuerthema. Der visuelle Hook entsteht aus der SITUATION "
+    "selbst, nicht aus einem Objekt. Die Person darf NICHT nur dekorativ posieren oder stumpf aufs Handy "
+    "starren. Ein Smartphone ist nur erlaubt, wenn es fuer die Aussage unverzichtbar ist - und dann nur "
+    "beilaeufig; UI, Chatblasen und App-Symbolik NIE als Hauptmotiv. Warme, moderne Alltagsumgebung, "
+    "weiches Tageslicht, natuerlich - kein steifes Stockfoto. STRENG VERBOTEN als Bildmittelpunkt: "
+    "abstrakte Objekt-Metaphern jeder Art (Papierflieger/Origami, schwebende Symbole, Pins, Netze, Icons, "
+    "Sprechblasen, verwandelte Objekte). Ein Satz.\n"
+    "7) BILD_MOTIV: kurzes Ersatzmotiv - ebenfalls eine echte Alltags-Personenszene mit sichtbarem "
+    "Nutzen, KEIN abstraktes Objekt und kein Geraet als Held.\n"
     "8) HERO: LEER lassen.\n\n"
     "WICHTIG: Emojis nur in der Caption, sparsam. Ueberschrift/Bullets/CTA werden als Text ins Bild "
-    "gezeichnet - dort keine Emojis. NIEMALS das echte WhatsApp-Logo oder fremde Marken-/App-Logos "
-    "abbilden (rechtlich) - hoechstens ganz dezent eine 'gruene Chat-/Nachrichten'-Andeutung ohne Logo."
+    "gezeichnet - dort keine Emojis. NIEMALS das echte WhatsApp-Logo, fremde Marken-/App-Logos ODER "
+    "WhatsApp-aehnliche gruene Sprechblasen/Chat-Symbole abbilden (rechtlich + verwaesert die Marke)."
 )
 
 CHANNEL_GUIDE = {
@@ -82,9 +90,13 @@ def build_prompt(kanal=None, variation_index=None):
         '{"ueberschrift": "max 60 Zeichen, einladend, keine Liste", "subline": "max 90 Zeichen", '
         '"bullets": ["hoechstens 3 kurze Nutzen-Punkte"], "cta": "kurze Aufforderung ohne URL", '
         '"slogan": "max 3 Woerter oder leer", '
-        '"szene_motiv": "warme, moderne Szene: informiert bleiben / gute Nachricht aufs Smartphone, echt, '
-        'kein steifes Stockfoto (2-3 Saetze).", '
-        '"bild_motiv": "Alternatives Motiv im selben Stil.", "hero": "leer lassen", '
+        '"szene_motiv": "PFLICHT glaubwuerdige Alltags-Personenszene der Zielgruppe, in der der Nutzen '
+        'durch Handlung/Reaktion/Situation sichtbar wird (z.B. erleichtert, weil rechtzeitig informiert). '
+        'Nicht nur dekorativ posieren/aufs Handy starren; Geraet nur wenn unverzichtbar, UI/Chatblasen/'
+        'App-Symbolik NIE als Held. Warm, natuerlich, kein steifes Stockfoto. VERBOTEN: abstrakte '
+        'Objekte/Symbole/Pins/Origami/Sprechblasen (2-3 Saetze).", '
+        '"bild_motiv": "Alternative Alltags-Personenszene mit sichtbarem Nutzen, kein abstraktes Objekt.", '
+        '"hero": "leer lassen", '
         '"captions": {"facebook": "Einladung zu folgen (siehe Vorgaben), hoechstens %d Zeichen", '
         '"instagram": "Einladung inkl. 3-5 Hashtags, hoechstens %d Zeichen", '
         '"whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
@@ -123,11 +135,20 @@ BILD_DIREKTIVE = (
     "\n\n=== KAMPAGNE: KANALWERBUNG (WhatsApp-Kanal bewerben) ===\n"
     "Dieses Bild wirbt fuer den KOSTENLOSEN WhatsApp-Kanal von HILO - es laedt ein, ihm zu folgen, um "
     "Steuer-Tipps und Fristen direkt aufs Handy zu bekommen.\n"
-    "BILDWELT: warme, moderne, ECHTE Szene rund um 'informiert bleiben / gute Nachricht aufs Smartphone' "
-    "- ein Mensch schaut zufrieden/erleichtert aufs Handy. Helles, warmes Tageslicht, natuerlich.\n"
-    "WICHTIG: NIEMALS das echte WhatsApp-Logo oder andere fremde Marken-/App-Logos abbilden (rechtliches "
-    "Risiko) - hoechstens ganz dezent eine 'gruene Chat-/Nachrichten'-Andeutung ohne erkennbares Logo. "
-    "KEIN Schreibtisch-/Amt-Klischee, keine gestellte Stockfoto-Pose.\n"
+    "BILDWELT (PFLICHT): eine glaubwuerdige ALLTAGS-PERSONENSZENE der Zielgruppe (Arbeitnehmer, "
+    "Rentnerin, Familie), in der der NUTZEN durch Handlung, Reaktion oder Situation sichtbar wird - "
+    "z.B. jemand ist erleichtert/entspannt, weil er rechtzeitig informiert war. Der visuelle Hook "
+    "entsteht aus der SITUATION selbst. Warme, moderne Alltagsumgebung, helles weiches Tageslicht, "
+    "natuerlich.\n"
+    "Die Person darf NICHT nur dekorativ posieren oder stumpf aufs Handy starren. Ein Smartphone ist "
+    "nur zulaessig, wenn es fuer die Bildaussage unverzichtbar ist - und dann beilaeufig; UI, "
+    "Chatblasen und App-Symbolik NIE als Hero-Motiv.\n"
+    "STRENG VERBOTEN als Bildmittelpunkt: abstrakte Objekt-Metaphern JEDER Art - Papierflieger/Origami, "
+    "schwebende Symbole/Pins/Icons, Netze, Sprechblasen, verwandelte Gegenstaende. Solche Motive wurden "
+    "wiederholt abgelehnt. Wenn kein glaubwuerdiger Mensch die Szene traegt, ist das Bild FALSCH.\n"
+    "WICHTIG: NIEMALS das echte WhatsApp-Logo, fremde Marken-/App-Logos ODER WhatsApp-aehnliche gruene "
+    "Sprechblasen/Chat-Symbole abbilden (rechtlich + verwaesert die Marke). KEIN Schreibtisch-/Amt-"
+    "Klischee, keine gestellte Stockfoto-Pose.\n"
     "TEXT IM BILD: nur die knackige Ueberschrift; KEINE Stichpunkt-Liste und keine Zahlen im Bild."
 )
 
@@ -142,7 +163,10 @@ JURY_HINT = (
     "wie sonst, keine anderen Themen-Annahmen."
 )
 QA_HINT = (
-    "\n\nKAMPAGNE KANALWERBUNG: Zeigt das Bild ein echtes WhatsApp-Logo oder ein anderes fremdes Marken-/"
-    "App-Logo, ist das ein AUTOMATISCHER Ablehnungsgrund (rechtliches Risiko) - erlaubt ist nur eine "
-    "dezente, LOGOLOSE 'grüne Chat/Nachricht'-Andeutung. Prüfe zudem, ob das Bild einladend/positiv wirkt."
+    "\n\nKAMPAGNE KANALWERBUNG: AUTOMATISCHE Ablehnungsgründe: (1) ein echtes WhatsApp-Logo, ein anderes "
+    "fremdes Marken-/App-Logo ODER eine WhatsApp-ähnliche grüne Sprechblase/Chat-Symbolik (rechtlich). "
+    "(2) Das Bild zeigt KEINE glaubwürdige Alltags-Personenszene, sondern eine abstrakte Objekt-Metapher "
+    "als Held (Papierflieger/Origami, schwebender Pin/Symbol, Netz, Icon, Sprechblase). (3) Die Person "
+    "posiert nur dekorativ oder starrt bloß aufs Handy, ohne dass ein Nutzen/eine Situation erkennbar "
+    "ist; UI/Chatblasen/App-Symbolik als Hauptmotiv. Prüfe zudem, ob das Bild einladend/positiv wirkt."
 )
