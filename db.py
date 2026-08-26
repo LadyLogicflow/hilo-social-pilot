@@ -108,6 +108,24 @@ CREATE TABLE IF NOT EXISTS pool_nutzung_recruiting (
     verbraucht_am TEXT DEFAULT (datetime('now')),
     UNIQUE(entwurf_id, stelle_id, kanal)
 );
+-- Kanalwerbung-Pool (EIGENE Tabellen, damit Steuer-, Recruiting- und Kanalwerbung-Beitraege sich NIE
+-- vermischen): der woechentliche/zufaellige Kanalwerbung-Scheduler zieht ausschliesslich aus
+-- `pool_kanalwerbung`. Struktur bewusst analog zu pool/pool_nutzung(_recruiting), damit die
+-- tabellen-parametrisierbaren pool.py-Funktionen unveraendert wiederverwendbar sind.
+CREATE TABLE IF NOT EXISTS pool_kanalwerbung (
+    entwurf_id INTEGER PRIMARY KEY,    -- ein freigegebener Kanalwerbung-Entwurf = ein Topf-Beitrag
+    aktiv INTEGER NOT NULL DEFAULT 1,  -- 0 = aus dem Topf genommen (nicht mehr ziehbar), bleibt fuer Historie
+    freigegeben_am TEXT DEFAULT (datetime('now'))
+);
+-- "Nie doppelt"-Gedaechtnis fuer Kanalwerbung: jeder Beitrag je Stelle GENAU EINMAL pro Kanal.
+CREATE TABLE IF NOT EXISTS pool_nutzung_kanalwerbung (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entwurf_id INTEGER,
+    stelle_id INTEGER,
+    kanal TEXT,                        -- facebook | instagram
+    verbraucht_am TEXT DEFAULT (datetime('now')),
+    UNIQUE(entwurf_id, stelle_id, kanal)
+);
 -- Globale Key-Value-Einstellungen (#132/#143): z.B. 'bild_stil' = 'standard' | 'ki_tafel' | 'kreativ'.
 -- Bewusst minimal (Schluessel/Wert), damit weitere globale Schalter ohne Schema-Migration moeglich sind.
 CREATE TABLE IF NOT EXISTS einstellungen (

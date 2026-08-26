@@ -83,6 +83,17 @@ def _mit_karriere_link(base):
     return (kern + "\n\n" + tags).strip() if tags else kern
 
 
+def _mit_kanal_invite(base, stelle):
+    """Haengt den WhatsApp-Kanal-Einladungslink der Stelle an den Begleittext an - aber VOR einen evtl.
+    Hashtag-Block. Ohne hinterlegten Einladungslink bleibt der Begleittext unveraendert (nur base)."""
+    invite = kanal_invite(stelle)
+    if not invite:
+        return (base or "").strip()
+    haupt, tags = _split_hashtags(base)
+    kern = ((haupt + "\n\n" if haupt else "") + "➡️ Jetzt folgen: %s" % invite).strip()
+    return (kern + "\n\n" + tags).strip() if tags else kern
+
+
 def caption_fuer_stelle(fields, stelle, kanal):
     """Kanalspezifischer, fuer die Beratungsstelle personalisierter Begleittext."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
@@ -91,6 +102,10 @@ def caption_fuer_stelle(fields, stelle, kanal):
     # Karriere-Link (der Beitrag wirbt deutschlandweit Beratungsstellenleiter an, nicht Steuer-Mandanten).
     if fields.get("kampagne") == "recruiting":
         return _mit_karriere_link(base)
+    # Kanalwerbung: bewirbt den kostenlosen WhatsApp-Kanal. KEINE steuerliche Stellen-Personalisierung -
+    # stattdessen der Kanal-Einladungslink der Stelle (auf Facebook anklickbar).
+    if fields.get("kampagne") == "kanalwerbung":
+        return _mit_kanal_invite(base, stelle)
     return personalisiere_caption(base, stelle, kanal)
 
 
