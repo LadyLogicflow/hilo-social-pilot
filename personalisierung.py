@@ -11,6 +11,16 @@ def buchungslink(stelle):
     return (stelle["buchungs_url"] or "").strip() if _has(stelle, "buchungs_url") else ""
 
 
+def homepage(stelle):
+    """HILO-Homepage-URL der Beratungsstelle (oder '')."""
+    return (stelle["homepage_url"] or "").strip() if (stelle and _has(stelle, "homepage_url")) else ""
+
+
+def kanal_invite(stelle):
+    """Einladungslink des WhatsApp-Kanals der Beratungsstelle (oder '')."""
+    return (stelle["wa_kanal_invite"] or "").strip() if (stelle and _has(stelle, "wa_kanal_invite")) else ""
+
+
 def _local_satz(stelle):
     """Persoenlicher, lokaler Satz (Leitung/Ort) fuer den Begleittext (oder '' ohne Ort) - OHNE Link.
     Den Link bzw. den kanalabhaengigen Termin-Hinweis ergaenzt personalisiere_caption."""
@@ -70,19 +80,21 @@ def caption_fuer_stelle(fields, stelle, kanal):
 
 
 def whatsapp_texte(fields, stelle=None, quelle_url=""):
-    """Liefert (kanal_text, story_text) fuer WhatsApp - Buchungs- und Quelllink werden hier direkt
-    eingebettet (WhatsApp erlaubt Links). stelle=None -> ohne Stellen-Personalisierung."""
+    """Liefert (kanal_text, story_text) fuer WhatsApp - Buchungs- und Info-Link werden hier direkt
+    eingebettet (WhatsApp erlaubt Links). Der "Mehr Infos"-Link zeigt auf die HILO-Homepage der
+    Beratungsstelle (homepage_url); der Parameter quelle_url wird nicht mehr verwendet (Kompatibilitaet).
+    stelle=None -> ohne Stellen-Personalisierung, dann auch ohne Homepage-Link."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
     link = buchungslink(stelle) if stelle else ""
     ort = (stelle["ort"] or "").strip() if (stelle and _has(stelle, "ort")) else ""
-    quelle_url = (quelle_url or "").strip()
+    hp = homepage(stelle)
 
     kanal = (caps.get("whatsapp_kanal") or fields.get("caption") or "").strip()
     zeilen = []
     if ort:
         zeilen.append("Ihre HILO-Beratungsstelle in %s berät Sie gerne." % ort)
-    if quelle_url:
-        zeilen.append("Mehr dazu: %s" % quelle_url)
+    if hp:
+        zeilen.append("Mehr Infos: %s" % hp)
     if link:
         zeilen.append("Termin vereinbaren: %s" % link)
     kanal_text = (kanal + ("\n\n" + "\n".join(zeilen) if zeilen else "")).strip()
@@ -90,6 +102,11 @@ def whatsapp_texte(fields, stelle=None, quelle_url=""):
     story = (caps.get("whatsapp_story") or "").strip()
     if link:
         story = (story + "\nTermin: %s" % link).strip()
+    # Funnel: der Status (nur Kontakte) lädt zum öffentlichen WhatsApp-Kanal ein - aber nur, wenn
+    # die Stelle überhaupt einen Kanal hinterlegt hat (sonst keine Einladung).
+    invite = kanal_invite(stelle)
+    if invite:
+        story = (story + "\n➡️ Für mehr Informationen folge unserem WhatsApp-Kanal: %s" % invite).strip()
     return kanal_text, story
 
 

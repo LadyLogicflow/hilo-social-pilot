@@ -469,8 +469,27 @@ def _kanal_verfuegbarkeit(stellen):
         return key in s.keys()
     wa_status_ids = {int(s["id"]) for s in stellen
                      if _hat(s, "wa_status_aktiv") and s["wa_status_aktiv"]}
-    wa_kanal_ids = {int(s["id"]) for s in stellen
-                    if _hat(s, "wa_kanal_invite") and (s["wa_kanal_invite"] or "").strip()}
+    # whatsapp_kanal: Stellen mit hinterlegtem Einladungslink. Bei einem GETEILTEN Kanal (mehrere Stellen
+    # mit DEMSELBEN Link) postet nur die markierte Posterin (wa_kanal_poster=1) die Kanal-Beitraege -
+    # sonst laege derselbe Beitrag doppelt im Kanal. Der Status-Funnel bleibt bei allen Stellen (er nutzt
+    # den Link nur als Einladung, nicht zum Posten).
+    _kanal_gruppen = {}
+    for s in stellen:
+        inv = (s["wa_kanal_invite"] or "").strip() if _hat(s, "wa_kanal_invite") else ""
+        if inv:
+            _kanal_gruppen.setdefault(inv, []).append(s)
+    wa_kanal_ids = set()
+    for inv, gruppe in _kanal_gruppen.items():
+        if len(gruppe) == 1:
+            wa_kanal_ids.add(int(gruppe[0]["id"]))
+            continue
+        poster = [s for s in gruppe if _hat(s, "wa_kanal_poster") and s["wa_kanal_poster"]]
+        if poster:
+            wa_kanal_ids.add(int(poster[0]["id"]))
+        else:
+            log.warning("Geteilter WhatsApp-Kanal (%d Stellen, gleicher Link) ohne markierte Kanal-Posterin"
+                        " - Kanal-Beitrag uebersprungen. Bitte in der Verwaltung EINE Stelle markieren.",
+                        len(gruppe))
     return {
         "facebook": fb_ids,
         "instagram": ig_ids,
@@ -734,6 +753,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 .run{color:#4D7C0F;font-weight:bold;font-size:13px;margin-top:8px}</style>
 """ + _NAV + """
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if wa_getrennt %}<div style="max-width:1040px;margin:0 auto 16px;background:#fde8e8;border:2px solid #b00020;border-radius:10px;padding:11px 16px;color:#7f1d1d;font-size:14px"><b>&#x26A0;&#xFE0F; {{wa_getrennt|length}} WhatsApp-Verbindung(en) getrennt – es gehen KEINE WhatsApp-Posts dieser Stellen raus:</b><ul style="margin:6px 0 4px">{% for w in wa_getrennt %}<li>{{w.name}}{% if w.ort %} · {{w.ort}}{% endif %}</li>{% endfor %}</ul><a href="/whatsapp" style="color:#b00020;font-weight:bold">&rarr; Jetzt verbinden</a></div>{% endif %}
 <div class=info>&#x1F552; Themen werden täglich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
 <div class=grid>
   <a class=tile href="/themen">{% if themen_offen %}<span class=badge>{{themen_offen}}</span>{% endif %}<h3>1. Freigabe: Themen</h3><p>Themen für die Kampagne auswählen (Stufe 1).</p></a>
@@ -1330,7 +1350,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
           <input name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="https://whatsapp.com/channel/…" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool" style="flex:1;min-width:260px">
           <button style="padding:7px 13px">OK</button>
-        </div></form>
+        </div>
+        <label style="font-weight:normal;font-size:13px;display:block;margin:8px 0 0"><input type=checkbox name=wa_kanal_poster value="1"{% if b.wa_kanal_poster %} checked{% endif %}> Diese Stelle postet die Kanal-Beiträge <span class=hint>(bei einem geteilten Kanal nur EINE Stelle aktivieren)</span></label>
+        </form>
     </div>
     <div class=stfield><label>WhatsApp-Verbindung</label>
       {% if wa_dienst_err %}<div class=hint>WhatsApp-Dienst nicht erreichbar.</div>{% endif %}
@@ -1819,7 +1841,7 @@ def index():
         freigegeben_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='freigegeben'").fetchone()[0]
     return render_template_string(HOME, **_ctx(themen_offen=themen_offen, bereit=bereit,
                                   entwuerfe_offen=entwuerfe_offen, freigegeben_offen=freigegeben_offen,
-                                  gen_running=_generation_running()))
+                                  gen_running=_generation_running(), wa_getrennt=_wa_getrennte_stellen()))
 
 @app.route("/entwuerfe")
 @login_required
@@ -3612,8 +3634,17 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
         kanal_text, story_text = (f.get("caption") or ""), ""
         log.exception("WhatsApp-Texte fuer Beitrag %s nicht erzeugbar: %s", eid, ex)
 
+    # Disconnect-Alarm (Vorab-Check): nur posten, wenn die Nummer der Stelle wirklich verbunden ist -
+    # sonst eine klare Fehlmeldung statt stillem Ins-Leere-Posten.
+    _wa_st, _wa_serr = _wa_call("/status", session=(stelle["id"] if stelle else None), timeout=6)
+    _verbunden = bool(_wa_st and _wa_st.get("state") == "connected")
+
     ok, info = False, ""
-    if kanal == "whatsapp_status":
+    if not _verbunden:
+        ok, info = False, (("WhatsApp-Dienst nicht erreichbar: %s" % _wa_serr) if _wa_serr
+                           else "WhatsApp-Stelle nicht verbunden (Status: %s) – kein Post gesendet"
+                                % ((_wa_st or {}).get("state", "nicht_verbunden")))
+    elif kanal == "whatsapp_status":
         # Personalisiertes 9:16-Status-Bild (Portraet/Ort), Fallback: allgemeines Hochkant-Bild.
         bild = None
         try:
@@ -4006,13 +4037,14 @@ def verwaltung():
                 sid = request.form.get("stelle_id", "").strip()
                 wa_status = 1 if request.form.get("wa_status_aktiv") else 0
                 wa_invite = request.form.get("wa_kanal_invite", "").strip()
+                wa_poster = 1 if request.form.get("wa_kanal_poster") else 0
                 if wa_invite and not (wa_invite.startswith("http://") or wa_invite.startswith("https://")):
                     flash("Der WhatsApp-Kanal-Link muss mit http:// oder https:// beginnen.")
                 elif sid and sid.isdigit():
-                    conn.execute("UPDATE beratungsstellen SET wa_status_aktiv=?, wa_kanal_invite=? WHERE id=?",
-                                 (wa_status, wa_invite or None, sid))
+                    conn.execute("UPDATE beratungsstellen SET wa_status_aktiv=?, wa_kanal_invite=?, wa_kanal_poster=? WHERE id=?",
+                                 (wa_status, wa_invite or None, wa_poster, sid))
                     audit_log(conn, session["user"], "beratungsstelle_whatsapp_gesetzt", None,
-                              "Stelle %s -> Status=%d, Kanal=%s" % (sid, wa_status, "ja" if wa_invite else "nein"))
+                              "Stelle %s -> Status=%d, Kanal=%s, Poster=%d" % (sid, wa_status, "ja" if wa_invite else "nein", wa_poster))
                     flash("WhatsApp-Einstellungen der Beratungsstelle gespeichert.")
             elif formular == "stelle_portrait":
                 sid = request.form.get("stelle_id", "").strip()
@@ -4499,6 +4531,32 @@ def _wa_call(path, method="GET", payload=None, timeout=6, session=None):
     except Exception as e:  # noqa: BLE001
         return None, str(e)
 
+def _wa_getrennte_stellen():
+    """Liefert die aktiven Beratungsstellen, die posten SOLLEN (Status aktiv oder Kanal hinterlegt),
+    deren WhatsApp-Verbindung aber NICHT 'connected' ist - fuer den Dashboard-Alarm. Ein einziger
+    /sessions-Aufruf (alle Verbindungen auf einmal). Faellt der Dienst aus, wird [] geliefert -
+    das Dashboard darf davon NIE brechen."""
+    try:
+        with get_conn() as conn:
+            rows = conn.execute("SELECT id, name, ort, wa_status_aktiv, wa_kanal_invite "
+                                "FROM beratungsstellen WHERE aktiv=1 ORDER BY ort").fetchall()
+        soll = [r for r in rows if r["wa_status_aktiv"] or (r["wa_kanal_invite"] or "").strip()]
+        if not soll:
+            return []
+        sess, err = _wa_call("/sessions", timeout=4)
+        if err or not isinstance(sess, dict):
+            return []
+        smap = sess.get("sessions") or {}
+        getrennt = []
+        for r in soll:
+            st = smap.get(str(r["id"])) or {}
+            if st.get("state") != "connected":
+                getrennt.append({"name": r["name"], "ort": r["ort"] or ""})
+        return getrennt
+    except Exception:
+        log.exception("WhatsApp-Disconnect-Check fehlgeschlagen")
+        return []
+
 WHATSAPP = """<!doctype html><meta charset=utf-8><title>ShareNext - WhatsApp</title>
 {% if any_pending %}<meta http-equiv=refresh content=6>{% endif %}
 <style>""" + _TOP + """
@@ -4555,7 +4613,7 @@ button.g{background:#4D7C0F}button.r{background:#b00020}
 </div>"""
 
 @app.route("/whatsapp")
-@login_required
+@rolle_required("freigeber")
 def whatsapp():
     """Multi-Session-Uebersicht: je aktiver Beratungsstelle eine eigene WhatsApp-Verbindung
     (eigene Nummer -> eigener Status an eigene Kontakte). session-Schluessel = Beratungsstellen-ID."""
@@ -4585,7 +4643,7 @@ def _wa_zurueck():
     return redirect(url_for("whatsapp"))
 
 @app.route("/whatsapp/connect/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_connect(sid):
     res, err = _wa_call("/connect", method="POST", payload={}, session=sid, timeout=15)
     if err:
@@ -4596,7 +4654,7 @@ def whatsapp_connect(sid):
     return _wa_zurueck()
 
 @app.route("/whatsapp/logout/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_logout(sid):
     _wa_call("/logout", method="POST", payload={}, session=sid)
     audit_log_safe("whatsapp_logout")
@@ -4604,7 +4662,7 @@ def whatsapp_logout(sid):
     return _wa_zurueck()
 
 @app.route("/whatsapp/test-status/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_test_status(sid):
     import re
     caption = request.form.get("caption", "").strip() or "ShareNext Test-Status"

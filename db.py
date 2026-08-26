@@ -349,6 +349,11 @@ def migrate(conn):
     # dieser Marker steuert nur, OB fuer die Stelle gezogen wird (Single-Source-Sende-Limitierung siehe MR).
     if "wa_status_aktiv" not in bcols:
         conn.execute("ALTER TABLE beratungsstellen ADD COLUMN wa_status_aktiv INTEGER NOT NULL DEFAULT 0")
+    # WhatsApp-Kanal-Posterin (geteilter Kanal): Haben mehrere Stellen DENSELBEN Kanal-Link hinterlegt,
+    # postet nur die markierte Stelle die Kanal-Beitraege -> verhindert Doppel-Posts im gemeinsamen Kanal.
+    # Der Status-Funnel (Einladung zum Kanal) bleibt bei allen Stellen. 0/NULL = postet nicht selbst.
+    if "wa_kanal_poster" not in bcols:
+        conn.execute("ALTER TABLE beratungsstellen ADD COLUMN wa_kanal_poster INTEGER NOT NULL DEFAULT 0")
     # R1 Karussell: Format je Beitrag (einzelbild | karussell)
     ecols = [r[1] for r in conn.execute("PRAGMA table_info(entwuerfe)")]
     if "format" not in ecols:
