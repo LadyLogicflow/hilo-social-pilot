@@ -109,6 +109,65 @@ CHANNEL_GUIDE = {
 CHANNEL_LIMIT = {"instagram": 1500, "facebook": 1400}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BILD-PIPELINE (Etappe 2): Recruiting-Framing fuer die 6 ShareNext-Stufen.
+# Der Message Brief (komplett steuer-spezifisch) wird ERSETZT; die kreativen Folgestufen
+# (Creative Director, Art Director, Image Producer, Visual QA) bekommen nur die Direktive ANGEHAENGT,
+# weil ihre Kreativ-Prinzipien thema-neutral und auch fuer Recruiting wertvoll sind. Modelle, Score-/
+# Gate-Logik und Retry bleiben unveraendert.
+# ─────────────────────────────────────────────────────────────────────────────
+
+MESSAGE_BRIEF_SYSTEM = (
+    "Du bist Marketing-Stratege fuer die PERSONALGEWINNUNG des Lohnsteuerhilfevereins HILO.\n"
+    "Aufgabe: Erstelle aus dem Recruiting-Anlass ein strukturiertes Message Brief fuer ein "
+    "Social-Media-Bild, das neue SELBSTSTAENDIGE Beratungsstellenleiter (m/w/d) anwirbt.\n\n"
+    "WICHTIG: Es geht NICHT um Steuertipps fuer Mandanten, sondern darum, Menschen fuer die "
+    "Selbststaendigkeit als HILO-Beratungsstellenleiter zu begeistern.\n\n"
+    "- kernaussage: die zentrale Recruiting-Botschaft dieses Posts (1-2 Saetze) - KONKRET (z.B. "
+    "eigener Chef werden, Selbstbestimmung, 80 Prozent des Netto-Mitgliedsbeitrages, kein "
+    "Umsatzdruck), nicht die pauschale 'tolle Karrierechance'.\n"
+    "- nutzen: was die Zielperson konkret davon hat (Freiheit, eigenes Einkommen, Unterstuetzung "
+    "beim Start).\n"
+    "- zielgruppe: Menschen mit kaufmaennischer Ausbildung und Erfahrung in der Einkommensteuer, die "
+    "mit dem Gedanken an Selbststaendigkeit spielen - Angestellte, die ihr eigener Chef werden wollen.\n"
+    "- reaktion: sich auf hilo.de/karriere informieren bzw. bewerben.\n"
+    "- funnel_stufe: meist Awareness oder Consideration.\n\n"
+    "ABSOLUTES WORT-VERBOT: 'Steuerberater' und 'Kanzlei' kommen NIE vor (HILO ist ein "
+    "Lohnsteuerhilfeverein; das Berufsbild heisst Beratungsstellenleiter)."
+)
+
+
+def message_brief_user(thema, text, kanal):
+    """User-Prompt fuer den Recruiting-Message-Brief."""
+    return (
+        "Erstelle ein Message Brief fuer diesen Recruiting-Post:\n\n"
+        "Anlass/Aufhaenger: %s\n"
+        "Text/Kontext: %s\n"
+        "Kanal: %s\n\n"
+        "Felder: kernaussage, nutzen, zielgruppe, reaktion, funnel_stufe, kanal=%s. "
+        "Denk daran: Zielgruppe sind potentielle SELBSTSTAENDIGE, nicht Steuer-Mandanten. "
+        "Niemals die Woerter 'Steuerberater' oder 'Kanzlei'." % (thema, text, kanal, kanal)
+    )
+
+
+# Wird den System-Prompts von Creative Director, Art Director, Image Producer und Visual QA
+# ANGEHAENGT, wenn kampagne=="recruiting".
+BILD_DIREKTIVE = (
+    "\n\n=== KAMPAGNE: RECRUITING (NICHT Steuer!) ===\n"
+    "Dieses Bild wirbt neue SELBSTSTAENDIGE HILO-Beratungsstellenleiter (m/w/d) an - es geht um "
+    "Aufbruch, Selbstbestimmung und beruflichen Erfolg, NICHT um Steuertipps fuer Mandanten.\n"
+    "BILDWELT: warme, echte, AKTIVE Szenen - ein Mensch, der sichtbar etwas Eigenes aufbaut oder "
+    "selbstbewusst und optimistisch nach vorn blickt. Helles, warmes Tageslicht, natuerlich.\n"
+    "VERBOTEN: klassische Schreibtisch-/Buero-Klischees, jemand der ueber Unterlagen/Akten bruetet, "
+    "steife gestellte Stockfoto-Posen; und NIEMALS die Woerter 'Steuerberater' oder 'Kanzlei' als "
+    "Text im Bild.\n"
+    "REGIONALER BEZUG (optional, sehr dezent): Wenn es sich voellig natuerlich ergibt, darf ganz "
+    "dezent im Hintergrund ein bekanntes Wahrzeichen aus Nordrhein-Westfalen ODER Baden-Wuerttemberg "
+    "erscheinen - niemals als Hauptmotiv, nie erzwungen, und ohne dass der Ort die Botschaft "
+    "dominiert. Kein bestimmtes Wahrzeichen vorgeben."
+)
+
+
 def build_prompt(kanal=None, variation_index=None):
     """User-Prompt fuer die Recruiting-Texterzeugung. Erzeugt Bild-, Ueberschrift- und Caption-Felder in
     EINEM KI-Aufruf (wie im Normalbetrieb). variation_index (optional, 0..n) rotiert den Schwerpunkt-Benefit,

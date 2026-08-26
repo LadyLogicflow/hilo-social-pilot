@@ -130,7 +130,8 @@ def create_production_brief(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     headline: str = "",
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> ImageProductionBrief:
     """Erstellt Production Brief nach ShareNext-Spezifikation (Catrin).
 
@@ -323,6 +324,10 @@ WICHTIG:
 - NUR DEUTSCHE SPRACHE, NIEMALS Englisch!
 - EURO (€) verwenden, NIEMALS Dollar ($)!
 """
+
+    if kampagne == "recruiting":
+        import recruiting_prompts
+        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE
 
     log.info(f"Prompt Director erstellt Bildgenerierungs-Prompt für: {route.titel}")
 
@@ -557,7 +562,8 @@ def produce_image(
     headline: str = "",
     size: str = "1024x1024",
     quality: str = "medium",
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    kampagne: str = "steuer"
 ) -> tuple[Image.Image, ImageProductionBrief]:
     """High-Level API: Erstellt Production Brief + generiert Bild.
 
@@ -583,7 +589,8 @@ def produce_image(
         >>> print(prod_brief.alt_text)
     """
     # Schritt 1: Production Brief erstellen (mit headline!)
-    production_brief = create_production_brief(brief, route, art_board, headline=headline)
+    production_brief = create_production_brief(brief, route, art_board, headline=headline,
+                                               kampagne=kampagne)
 
     # Schritt 2: Bild generieren
     image = generate_image(production_brief, size, quality, output_path)

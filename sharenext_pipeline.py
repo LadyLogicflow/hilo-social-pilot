@@ -156,7 +156,8 @@ def run_sharenext_pipeline(
     headline: str = "",
     size: str = "1024x1024",
     quality: str = "medium",
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    kampagne: str = "steuer"
 ) -> ShareNextResult:
     """ShareNext Premium Pipeline - End-to-End Bildgenerierung.
 
@@ -200,22 +201,29 @@ def run_sharenext_pipeline(
     # STUFE 1: Message Brief
     # ─────────────────────────────────────────────────────────────────────────
     log.info("📋 Stufe 1/6: Message Brief Generator")
-    message_brief = generate_message_brief(stream, thema, text, kanal)
+    message_brief = generate_message_brief(stream, thema, text, kanal, kampagne=kampagne)
     log.info(f"   ✓ Zielgruppe: {message_brief.zielgruppe}")
 
     # Headline-Fallback: Ohne Überschrift liefe der Image Producer im Modus 'no_text' und
     # erzeugte ein Bild ganz ohne Text. Eine freigegebene Überschrift hat immer Vorrang.
     if not headline or not headline.strip():
-        headline = generate_headline(message_brief, text=text)
+        headline = generate_headline(message_brief, text=text, kampagne=kampagne)
         log.info(f"   ℹ Überschrift selbst generiert (keine freigegebene übergeben)")
     else:
         headline = headline.strip()
+
+    # Recruiting: harte Wort-Sperre auch auf die INS BILD gerenderte Überschrift anwenden
+    # (Steuerberater/Kanzlei duerfen nie im Bild stehen - garantiert, nicht nur per Prompt).
+    if kampagne == "recruiting" and headline:
+        import recruiting_prompts
+        for _rx, _repl in recruiting_prompts.BEGRIFFE_TABU:
+            headline = _rx.sub(_repl, headline)
 
     # ─────────────────────────────────────────────────────────────────────────
     # STUFE 2: Creative Director - 4 Routen
     # ─────────────────────────────────────────────────────────────────────────
     log.info("🎨 Stufe 2/6: Creative Director (4 Routen)")
-    creative_territories = generate_creative_routes(message_brief)
+    creative_territories = generate_creative_routes(message_brief, kampagne=kampagne)
     log.info("   ✓ 4 kreative Routen generiert")
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -236,7 +244,7 @@ def run_sharenext_pipeline(
     concept_verdict = evaluate_routes(
         message_brief, creative_territories,
         recent_heroes=recent_heroes, recent_environments=recent_environments,
-        recent_message_angles=recent_message_angles
+        recent_message_angles=recent_message_angles, kampagne=kampagne
     )
     log.info(f"   ✓ Gewinner: Route {concept_verdict.winning_route} - {concept_verdict.winning_titel}")
     log.info(f"   Score: {concept_verdict.winning_score:.1f}/10")
@@ -267,7 +275,7 @@ def run_sharenext_pipeline(
     # STUFE 4: Art Director Board
     # ─────────────────────────────────────────────────────────────────────────
     log.info("🎬 Stufe 4/6: Art Director Board")
-    art_board = create_art_direction_board(message_brief, winning_route)
+    art_board = create_art_direction_board(message_brief, winning_route, kampagne=kampagne)
     log.info(f"   ✓ Focal Point: {art_board.focal_point}")
     log.info(f"   ✓ Farben: {', '.join(art_board.dominante_farben[:3])}")
 
@@ -283,7 +291,8 @@ def run_sharenext_pipeline(
         headline=headline,
         size=size,
         quality=quality,
-        output_path=output_path
+        output_path=output_path,
+        kampagne=kampagne
     )
     log.info(f"   ✓ Bild generiert: {image.size[0]}x{image.size[1]} px")
     log.info(f"   ✓ Alt-Text: {production_brief.alt_text or '(nicht generiert)'}")
@@ -292,7 +301,8 @@ def run_sharenext_pipeline(
     # STUFE 6: Visual QA - Gate A
     # ─────────────────────────────────────────────────────────────────────────
     log.info("✅ Stufe 6/6: Visual QA (Gate A)")
-    qa_verdict = check_raw_image(image, message_brief, winning_route, art_board, headline=headline)
+    qa_verdict = check_raw_image(image, message_brief, winning_route, art_board, headline=headline,
+                                 kampagne=kampagne)
     log.info(f"   ✓ QA Score: {qa_verdict.gesamtscore:.1f}/10")
     log.info(f"   {'✓ FREIGEGEBEN' if qa_verdict.freigegeben else '⚠ ABGELEHNT'}")
 

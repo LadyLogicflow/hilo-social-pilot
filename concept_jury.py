@@ -324,7 +324,8 @@ def evaluate_routes(
     model: str = "gpt-5-nano",
     recent_heroes: "list[str] | None" = None,
     recent_environments: "list[str] | None" = None,
-    recent_message_angles: "list[str] | None" = None
+    recent_message_angles: "list[str] | None" = None,
+    kampagne: str = "steuer"
 ) -> ConceptJuryVerdict:
     """Bewertet 5 kreative Routen und wählt die beste aus.
 
@@ -578,6 +579,13 @@ Bewerte jede Route nach den 7 Kriterien (1-10).
 Begründe Stärken und Schwächen je Route.
 Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du musst nicht rechnen.
 """
+
+    if kampagne == "recruiting":
+        system_prompt = system_prompt + (
+            "\n\nKAMPAGNE RECRUITING: Dies ist KEIN Steuer-Post, sondern wirbt selbstständige "
+            "HILO-Beratungsstellenleiter (m/w/d) an. Bewerte Botschaftsklarheit und die Brücke zur "
+            "RECRUITING-Kernaussage (Aufbruch, Selbständigkeit, eigener Chef) - nicht zu einem "
+            "Steuerthema. Dieselbe Strenge und Ehrlichkeit wie sonst, nur keine Steuer-Annahmen.")
 
     log.info(f"Concept Jury bewertet 5 Routen für: {brief.kernaussage}")
 

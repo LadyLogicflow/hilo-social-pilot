@@ -268,7 +268,8 @@ class ArtDirectionBoard(BaseModel):
 def create_art_direction_board(
     brief: MessageBrief,
     winning_route: CreativeRoute,
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> ArtDirectionBoard:
     """Erstellt Art Direction Board aus gewinnender Route.
 
@@ -477,6 +478,10 @@ Wähle bevorzugt eine andere Option als zuletzt, WENN sie zur Route genauso gut 
 Wenn die zuletzt genutzte Option für dieses Motiv klar die stärkste Wahl ist, nimm sie trotzdem -
 die inhaltliche Passung zur Route hat immer Vorrang vor reiner Abwechslung.
 """
+
+    if kampagne == "recruiting":
+        import recruiting_prompts
+        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE
 
     log.info(f"Art Director erstellt Board für: {winning_route.titel}")
 

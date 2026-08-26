@@ -206,7 +206,8 @@ def check_raw_image(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     headline: str = "",
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> VisualQAVerdict:
     """Gate A: Prüft das generierte Motiv (inkl. eingebrannter Überschrift).
 
@@ -406,6 +407,13 @@ Bewerte (1-10):
 
 Gib nur die Einzelbewertungen an - Gesamtscore und Freigabe berechnet das System.
 """
+
+    if kampagne == "recruiting":
+        system_prompt = system_prompt + (
+            "\n\nKAMPAGNE RECRUITING: Dieses Bild wirbt selbstständige Beratungsstellenleiter (m/w/d) an. "
+            "Sind im Bild die Wörter 'Steuerberater' oder 'Kanzlei' sichtbar, ist das ein AUTOMATISCHER "
+            "Ablehnungsgrund. Prüfe zudem, ob das Bild Lust auf Selbständigkeit/Aufbruch macht statt ein "
+            "Steuer- oder Schreibtisch-/Büro-Klischee zu zeigen.")
 
     log.info(f"Visual QA prüft Rohmotiv: {route.titel}")
 
