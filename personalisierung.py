@@ -72,10 +72,25 @@ def personalisiere_caption(base, stelle, kanal=None):
     return (kombi + "\n\n" + tags).strip() if tags else kombi
 
 
+# Fester Karriere-Link fuer Recruiting-Beitraege (deutschlandweit, keine Stellen-Regionalisierung).
+KARRIERE_LINK = "https://www.hilo.de/karriere/"
+
+
+def _mit_karriere_link(base):
+    """Haengt den Karriere-Link an den Begleittext an - aber VOR einen evtl. Hashtag-Block."""
+    haupt, tags = _split_hashtags(base)
+    kern = ((haupt + "\n\n" if haupt else "") + "Mehr erfahren: %s" % KARRIERE_LINK).strip()
+    return (kern + "\n\n" + tags).strip() if tags else kern
+
+
 def caption_fuer_stelle(fields, stelle, kanal):
     """Kanalspezifischer, fuer die Beratungsstelle personalisierter Begleittext."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
     base = caps.get(kanal) or fields.get("caption") or ""
+    # Recruiting: KEINE steuerliche Stellen-Personalisierung und KEIN Terminlink - stattdessen der feste
+    # Karriere-Link (der Beitrag wirbt deutschlandweit Beratungsstellenleiter an, nicht Steuer-Mandanten).
+    if fields.get("kampagne") == "recruiting":
+        return _mit_karriere_link(base)
     return personalisiere_caption(base, stelle, kanal)
 
 
@@ -85,6 +100,14 @@ def whatsapp_texte(fields, stelle=None, quelle_url=""):
     Beratungsstelle (homepage_url); der Parameter quelle_url wird nicht mehr verwendet (Kompatibilitaet).
     stelle=None -> ohne Stellen-Personalisierung, dann auch ohne Homepage-Link."""
     caps = fields.get("captions") if isinstance(fields.get("captions"), dict) else {}
+    # Recruiting-Status/-Kanal: kein Terminlink, keine Kanal-Einladung (das ist der Steuer-Funnel) -
+    # nur der feste Karriere-Link.
+    if fields.get("kampagne") == "recruiting":
+        kanal_text = ((caps.get("whatsapp_kanal") or fields.get("caption") or "").strip()
+                      + "\n\nMehr erfahren: %s" % KARRIERE_LINK).strip()
+        story = ((caps.get("whatsapp_story") or "").strip()
+                 + "\nMehr erfahren: %s" % KARRIERE_LINK).strip()
+        return kanal_text, story
     link = buchungslink(stelle) if stelle else ""
     ort = (stelle["ort"] or "").strip() if (stelle and _has(stelle, "ort")) else ""
     hp = homepage(stelle)

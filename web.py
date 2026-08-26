@@ -8,7 +8,7 @@ from flask import (Flask, request, redirect, url_for, session, send_file,
                    render_template_string, flash, abort)
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from db import get_conn, init_db, audit_log
+from db import get_conn, init_db, audit_log, get_einstellung, set_einstellung
 from secrets_store import get_secret
 from config import BASE_DIR, DATA_DIR, WHATSAPP_URL
 import textgen, bildgen
@@ -81,6 +81,12 @@ def _pages(force=False):
     return _pages_cache["data"], _pages_cache["err"]
 
 _KANAL_DE = {"facebook": "Facebook", "instagram": "Instagram", "beide": "Facebook + Instagram"}
+
+# Recruiting-Entwuerfe tragen im Entwurf-JSON die Markierung fields['kampagne']='recruiting'. json.dumps
+# (Default-Separatoren) serialisiert das als der untenstehende Teilstring. Damit sich Steuer- und
+# Recruiting-Beitraege NIE vermischen, filtern die Steuer-Ansichten (/entwuerfe, Pool-Sammelaufnahme,
+# Startseiten-Zaehler) Recruiting-Entwuerfe per 'text NOT LIKE _RECRUITING_LIKE' heraus.
+_RECRUITING_LIKE = '%"kampagne": "recruiting"%'
 
 def _kanal_fuer(prefix, tid):
     """Liest den je Ziel gewaehlten Kanal aus dem Formular (kanal_s<id> bzw. kanal_p<id>).
@@ -325,7 +331,9 @@ def _publiziere_geplant(gpid):
     # Pool-Beitraege (gp['pool']==1) tragen den Status 'pool' (einmalige Freigabe beim Topf-Eintrag)
     # und sind ebenfalls postbar - sie bleiben aber wiederverwendbar (siehe Status-Flip unten).
     pool_post = bool(gp["pool"])
-    erlaubte_status = ("freigegeben", "pool") if pool_post else ("freigegeben",)
+    # Recruiting-Pool-Beitraege tragen den Status 'pool_recruiting' (eigene Freigabe beim Recruiting-
+    # Topf-Eintrag) und sind - wie die Steuer-Pool-Beitraege - postbar und wiederverwendbar.
+    erlaubte_status = ("freigegeben", "pool", "pool_recruiting") if pool_post else ("freigegeben",)
     if not e or e["status"] not in erlaubte_status:
         with get_conn() as conn:
             conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
@@ -763,6 +771,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 </div>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#0B2545" href="/recruiting">{% if recruiting_offen %}<span class=badge>{{recruiting_offen}}</span>{% endif %}<h3>&#x1F4BC; Recruiting-Kampagne</h3><p>Beratungsstellenleiter/in (m/w/d) deutschlandweit anwerben: 5 Beiträge auf einmal erzeugen, freigeben, eigener Recruiting-Pool – einmal pro Woche automatisch je Stelle ausgespielt (Facebook, Instagram, WhatsApp-Status).</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#f59e0b;background:linear-gradient(180deg,#fffbeb,#fff)" href="/sharenext"><h3>🚀 ShareNext - Premium Bildgenerierung</h3><p>KI-basierte 6-Stufen-Pipeline für hochwertige Social-Media-Bilder (~$0.10/Bild, 30-60 Sek.)</p></a>"""
@@ -904,6 +913,67 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
     </div>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
+"""
+
+RECRUITING = """<!doctype html><meta charset=utf-8><title>Recruiting-Kampagne</title>
+<style>""" + _TOP + """
+.card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
+.card img{width:280px;height:280px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
+.cta{display:inline-block;background:#0B2545;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
+button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6px;color:#fff}
+.ok{background:#4D7C0F}.re{background:#0B2545}.del{background:#b00020}.gr{background:#6b7280}
+.status{max-width:1040px;margin:0 auto 16px;background:#eef2f8;border-radius:10px;padding:12px 16px;color:#0B2545;font-size:14px}
+.sec{max-width:1040px;margin:22px auto 8px;color:#0B2545}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Recruiting-Kampagne (Beratungsstellenleiter/in gesucht)</h2><a href="/">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=status>
+  <b>Recruiting-Pool:</b> {{aktiv_pool}} freigegebene Beiträge{% if aktiv_pool < min_pool %} &nbsp;<span style="color:#b00020">(knapp – Auto-Nachschub aktiv ab &lt; {{min_pool}})</span>{% endif %}
+  &middot; <b>Nächste Wochen-Ausspielung geplant für Woche:</b> {{plan}}
+  &middot; Kanäle: {{kanaele|join(', ')}}
+  {% if laeuft %}<br><b>&#x23F3; Es werden gerade Recruiting-Beiträge im Hintergrund erzeugt – Seite in 1–2 Min. neu laden.</b>{% endif %}
+</div>
+<div style="max-width:1040px;margin:0 auto 14px;text-align:right">
+  <form method=post action="/recruiting-erzeugen" style="display:inline">
+    <button class=ok{% if laeuft %} disabled{% endif %} title="Fünf neue Recruiting-Beiträge (Text + Bild) erzeugen">&#x2795; Recruiting-Beiträge erzeugen (5)</button></form>
+</div>
+<h3 class=sec>Offene Recruiting-Entwürfe ({{entwuerfe|length}})</h3>
+{% for e in entwuerfe %}
+<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Bild wird gerade im Hintergrund erstellt – Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}<img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p><span class=cta>{{e.f.cta}}</span></p>
+    {% if e.f.captions %}<details><summary>Begleittexte je Kanal anzeigen</summary>{% for k,v in e.f.captions.items() %}<p><b>{{k}}:</b> {{v}}</p>{% endfor %}</details>{% endif %}
+    """ + _WARUM_PANEL + """
+    <div style="margin-top:10px">
+      <form method=post action="/bild-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Nur ein neues Foto erzeugen? Text bleibt unverändert.')">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=gr title="Nur ein neues Foto (Recruiting-Bildpipeline) – Text bleibt gleich">&#x1F3B2; Bild neu</button></form>
+      {% if e.f.sharenext_state %}<form method=post action="/umsetzung-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Gleiche Idee behalten und nur das Bild neu rendern?')">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=gr title="Dieselbe Idee behalten, nur das Bild neu rendern">&#x1F504; Idee behalten</button></form>{% endif %}
+      <form method=post action="/recruiting-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Text UND Bild komplett neu erzeugen?')">
+        <button class=re title="Frischen Recruiting-Text und ein neues Bild erzeugen">&#x270F;&#xFE0F; Bild + Text neu</button></form>
+    </div>
+    <div style="margin-top:12px">
+      <form method=post action="/recruiting-freigeben/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Recruiting-Beitrag freigeben und in den Recruiting-Pool legen? Er wird dann automatisch einmal pro Woche je Beratungsstelle ausgespielt.')">
+        <button class=ok>&#x2714;&#xFE0F; Freigeben &rarr; Recruiting-Pool</button></form>
+      <form method=post action="/aktion/{{e.id}}" style="display:inline">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Recruiting-Entwurf wirklich löschen?')">Löschen</button></form>
+    </div>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Keine offenen Recruiting-Entwürfe. Oben „Recruiting-Beiträge erzeugen (5)“ klicken.</p>{% endfor %}
+<h3 class=sec>Recruiting-Pool ({{pool_items|length}} freigegeben)</h3>
+{% for e in pool_items %}
+<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p style="color:#6b7280;font-size:13px">Freigegeben: {{e.freigegeben_de}} &middot; bereits ausgespielt: {{e.bespielt}}×</p>
+    <form method=post action="/recruiting-pool-entfernen/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Recruiting-Pool nehmen?')">
+      <button class=gr>Aus dem Recruiting-Pool nehmen</button></form>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Noch keine Beiträge im Recruiting-Pool.</p>{% endfor %}
 """
 
 EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentlichung</title>
@@ -1837,10 +1907,15 @@ def index():
         themen_offen = conn.execute("SELECT COUNT(*) FROM themen WHERE status='vorgeschlagen'").fetchone()[0]
         bereit = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
                               "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
-        entwuerfe_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf'").fetchone()[0]
+        entwuerfe_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' "
+                                       "AND text NOT LIKE ?", (_RECRUITING_LIKE,)).fetchone()[0]
+        recruiting_offen = conn.execute(
+            "SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+            (_RECRUITING_LIKE,)).fetchone()[0]
         freigegeben_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='freigegeben'").fetchone()[0]
     return render_template_string(HOME, **_ctx(themen_offen=themen_offen, bereit=bereit,
                                   entwuerfe_offen=entwuerfe_offen, freigegeben_offen=freigegeben_offen,
+                                  recruiting_offen=recruiting_offen,
                                   gen_running=_generation_running(), wa_getrennt=_wa_getrennte_stellen()))
 
 @app.route("/entwuerfe")
@@ -1848,7 +1923,8 @@ def index():
 def entwuerfe():
     rows = []
     with get_conn() as conn:
-        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' ORDER BY id DESC"):
+        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' "
+                              "AND text NOT LIKE ? ORDER BY id DESC", (_RECRUITING_LIKE,)):
             row = _parse(e)
             # NUR NOCH ShareNext Premium-Bilder - keine has_premium Flag mehr!
             rows.append(row)
@@ -1984,6 +2060,16 @@ def pool_export():
     resp.headers["Content-Disposition"] = 'attachment; filename="sharenext-pool-export.txt"'
     return resp
 
+def _zurueck_ziel(zurueck):
+    """Rueckleitziel fuer die Bild-/Aktions-Buttons anhand des versteckten Feldes 'zurueck'.
+    Additiv um 'recruiting' erweitert, damit die Buttons auf der Recruiting-Uebersicht dorthin
+    zurueckfuehren; Default bleibt die Entwuerfe-Seite (unveraendertes Steuer-Verhalten)."""
+    if zurueck == "recruiting":
+        return url_for("recruiting_seite")
+    if zurueck == "einplanung":
+        return url_for("einplanung")
+    return url_for("entwuerfe")
+
 def _pool_back():
     """Nach einer Pool-Aufnahme NICHT auf die Pool-Seite umleiten (ueberfluessig), sondern zurueck
     zur Ausgangsseite (Freigabe oder Einplanung). Die Pool-Seite erreicht man nur ueber die
@@ -2040,7 +2126,9 @@ def pool_aufnehmen_alle():
     user = session["user"]
     n = 0
     with get_conn() as conn:
-        ids = [r["id"] for r in conn.execute("SELECT id FROM entwuerfe WHERE status='entwurf'")]
+        # Recruiting-Entwuerfe NICHT in den Steuer-Pool aufnehmen (eigener Recruiting-Pool).
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM entwuerfe WHERE status='entwurf' AND text NOT LIKE ?", (_RECRUITING_LIKE,))]
         for eid in ids:
             conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
             conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))  # frueher entfernten reaktivieren
@@ -2054,6 +2142,347 @@ def pool_aufnehmen_alle():
     else:
         flash("Es gab keine offenen Entwürfe, die in den Pool aufgenommen werden konnten.")
     return _pool_back()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECRUITING-KAMPAGNE (Etappen 3-5): PARALLELE Content-Maschinerie zur Anwerbung neuer
+# selbststaendiger HILO-Beratungsstellenleiter. Vollstaendig ADDITIV und von der Steuer-Maschinerie
+# getrennt: EIGENE Pool-Tabellen (pool_recruiting/pool_nutzung_recruiting), eigene Erzeugung, eigener
+# WOECHENTLICHER Scheduler. Der taegliche Steuer-Scheduler zieht ausschliesslich aus `pool` und kann
+# Recruiting-Beitraege daher nie erwischen. Deutschlandweit beworben (keine Regionalisierung).
+# ─────────────────────────────────────────────────────────────────────────────
+RECRUITING_KANAELE = ["facebook", "instagram", "whatsapp_status"]   # Vorgabe catrin (kein WhatsApp-Kanal)
+RECRUITING_POOL_TABLE = "pool_recruiting"
+RECRUITING_NUTZUNG_TABLE = "pool_nutzung_recruiting"
+RECRUITING_SCHWUNG = 5              # Beitraege je Erzeugungs-Schub (Vorgabe catrin: "5 auf einmal")
+RECRUITING_MIN_POOL = 5             # aktive Recruiting-Pool-Beitraege, ab deren Unterschreitung Auto-Nachschub laeuft
+_recruiting_gen_lock = threading.Lock()
+_recruiting_gen = {"running": False}
+
+
+def _recruiting_generation_running():
+    return _recruiting_gen.get("running", False)
+
+
+def _recruiting_erzeuge_schwung(anzahl, user):
+    """Erzeugt SYNCHRON einen Schwung Recruiting-Entwuerfe (Text + Bild) - laeuft in einem
+    Hintergrund-Thread (siehe _recruiting_start_schwung). Pro Entwurf: EIN KI-Textaufruf
+    (textgen.generate(..., kampagne='recruiting', variation_index=i) fuer Diversitaet der 5) und
+    EIN Recruiting-Bildlauf (ShareNext-Pipeline im Recruiting-Modus, Auto-Retry). Entwuerfe werden
+    mit status='entwurf' + fields['kampagne']='recruiting' angelegt (im Steuer-Fluss unsichtbar).
+    Robust: ein fehlgeschlagener Einzel-Beitrag stoppt den Schwung nicht."""
+    created = 0
+    for i in range(anzahl):
+        try:
+            data = textgen.generate({}, kampagne="recruiting", variation_index=i)
+            # HARTE Markierung: ueberall als Recruiting-Beitrag erkennbar; der Steuer-Pfad ignoriert ihn.
+            data["kampagne"] = "recruiting"
+            with get_conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) "
+                    "VALUES (NULL, 'facebook', ?, 'entwurf', NULL)",
+                    (json.dumps(data, ensure_ascii=False),))
+                eid = cur.lastrowid
+                audit_log(conn, user, "recruiting_entwurf", eid, "Recruiting-Beitrag erzeugt (Variante %d)" % i)
+                conn.commit()
+            # Bild im Recruiting-Modus (Auto-Retry, Best of N). Fehler -> bild_fehler im JSON, Entwurf bleibt.
+            try:
+                _sharenext_bild_mit_retry(data, eid, kampagne="recruiting")
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), data.get("bild_pfad"), eid))
+                    conn.commit()
+            except Exception as ex:
+                log.error("Recruiting-Bild fehlgeschlagen (Entwurf %s): %s", eid, ex, exc_info=True)
+                data["bild_fehler"] = str(ex)
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), eid))
+                    conn.commit()
+            created += 1
+            log.info("Recruiting-Entwurf %s erzeugt (%d/%d).", eid, i + 1, anzahl)
+        except Exception as ex:
+            log.warning("Recruiting-Texterzeugung fehlgeschlagen (Variante %d): %s", i, ex)
+    log.info("Recruiting-Schwung fertig: %d/%d Beitraege erzeugt.", created, anzahl)
+    return created
+
+
+def _recruiting_start_schwung(anzahl=RECRUITING_SCHWUNG, user="system"):
+    """Startet die Recruiting-Erzeugung EINMAL im Hintergrund (kein Doppelstart). Rueckgabe:
+    True = gestartet, False = laeuft bereits."""
+    with _recruiting_gen_lock:
+        if _recruiting_generation_running():
+            return False
+        _recruiting_gen["running"] = True
+
+    def runner():
+        try:
+            _recruiting_erzeuge_schwung(anzahl, user)
+        finally:
+            _recruiting_gen["running"] = False
+
+    threading.Thread(target=runner, daemon=True).start()
+    return True
+
+
+def _recruiting_auto_nachschub(user="system"):
+    """Auto-Nachschub: faellt der aktive Recruiting-Pool unter RECRUITING_MIN_POOL Beitraege, wird EIN
+    neuer 5er-Schwung erzeugt (im Hintergrund). Rueckgabe: True = Nachschub angestossen. Der zaehl-
+    basierte Schwellwert ist fuer die WOECHENTLICHE, deutschlandweite Recruiting-Ausspielung robuster
+    als die (fuer den taeglichen Steuer-Betrieb gedachte) WARNSCHWELLE von pool.knappe_vorraete."""
+    import pool as poolmod
+    with get_conn() as conn:
+        aktiv = len(poolmod.aktive_pool_ids(conn, pool_table=RECRUITING_POOL_TABLE))
+    if aktiv < RECRUITING_MIN_POOL and not _recruiting_generation_running():
+        if _recruiting_start_schwung(RECRUITING_SCHWUNG, user):
+            log.info("Recruiting-Auto-Nachschub: Pool bei %d (< %d) - neuer Schwung gestartet.",
+                     aktiv, RECRUITING_MIN_POOL)
+            return True
+    return False
+
+
+def _recruiting_wochenziehung(conn, datum, zeit, rng):
+    """Zieht je aktive Beratungsstelle und je Recruiting-Kanal (facebook/instagram/whatsapp_status)
+    einen noch offenen Recruiting-Pool-Beitrag und legt dafuer einen geplante_posts-Eintrag (pool=1)
+    zur uebergebenen Uhrzeit am uebergebenen Datum an; danach markiere_verbraucht auf die
+    Recruiting-Nutzungstabelle. Nur Stellen, die den jeweiligen Kanal tatsaechlich haben, werden
+    bespielt (_kanal_verfuegbarkeit). Rueckgabe: Anzahl neu eingeplanter Beitraege.
+    Nur FREIGEGEBENE Beitraege liegen im Recruiting-Pool -> Veroeffentlichung erst nach menschlicher
+    Freigabe (Vorgabe catrin)."""
+    import pool as poolmod
+    stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                           "AND fb_seite!='' ORDER BY id").fetchall()
+    stelle_ids = [int(r["id"]) for r in stellen]
+    if not stelle_ids:
+        return 0
+    verfuegbar = _kanal_verfuegbarkeit(stellen)   # dict[kanal] -> set(stelle_id)
+    geplant_am = "%sT%s" % (datum, zeit)
+    n = 0
+    for kanal in RECRUITING_KANAELE:
+        kanal_stellen = [sid for sid in stelle_ids if sid in verfuegbar.get(kanal, set())]
+        if not kanal_stellen:
+            continue
+        auswahl = poolmod.ziehe_tagesauswahl(
+            conn, kanal_stellen, kanal, rng,
+            pool_table=RECRUITING_POOL_TABLE, nutzung_table=RECRUITING_NUTZUNG_TABLE)
+        for sid, eid in auswahl.items():
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
+                         "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
+                         (eid, sid, kanal, "einzelbild", "einzelbild", "einzelbild", geplant_am))
+            poolmod.markiere_verbraucht(conn, eid, sid, kanal, nutzung_table=RECRUITING_NUTZUNG_TABLE)
+            n += 1
+    if n:
+        audit_log(conn, "system", "recruiting_wochenziehung", None,
+                  "%d Recruiting-Beitrag/-Beitraege fuer %s %s" % (n, datum, zeit))
+    conn.commit()
+    return n
+
+
+def _recruiting_wochenplan(now, rng):
+    """Legt fuer die aktuelle ISO-Woche EINMAL Zufalls-Tag + Zufalls-Uhrzeit (06:00-07:59) fest -
+    ohne erkennbares Muster (Vorgabe catrin). Waehlt nur Tage, deren 06-08-Fenster noch in der
+    ZUKUNFT liegt (damit der Verpasst-Schutz von _publiziere_geplant nicht zuschlaegt): kuenftige
+    Tage dieser ISO-Woche, plus heute nur, wenn es vor 06:00 Uhr ist. Rueckgabe: (datum_iso, 'HH:MM')
+    oder (None, None), wenn in dieser Woche kein solcher Tag mehr uebrig ist (sehr seltener
+    Spaet-Start am Wochenende -> diese Woche einmalig kein Recruiting-Post)."""
+    import datetime
+    iso_year, iso_week, _ = now.isocalendar()
+    montag = datetime.date.fromisocalendar(iso_year, iso_week, 1)
+    heute = now.date()
+    kandidaten = []
+    for offset in range(7):
+        d = montag + datetime.timedelta(days=offset)
+        if d > heute or (d == heute and now.hour < 6):
+            kandidaten.append(d)
+    if not kandidaten:
+        return None, None
+    tag = rng.choice(kandidaten)
+    minute = rng.randint(6 * 60, 8 * 60 - 1)   # 06:00 .. 07:59
+    return tag.isoformat(), "%02d:%02d" % (minute // 60, minute % 60)
+
+
+def _recruiting_scheduler():
+    """Woechentlicher Recruiting-Scheduler: plant EINMAL pro ISO-Woche an einem ZUFAELLIGEN Wochentag
+    zu einer ZUFAELLIGEN Uhrzeit zwischen 06:00 und 08:00 die Recruiting-Ausspielung ein (legt die
+    geplante_posts-Eintraege im Voraus an; das eigentliche Posten uebernimmt der bestehende
+    _publish_scheduler zur geplanten Uhrzeit). Tag/Zeit werden pro Woche EINMAL gewuerfelt und in der
+    Ziehung materialisiert -> stabil, kein Muster. Doppelausfuehrung pro Woche verhindert der
+    einstellungen-Marker 'recruiting_geplante_woche'. Loest ausserdem den Auto-Nachschub aus, wenn der
+    Recruiting-Pool knapp wird. Faengt jeden Fehler ab - der Thread darf nie sterben."""
+    import datetime, random
+    while True:
+        try:
+            now = datetime.datetime.now()
+            iso_year, iso_week, _ = now.isocalendar()
+            wochen_key = "%04d-W%02d" % (iso_year, iso_week)
+            if get_einstellung("recruiting_geplante_woche") != wochen_key:
+                # Deterministischer Seed je Woche -> Tag/Zeit sind stabil, falls der Scheduler mehrfach
+                # in derselben Iteration prueft, bleiben aber ueber die Wochen zufaellig/musterlos.
+                rng = random.Random("recruiting-%s" % wochen_key)
+                datum, zeit = _recruiting_wochenplan(now, rng)
+                if datum:
+                    with get_conn() as conn:
+                        n = _recruiting_wochenziehung(conn, datum, zeit, rng)
+                    log.info("Recruiting-Wochenplan %s: %d Beitrag/Beitraege fuer %s %s eingeplant.",
+                             wochen_key, n, datum, zeit)
+                else:
+                    log.info("Recruiting-Wochenplan %s: kein passender Tag mehr in dieser Woche - "
+                             "uebersprungen.", wochen_key)
+                set_einstellung("recruiting_geplante_woche", wochen_key)
+                # Nach der Ziehung pruefen, ob Nachschub noetig ist (Pool koennte jetzt knapp sein).
+                _recruiting_auto_nachschub("scheduler")
+        except Exception:
+            log.exception("Recruiting-Scheduler-Fehler")
+        time.sleep(300)
+
+
+@app.route("/recruiting")
+@login_required
+def recruiting_seite():
+    """Recruiting-Uebersicht: offene Recruiting-Entwuerfe (zur Freigabe) und der Recruiting-Pool
+    (freigegebene, automatisch woechentlich ausgespielte Beitraege). Analog zu /entwuerfe bzw. /pool,
+    aber strikt auf die Recruiting-Kampagne gefiltert."""
+    import pool as poolmod
+    entwuerfe, pool_items = [], []
+    with get_conn() as conn:
+        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' AND text LIKE ? "
+                              "ORDER BY id DESC", (_RECRUITING_LIKE,)):
+            entwuerfe.append(_parse(e))
+        nutzung = {r["entwurf_id"]: r["n"] for r in conn.execute(
+            "SELECT entwurf_id, COUNT(*) n FROM %s GROUP BY entwurf_id" % RECRUITING_NUTZUNG_TABLE)}
+        for e in conn.execute(
+                "SELECT p.entwurf_id id, p.freigegeben_am, e.text FROM %s p "
+                "JOIN entwuerfe e ON e.id=p.entwurf_id WHERE p.aktiv=1 "
+                "ORDER BY p.freigegeben_am, p.entwurf_id" % RECRUITING_POOL_TABLE):
+            row = _parse(e)
+            row["freigegeben_de"] = _de_datum((e["freigegeben_am"] or "")[:10])
+            row["bespielt"] = nutzung.get(e["id"], 0)
+            pool_items.append(row)
+        stellen = conn.execute("SELECT id FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                               "AND fb_seite!='' ORDER BY id").fetchall()
+        stelle_ids = [s["id"] for s in stellen]
+        aktiv_pool = len(poolmod.aktive_pool_ids(conn, pool_table=RECRUITING_POOL_TABLE))
+        knapp = poolmod.knappe_vorraete(conn, stelle_ids, kanaele=RECRUITING_KANAELE,
+                                        pool_table=RECRUITING_POOL_TABLE,
+                                        nutzung_table=RECRUITING_NUTZUNG_TABLE) if stelle_ids else []
+    plan = get_einstellung("recruiting_geplante_woche") or "(noch nicht geplant)"
+    return render_template_string(RECRUITING, **_ctx(
+        entwuerfe=entwuerfe, pool_items=pool_items, aktiv_pool=aktiv_pool,
+        min_pool=RECRUITING_MIN_POOL, knapp=len(knapp), plan=plan,
+        laeuft=_recruiting_generation_running(), kanaele=RECRUITING_KANAELE))
+
+
+@app.route("/recruiting-erzeugen", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_erzeugen():
+    """Erzeugt einen Schwung (5) Recruiting-Entwuerfe im Hintergrund."""
+    if _recruiting_start_schwung(RECRUITING_SCHWUNG, session["user"]):
+        flash("Erzeuge %d Recruiting-Beiträge im Hintergrund – in ein bis zwei Minuten die Seite neu "
+              "laden." % RECRUITING_SCHWUNG)
+    else:
+        flash("Es läuft bereits eine Recruiting-Erzeugung – bitte kurz warten und die Seite neu laden.")
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-freigeben/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_freigeben(eid):
+    """Gibt einen Recruiting-Entwurf frei und legt ihn in den EIGENEN Recruiting-Pool (pool_recruiting).
+    Status wechselt auf 'pool_recruiting' -> woechentliche Auto-Ausspielung, nie im Steuer-Pool."""
+    user = session["user"]
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        try:
+            is_recruiting = (json.loads(e["text"]) or {}).get("kampagne") == "recruiting"
+        except Exception:
+            is_recruiting = False
+        if not is_recruiting:
+            flash("Beitrag %d ist kein Recruiting-Beitrag." % eid)
+            return redirect(url_for("recruiting_seite"))
+        conn.execute("INSERT OR IGNORE INTO %s(entwurf_id) VALUES (?)" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE %s SET aktiv=1 WHERE entwurf_id=?" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='pool_recruiting' WHERE id=?", (eid,))
+        audit_log(conn, user, "recruiting_freigegeben", eid, "in den Recruiting-Pool aufgenommen")
+        conn.commit()
+    flash("Recruiting-Beitrag %d ist freigegeben und im Recruiting-Pool – er wird ab jetzt automatisch "
+          "einmal pro Woche je Beratungsstelle ausgespielt (Facebook, Instagram, WhatsApp-Status)." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-pool-entfernen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_pool_entfernen(eid):
+    """Nimmt einen Beitrag aus dem Recruiting-Pool (aktiv=0). Das 'nie doppelt'-Gedaechtnis bleibt.
+    Der Beitrag geht zurueck auf 'entwurf' (Recruiting) -> wieder in der Recruiting-Uebersicht."""
+    user = session["user"]
+    with get_conn() as conn:
+        conn.execute("UPDATE %s SET aktiv=0 WHERE entwurf_id=?" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='entwurf' WHERE id=? AND status='pool_recruiting'", (eid,))
+        audit_log(conn, user, "recruiting_pool_entfernt", eid, "aus dem Recruiting-Pool genommen")
+        conn.commit()
+    flash("Recruiting-Beitrag %d ist nicht mehr im Recruiting-Pool." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_neu(eid):
+    """"Bild + Text neu" fuer einen Recruiting-Entwurf: erzeugt Text UND Bild komplett neu
+    (frischer Recruiting-Aufhaenger). Laeuft im Hintergrund, Status/Kampagne bleiben."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("entwurf", "pool_recruiting"):
+        flash("Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+        return redirect(url_for("recruiting_seite"))
+    try:
+        data = json.loads(e["text"]) if e["text"] else {}
+    except Exception:
+        data = {}
+    if data.get("kampagne") != "recruiting":
+        flash("Beitrag %d ist kein Recruiting-Beitrag." % eid)
+        return redirect(url_for("recruiting_seite"))
+    data["bild_wird_erstellt"] = True
+    data.pop("bild_fehler", None)
+    with get_conn() as conn:
+        conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
+        conn.commit()
+    _bg_start(_recruiting_neu_hintergrund, eid, session["user"])
+    flash("Recruiting-Beitrag %d wird mit frischem Text und Bild neu erzeugt (im Hintergrund)." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+def _recruiting_neu_hintergrund(eid, user):
+    """Erzeugt Text + Bild eines Recruiting-Entwurfs komplett neu (Hintergrund-Thread)."""
+    try:
+        neu = textgen.generate({}, kampagne="recruiting")
+        neu["kampagne"] = "recruiting"
+        _sharenext_bild_mit_retry(neu, eid, kampagne="recruiting")
+        neu["bild_wird_erstellt"] = False
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(neu, ensure_ascii=False), neu.get("bild_pfad"), eid))
+            audit_log(conn, user, "recruiting_neu", eid)
+            conn.commit()
+        log.info("Recruiting-Neuerzeugung (Hintergrund) fertig fuer Entwurf %d", eid)
+    except Exception as ex:
+        log.error("Recruiting-Neuerzeugung (Hintergrund) fehlgeschlagen fuer Entwurf %d: %s",
+                  eid, ex, exc_info=True)
+        try:
+            with get_conn() as conn:
+                row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+                d = json.loads(row["text"]) if row and row["text"] else {}
+                d["bild_wird_erstellt"] = False
+                d["bild_fehler"] = "Neuerzeugung fehlgeschlagen: %s" % ex
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(d, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
@@ -2159,12 +2588,12 @@ def bild_neu(eid):
     Ueberschrift, Bullets, CTA und Begleittext (Caption) bleiben UNVERAENDERT - es wird kein
     einziges Wort neu generiert, nur ein neues Foto mit der bestehenden Ueberschrift."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    ziel = _zurueck_ziel(zurueck)
     with get_conn() as conn:
         e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
-    if e["status"] not in ("freigegeben", "entwurf"):
+    if e["status"] not in ("freigegeben", "entwurf", "pool_recruiting"):
         flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
@@ -2175,6 +2604,8 @@ def bild_neu(eid):
             conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
             conn.commit()
         # Im Hintergrund erzeugen (voller ShareNext-Bildlauf) - UI blockiert nicht, direkt weiterarbeiten.
+        # _premium_foto_hintergrund leitet die Kampagne aus data['kampagne'] ab (Recruiting-Entwuerfe
+        # laufen so automatisch im Recruiting-Bildmodus).
         _bg_start(_premium_foto_hintergrund, eid, session["user"])
         flash("Neues Bild für Beitrag %d wird im Hintergrund erzeugt – du kannst direkt weiterarbeiten." % eid)
     except Exception as ex:
@@ -2187,12 +2618,12 @@ def umsetzung_neu(eid):
     """"Nur Umsetzung neu (Idee behalten)": rendert das Bild mit der GESPEICHERTEN Gewinner-Idee
     (Route + Art Direction) neu - gleiche Idee, frische Ausfuehrung. Laeuft im Hintergrund."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    ziel = _zurueck_ziel(zurueck)
     with get_conn() as conn:
         e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
-    if e["status"] not in ("freigegeben", "entwurf"):
+    if e["status"] not in ("freigegeben", "entwurf", "pool_recruiting"):
         flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
@@ -2406,14 +2837,22 @@ def _umsetzung_neu_hintergrund(eid, user):
             pass
 
 
-def _sharenext_bild_synchron(data, eid):
+def _sharenext_bild_synchron(data, eid, kampagne=None):
     """Erzeugt SYNCHRON ein Bild ueber die ShareNext-Pipeline (GPT integriert die Ueberschrift
     direkt ins Foto, Pillow ergaenzt danach nur noch die beiden CI-Kreise) und schreibt die
     Ergebnisfelder in `data`. Ersetzt die alte 'Standard'-Pipeline (bildmotiv.ensure_photo_fuer +
     bildgen.render mit Karte/Bullets/CTA), die nicht mehr verwendet wird.
 
+    kampagne: 'steuer' (Default) oder 'recruiting'. Wird nicht explizit uebergeben, leitet sich die
+    Kampagne aus dem Entwurf-JSON ab (data['kampagne']) - so laufen bild_neu/umsetzung_neu bei
+    Recruiting-Entwuerfen automatisch im richtigen Modus (run_sharenext_pipeline(..., kampagne=...)).
+    Die frueher fest verdrahtete stream='radar'-Vorgabe ist fuer Recruiting inhaltlich egal, weil der
+    Message-Brief-Generator bei kampagne='recruiting' den steuer-spezifischen Brief komplett ersetzt.
+
     Wirft bei Fehler eine Exception weiter (Aufrufer faengt/meldet). Rueckgabe: Pfad zum Bild."""
     from sharenext_pipeline import run_sharenext_pipeline
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     headline = data.get("ueberschrift", "")
     bullets = data.get("bullets", [])
     text = "\n".join(bullets) if bullets else ""
@@ -2426,6 +2865,7 @@ def _sharenext_bild_synchron(data, eid):
         headline=headline,
         size="1024x1024",
         quality="medium",
+        kampagne=kampagne,
     )
     # "Warum dieses Bild?"-Panel-Daten + Gewinner-Idee (fuer "Idee behalten") zentral aus dem
     # Result uebernehmen - dieselbe Quelle wie alle anderen Erzeugungs-Wege.
@@ -2457,8 +2897,10 @@ _SHARENEXT_MAX_VERSUCHE = 3
 _CONCEPT_FIDELITY_OK = 7.0   # ab hier gilt die Idee als gut umgesetzt -> nur Umsetzung neu rendern
 
 
-def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
+def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE, kampagne=None):
     """Erzeugt ein Bild und rendert bei QA-Ablehnung automatisch nach (Best of N).
+    kampagne (Default: aus data['kampagne'] abgeleitet, sonst 'steuer') wird an beide Bild-Pfade
+    (voller Lauf / nur Umsetzung) durchgereicht, damit Recruiting-Entwuerfe im Recruiting-Modus laufen.
     Kombinierte Logik je Nachlauf:
     - Idee laut Concept Fidelity gut umgesetzt (>= _CONCEPT_FIDELITY_OK), aber QA abgelehnt
       -> NUR Umsetzung neu (gleiche Idee, via sharenext_state).
@@ -2467,6 +2909,8 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     behalten. Vermerkt die Versuchszahl in data['pipeline_info']['versuche']."""
     import copy as _copy
     import shutil as _shutil
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     best_path = out + ".best"
     best_qa = -1.0
@@ -2481,14 +2925,14 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     while versuche < max_versuche and not approved:
         versuche += 1
         if versuche == 1:
-            _sharenext_bild_synchron(data, eid)
+            _sharenext_bild_synchron(data, eid, kampagne=kampagne)
         else:
             info = data.get("pipeline_info") or {}
             cf = info.get("concept_fidelity")
             if cf is not None and cf >= _CONCEPT_FIDELITY_OK and data.get("sharenext_state"):
-                _sharenext_rerender_synchron(data, eid)   # gute Idee -> gleiche Idee neu rendern
+                _sharenext_rerender_synchron(data, eid, kampagne=kampagne)   # gute Idee -> gleiche Idee neu rendern
             else:
-                _sharenext_bild_synchron(data, eid)       # schwaches Konzept -> neue Idee
+                _sharenext_bild_synchron(data, eid, kampagne=kampagne)       # schwaches Konzept -> neue Idee
         approved = bool(data.get("qa_approved"))
         qa_score = (data.get("pipeline_info") or {}).get("qa_score") or 0.0
         log.info("Auto-Retry Entwurf %d: Versuch %d/%d, QA=%.1f, freigegeben=%s",
@@ -2521,14 +2965,18 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     return out
 
 
-def _sharenext_rerender_synchron(data, eid):
+def _sharenext_rerender_synchron(data, eid, kampagne=None):
     """"Nur Umsetzung neu (Idee behalten)": rendert das Bild NEU, aber mit der GESPEICHERTEN
     Gewinner-Idee (Route + Art Direction) - laeuft also NUR Image Producer + Visual QA, nicht die
-    volle Pipeline. Faellt auf den vollen Lauf zurueck, wenn keine gespeicherte Idee vorliegt."""
+    volle Pipeline. Faellt auf den vollen Lauf zurueck, wenn keine gespeicherte Idee vorliegt.
+    kampagne (Default aus data['kampagne'], sonst 'steuer') steuert die Recruiting-Direktive/Wortsperre
+    in Image Producer + Visual QA."""
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     state = data.get("sharenext_state")
     if not state:
         # Keine gespeicherte Idee (alter Entwurf) -> voller Lauf als Fallback.
-        return _sharenext_bild_synchron(data, eid)
+        return _sharenext_bild_synchron(data, eid, kampagne=kampagne)
 
     from message_brief import MessageBrief
     from creative_director import CreativeRoute
@@ -2548,9 +2996,10 @@ def _sharenext_rerender_synchron(data, eid):
 
     # NUR Stufe 5 (Image Producer) + Stufe 6 (Visual QA) - Idee bleibt unveraendert.
     image, _production_brief = produce_image(
-        brief, route, art_board, headline=headline, size="1024x1024", quality="medium"
+        brief, route, art_board, headline=headline, size="1024x1024", quality="medium",
+        kampagne=kampagne
     )
-    qa = check_raw_image(image, brief, route, art_board, headline=headline)
+    qa = check_raw_image(image, brief, route, art_board, headline=headline, kampagne=kampagne)
 
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     image.save(out)
@@ -3279,7 +3728,7 @@ def aktion(eid):
     feedback = request.form.get("feedback", "").strip()
     zurueck = request.form.get("zurueck", "entwuerfe")
     # NUR NOCH ShareNext Premium-Bilder - keine Varianten-Auswahl mehr!
-    ziel = url_for("einplanung") if zurueck == "einplanung" else url_for("entwuerfe")
+    ziel = _zurueck_ziel(zurueck)
     user = session["user"]
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -3550,7 +3999,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         ergebnisse.append(("facebook", ok, info))
         # Erster Kommentar mit dem Termin-Link (FB-Caption verweist auf "Link in den Kommentaren").
         # Nur fuer Beratungsstellen mit hinterlegtem Buchungslink; rein protokolliert.
-        if ok and stelle:
+        # NICHT fuer Recruiting-Beitraege: die tragen den Karriere-Link bereits in der Caption, kein
+        # steuerlicher Termin-Kommentar.
+        if ok and stelle and f.get("kampagne") != "recruiting":
             import personalisierung
             link = personalisierung.buchungslink(stelle)
             if link:
@@ -4795,6 +5246,7 @@ def serve(host="0.0.0.0", port=None):
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
     threading.Thread(target=_pool_scheduler, daemon=True).start()      # Taegliche Auto-Ziehung aus dem Topf (#126)
+    threading.Thread(target=_recruiting_scheduler, daemon=True).start()  # Woechentliche Recruiting-Ausspielung + Auto-Nachschub
     threading.Thread(target=_cache_cleanup_scheduler, daemon=True).start()  # Taegliches Cache-Aufraeumen (#134)
     threading.Thread(target=_insights_scheduler, daemon=True).start()  # Taegliche Auto-Aktualisierung der Insights
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))

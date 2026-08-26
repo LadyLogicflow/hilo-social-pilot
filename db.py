@@ -89,6 +89,25 @@ CREATE TABLE IF NOT EXISTS pool_nutzung (
     verbraucht_am TEXT DEFAULT (datetime('now')),
     UNIQUE(entwurf_id, stelle_id, kanal)
 );
+-- Recruiting-Pool (EIGENE Tabellen, damit Steuer- und Recruiting-Beitraege sich NIE vermischen):
+-- die taegliche Steuer-Ziehung liest ausschliesslich aus `pool`; Recruiting-Beitraege liegen in
+-- `pool_recruiting` und werden nur vom woechentlichen Recruiting-Scheduler gezogen. Struktur bewusst
+-- analog zu pool/pool_nutzung, damit die (nun tabellen-parametrisierbaren) pool.py-Funktionen
+-- unveraendert wiederverwendbar sind.
+CREATE TABLE IF NOT EXISTS pool_recruiting (
+    entwurf_id INTEGER PRIMARY KEY,    -- ein freigegebener Recruiting-Entwurf = ein Topf-Beitrag
+    aktiv INTEGER NOT NULL DEFAULT 1,  -- 0 = aus dem Topf genommen (nicht mehr ziehbar), bleibt fuer Historie
+    freigegeben_am TEXT DEFAULT (datetime('now'))
+);
+-- "Nie doppelt"-Gedaechtnis fuer Recruiting: jeder Beitrag je Stelle GENAU EINMAL pro Kanal.
+CREATE TABLE IF NOT EXISTS pool_nutzung_recruiting (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entwurf_id INTEGER NOT NULL,
+    stelle_id INTEGER NOT NULL,
+    kanal TEXT NOT NULL,               -- facebook | instagram | whatsapp_status
+    verbraucht_am TEXT DEFAULT (datetime('now')),
+    UNIQUE(entwurf_id, stelle_id, kanal)
+);
 -- Globale Key-Value-Einstellungen (#132/#143): z.B. 'bild_stil' = 'standard' | 'ki_tafel' | 'kreativ'.
 -- Bewusst minimal (Schluessel/Wert), damit weitere globale Schalter ohne Schema-Migration moeglich sind.
 CREATE TABLE IF NOT EXISTS einstellungen (
