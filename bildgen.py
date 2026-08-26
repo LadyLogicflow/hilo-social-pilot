@@ -39,6 +39,11 @@ _REG  = ["/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
 STANDARD_SLOGANS = ["Wir sind HILO", "HILO - wir machen's einfach", "Steuern? Machen wir.",
                     "Mehr Netto für Sie", "Ihr gutes Recht", "Einfach mehr rausholen"]
 
+# Recruiting-Slogans fuer den CI-Kreis - damit NIE ein Steuer-Kunden-Slogan ("Mehr Netto fuer Sie",
+# "Steuern? Machen wir.") in ein Recruiting-Bild rutscht (catrin). Kurz (<=22 Zeichen, <=4 Woerter).
+RECRUITING_SLOGANS = ["Selbst entscheiden.", "Ihr eigener Weg", "Nie allein", "Ihr eigenes Ding",
+                      "Machen Sie's selbst", "Gemeinsam stark"]
+
 def _font(paths, size):
     for p in paths:
         if os.path.exists(p):
@@ -155,7 +160,11 @@ def _card(base, x0, y0, x1, y1, radius=38):
 def _last_slogan_path():
     return os.path.join(DATA_DIR, "last_slogan.txt")
 
-def pick_slogan(s):
+def pick_slogan(s, slogans=None):
+    """Waehlt den CI-Kreis-Slogan. Ist s (der vom Beitrag gelieferte Slogan) kurz genug, wird er genommen;
+    sonst faellt es auf die uebergebene Slogan-Liste zurueck (Default: STANDARD_SLOGANS = Steuer). Fuer
+    Recruiting wird bildgen.RECRUITING_SLOGANS uebergeben, damit KEIN Steuer-Slogan durchrutscht."""
+    pool = slogans or STANDARD_SLOGANS
     s = (s or "").strip()
     if s and len(s) <= 22 and len(s.split()) <= 4:
         chosen = s
@@ -165,7 +174,7 @@ def pick_slogan(s):
             last = open(_last_slogan_path(), encoding="utf-8").read().strip()
         except Exception:
             pass
-        opts = [x for x in STANDARD_SLOGANS if x != last] or STANDARD_SLOGANS
+        opts = [x for x in pool if x != last] or pool
         chosen = random.choice(opts)
     try:
         os.makedirs(DATA_DIR, exist_ok=True)

@@ -2879,7 +2879,8 @@ def _sharenext_bild_synchron(data, eid, kampagne=None):
     # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     result.image.save(out)
-    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    slogan = bildgen.pick_slogan(data.get("slogan", ""),
+                                 bildgen.RECRUITING_SLOGANS if kampagne == "recruiting" else None)
     tmp = out + ".tmp_logos.png"
     bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
     os.replace(tmp, out)
@@ -3003,7 +3004,8 @@ def _sharenext_rerender_synchron(data, eid, kampagne=None):
 
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     image.save(out)
-    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    slogan = bildgen.pick_slogan(data.get("slogan", ""),
+                                 bildgen.RECRUITING_SLOGANS if kampagne == "recruiting" else None)
     tmp = out + ".tmp_logos.png"
     bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
     os.replace(tmp, out)
