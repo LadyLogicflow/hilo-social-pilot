@@ -935,7 +935,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
 </div>
 <div style="max-width:1040px;margin:0 auto 14px;text-align:right">
   <form method=post action="/recruiting-erzeugen" style="display:inline">
-    <button class=ok{% if laeuft %} disabled{% endif %} title="Fünf neue Recruiting-Beiträge (Text + Bild) erzeugen">&#x2795; Recruiting-Beiträge erzeugen (5)</button></form>
+    <button class=ok{% if laeuft %} disabled{% endif %} title="{{schwung}} neue(n) Recruiting-Beitrag/-Beiträge (Text + Bild) erzeugen">&#x2795; Recruiting-Beitrag erzeugen{% if schwung != 1 %} ({{schwung}}){% endif %}</button></form>
 </div>
 <h3 class=sec>Offene Recruiting-Entwürfe ({{entwuerfe|length}})</h3>
 {% for e in entwuerfe %}
@@ -963,7 +963,7 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Recruiting-Entwurf wirklich löschen?')">Löschen</button></form>
     </div>
   </div></div>
-{% else %}<p style="text-align:center;color:#6b7280">Keine offenen Recruiting-Entwürfe. Oben „Recruiting-Beiträge erzeugen (5)“ klicken.</p>{% endfor %}
+{% else %}<p style="text-align:center;color:#6b7280">Keine offenen Recruiting-Entwürfe. Oben „Recruiting-Beitrag erzeugen“ klicken.</p>{% endfor %}
 <h3 class=sec>Recruiting-Pool ({{pool_items|length}} freigegeben)</h3>
 {% for e in pool_items %}
 <div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
@@ -2153,7 +2153,7 @@ def pool_aufnehmen_alle():
 RECRUITING_KANAELE = ["facebook", "instagram", "whatsapp_status"]   # Vorgabe catrin (kein WhatsApp-Kanal)
 RECRUITING_POOL_TABLE = "pool_recruiting"
 RECRUITING_NUTZUNG_TABLE = "pool_nutzung_recruiting"
-RECRUITING_SCHWUNG = 5              # Beitraege je Erzeugungs-Schub (Vorgabe catrin: "5 auf einmal")
+RECRUITING_SCHWUNG = 1              # Testphase (catrin 2026-08-26): pro Klick nur EINEN Beitrag. Spaeter wieder 5.
 RECRUITING_MIN_POOL = 5             # aktive Recruiting-Pool-Beitraege, ab deren Unterschreitung Auto-Nachschub laeuft
 _recruiting_gen_lock = threading.Lock()
 _recruiting_gen = {"running": False}
@@ -2369,7 +2369,7 @@ def recruiting_seite():
     plan = get_einstellung("recruiting_geplante_woche") or "(noch nicht geplant)"
     return render_template_string(RECRUITING, **_ctx(
         entwuerfe=entwuerfe, pool_items=pool_items, aktiv_pool=aktiv_pool,
-        min_pool=RECRUITING_MIN_POOL, knapp=len(knapp), plan=plan,
+        min_pool=RECRUITING_MIN_POOL, knapp=len(knapp), plan=plan, schwung=RECRUITING_SCHWUNG,
         laeuft=_recruiting_generation_running(), kanaele=RECRUITING_KANAELE))
 
 

@@ -21,7 +21,7 @@ def _korrigiere_begriffe(data, kampagne="steuer"):
     if kampagne == "recruiting":
         try:
             import recruiting_prompts
-            tabu = tabu + list(recruiting_prompts.BEGRIFFE_TABU)
+            tabu = tabu + list(recruiting_prompts.BEGRIFFE_TABU) + list(recruiting_prompts.NORMALISIERUNG)
         except Exception:
             log.exception("Recruiting-Tabu-Liste nicht ladbar")
     def fix(v):

@@ -17,11 +17,20 @@ BEGRIFFE_TABU = [
     (re.compile(r"Kanzlei\w*", re.IGNORECASE), "Büro"),
 ]
 
+# Deterministische Normalisierung nach der Erzeugung: die 80 Prozent Verdienst sind ein DURCHSCHNITT
+# (catrin) - daher immer das Durchschnittszeichen 'ø' davor, falls die KI die Zahl bar ausgibt. Die
+# Lookbehinds verhindern doppeltes 'ø' bei bereits korrektem 'ø 80 %'. "180 %" o.ae. bleibt unberuehrt (\b).
+NORMALISIERUNG = [
+    (re.compile(r"(?<![øØ])(?<![øØ] )\b80(\s*)(%|Prozent)"), r"ø 80\1\2"),
+]
+
 # Der "Vorrat" an Fakten/Benefits. NICHT alle in jeden Post (catrin) - die KI zieht pro Beitrag EINEN
 # frischen Aufhaenger + 1-2 Benefits. Nichts davon erfinden, nichts hinzufuegen.
 FAKTEN_VORRAT = (
     "- Angebot: Werden Sie selbststaendige/r HILO-Beratungsstellenleiter/in (m/w/d) - Ihr eigener Chef.\n"
-    "- Verdienst: 80 Prozent des Netto-Mitgliedsbeitrages.\n"
+    "- Verdienst: ø 80 Prozent des Netto-Mitgliedsbeitrages. WICHTIG: Das ist ein DURCHSCHNITTSwert "
+    "(nicht immer, nicht garantiert) - stelle die 80 Prozent IMMER mit dem Durchschnittszeichen 'ø' "
+    "davor dar (also 'ø 80 %'), niemals als feste Zahl.\n"
     "- Kein Umsatzdruck - Sie setzen Ihre Ziele selbst.\n"
     "- Voraussetzung: kaufmaennische Ausbildung und 3 Jahre Praxis in der Einkommensteuer; fehlt die "
     "Praxis noch, bauen wir sie gemeinsam auf.\n"
@@ -56,11 +65,13 @@ SYSTEM = (
     "Aufhaenger und höchstens ein bis zwei Benefits, damit der Post knackig bleibt und von Woche zu Woche "
     "abwechselt.\n\n"
     "AUFBAU JEDES BEITRAGS:\n"
-    "1) UEBERSCHRIFT (erscheint gross auf dem Bild): kurzer, mutiger Hook, der sofort Lust auf "
-    "Selbststaendigkeit macht. Hoechstens 60 Zeichen.\n"
+    "1) UEBERSCHRIFT (erscheint gross auf dem Bild - HIER NUR KNACKIG): ein kurzer, schlagkraeftiger "
+    "Hook, gern als staccato-Dreiklang im Stil von 'Ihr Name. Ihre Regeln. Ihr Erfolg.' (NUR als "
+    "Stilreferenz, NIEMALS woertlich - jede Woche frisch). Hoechstens 60 Zeichen. KEINE Vorzugs- oder "
+    "Stichpunkt-Aufzaehlung in der Ueberschrift - die gehoert in den Begleittext, nicht ins Bild.\n"
     "2) SUBLINE: kurze Zeile, die den Hook zuspitzt. Hoechstens 90 Zeichen.\n"
     "3) BULLETS (Text auf dem Bild): hoechstens 3 Stichpunkte, je hoechstens 5 Woerter, nur echte Benefits "
-    "aus den Fakten (z.B. '80 % des Netto-Beitrags', 'Kein Umsatzdruck', 'Steuersoft gratis').\n"
+    "aus den Fakten (z.B. 'ø 80 % des Netto-Beitrags', 'Kein Umsatzdruck', 'Steuersoft gratis').\n"
     "4) CTA (erscheint auf dem Bild): kurze Handlungsaufforderung, z.B. 'Jetzt Ihr eigener Chef werden' "
     "oder 'Mehr erfahren: hilo.de/karriere'.\n"
     "5) SLOGAN: sehr kurzer Claim (hoechstens 3 Woerter), passend zur Selbststaendigkeits-Botschaft, oder "
@@ -72,8 +83,8 @@ SYSTEM = (
     "Unterlagen oder am Schreibtisch sitzt, gestellte Stockfoto-Posen. KEIN Text/Logo im Bild. Ein Satz.\n"
     "7) BILD_MOTIV: kurzes Ersatzmotiv im selben Stil (aktive, selbstbestimmte Szene, kein Schreibtisch-/"
     "Buero-Klischee).\n"
-    "8) HERO (OPTIONAL): ein kurzer, echter Blickfang-Wert aus den Fakten, der sich gross eignet - "
-    "typischerweise '80 %'. Nur ausfuellen, wenn er zum Aufhaenger passt, sonst leer.\n\n"
+    "8) HERO: LEER lassen - das Recruiting-Bild traegt NUR die knackige Ueberschrift, keine grosse Zahl "
+    "und keine Kachel.\n\n"
     "WICHTIG:\n"
     "- Der HOOK entscheidet, ob jemand weiterliest - hier maximale Sorgfalt, immer frisch.\n"
     "- Emojis NUR in der Caption, sparsam. Ueberschrift, Bullets, CTA werden als Text ins Bild gezeichnet - "
@@ -84,16 +95,19 @@ SYSTEM = (
 # Kanalspezifische Vorgaben (Recruiting-Ton) - werden in den User-Prompt eingesetzt.
 CHANNEL_GUIDE = {
     "facebook": (
-        "PLATTFORM FACEBOOK (Hauptkanal): Etwas ausfuehrlicher, persoenlich und mitreissend. HOECHSTENS "
-        "150 Woerter, HOECHSTENS 2 Emojis. KEIN Link im Text (wird automatisch ergaenzt). Schliesse mit "
-        "einer ECHTEN, offenen Frage, die zum Nachdenken ueber die eigene Selbststaendigkeit einlaedt "
-        "(keine formelhafte 'Kommentiere!'-Aufforderung). HOECHSTENS 1 Hashtag (#HILO), wenn ueberhaupt."
+        "PLATTFORM FACEBOOK (Hauptkanal): Fliessende, schlagkraeftige Prosa in unserem Ton - persoenlich "
+        "und mitreissend, kurze Saetze. Du DARFST die Vorzuege schoen formatieren: eine kurze Aufzaehlung "
+        "von 2-3 Benefits (je eigene Zeile, mit '-' oder '•') mitten im Text ist ausdruecklich erwuenscht. "
+        "HOECHSTENS 150 Woerter, HOECHSTENS 2 Emojis. KEIN Link im Text (wird automatisch ergaenzt). "
+        "Schliesse mit einer ECHTEN, offenen Frage zur eigenen Selbststaendigkeit (keine formelhafte "
+        "'Kommentiere!'-Aufforderung). HOECHSTENS 1 Hashtag (#HILO), wenn ueberhaupt."
     ),
     "instagram": (
         "PLATTFORM INSTAGRAM (Hauptkanal): Knackig, visuell gedacht - das Bild traegt die Hauptlast. "
-        "HOECHSTENS 100 Woerter, HOECHSTENS 2 Emojis. Der Hook MUSS in die ersten 125 Zeichen passen. "
-        "KEIN Link im Text (Bio-Hinweis wird ergaenzt). Beende mit 3 bis 5 thematisch praezisen Hashtags "
-        "(z.B. #Selbststaendigkeit #Karriere #Steuerprofi), #HILO als letzten - kein Spam."
+        "Fliessende Prosa in unserem Ton; eine kurze Aufzaehlung von 2-3 Vorzuegen (je eigene Zeile) ist "
+        "erlaubt. HOECHSTENS 100 Woerter, HOECHSTENS 2 Emojis. Der Hook MUSS in die ersten 125 Zeichen "
+        "passen. KEIN Link im Text (Bio-Hinweis wird ergaenzt). Beende mit 3 bis 5 thematisch praezisen "
+        "Hashtags (z.B. #Selbststaendigkeit #Karriere #Steuerprofi), #HILO als letzten - kein Spam."
     ),
     "whatsapp_kanal": (
         "WHATSAPP-KANAL: HOECHSTENS 3 Saetze, direkter Nutzen, KEIN Werbeton, KEINE Hashtags, KEINE Links "
@@ -164,7 +178,9 @@ BILD_DIREKTIVE = (
     "REGIONALER BEZUG (optional, sehr dezent): Wenn es sich voellig natuerlich ergibt, darf ganz "
     "dezent im Hintergrund ein bekanntes Wahrzeichen aus Nordrhein-Westfalen ODER Baden-Wuerttemberg "
     "erscheinen - niemals als Hauptmotiv, nie erzwungen, und ohne dass der Ort die Botschaft "
-    "dominiert. Kein bestimmtes Wahrzeichen vorgeben."
+    "dominiert. Kein bestimmtes Wahrzeichen vorgeben.\n"
+    "TEXT IM BILD: NUR die eine knackige Ueberschrift - KEINE Vorzugs-/Stichpunkt-Liste, keine "
+    "Aufzaehlung, keine Zahlen-Kacheln im Bild. Die Vorzuege stehen im Begleittext, nicht im Bild."
 )
 
 
@@ -174,7 +190,7 @@ def build_prompt(kanal=None, variation_index=None):
     damit ein 5er-Schwung sich staerker unterscheidet."""
     schwerpunkte = [
         "der Selbststaendigkeit / dem eigenen Chef-Sein",
-        "dem Verdienst (80 Prozent des Netto-Mitgliedsbeitrages) ohne Umsatzdruck",
+        "dem Verdienst (ø 80 Prozent des Netto-Mitgliedsbeitrages im Schnitt) ohne Umsatzdruck",
         "der Unterstuetzung (Direktionsleiter, jaehrliche Schulung, Prozess-/Digitalisierungshilfe)",
         "dem einfachen Start (Steuersoft kostenlos, Mitgliederportal, Praxis gemeinsam aufbauen)",
         "dem Wachstumsmarkt und der deutschlandweiten Chance",
@@ -198,7 +214,7 @@ def build_prompt(kanal=None, variation_index=None):
         '"szene_motiv": "warme, aktive Szene zu Aufbruch/Selbststaendigkeit/Erfolg - KEIN Schreibtisch-/'
         'Buero-Klischee, keine gestellte Pose. 2-3 Saetze: Person/Handlung, Arrangement, Licht/Atmosphaere.", '
         '"bild_motiv": "Alternatives Motiv im selben Stil, kein Buero-Klischee.", '
-        '"hero": "kurzer echter Blickfang-Wert (typisch \\"80 %%\\") oder leer", '
+        '"hero": "leer lassen (das Bild traegt nur die knackige Ueberschrift, keine grosse Zahl)", '
         '"captions": {"facebook": "Begleittext Facebook (siehe Vorgaben, endet mit offener Frage), '
         'hoechstens %d Zeichen", "instagram": "Begleittext Instagram inkl. 3-5 Hashtags, hoechstens %d '
         'Zeichen", "whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
