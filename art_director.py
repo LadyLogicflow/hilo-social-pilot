@@ -479,9 +479,10 @@ Wenn die zuletzt genutzte Option für dieses Motiv klar die stärkste Wahl ist, 
 die inhaltliche Passung zur Route hat immer Vorrang vor reiner Abwechslung.
 """
 
-    if kampagne == "recruiting":
-        import recruiting_prompts
-        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + _cmp.BILD_DIREKTIVE
 
     log.info(f"Art Director erstellt Board für: {winning_route.titel}")
 

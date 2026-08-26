@@ -18,12 +18,14 @@ def _korrigiere_begriffe(data, kampagne="steuer"):
     Begriffe deterministisch. Fuer die Recruiting-Kampagne kommt die harte Sperre fuer 'Steuerberater'/
     'Kanzlei' hinzu (catrin: duerfen NIE erscheinen). Gibt data zurueck."""
     tabu = list(_BEGRIFFE_TABU)
-    if kampagne == "recruiting":
+    if kampagne and kampagne != "steuer":
         try:
-            import recruiting_prompts
-            tabu = tabu + list(recruiting_prompts.BEGRIFFE_TABU) + list(recruiting_prompts.NORMALISIERUNG)
+            import campaigns
+            _cmp = campaigns.get(kampagne)
+            if _cmp:
+                tabu = tabu + list(getattr(_cmp, "BEGRIFFE_TABU", [])) + list(getattr(_cmp, "NORMALISIERUNG", []))
         except Exception:
-            log.exception("Recruiting-Tabu-Liste nicht ladbar")
+            log.exception("Kampagnen-Tabu-Liste nicht ladbar")
     def fix(v):
         if isinstance(v, str):
             for rx, repl in tabu:
@@ -623,10 +625,11 @@ def generate(thema, kanal=None, kampagne="steuer", variation_index=None):
     key = get_secret("anthropic_api_key", required=True)
     import anthropic  # lazy
     client = anthropic.Anthropic(api_key=key)
-    if kampagne == "recruiting":
-        import recruiting_prompts
-        system = recruiting_prompts.SYSTEM
-        user = recruiting_prompts.build_prompt(kanal, variation_index)
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system = _cmp.SYSTEM
+        user = _cmp.build_prompt(kanal, variation_index)
     else:
         system = SYSTEM
         user = _build_prompt(thema)

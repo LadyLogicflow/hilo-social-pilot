@@ -580,12 +580,10 @@ Begründe Stärken und Schwächen je Route.
 Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du musst nicht rechnen.
 """
 
-    if kampagne == "recruiting":
-        system_prompt = system_prompt + (
-            "\n\nKAMPAGNE RECRUITING: Dies ist KEIN Steuer-Post, sondern wirbt selbstständige "
-            "HILO-Beratungsstellenleiter (m/w/d) an. Bewerte Botschaftsklarheit und die Brücke zur "
-            "RECRUITING-Kernaussage (Aufbruch, Selbständigkeit, eigener Chef) - nicht zu einem "
-            "Steuerthema. Dieselbe Strenge und Ehrlichkeit wie sonst, nur keine Steuer-Annahmen.")
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + getattr(_cmp, "JURY_HINT", "")
 
     log.info(f"Concept Jury bewertet 5 Routen für: {brief.kernaussage}")
 

@@ -211,10 +211,11 @@ Erstelle ein strukturiertes Message Brief mit:
 """
 
     # Recruiting-Kampagne: kompletter Prompt-Wechsel (der Standard-Brief ist voll steuer-spezifisch).
-    if kampagne == "recruiting":
-        import recruiting_prompts
-        system_prompt = recruiting_prompts.MESSAGE_BRIEF_SYSTEM
-        user_prompt = recruiting_prompts.message_brief_user(thema, text, kanal)
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = _cmp.MESSAGE_BRIEF_SYSTEM
+        user_prompt = _cmp.message_brief_user(thema, text, kanal)
 
     log.info(f"Generiere Message Brief für: {thema} ({stream}/{kanal}, Kampagne={kampagne})")
 
@@ -310,11 +311,10 @@ RECHTLICH KRITISCH:
 - Quelltext (Faktenbasis, nichts hinzuerfinden): {text or "(nicht angegeben)"}
 """
 
-    if kampagne == "recruiting":
-        system_prompt = system_prompt + (
-            "\n\nKAMPAGNE RECRUITING: Die Überschrift wirbt SELBSTSTÄNDIGE HILO-Beratungsstellenleiter "
-            "(m/w/d) an (Aufbruch, eigener Chef, Selbstbestimmung) - NICHT Steuertipps. NIEMALS die "
-            "Wörter 'Steuerberater' oder 'Kanzlei'.")
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + getattr(_cmp, "HEADLINE_HINT", "")
 
     log.info("Keine Überschrift übergeben - generiere Fallback-Überschrift...")
 

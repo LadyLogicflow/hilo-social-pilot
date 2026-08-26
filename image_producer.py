@@ -325,9 +325,10 @@ WICHTIG:
 - EURO (€) verwenden, NIEMALS Dollar ($)!
 """
 
-    if kampagne == "recruiting":
-        import recruiting_prompts
-        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + _cmp.BILD_DIREKTIVE
 
     log.info(f"Prompt Director erstellt Bildgenerierungs-Prompt für: {route.titel}")
 

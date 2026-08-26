@@ -219,6 +219,28 @@ CREATIVE_DIREKTIVE = (
     "Wenn eine Prozentzahl zur Bildmechanik wird, IMMER als Durchschnitt 'ø 80 %' (nie bar '80 %')."
 )
 
+# An generate_headline / concept_jury / visual_qa angehaengt (via campaigns-Registry).
+HEADLINE_HINT = (
+    "\n\nKAMPAGNE RECRUITING: Die Überschrift wirbt SELBSTSTÄNDIGE HILO-Beratungsstellenleiter "
+    "(m/w/d) an (Aufbruch, eigener Chef, Selbstbestimmung) - NICHT Steuertipps. NIEMALS die "
+    "Wörter 'Steuerberater' oder 'Kanzlei'."
+)
+JURY_HINT = (
+    "\n\nKAMPAGNE RECRUITING: Dies ist KEIN Steuer-Post, sondern wirbt selbstständige "
+    "HILO-Beratungsstellenleiter (m/w/d) an. Bewerte Botschaftsklarheit und die Brücke zur "
+    "RECRUITING-Kernaussage (Aufbruch, Selbständigkeit, eigener Chef) - nicht zu einem "
+    "Steuerthema. Dieselbe Strenge und Ehrlichkeit wie sonst, nur keine Steuer-Annahmen."
+)
+QA_HINT = (
+    "\n\nKAMPAGNE RECRUITING: Dieses Bild wirbt selbstständige Beratungsstellenleiter (m/w/d) an. "
+    "Sind im Bild die Wörter 'Steuerberater' oder 'Kanzlei' sichtbar, ist das ein AUTOMATISCHER "
+    "Ablehnungsgrund. Zeigt das Bild eine Prozentzahl (z.B. 80 %) OHNE das Durchschnittszeichen 'ø' "
+    "direkt davor, ist das EBENFALLS ein automatischer Ablehnungsgrund - die 80 % sind ein "
+    "Durchschnitt und müssen im Bild als 'ø 80 %' erscheinen, nie als bare '80 %'. Prüfe zudem, ob "
+    "das Bild Lust auf Selbständigkeit/Aufbruch macht (aktive Menschen-Szene) statt ein Steuer-, "
+    "Schreibtisch-/Büro-Klischee oder ein reines Objekt-Stillleben zu zeigen."
+)
+
 
 def build_prompt(kanal=None, variation_index=None):
     """User-Prompt fuer die Recruiting-Texterzeugung. Erzeugt Bild-, Ueberschrift- und Caption-Felder in
