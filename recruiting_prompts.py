@@ -199,6 +199,20 @@ BILD_DIREKTIVE = (
 )
 
 
+# NUR an den Creative Director angehaengt (nicht Art Director/Image Producer) - Leitidee-Prinzip nach
+# Chatty-Analyse (catrin freigegeben): der konkrete Nutzen wird SELBST zum Hero, nicht nur ein Symbol.
+CREATIVE_DIREKTIVE = (
+    "\n\nLEITIDEE-PRINZIP (nur Creative Director): Bevorzuge Leitideen, bei denen der KONKRETE, "
+    "kampagnenspezifische Nutzen (das eigene Angebot) SELBST zum visuellen Hero oder zur ueberraschenden "
+    "Bildmechanik wird - statt ihn nur durch ein allgemeines, austauschbares Symbol darzustellen. Solche "
+    "Ideen sind eigenstaendiger, merkfaehiger und von Wettbewerbern schwer kopierbar (Beispiel des "
+    "Gegenteils: 'Selbststaendigkeit = irgendein Schluessel' ist ein beliebiges Symbol). "
+    "ABER als GEGENGEWICHT: variiere die Mechanik von Post zu Post - NICHT immer dieselbe Zahl oder "
+    "dasselbe Motiv; die Serien-Vielfalt-/Diversitaets-Regeln bleiben bindend und gehen vor Wiederholung. "
+    "Wenn eine Prozentzahl zur Bildmechanik wird, IMMER als Durchschnitt 'ø 80 %' (nie bar '80 %')."
+)
+
+
 def build_prompt(kanal=None, variation_index=None):
     """User-Prompt fuer die Recruiting-Texterzeugung. Erzeugt Bild-, Ueberschrift- und Caption-Felder in
     EINEM KI-Aufruf (wie im Normalbetrieb). variation_index (optional, 0..n) rotiert den Schwerpunkt-Benefit,

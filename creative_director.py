@@ -428,7 +428,7 @@ Jede Route braucht:
 
     if kampagne == "recruiting":
         import recruiting_prompts
-        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE
+        system_prompt = system_prompt + recruiting_prompts.BILD_DIREKTIVE + recruiting_prompts.CREATIVE_DIREKTIVE
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")
 
