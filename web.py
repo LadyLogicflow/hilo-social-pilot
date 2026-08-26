@@ -2588,7 +2588,7 @@ def _recruiting_neu_hintergrund(eid, user):
 KANALWERBUNG_KANAELE = ["facebook", "instagram"]     # Vorgabe catrin (NICHT WhatsApp; nur FB + IG)
 KANALWERBUNG_POOL_TABLE = "pool_kanalwerbung"
 KANALWERBUNG_NUTZUNG_TABLE = "pool_nutzung_kanalwerbung"
-KANALWERBUNG_SCHWUNG = 3            # Beitraege pro Klick/Vorab-Schwung (analog Recruiting-Vorab-Pool)
+KANALWERBUNG_SCHWUNG = 1            # Testphase (catrin 2026-08-26): pro Klick nur EINEN Beitrag (wie Recruiting). Spaeter wieder hoch.
 KANALWERBUNG_MIN_POOL = 3          # aktive Kanalwerbung-Pool-Beitraege, ab deren Unterschreitung Auto-Nachschub laeuft
 _kanalwerbung_gen_lock = threading.Lock()
 _kanalwerbung_gen = {"running": False}
