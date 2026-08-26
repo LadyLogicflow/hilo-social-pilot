@@ -67,7 +67,7 @@ class CompositionCheck(BaseModel):
     primary_focus: str = Field(description="Position des Hauptmotivs")
     text_zone: str = Field(description="Position der ruhigen Textfläche")
     bottom_left_safe: bool = Field(description="Untere linke Schutzzone frei?")
-    top_right_safe: bool = Field(description="Obere rechte Schutzzone frei?")
+    bottom_right_safe: bool = Field(description="Untere rechte Schutzzone frei?")
 
 
 class Preflight(BaseModel):
@@ -187,7 +187,7 @@ PRIORITÄT A - UNVERHANDELBAR
 - NUR DEUTSCHE SPRACHE - absolut kein Englisch.
 - EURO (€) - NIEMALS Dollar ($) oder USD.
 - Zielgruppe strikt beachten - siehe konkrete Zielgruppe im User-Prompt, nicht pauschalisieren.
-- Logo-Schutzzonen (unten links + oben rechts, Maße im User-Prompt) MÜSSEN frei von wichtigem
+- Logo-Schutzzonen (unten links + unten rechts, Maße im User-Prompt) MÜSSEN frei von wichtigem
   Bildinhalt bleiben.
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen (außer HILO-Logo).
 - **KEINE echten oder erkennbar nachgebildeten Hoheitszeichen, Institutions- oder Marken-Logos**
@@ -303,7 +303,7 @@ Layoutvorgaben:
 - Überschrift: {headline if headline else "(keine - wird später gesetzt)"}
 - Textmodus: {text_mode}
 - Logo-Schutzzone unten links: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
-- Logo-Schutzzone oben rechts: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
+- Logo-Schutzzone unten rechts: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
 
 AUSGABEFORMAT
 
@@ -320,7 +320,7 @@ Stelle sicher dass:
 WICHTIG:
 - Bei text_mode = "exact_headline": Verwende EXAKT die Überschrift "{headline}"!
 - Bei text_mode = "no_text": KEINE Schrift im Bild!
-- Schutzzonen unten links + oben rechts MÜSSEN frei bleiben!
+- Schutzzonen unten links + unten rechts MÜSSEN frei bleiben!
 - NUR DEUTSCHE SPRACHE, NIEMALS Englisch!
 - EURO (€) verwenden, NIEMALS Dollar ($)!
 """
@@ -361,7 +361,7 @@ WICHTIG:
             f"   Keywords: {', '.join(production_brief.style_keywords[:3])}...\n"
             f"   Text-Modus: {production_brief.visible_text.mode}\n"
             f"   Schutzzonen: BL={production_brief.composition_check.bottom_left_safe}, "
-            f"TR={production_brief.composition_check.top_right_safe}"
+            f"BR={production_brief.composition_check.bottom_right_safe}"
         )
 
         return production_brief

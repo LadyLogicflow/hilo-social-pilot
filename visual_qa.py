@@ -65,7 +65,7 @@ class VisualQAVerdict(BaseModel):
     technische_qualitaet: float = Field(ge=1.0, le=10.0, description="Technische Qualität okay?")
     schutzzonen_frei: float = Field(
         ge=1.0, le=10.0, default=10.0,
-        description="Sind die Logo-Schutzzonen (unten links, oben rechts) frei von wichtigen Bildinhalten?"
+        description="Sind die Logo-Schutzzonen (unten links, unten rechts) frei von wichtigen Bildinhalten?"
     )
     scroll_stop_wirkung: float = Field(
         ge=1.0, le=10.0, default=5.0,
@@ -288,7 +288,7 @@ GATE A CHECKS (vor Text-Rendering):
      Behörden-/Bank-Motiven genau (Schulterklappen, Briefköpfe, Umschlag-Absender, Kragenspiegel).
 
 6. **Schutzzonen frei? (1-10)**
-   - Die Logo-Kreise werden später unten links und oben rechts platziert
+   - Die Logo-Kreise werden später unten links und unten rechts platziert
    - Sind diese Ecken (je ca. 22% Bildbreite × 28% Bildhöhe) frei von wichtigen Bildinhalten?
    - Ragt kein Gesicht, keine Hand, kein zentrales Objekt hinein?
 
@@ -398,7 +398,7 @@ Bewerte (1-10):
 3. Textzonen nutzbar?
 4. Markenpassung (HILO: warm, professionell, persönlich - auffällig/kontraststark ist ERWÜNSCHT)?
 5. Technische Qualität (inkl. Anatomie bei Personen, KEINE Hoheitszeichen/fremden Logos)?
-6. Schutzzonen unten links + oben rechts frei (je ca. 22% × 28%)?
+6. Schutzzonen unten links + unten rechts frei (je ca. 22% × 28%)?
 7. Scroll-Stop-Wirkung (Thumbnail-Test: sofort verständlich/dominant auch bei ca. 180×180px; Farbe/Größe allein zählt nicht, die IDEE muss auffallen)?
 8. Composition Integrity (wirkt Text+Motiv wie EINE Gestaltung, oder wie 'Foto + Textkasten + Logo'?)
 9. Concept Fidelity (ist die zentrale MECHANIK der geplanten Idee oben im Bild WIRKLICH sichtbar umgesetzt? Nur das Sichtbare zählt, nicht die Absicht; Leitidee und Scroll-Stop nicht höher als dieser Wert)
