@@ -24,6 +24,9 @@ NORMALISIERUNG = [
     (re.compile(r"(?<![øØ])(?<![øØ] )\b80(\s*)(%|Prozent)"), r"ø 80\1\2"),
     # catrin: "Einkommensteuer-Erfahrung" ist doof -> "Einkommensteuer-Wissen".
     (re.compile(r"Einkommensteuer-?Erfahrung", re.IGNORECASE), "Einkommensteuer-Wissen"),
+    # catrin: "Praxis" ist unueblich, das eigene Business heisst immer "Beratungsstelle". Konservativ nur
+    # die Buero-Bedeutung mit Possessiv-Artikel ersetzen (nicht "3 Jahre Praxis"/"in der Praxis").
+    (re.compile(r"\b(eigene[nrs]?|Ihre[nmr]?)\s+Praxis\b"), r"\1 Beratungsstelle"),
 ]
 
 # Der "Vorrat" an Fakten/Benefits. NICHT alle in jeden Post (catrin) - die KI zieht pro Beitrag EINEN
@@ -34,8 +37,8 @@ FAKTEN_VORRAT = (
     "(nicht immer, nicht garantiert) - stelle die 80 Prozent IMMER mit dem Durchschnittszeichen 'ø' "
     "davor dar (also 'ø 80 %'), niemals als feste Zahl.\n"
     "- Kein Umsatzdruck - Sie setzen Ihre Ziele selbst.\n"
-    "- Voraussetzung: kaufmaennische Ausbildung und 3 Jahre Praxis in der Einkommensteuer; fehlt die "
-    "Praxis noch, bauen wir sie gemeinsam auf.\n"
+    "- Voraussetzung: kaufmaennische Ausbildung und 3 Jahre Berufserfahrung in der Einkommensteuer; "
+    "fehlt Ihnen noch etwas, bauen wir das Know-how gemeinsam auf. (Das Wort 'Praxis' NICHT verwenden.)\n"
     "- Die Steuersoftware 'Steuersoft' wird kostenlos gestellt.\n"
     "- Mitgliederportal vorhanden.\n"
     "- Unterstuetzung durch engagierte Direktionsleiter.\n"
@@ -60,8 +63,9 @@ SYSTEM = (
     "SPRACHE: Alle Begriffe ausschreiben, KEINE Abkuerzungen. Durchgehend Sie-Form (Sie/Ihr/Ihnen).\n\n"
     "ABSOLUTES WORT-VERBOT: Die Woerter 'Steuerberater' und 'Kanzlei' (in JEDER Schreibweise/Beugung) "
     "kommen NIEMALS vor - weder im Text noch als Text im Bild. HILO ist ein Lohnsteuerhilfeverein; das "
-    "Berufsbild heisst 'Beratungsstellenleiter'. Sprich von Selbststaendigkeit, eigenem Buero, eigener "
-    "Beratungsstelle - nie von einer Kanzlei oder einem Steuerberater.\n\n"
+    "Berufsbild heisst 'Beratungsstellenleiter'. Das eigene Business heisst IMMER 'Beratungsstelle' - "
+    "NIEMALS 'Praxis' (unueblich), 'Kanzlei' oder 'Steuerberater'. Sprich von Selbststaendigkeit und der "
+    "eigenen Beratungsstelle.\n\n"
     "FAKTEN: Nutze AUSSCHLIESSLICH die untenstehenden Fakten. Erfinde nichts hinzu (keine Zahlen, Fristen, "
     "Versprechen, Orte). Es muessen NICHT alle Fakten in einem Post vorkommen - waehle EINEN frischen "
     "Aufhaenger und höchstens ein bis zwei Benefits, damit der Post knackig bleibt und von Woche zu Woche "
