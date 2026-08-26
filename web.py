@@ -910,6 +910,8 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       </form>
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
+      <form method=post action="/whatsapp/kanal-jetzt/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen Beitrag JETZT in den WhatsApp-Kanal stellen (über deine Poster-Nummer)?')">
+        <button class=ok style="background:#0B2545" title="Diesen Beitrag sofort manuell in den WhatsApp-Kanal posten (über die Poster-Nummer)">&#x1F4E2; In den WhatsApp-Kanal</button></form>
     </div>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
@@ -1096,6 +1098,8 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     """ + _WARUM_PANEL + """
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
+    <form method=post action="/whatsapp/kanal-jetzt/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag JETZT in den WhatsApp-Kanal stellen (über deine Poster-Nummer)?')">
+      <button style="background:#0B2545;color:#fff" title="Diesen Beitrag sofort manuell in den WhatsApp-Kanal posten (über die Poster-Nummer)">&#x1F4E2; In den WhatsApp-Kanal</button></form>
     <details style="margin-top:8px">
       <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
       <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
@@ -5138,6 +5142,41 @@ def whatsapp_test_status(sid):
         n = res.get("recipients") if res else None
         flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
     return redirect(url_for("whatsapp"))
+
+@app.route("/whatsapp/kanal-jetzt/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def whatsapp_kanal_jetzt(eid):
+    """Stellt EINEN Beitrag SOFORT manuell in den gemeinsamen WhatsApp-Kanal - ueber die Kanal-Posterin
+    (aktive Stelle mit gesetztem Poster-Haekchen + hinterlegtem Kanal-Link). Ergaenzt den automatischen
+    Di/Fr-Rhythmus um eine Hand-Ausloesung (Vorgabe catrin). Nach Erfolg wird der Beitrag fuer diese
+    Stelle/Kanal als verbraucht markiert, damit die automatische Ziehung ihn nicht nochmal postet."""
+    import pool as poolmod
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        stelle = conn.execute(
+            "SELECT * FROM beratungsstellen WHERE aktiv=1 AND wa_kanal_poster=1 "
+            "AND wa_kanal_invite IS NOT NULL AND TRIM(wa_kanal_invite)!='' ORDER BY id LIMIT 1").fetchone()
+        if not stelle:
+            stelle = conn.execute(
+                "SELECT * FROM beratungsstellen WHERE aktiv=1 AND wa_kanal_invite IS NOT NULL "
+                "AND TRIM(wa_kanal_invite)!='' ORDER BY id LIMIT 1").fetchone()
+        if not stelle:
+            flash("Keine Stelle mit hinterlegtem WhatsApp-Kanal gefunden - bitte in der Verwaltung den "
+                  "Kanal-Link setzen und das Haekchen 'Diese Stelle postet die Kanal-Beitraege' aktivieren.")
+            return redirect(request.referrer or url_for("entwuerfe"))
+        f = _parse(e)["f"]
+        _ziel, ok, erg = _veroeffentliche_whatsapp(conn, e, eid, f, "whatsapp_kanal", stelle, session["user"])
+        if ok:
+            poolmod.markiere_verbraucht(conn, eid, int(stelle["id"]), "whatsapp_kanal")
+            conn.commit()
+    if ok:
+        flash("Beitrag %d in den WhatsApp-Kanal gestellt (ueber %s)." % (eid, stelle["name"]))
+    else:
+        info = (erg[0][2] if erg else "") or "unbekannter Fehler"
+        flash("Konnte Beitrag %d nicht in den Kanal stellen: %s" % (eid, info))
+    return redirect(request.referrer or url_for("entwuerfe"))
 
 @app.route("/sharenext", methods=["GET", "POST"])
 @login_required
