@@ -31,8 +31,10 @@ SYSTEM = (
     "FAKTEN: Nutze AUSSCHLIESSLICH die untenstehenden Fakten - erfinde nichts (keine Zahlen, Versprechen).\n\n"
     "AUFBAU:\n"
     "1) UEBERSCHRIFT (gross im Bild - HIER NUR KNACKIG): eine kurze, einladende Zeile, die Lust macht zu "
-    "folgen (z.B. 'Nie wieder eine Frist verpassen.' / 'Steuer-Tipps aufs Handy.'). Hoechstens 60 "
-    "Zeichen. KEINE Stichpunkt-Liste in der Ueberschrift.\n"
+    "folgen. Variiere Einstieg und Form von Post zu Post; beginne NICHT jedes Mal mit den Fristen oder "
+    "'Nie wieder ...'. Die Beispiele sind NUR Stilreferenz, NIEMALS woertlich uebernehmen (z.B. "
+    "'Steuer-Tipps aufs Handy.' / 'Bleiben Sie informiert.' / 'Nichts Wichtiges mehr verpassen.' / "
+    "'Ihr Draht zur Steuer.'). Hoechstens 60 Zeichen. KEINE Stichpunkt-Liste in der Ueberschrift.\n"
     "2) SUBLINE: kurze Zeile, die den Nutzen zuspitzt. Hoechstens 90 Zeichen.\n"
     "3) BULLETS (fuer den Begleittext): hoechstens 3 kurze Nutzen-Punkte (z.B. 'Wichtige Fristen', "
     "'Praktische Tipps', 'Kostenlos').\n"
@@ -78,12 +80,28 @@ CHANNEL_LIMIT = {"facebook": 1400, "instagram": 1500}
 
 
 def build_prompt(kanal=None, variation_index=None):
-    """User-Prompt fuer die Kanalwerbung-Texterzeugung (ein KI-Aufruf, Bild-/Ueberschrift-/Caption-Felder)."""
+    """User-Prompt fuer die Kanalwerbung-Texterzeugung (ein KI-Aufruf, Bild-/Ueberschrift-/Caption-Felder).
+    variation_index (0..n) rotiert den BLICKWINKEL/Aufhaenger, damit nicht jeder Beitrag mit derselben Zeile
+    ('Nie wieder eine Frist verpassen') beginnt."""
+    blickwinkel = [
+        "aktuelle Steuer-Tipps, die man sonst leicht uebersieht",
+        "Neuigkeiten und Aenderungen rund um die Steuer",
+        "dass alles kostenlos, unverbindlich und jederzeit abbestellbar ist",
+        "die Bequemlichkeit - alles Wichtige direkt aufs Handy, ohne selbst suchen zu muessen",
+        "wichtige Fristen rechtzeitig im Blick behalten",
+    ]
+    if isinstance(variation_index, int):
+        w = blickwinkel[variation_index % len(blickwinkel)]
+        fokus = ("SCHWERPUNKT DIESES POSTS: Ueberschrift und Aufhaenger drehen sich um %s. Beginne NICHT "
+                 "mit 'Nie wieder eine Frist verpassen' und nicht mit den Fristen - waehle einen frischen "
+                 "Einstieg passend zu diesem Schwerpunkt." % w)
+    else:
+        fokus = "Variiere Ueberschrift und Einstieg von Post zu Post - NICHT immer mit den Fristen beginnen."
     return (
         "Erzeuge einen Beitrag fuer FACEBOOK und INSTAGRAM, der Menschen einlaedt, dem kostenlosen "
         "WhatsApp-Kanal von HILO zu folgen (aktuelle Steuer-Tipps & Fristen aufs Handy). Ueberschrift, "
         "Bullets und Bildmotiv sind fuer beide gleich; nur der Begleittext unterscheidet sich je Kanal:\n\n"
-        "%s\n\n%s\n\n"
+        "%s\n\n%s\n\n%s\n\n"
         "FAKTEN-VORRAT (nur diese nutzen):\n%s\n"
         "Antworte AUSSCHLIESSLICH als JSON-Objekt (keine Erklaerung, kein Markdown) mit genau diesen "
         "Feldern:\n"
@@ -102,7 +120,7 @@ def build_prompt(kanal=None, variation_index=None):
         '"whatsapp_kanal": "max 3 Saetze, ohne Hashtags/Links", '
         '"whatsapp_story": "max 2 Saetze, ohne Hashtags/Links"}}\n'
         "Sprache: Deutsch, Sie-Form."
-        % (CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"], FAKTEN_VORRAT,
+        % (CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"], fokus, FAKTEN_VORRAT,
            CHANNEL_LIMIT["facebook"], CHANNEL_LIMIT["instagram"])
     )
 

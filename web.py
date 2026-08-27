@@ -2628,9 +2628,16 @@ def _kanalwerbung_erzeuge_schwung(anzahl, user):
     'kanalwerbung' angelegt (im Steuer- und Recruiting-Fluss unsichtbar). Robust: ein fehlgeschlagener
     Einzel-Beitrag stoppt den Schwung nicht."""
     created = 0
+    # Variation (catrin 2026-08-27): rotierender Basis-Zaehler, damit auch bei SCHWUNG=1 (Schleife nur mit
+    # i=0) JEDER Klick einen anderen Blickwinkel nimmt. Ohne das begann jeder Beitrag mit derselben Zeile
+    # ('Nie wieder eine Steuerfrist verpassen').
+    try:
+        _basis = int(get_einstellung("kanalwerbung_variation_zaehler", "0") or "0")
+    except (TypeError, ValueError):
+        _basis = 0
     for i in range(anzahl):
         try:
-            data = textgen.generate({}, kampagne="kanalwerbung", variation_index=i)
+            data = textgen.generate({}, kampagne="kanalwerbung", variation_index=_basis + i)
             # HARTE Markierung: ueberall als Kanalwerbung-Beitrag erkennbar; Steuer-/Recruiting-Pfad ignorieren ihn.
             data["kampagne"] = "kanalwerbung"
             with get_conn() as conn:
@@ -2661,6 +2668,11 @@ def _kanalwerbung_erzeuge_schwung(anzahl, user):
             log.info("Kanalwerbung-Entwurf %s erzeugt (%d/%d).", eid, i + 1, anzahl)
         except Exception as ex:
             log.warning("Kanalwerbung-Texterzeugung fehlgeschlagen (Variante %d): %s", i, ex)
+    # Zaehler weiterdrehen, damit der naechste Klick beim naechsten Blickwinkel startet.
+    try:
+        set_einstellung("kanalwerbung_variation_zaehler", str(_basis + anzahl))
+    except Exception as ex:
+        log.warning("Kanalwerbung-Variation-Zaehler nicht gespeichert: %s", ex)
     log.info("Kanalwerbung-Schwung fertig: %d/%d Beitraege erzeugt.", created, anzahl)
     return created
 
