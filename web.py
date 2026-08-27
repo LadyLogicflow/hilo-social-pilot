@@ -1037,6 +1037,14 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
         <input type=hidden name=zurueck value=kanalwerbung>
         <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Kanalwerbung-Entwurf wirklich löschen?')">Löschen</button></form>
     </div>
+    <div style="margin-top:10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px">
+      <form method=post action="/whatsapp/status-test/{{e.id}}" style="margin:0" onsubmit="return confirm('Dieses Bild als WhatsApp-Status senden? Ohne Häkchen nur an die eingegebene Test-Nummer, mit Häkchen an ALLE Kontakte.')">
+        <b style="font-size:13px">&#x1F4F2; Als WhatsApp-Status testen</b><br>
+        <input name=empfaenger placeholder="deine Nummer, z.B. 49160…" style="padding:5px;min-width:200px;margin:4px 6px 4px 0">
+        <label style="font-size:12px;font-weight:normal"><input type=checkbox name=an_alle value=1> an alle Kontakte</label>
+        <button class=gr style="margin-left:6px">Status senden</button>
+      </form>
+    </div>
   </div></div>
 {% else %}<p style="text-align:center;color:#6b7280">Keine offenen Kanalwerbung-Entwürfe. Oben „Kanalwerbung-Beitrag erzeugen“ klicken.</p>{% endfor %}
 <h3 class=sec>Kanalwerbung-Pool ({{pool_items|length}} freigegeben)</h3>
@@ -5668,6 +5676,74 @@ def whatsapp_test_status(sid):
         n = res.get("recipients") if res else None
         flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
     return redirect(url_for("whatsapp"))
+
+
+@app.route("/whatsapp/status-test/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def whatsapp_status_test(eid):
+    """Postet das BILD eines Beitrags als WhatsApp-Status (9:16) - zum kontrollierten Test des echten
+    Bild-Status-Wegs (zuverlaessiger als der reine Text-Test). Standard: nur an die eingegebene
+    Test-Nummer. Mit Haekchen 'an_alle' bewusst an alle synchronisierten Kontakte. Postet ueber die
+    aktuell VERBUNDENE Stelle (deren Nummer)."""
+    import re
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        f = _parse(e)["f"]
+        # Verbundene Stelle finden (Status wird von ihrer Nummer gepostet).
+        sess, serr = _wa_call("/sessions", timeout=4)
+        connected_sid = None
+        if sess and isinstance(sess.get("sessions"), dict):
+            for k, v in sess["sessions"].items():
+                if isinstance(v, dict) and v.get("state") == "connected":
+                    connected_sid = k
+                    break
+        if not connected_sid:
+            flash("Keine verbundene WhatsApp-Stelle gefunden%s – bitte zuerst unter „WhatsApp“ verbinden."
+                  % ((": " + serr) if serr else ""))
+            return redirect(url_for("kanalwerbung_seite"))
+        # 9:16-Status-Bild aus dem Beitragsbild aufbereiten (gleicher Weg wie der Automatik-Status).
+        bild = None
+        try:
+            _bp = _ensure_bild_pfad(conn, eid, f)
+            if _bp and os.path.exists(_bp):
+                bild = _status_hochkant(_bp, os.path.join(DATA_DIR, "preview", "status_test_%d.png" % eid))
+        except Exception as ex:
+            log.exception("Status-Test-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
+            bild = None
+    caption = ((f.get("captions") or {}).get("whatsapp_story")
+               or (f.get("captions") or {}).get("whatsapp_kanal")
+               or f.get("ueberschrift") or "HILO")
+    payload = {"caption": caption}
+    if bild:
+        payload["imagePath"] = bild
+    an_alle = bool(request.form.get("an_alle"))
+    if an_alle:
+        payload["toContacts"] = True
+    else:
+        digits = re.sub(r"\D", "", request.form.get("empfaenger", ""))
+        if digits.startswith("00"):
+            digits = digits[2:]
+        elif digits.startswith("0"):
+            digits = "49" + digits[1:]
+        if not digits:
+            flash("Bitte eine Test-Nummer eingeben (oder „an alle Kontakte“ wählen).")
+            return redirect(url_for("kanalwerbung_seite"))
+        payload["statusJidList"] = [digits + "@s.whatsapp.net"]
+    res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=60, session=connected_sid)
+    if err:
+        flash("Fehler: " + err)
+    elif res and res.get("error"):
+        flash("WhatsApp: " + res["error"])
+    else:
+        n = res.get("recipients") if res else None
+        ziel = "alle Kontakte" if an_alle else "die Test-Nummer"
+        flash("Bild-Status an %s gesendet%s.%s" % (
+            ziel, ((" (%d Empfänger)" % n) if n else ""),
+            "" if bild else " (Hinweis: kein Bild gefunden – als Text gesendet.)"))
+    return redirect(url_for("kanalwerbung_seite"))
+
 
 @app.route("/whatsapp/kanal-jetzt/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
