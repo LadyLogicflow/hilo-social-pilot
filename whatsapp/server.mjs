@@ -80,6 +80,10 @@ async function start(key) {
       fetchAgent: agent,
       browser: Browsers.ubuntu('HISOME'),
       markOnlineOnConnect: false,
+      // KONTAKT-SYNC (catrin 2026-08-27): vollen Verlaufs-/Kontakt-Abgleich beim Verbinden anfordern,
+      // damit die auf dem Handy gespeicherten Kontakte ans verknuepfte Geraet uebertragen werden
+      // (sonst Kontakte:0 -> Status hat kein Publikum). Kontakte kommen ueber messaging-history.set.
+      syncFullHistory: true,
       // Verbindungs-Haertung (catrin-Incident 2026-08-27): gezielt gegen die beobachteten Fehler auf
       // dem Pi - "init queries Timed Out" (408) und "stream errored out" beim Nachrichten-Resend.
       defaultQueryTimeoutMs: 0,        // kein hartes Query-Timeout -> keine "Timed Out"-Abbrueche mehr
