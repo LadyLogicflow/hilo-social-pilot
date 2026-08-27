@@ -2741,6 +2741,19 @@ def _kanalwerbung_ziehung(conn, datum, zeit, rng):
     import pool as poolmod
     stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
                            "AND fb_seite!='' ORDER BY id").fetchall()
+    # LINK-PFLICHT (catrin-Incident 2026-08-27): Kanalwerbung NUR fuer Stellen mit hinterlegtem
+    # WhatsApp-Kanal-Einladungslink - ein Kanal-Werbebeitrag ohne Link darf nie raus. Stellen ohne
+    # eigenen Kanal (z.B. Doreen) werden dadurch automatisch aus der Kanalwerbung ausgeschlossen.
+    def _hat_invite(r):
+        try:
+            return bool((r["wa_kanal_invite"] or "").strip())
+        except (IndexError, KeyError):
+            return False
+    ohne_link = [r["name"] for r in stellen if not _hat_invite(r)]
+    stellen = [r for r in stellen if _hat_invite(r)]
+    if ohne_link:
+        log.info("Kanalwerbung-Ziehung: %d Stelle(n) ohne Kanal-Link uebersprungen: %s",
+                 len(ohne_link), ", ".join(ohne_link))
     stelle_ids = [int(r["id"]) for r in stellen]
     if not stelle_ids:
         return 0
@@ -4449,6 +4462,14 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
+    # LINK-PFLICHT Kanalwerbung (catrin-Incident 2026-08-27): NIEMALS einen Kanal-Werbebeitrag ohne
+    # Einladungslink posten. Fehlt der wa_kanal_invite der Stelle, wird nichts veroeffentlicht.
+    if f.get("kampagne") == "kanalwerbung" and stelle is not None:
+        import personalisierung
+        if not personalisierung.kanal_invite(stelle):
+            log.warning("Kanalwerbung fuer Stelle %s ohne Kanal-Link NICHT veroeffentlicht "
+                        "(kein wa_kanal_invite).", ziel_name)
+            return (ziel_name, False, [(kanal, False, "kein Kanal-Link hinterlegt - nicht veroeffentlicht")])
     # Orts-ID (Geotag) der Beratungsstelle - gilt fuer Facebook (place) UND Instagram (location_id).
     loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
     _cache = {}
