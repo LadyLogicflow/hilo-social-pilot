@@ -2252,9 +2252,16 @@ def _recruiting_erzeuge_schwung(anzahl, user):
     mit status='entwurf' + fields['kampagne']='recruiting' angelegt (im Steuer-Fluss unsichtbar).
     Robust: ein fehlgeschlagener Einzel-Beitrag stoppt den Schwung nicht."""
     created = 0
+    # Variation (catrin 2026-08-27): rotierender Basis-Zaehler ueber einstellungen, damit auch bei
+    # SCHWUNG=1 (Schleife laeuft nur mit i=0) JEDER Klick einen ANDEREN Schwerpunkt-Index nimmt. Ohne
+    # das stand variation_index fest auf 0 -> immer derselbe Schwerpunkt -> immer dieselbe Headline.
+    try:
+        _basis = int(get_einstellung("recruiting_variation_zaehler", "0") or "0")
+    except (TypeError, ValueError):
+        _basis = 0
     for i in range(anzahl):
         try:
-            data = textgen.generate({}, kampagne="recruiting", variation_index=i)
+            data = textgen.generate({}, kampagne="recruiting", variation_index=_basis + i)
             # HARTE Markierung: ueberall als Recruiting-Beitrag erkennbar; der Steuer-Pfad ignoriert ihn.
             data["kampagne"] = "recruiting"
             with get_conn() as conn:
@@ -2285,6 +2292,11 @@ def _recruiting_erzeuge_schwung(anzahl, user):
             log.info("Recruiting-Entwurf %s erzeugt (%d/%d).", eid, i + 1, anzahl)
         except Exception as ex:
             log.warning("Recruiting-Texterzeugung fehlgeschlagen (Variante %d): %s", i, ex)
+    # Zaehler um die Anzahl weiterdrehen, damit der naechste Klick beim naechsten Schwerpunkt startet.
+    try:
+        set_einstellung("recruiting_variation_zaehler", str(_basis + anzahl))
+    except Exception as ex:
+        log.warning("Recruiting-Variation-Zaehler nicht gespeichert: %s", ex)
     log.info("Recruiting-Schwung fertig: %d/%d Beitraege erzeugt.", created, anzahl)
     return created
 
