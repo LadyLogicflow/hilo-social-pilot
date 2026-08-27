@@ -37,6 +37,12 @@ const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || ''
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined
 const logger = pino({ level: process.env.HILO_WHATSAPP_LOGLEVEL || 'warn' })
 
+// ABSTURZ-SCHUTZ (catrin-Incident 2026-08-27): ein einzelner unbehandelter Fehler (z.B. libsignal
+// "failed to decrypt"/PreKeyError/SessionError) soll den GANZEN Dienst nicht beenden. Loggen und
+// weiterlaufen - die Baileys-Reconnect-Logik faengt echte Verbindungsprobleme selbst ab.
+process.on('uncaughtException', (e) => logger.error({ err: e?.message, stack: e?.stack }, 'uncaughtException - Dienst laeuft weiter'))
+process.on('unhandledRejection', (e) => logger.error({ err: e?.message || String(e) }, 'unhandledRejection - Dienst laeuft weiter'))
+
 // --- Sessions ----------------------------------------------------------------
 // key -> { key, state, qr, me, error, contacts:Set, sock, starting }
 const sessions = new Map()
@@ -62,9 +68,35 @@ function readImage(p) {
   return fs.readFileSync(p)
 }
 
+// KONTAKT-PERSISTENZ (catrin 2026-08-27): synchronisierte Kontakte je Sitzung auf Platte halten, damit
+// sie einen Dienst-Neustart ueberleben. Sonst faellt die Zahl bei jedem Restart auf 0 (Status ohne
+// Publikum), bis WhatsApp ueber Minuten neu gesynct hat. Datei liegt neben den Auth-Daten je Stelle,
+// wird beim loggedOut mit dem Auth-Ordner geloescht (frischer Start).
+function contactsFileFor(key) { return path.join(authDirFor(key), 'contacts.json') }
+function loadContacts(s) {
+  try {
+    const f = contactsFileFor(s.key)
+    if (fs.existsSync(f)) {
+      const arr = JSON.parse(fs.readFileSync(f, 'utf8'))
+      if (Array.isArray(arr)) arr.forEach(j => { if (typeof j === 'string') s.contacts.add(j) })
+    }
+  } catch (e) { logger.warn({ session: s.key, err: e.message }, 'contacts.json laden fehlgeschlagen') }
+}
+function saveContacts(s) {
+  try {
+    fs.mkdirSync(authDirFor(s.key), { recursive: true })
+    fs.writeFileSync(contactsFileFor(s.key), JSON.stringify(Array.from(s.contacts)))
+  } catch (e) { logger.warn({ session: s.key, err: e.message }, 'contacts.json speichern fehlgeschlagen') }
+}
+function scheduleSaveContacts(s) {
+  if (s._saveTimer) return
+  s._saveTimer = setTimeout(() => { s._saveTimer = null; saveContacts(s) }, 2000)
+}
+
 async function start(key) {
   const s = getSess(key)
   if (s.starting) return
+  if (s.contacts.size === 0) loadContacts(s)   // persistierte Kontakte sofort verfuegbar machen
   s.starting = true
   try {
     const authDir = authDirFor(key)
@@ -97,7 +129,11 @@ async function start(key) {
 
     const addContact = (c) => {
       const id = c?.id || c?.jid
-      if (id && id.endsWith('@s.whatsapp.net')) s.contacts.add(jidNormalizedUser(id))
+      if (id && id.endsWith('@s.whatsapp.net')) {
+        const before = s.contacts.size
+        s.contacts.add(jidNormalizedUser(id))
+        if (s.contacts.size !== before) scheduleSaveContacts(s)   // persistieren (debounced)
+      }
     }
     // DIAG (catrin 2026-08-27): Kontakte bleiben 0 trotz 1333 im Handy. Wir loggen, was WhatsApp beim
     // Verbinden wirklich schickt (Event, Anzahl, Beispiel-JIDs, laufende Summe) - auf warn-Level sichtbar.
