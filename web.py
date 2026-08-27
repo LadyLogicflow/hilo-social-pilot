@@ -1008,7 +1008,11 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
   <form method=post action="/kanalwerbung-erzeugen" style="display:inline">
     <button class=ok{% if laeuft %} disabled{% endif %} title="{{schwung}} neue(n) Kanalwerbung-Beitrag/-Beiträge (Text + Bild) erzeugen">&#x2795; Kanalwerbung-Beitrag erzeugen{% if schwung != 1 %} ({{schwung}}){% endif %}</button></form>
 </div>
-<h3 class=sec>Offene Kanalwerbung-Entwürfe ({{entwuerfe|length}})</h3>
+<div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <h3 class=sec style="margin:0">Offene Kanalwerbung-Entwürfe ({{entwuerfe|length}})</h3>
+  {% if entwuerfe %}<form method=post action="/kanalwerbung-alle-loeschen" style="margin:0" onsubmit="return confirm('Wirklich ALLE {{entwuerfe|length}} offenen Kanalwerbung-Entwürfe löschen? Das lässt sich nicht rückgängig machen. Freigegebene Pool-Beiträge bleiben unberührt.')">
+    <button class=del title="Alle offenen Kanalwerbung-Entwürfe auf einmal löschen">&#x1F5D1;&#xFE0F; Alle {{entwuerfe|length}} löschen</button></form>{% endif %}
+</div>
 {% for e in entwuerfe %}
 <div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Bild wird gerade im Hintergrund erstellt – Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}<img src="/bild/{{e.id}}" alt="Vorschau">
   <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
@@ -2327,10 +2331,16 @@ def _recruiting_auto_nachschub(user="system"):
     import pool as poolmod
     with get_conn() as conn:
         aktiv = len(poolmod.aktive_pool_ids(conn, pool_table=RECRUITING_POOL_TABLE))
-    if aktiv < RECRUITING_MIN_POOL and not _recruiting_generation_running():
+        # RUNAWAY-FIX (catrin-Incident 2026-08-27): auch die noch NICHT freigegebenen Entwuerfe zaehlen,
+        # sonst erzeugt der Nachschub bei manueller Freigabe endlos weiter (Pool bleibt 0). Recruiting
+        # laeuft nur woechentlich, war also weniger exponiert - selbe Absicherung trotzdem.
+        offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                             (_RECRUITING_LIKE,)).fetchone()[0]
+    vorrat = aktiv + offen
+    if vorrat < RECRUITING_MIN_POOL and not _recruiting_generation_running():
         if _recruiting_start_schwung(RECRUITING_SCHWUNG, user):
-            log.info("Recruiting-Auto-Nachschub: Pool bei %d (< %d) - neuer Schwung gestartet.",
-                     aktiv, RECRUITING_MIN_POOL)
+            log.info("Recruiting-Auto-Nachschub: Vorrat %d (Pool %d + offen %d, < %d) - Schwung gestartet.",
+                     vorrat, aktiv, offen, RECRUITING_MIN_POOL)
             return True
     return False
 
@@ -2679,10 +2689,16 @@ def _kanalwerbung_auto_nachschub(user="system"):
     import pool as poolmod
     with get_conn() as conn:
         aktiv = len(poolmod.aktive_pool_ids(conn, pool_table=KANALWERBUNG_POOL_TABLE))
-    if aktiv < KANALWERBUNG_MIN_POOL and not _kanalwerbung_generation_running():
+        # RUNAWAY-FIX (catrin-Incident 2026-08-27): auch die noch NICHT freigegebenen Entwuerfe zaehlen.
+        # Vorher pruefte der Nachschub nur den FREIGEGEBENEN Pool - der bleibt bei manueller Freigabe
+        # dauerhaft 0, also erzeugte der Scheduler alle 5 Min neue Entwuerfe (endlos -> 196 Bilder).
+        offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                             (_KANALWERBUNG_LIKE,)).fetchone()[0]
+    vorrat = aktiv + offen
+    if vorrat < KANALWERBUNG_MIN_POOL and not _kanalwerbung_generation_running():
         if _kanalwerbung_start_schwung(KANALWERBUNG_SCHWUNG, user):
-            log.info("Kanalwerbung-Auto-Nachschub: Pool bei %d (< %d) - neuer Schwung gestartet.",
-                     aktiv, KANALWERBUNG_MIN_POOL)
+            log.info("Kanalwerbung-Auto-Nachschub: Vorrat %d (Pool %d + offen %d, < %d) - Schwung gestartet.",
+                     vorrat, aktiv, offen, KANALWERBUNG_MIN_POOL)
             return True
     return False
 
@@ -2843,6 +2859,24 @@ def kanalwerbung_erzeugen():
               "laden." % KANALWERBUNG_SCHWUNG)
     else:
         flash("Es läuft bereits eine Kanalwerbung-Erzeugung – bitte kurz warten und die Seite neu laden.")
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/kanalwerbung-alle-loeschen", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_alle_loeschen():
+    """Loescht ALLE offenen (noch nicht freigegebenen) Kanalwerbung-Entwuerfe auf einmal. Freigegebene
+    Pool-Beitraege (status='pool_kanalwerbung') bleiben unberuehrt. Notfall-Aufraeumung nach dem
+    Auto-Nachschub-Runaway (catrin-Incident 2026-08-27)."""
+    user = session["user"]
+    with get_conn() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                         (_KANALWERBUNG_LIKE,)).fetchone()[0]
+        conn.execute("DELETE FROM entwuerfe WHERE status='entwurf' AND text LIKE ?", (_KANALWERBUNG_LIKE,))
+        audit_log(conn, user, "kanalwerbung_alle_geloescht", 0,
+                  "%d offene Kanalwerbung-Entwuerfe auf einmal geloescht" % n)
+        conn.commit()
+    flash("%d offene Kanalwerbung-Entwürfe gelöscht. Freigegebene Pool-Beiträge sind unberührt." % n)
     return redirect(url_for("kanalwerbung_seite"))
 
 
