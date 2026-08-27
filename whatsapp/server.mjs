@@ -80,6 +80,13 @@ async function start(key) {
       fetchAgent: agent,
       browser: Browsers.ubuntu('HISOME'),
       markOnlineOnConnect: false,
+      // Verbindungs-Haertung (catrin-Incident 2026-08-27): gezielt gegen die beobachteten Fehler auf
+      // dem Pi - "init queries Timed Out" (408) und "stream errored out" beim Nachrichten-Resend.
+      defaultQueryTimeoutMs: 0,        // kein hartes Query-Timeout -> keine "Timed Out"-Abbrueche mehr
+      keepAliveIntervalMs: 15000,      // Socket aktiv halten -> seltener Verbindungsabbruch
+      connectTimeoutMs: 60000,         // mehr Zeit fuer den Verbindungsaufbau (Pi/Netz)
+      retryRequestDelayMs: 500,        // sanftere Retries
+      getMessage: async () => undefined, // Resend-Pfad graziell (verhindert stream-Fehler bei Retry)
     })
     s.sock = sock
     sock.ev.on('creds.update', saveCreds)
