@@ -96,12 +96,23 @@ async function start(key) {
     sock.ev.on('creds.update', saveCreds)
 
     const addContact = (c) => {
-      const id = c?.id
+      const id = c?.id || c?.jid
       if (id && id.endsWith('@s.whatsapp.net')) s.contacts.add(jidNormalizedUser(id))
     }
-    sock.ev.on('contacts.upsert', (cs) => (cs || []).forEach(addContact))
-    sock.ev.on('contacts.update', (cs) => (cs || []).forEach(addContact))
-    sock.ev.on('messaging-history.set', (h) => (h?.contacts || []).forEach(addContact))
+    // DIAG (catrin 2026-08-27): Kontakte bleiben 0 trotz 1333 im Handy. Wir loggen, was WhatsApp beim
+    // Verbinden wirklich schickt (Event, Anzahl, Beispiel-JIDs, laufende Summe) - auf warn-Level sichtbar.
+    sock.ev.on('contacts.upsert', (cs) => {
+      (cs || []).forEach(addContact)
+      logger.warn({ session: s.key, ev: 'contacts.upsert', n: cs?.length || 0, total: s.contacts.size, sample: (cs || []).slice(0, 3).map(c => c?.id || c?.jid) }, 'DIAG-KONTAKTE')
+    })
+    sock.ev.on('contacts.update', (cs) => {
+      (cs || []).forEach(addContact)
+      logger.warn({ session: s.key, ev: 'contacts.update', n: cs?.length || 0, total: s.contacts.size }, 'DIAG-KONTAKTE')
+    })
+    sock.ev.on('messaging-history.set', (h) => {
+      (h?.contacts || []).forEach(addContact)
+      logger.warn({ session: s.key, ev: 'history.set', contacts: h?.contacts?.length || 0, chats: h?.chats?.length || 0, syncType: h?.syncType, isLatest: h?.isLatest, total: s.contacts.size, sample: (h?.contacts || []).slice(0, 3).map(c => c?.id || c?.jid) }, 'DIAG-KONTAKTE')
+    })
 
     sock.ev.on('connection.update', async (u) => {
       const { connection, lastDisconnect, qr } = u
