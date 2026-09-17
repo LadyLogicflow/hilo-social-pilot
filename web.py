@@ -920,6 +920,12 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       <form method=post action="/whatsapp/kanal-jetzt/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen Beitrag JETZT in den WhatsApp-Kanal stellen (über deine Poster-Nummer)?')">
         <button class=ok style="background:#0B2545" title="Diesen Beitrag sofort manuell in den WhatsApp-Kanal posten (über die Poster-Nummer)">&#x1F4E2; In den WhatsApp-Kanal</button></form>
     </div>
+    <div style="margin-top:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px">
+      <form method=post action="/reel-test/{{e.id}}" style="margin:0;display:inline" onsubmit="return confirm('Aus diesem Motiv ein Test-Reel (kurzer Hochkant-Clip) erzeugen? Dauert ca. 1–3 Minuten und kostet ein paar Cent (fal.ai).')">
+        <button class=gr title="Das fertige Motiv (mit Überschrift + Logo) zu einem kurzen 9:16-Video animieren (Test)">&#x1F3AC; Test-Reel erzeugen</button></form>
+      <a class=gr href="/reel/{{e.id}}" style="margin-left:6px" target="_blank" title="Zuletzt erzeugtes Test-Reel ansehen (falls vorhanden)">&#x25B6;&#xFE0F; Reel ansehen</a>
+      <span class=hint style="display:block;margin-top:4px">Video-MVP (fal.ai) – erst Test, Veröffentlichung später und nur nach Freigabe.</span>
+    </div>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
 """
@@ -4230,6 +4236,68 @@ def bild(eid):
     if not e or not e["bild_pfad"] or not os.path.exists(e["bild_pfad"]):
         abort(404)
     return send_file(e["bild_pfad"], mimetype="image/png")
+
+
+# ─── Reels-MVP (Spur A): fertiges Motiv als Hochkant-Clip animieren (fal.ai) ───────────────────────
+# Bewusst schlank: EIN branded Motiv (Ueberschrift + Logo schon im Bild) -> 9:16 -> fal Image-to-Video
+# -> MP4. Kein Multi-Shot, kein Schnitt. Erzeugung laeuft im Hintergrund (fal dauert 1-3 Min).
+_reel_gen = {}          # eid -> {"running": bool, "info": str|None, "path": str|None}
+_reel_gen_lock = threading.Lock()
+
+def _reel_pfad(eid):
+    return os.path.join(DATA_DIR, "reels", "reel_%d.mp4" % int(eid))
+
+def _reel_erzeuge(eid, user="system"):
+    """Rendert das 9:16-Standbild und animiert es via fal zu einem Clip. Setzt _reel_gen[eid]."""
+    import falvideo
+    try:
+        with get_conn() as conn:
+            e = conn.execute("SELECT bild_pfad, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+            if not e:
+                _reel_gen[eid] = {"running": False, "info": "Entwurf nicht gefunden", "path": None}
+                return
+            f = _parse(e)["f"]
+            still = _ensure_bild_pfad(conn, eid, f)
+        if not still or not os.path.exists(still):
+            _reel_gen[eid] = {"running": False, "info": "Kein Bild zum Animieren vorhanden", "path": None}
+            return
+        hoch = os.path.join(DATA_DIR, "reels", "reel_%d_src.png" % int(eid))
+        _status_hochkant(still, hoch)                       # 9:16-Standbild (mit eingebranntem Text/Logo)
+        out = _reel_pfad(eid)
+        ok, info = falvideo.generate_clip(hoch, out, get_einstellung=get_einstellung)
+        _reel_gen[eid] = {"running": False, "info": (None if ok else info),
+                          "path": (out if ok else None)}
+        with get_conn() as conn:
+            audit_log(conn, user, "reel_test_%s" % ("ok" if ok else "fehler"), eid, info)
+            conn.commit()
+    except Exception as ex:
+        log.exception("Reel-Erzeugung fehlgeschlagen (Entwurf %s): %s", eid, ex)
+        _reel_gen[eid] = {"running": False, "info": str(ex), "path": None}
+
+
+@app.route("/reel-test/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def reel_test(eid):
+    """Startet die Test-Reel-Erzeugung im Hintergrund (kein Doppelstart je Entwurf)."""
+    with _reel_gen_lock:
+        if _reel_gen.get(eid, {}).get("running"):
+            flash("Für Beitrag %d wird bereits ein Reel erzeugt – bitte kurz warten." % eid)
+            return redirect(request.referrer or url_for("entwuerfe"))
+        _reel_gen[eid] = {"running": True, "info": None, "path": None}
+    threading.Thread(target=_reel_erzeuge, args=(eid, session["user"]), daemon=True).start()
+    flash("Test-Reel für Beitrag %d wird erzeugt (dauert ca. 1–3 Minuten) – Seite dann neu laden." % eid)
+    return redirect(request.referrer or url_for("entwuerfe"))
+
+
+@app.route("/reel/<int:eid>")
+@login_required
+def reel(eid):
+    """Liefert das erzeugte Test-Reel (MP4) aus."""
+    p = _reel_pfad(eid)
+    if not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="video/mp4", max_age=0)
+
 
 @app.route("/strip-panel/<int:eid>/<int:idx>")
 @login_required
