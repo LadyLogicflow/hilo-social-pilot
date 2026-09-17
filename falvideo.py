@@ -27,6 +27,40 @@ DEFAULT_MOTION_PROMPT = (
 )
 
 
+def selftest():
+    """Schneller Verbindungs-/Key-Test OHNE Video-Erzeugung: laedt ein winziges Testbild in den
+    fal-Speicher hoch (das prueft Key + Erreichbarkeit). Rueckgabe: (ok, meldung)."""
+    try:
+        from secrets_store import get_secret
+    except Exception as ex:
+        return False, "secrets_store nicht verfuegbar: %s" % ex
+    key = get_secret("fal_api_key", required=False)
+    if not key:
+        return False, "Kein fal-API-Key hinterlegt. Setzen: python3 main.py --set-secret fal_api_key"
+    os.environ["FAL_KEY"] = key
+    try:
+        import fal_client
+    except Exception:
+        return False, "Python-Paket 'fal-client' fehlt (pip install fal-client)."
+    import tempfile
+    try:
+        from PIL import Image
+        p = os.path.join(tempfile.gettempdir(), "fal_selftest.png")
+        Image.new("RGB", (16, 16), (11, 37, 69)).save(p)
+    except Exception as ex:
+        return False, "Testbild konnte nicht erstellt werden: %s" % ex
+    try:
+        url = fal_client.upload_file(p)
+        return True, "fal-Verbindung + Key OK (Test-Upload erfolgreich)."
+    except Exception as ex:
+        return False, "fal-Verbindung/Key FEHLGESCHLAGEN: %s" % ex
+    finally:
+        try:
+            os.remove(p)
+        except Exception:
+            pass
+
+
 def _model(get_einstellung=None):
     if get_einstellung:
         try:
@@ -65,34 +99,77 @@ def generate_clip(image_path, out_path, prompt=None, duration=6, get_einstellung
 
     model = _model(get_einstellung)
     prompt = prompt or DEFAULT_MOTION_PROMPT
-    try:
-        # 1) Bild in den fal-Speicher laden -> oeffentliche URL (fal braucht eine URL, keine lokale Datei).
-        image_url = fal_client.upload_file(image_path)
-        # 2) Job einreichen (Image-to-Video). duration als String - so erwarten es die gaengigen Modelle.
-        args = {"prompt": prompt, "image_url": image_url, "duration": str(duration)}
-        handler = fal_client.submit(model, arguments=args)
-        result = handler.get()   # blockiert bis fertig (fal-Queue mit Auto-Retry)
-    except Exception as ex:
-        return False, "fal-Video fehlgeschlagen (%s): %s" % (model, ex)
+    headers = {"Authorization": "Key %s" % key, "Content-Type": "application/json"}
+    import time
 
-    # 3) Video-URL aus dem Ergebnis holen (fal liefert i.d.R. {"video": {"url": ...}}).
-    video_url = None
+    # 1) Bild in den fal-Speicher laden -> oeffentliche URL (fal braucht eine URL, keine lokale Datei).
     try:
-        v = result.get("video") if isinstance(result, dict) else None
-        if isinstance(v, dict):
-            video_url = v.get("url")
-        elif isinstance(v, str):
-            video_url = v
-        if not video_url and isinstance(result, dict):
-            # Fallback: manche Modelle liefern eine Liste unter 'videos'
-            vids = result.get("videos")
-            if isinstance(vids, list) and vids:
-                first = vids[0]
-                video_url = first.get("url") if isinstance(first, dict) else first
+        log.warning("fal-Reel: lade Bild hoch ... (%s)", os.path.basename(image_path))
+        image_url = fal_client.upload_file(image_path)
     except Exception as ex:
-        return False, "fal-Antwort ohne Video-URL: %s" % ex
+        return False, "fal-Upload fehlgeschlagen: %s" % ex
+
+    # 2) Job ueber die REST-Queue einreichen (volle Kontrolle ueber Timeout/Logging statt blockierendem get()).
+    submit_url = "https://queue.fal.run/%s" % model
+    args = {"prompt": prompt, "image_url": image_url, "duration": str(duration)}
+    try:
+        log.warning("fal-Reel: submit an %s", model)
+        sr = requests.post(submit_url, headers=headers, json=args, timeout=60)
+        if sr.status_code not in (200, 201):
+            return False, "fal-Submit fehlgeschlagen (HTTP %s): %s" % (sr.status_code, sr.text[:300])
+        sj = sr.json()
+        status_url = sj.get("status_url")
+        response_url = sj.get("response_url")
+        req_id = sj.get("request_id")
+        if not status_url or not response_url:
+            return False, "fal-Submit ohne status_url/response_url: %s" % str(sj)[:300]
+        log.warning("fal-Reel: request_id=%s, warte auf Fertigstellung ...", req_id)
+    except Exception as ex:
+        return False, "fal-Submit-Fehler (%s): %s" % (model, ex)
+
+    # 3) Pollen mit HARTEM Timeout (max ~5 Min) - kein ewiges Haengen mehr.
+    deadline = time.time() + 300
+    last = None
+    try:
+        while time.time() < deadline:
+            st = requests.get(status_url, headers=headers, timeout=30)
+            if st.status_code != 200:
+                return False, "fal-Status-Abfrage HTTP %s: %s" % (st.status_code, st.text[:200])
+            stj = st.json()
+            last = stj.get("status")
+            if last == "COMPLETED":
+                break
+            if last in ("FAILED", "ERROR", "CANCELLED"):
+                return False, "fal-Job %s: %s" % (last, str(stj)[:300])
+            time.sleep(5)
+        else:
+            return False, ("fal-Timeout nach 5 Min (Status zuletzt: %s, Modell %s). Evtl. Modell-ID/"
+                           "Parameter pruefen." % (last, model))
+    except Exception as ex:
+        return False, "fal-Poll-Fehler: %s" % ex
+
+    # 4) Ergebnis holen -> Video-URL.
+    try:
+        rr = requests.get(response_url, headers=headers, timeout=60)
+        if rr.status_code != 200:
+            return False, "fal-Ergebnis HTTP %s: %s" % (rr.status_code, rr.text[:200])
+        result = rr.json()
+    except Exception as ex:
+        return False, "fal-Ergebnis-Fehler: %s" % ex
+    video_url = None
+    v = result.get("video") if isinstance(result, dict) else None
+    if isinstance(v, dict):
+        video_url = v.get("url")
+    elif isinstance(v, str):
+        video_url = v
+    if not video_url and isinstance(result, dict):
+        vids = result.get("videos")
+        if isinstance(vids, list) and vids:
+            first = vids[0]
+            video_url = first.get("url") if isinstance(first, dict) else first
     if not video_url:
-        return False, "fal-Antwort ohne Video-URL (Modell %s)." % model
+        return False, "fal-Antwort ohne Video-URL (Modell %s): %s" % (model, str(result)[:300])
+    log.warning("fal-Reel: Video fertig, lade herunter ...")
 
     # 4) MP4 herunterladen.
     try:

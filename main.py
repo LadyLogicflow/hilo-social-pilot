@@ -59,7 +59,15 @@ def main():
                    help="Test: ein Bild per SFTP hochladen und die oeffentliche URL anzeigen (fuer Instagram)")
     p.add_argument("--extend-token", action="store_true",
                    help="Meta-Token in einen Langzeit-Token (~60 Tage) tauschen (braucht meta_app_id + meta_app_secret)")
+    p.add_argument("--test-fal", action="store_true",
+                   help="Test: prueft die fal.ai-Verbindung + den Key (fuer Reels), ohne Video zu erzeugen")
     args = p.parse_args()
+
+    if args.test_fal:
+        import falvideo
+        ok, msg = falvideo.selftest()
+        print(("OK: " if ok else "FEHLER: ") + msg)
+        return
 
     if args.extend_token:
         import publish
