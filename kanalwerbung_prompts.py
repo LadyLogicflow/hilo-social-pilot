@@ -41,18 +41,22 @@ SYSTEM = (
     "4) CTA (im Bild): kurze Aufforderung OHNE URL, z.B. 'Jetzt Kanal folgen' (der Link kommt im "
     "Begleittext automatisch dazu).\n"
     "5) SLOGAN: sehr kurzer Claim (max 3 Woerter) oder leer.\n"
-    "6) SZENE_MOTIV (wichtigstes Bildfeld): PFLICHT ist eine glaubwuerdige ALLTAGS-PERSONENSZENE der "
-    "Zielgruppe (Arbeitnehmer, Rentnerin, Familie), in der der NUTZEN durch Handlung, Reaktion oder "
-    "Situation sichtbar wird - z.B. jemand ist erleichtert/gut gelaunt, weil er rechtzeitig Bescheid "
-    "wusste; entspannt statt gestresst mit dem Steuerthema. Der visuelle Hook entsteht aus der SITUATION "
-    "selbst, nicht aus einem Objekt. Die Person darf NICHT nur dekorativ posieren oder stumpf aufs Handy "
-    "starren. Ein Smartphone ist nur erlaubt, wenn es fuer die Aussage unverzichtbar ist - und dann nur "
-    "beilaeufig; UI, Chatblasen und App-Symbolik NIE als Hauptmotiv. Warme, moderne Alltagsumgebung, "
-    "weiches Tageslicht, natuerlich - kein steifes Stockfoto. STRENG VERBOTEN als Bildmittelpunkt: "
-    "abstrakte Objekt-Metaphern jeder Art (Papierflieger/Origami, schwebende Symbole, Pins, Netze, Icons, "
-    "Sprechblasen, verwandelte Objekte). Ein Satz.\n"
-    "7) BILD_MOTIV: kurzes Ersatzmotiv - ebenfalls eine echte Alltags-Personenszene mit sichtbarem "
-    "Nutzen, KEIN abstraktes Objekt und kein Geraet als Held.\n"
+    "6) SZENE_MOTIV (wichtigstes Bildfeld): PFLICHT ist ein echter Mensch der Zielgruppe (Arbeitnehmer, "
+    "Rentnerin, Familie) bei einer KONKRETEN, KLEINEN ALLTAGS-HANDLUNG, die den Nutzen des Kanals SELBST "
+    "erzaehlt - also 'informiert bleiben / Frist & Tipp im Blick'. Genau DAS ist der visuelle Anker; die "
+    "Handlung traegt die Botschaft, nicht die Ueberschrift allein. Gute Beispiele (variieren, nicht "
+    "woertlich): einen Termin/eine Frist im Kalender oder Handy-Kalender markieren; einen Reminder-Zettel "
+    "an Pinnwand/Kuehlschrank heften; kurz konzentriert einen Tipp auf dem Handy lesen (als HANDLUNG, "
+    "beilaeufig, ohne sichtbares Display/UI); etwas in einen Planer/Notizblock eintragen; einen "
+    "Kalendertag mit Stift einkreisen. Warme, moderne Alltagsumgebung, weiches Tageslicht, echt.\n"
+    "   STRENG VERBOTEN: (a) ein 'generisch erleichterter/gluecklicher Mensch' als Botschaftstraeger "
+    "(seliges Laecheln, Arme hoch, Familien-Wohlfuehl-Stock ohne Bezug) - das sagt NICHTS ueber Steuer; "
+    "(b) ein abstraktes Objekt als Held (Ball, Papierflieger/Origami, schwebende Symbole/Pins/Netze/Icons/"
+    "Sprechblasen, ein blosser Gegenstand in HILO-Gruen); (c) stumpfes Aufs-Handy-Starren oder dekoratives "
+    "Posieren. Das Handy/UI/App-Symbolik NIE als Hauptmotiv. Ein Satz mit der konkreten Handlung.\n"
+    "7) BILD_MOTIV: kurzes Ersatzmotiv im selben Prinzip - echter Mensch bei einer ANDEREN konkreten "
+    "Alltags-Handlung, die 'Frist/Tipp im Blick' zeigt. KEIN erleichtertes Wohlfuehl-Gesicht, KEIN "
+    "abstraktes Objekt, KEIN Geraet als Held.\n"
     "8) HERO: LEER lassen.\n\n"
     "WICHTIG: Emojis nur in der Caption, sparsam. Ueberschrift/Bullets/CTA werden als Text ins Bild "
     "gezeichnet - dort keine Emojis. NIEMALS das echte WhatsApp-Logo, fremde Marken-/App-Logos ODER "
@@ -108,12 +112,14 @@ def build_prompt(kanal=None, variation_index=None):
         '{"ueberschrift": "max 60 Zeichen, einladend, keine Liste", "subline": "max 90 Zeichen", '
         '"bullets": ["hoechstens 3 kurze Nutzen-Punkte"], "cta": "kurze Aufforderung ohne URL", '
         '"slogan": "max 3 Woerter oder leer", '
-        '"szene_motiv": "PFLICHT glaubwuerdige Alltags-Personenszene der Zielgruppe, in der der Nutzen '
-        'durch Handlung/Reaktion/Situation sichtbar wird (z.B. erleichtert, weil rechtzeitig informiert). '
-        'Nicht nur dekorativ posieren/aufs Handy starren; Geraet nur wenn unverzichtbar, UI/Chatblasen/'
-        'App-Symbolik NIE als Held. Warm, natuerlich, kein steifes Stockfoto. VERBOTEN: abstrakte '
-        'Objekte/Symbole/Pins/Origami/Sprechblasen (2-3 Saetze).", '
-        '"bild_motiv": "Alternative Alltags-Personenszene mit sichtbarem Nutzen, kein abstraktes Objekt.", '
+        '"szene_motiv": "PFLICHT: echter Mensch der Zielgruppe bei einer KONKRETEN kleinen Alltags-Handlung, '
+        'die den Nutzen SELBST erzaehlt (Frist/Tipp im Blick): z.B. Termin im Kalender markieren, '
+        'Reminder-Zettel anheften, kurz einen Tipp aufs Handy lesen (als Handlung, beilaeufig, kein UI), '
+        'etwas in einen Planer eintragen. Warm, echt. VERBOTEN: generisch erleichtertes/gluecklickes '
+        'Wohlfuehl-Gesicht ohne Steuerbezug, abstrakte Objekte (Ball/Origami/Pin/Symbol), stumpfes '
+        'Handy-Starren, Geraet/UI als Held (2-3 Saetze).", '
+        '"bild_motiv": "Alternative Alltags-Handlung im selben Prinzip (andere konkrete Handlung); kein '
+        'erleichtertes Wohlfuehl-Gesicht, kein abstraktes Objekt, kein Geraet als Held.", '
         '"hero": "leer lassen", '
         '"captions": {"facebook": "Einladung zu folgen (siehe Vorgaben), hoechstens %d Zeichen", '
         '"instagram": "Einladung inkl. 3-5 Hashtags, hoechstens %d Zeichen", '
@@ -153,17 +159,20 @@ BILD_DIREKTIVE = (
     "\n\n=== KAMPAGNE: KANALWERBUNG (WhatsApp-Kanal bewerben) ===\n"
     "Dieses Bild wirbt fuer den KOSTENLOSEN WhatsApp-Kanal von HILO - es laedt ein, ihm zu folgen, um "
     "Steuer-Tipps und Fristen direkt aufs Handy zu bekommen.\n"
-    "BILDWELT (PFLICHT): eine glaubwuerdige ALLTAGS-PERSONENSZENE der Zielgruppe (Arbeitnehmer, "
-    "Rentnerin, Familie), in der der NUTZEN durch Handlung, Reaktion oder Situation sichtbar wird - "
-    "z.B. jemand ist erleichtert/entspannt, weil er rechtzeitig informiert war. Der visuelle Hook "
-    "entsteht aus der SITUATION selbst. Warme, moderne Alltagsumgebung, helles weiches Tageslicht, "
-    "natuerlich.\n"
-    "Die Person darf NICHT nur dekorativ posieren oder stumpf aufs Handy starren. Ein Smartphone ist "
-    "nur zulaessig, wenn es fuer die Bildaussage unverzichtbar ist - und dann beilaeufig; UI, "
-    "Chatblasen und App-Symbolik NIE als Hero-Motiv.\n"
-    "STRENG VERBOTEN als Bildmittelpunkt: abstrakte Objekt-Metaphern JEDER Art - Papierflieger/Origami, "
-    "schwebende Symbole/Pins/Icons, Netze, Sprechblasen, verwandelte Gegenstaende. Solche Motive wurden "
-    "wiederholt abgelehnt. Wenn kein glaubwuerdiger Mensch die Szene traegt, ist das Bild FALSCH.\n"
+    "BILDWELT (PFLICHT): ein echter Mensch der Zielgruppe (Arbeitnehmer, Rentnerin, Familie) bei einer "
+    "KONKRETEN, KLEINEN ALLTAGS-HANDLUNG, die den Nutzen des Kanals SELBST erzaehlt - 'Frist/Tipp im "
+    "Blick, direkt aufs Handy'. Die HANDLUNG traegt die Botschaft, nicht die Ueberschrift. Gute "
+    "Beispiele (variieren, nicht 1:1): einen Termin/eine Frist im Kalender (Wand-, Tisch- oder "
+    "Handy-Kalender) markieren; einen Reminder-Zettel an Pinnwand/Kuehlschrank heften; kurz konzentriert "
+    "einen Tipp auf dem Handy lesen (als Handlung, beilaeufig, KEIN sichtbares Display/UI); etwas in "
+    "einen Planer/Notizblock eintragen; einen Kalendertag einkreisen. Warme, moderne Alltagsumgebung, "
+    "helles weiches Tageslicht, natuerlich.\n"
+    "STRENG VERBOTEN (wurde wiederholt abgelehnt): (a) ein 'generisch erleichterter/gluecklicher Mensch' "
+    "als Botschaftstraeger (seliges Laecheln, Arme hoch, Familien-Wohlfuehl-Stock ohne Steuerbezug) - das "
+    "sagt NICHTS ueber Steuer/Kanal; (b) ein abstraktes Objekt als Held (Ball, Papierflieger/Origami, "
+    "schwebende Symbole/Pins/Icons/Netze/Sprechblasen, ein blosser Gegenstand in HILO-Gruen); (c) stumpfes "
+    "Aufs-Handy-Starren oder dekoratives Posieren. Handy/UI/App-Symbolik NIE als Hero-Motiv. Wenn keine "
+    "konkrete, themenbezogene Handlung im Bild ist, ist das Bild FALSCH.\n"
     "WICHTIG: NIEMALS das echte WhatsApp-Logo, fremde Marken-/App-Logos ODER WhatsApp-aehnliche gruene "
     "Sprechblasen/Chat-Symbole abbilden (rechtlich + verwaesert die Marke). KEIN Schreibtisch-/Amt-"
     "Klischee, keine gestellte Stockfoto-Pose.\n"
@@ -176,15 +185,19 @@ HEADLINE_HINT = (
     "folgen (Steuer-Tipps/Fristen aufs Handy) - kurz und einladend, kein Werbedruck."
 )
 JURY_HINT = (
-    "\n\nKAMPAGNE KANALWERBUNG: Dieser Post lädt ein, dem WhatsApp-Kanal von HILO zu folgen. Bewerte die "
-    "Brücke zur EINLADUNGS-Kernaussage (informiert bleiben, Tipps/Fristen aufs Handy) - dieselbe Strenge "
-    "wie sonst, keine anderen Themen-Annahmen."
+    "\n\nKAMPAGNE KANALWERBUNG: Dieser Post lädt ein, dem WhatsApp-Kanal von HILO zu folgen. Bewerte streng "
+    "die BRÜCKE zwischen BILD und Botschaft: Trägt eine konkrete Alltags-HANDLUNG im Bild den Nutzen "
+    "(Frist/Tipp im Blick, informiert bleiben)? Ein bloß emotional schönes Wohlfühl-/Familienbild OHNE "
+    "erkennbaren Steuer-/Informiert-Bezug ist SCHWACH (Botschaftsklarheit niedrig) - auch wenn es "
+    "handwerklich gut ist. Belohne Motive, bei denen man ohne Überschrift erahnt, worum es geht."
 )
 QA_HINT = (
     "\n\nKAMPAGNE KANALWERBUNG: AUTOMATISCHE Ablehnungsgründe: (1) ein echtes WhatsApp-Logo, ein anderes "
     "fremdes Marken-/App-Logo ODER eine WhatsApp-ähnliche grüne Sprechblase/Chat-Symbolik (rechtlich). "
-    "(2) Das Bild zeigt KEINE glaubwürdige Alltags-Personenszene, sondern eine abstrakte Objekt-Metapher "
-    "als Held (Papierflieger/Origami, schwebender Pin/Symbol, Netz, Icon, Sprechblase). (3) Die Person "
-    "posiert nur dekorativ oder starrt bloß aufs Handy, ohne dass ein Nutzen/eine Situation erkennbar "
-    "ist; UI/Chatblasen/App-Symbolik als Hauptmotiv. Prüfe zudem, ob das Bild einladend/positiv wirkt."
+    "(2) Eine abstrakte Objekt-Metapher als Held (Ball/Papierflieger/Origami, schwebender Pin/Symbol, "
+    "Netz, Icon, Sprechblase, bloßer Gegenstand in HILO-Grün). (3) Ein 'generisch erleichterter/"
+    "glücklicher Mensch' bzw. reines Familien-Wohlfühl-Stock OHNE erkennbaren Bezug zu Steuer/Informiert-"
+    "sein (das Bild könnte für jedes Produkt stehen). (4) Stumpfes Aufs-Handy-Starren oder rein "
+    "dekoratives Posieren; UI/Chatblasen/App-Symbolik als Hauptmotiv. Gut ist eine konkrete, "
+    "themenbezogene Alltags-HANDLUNG (Kalender/Frist markieren, Reminder anheften, Tipp lesen)."
 )
