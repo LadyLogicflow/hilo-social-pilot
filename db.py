@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS beratungsstellen (
     homepage_url TEXT, buchungs_url TEXT, aktiv INTEGER NOT NULL DEFAULT 1,
     erstellt_am TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS wa_qr_links (
+    token TEXT PRIMARY KEY,
+    stelle_id INTEGER NOT NULL REFERENCES beratungsstellen(id),
+    erstellt_am TEXT DEFAULT (datetime('now')),
+    laeuft_ab TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS anlasstage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     datum TEXT NOT NULL,            -- MM-DD

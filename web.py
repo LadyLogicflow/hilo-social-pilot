@@ -1352,6 +1352,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <form method=post action="/whatsapp/connect/{{b.id}}"><input type=hidden name=zurueck value=verwaltung><button style="padding:6px 12px">Verbinden (QR anzeigen)</button></form>
       {% endif %}
     </div>
+    <div class=stfield><label>QR-Link für die Beratungsstelle</label>
+      <div class=hint style="margin:0 0 6px">Login-freier Link, 48 Stunden gültig, zeigt NUR den QR-Code dieser Stelle.</div>
+      <form method=post action="/whatsapp/qr-link/{{b.id}}"><button style="padding:6px 12px">QR-Link erzeugen (48h gültig)</button></form>
+    </div>
     <div class=stfield><label>Buchungslink</label><div class=hint style="word-break:break-all">{{b.buchungs_url or '—'}}</div></div>
     <div class=stfield><label>Porträt (Kreis)</label>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -4603,6 +4607,80 @@ def whatsapp_connect(sid):
         audit_log_safe("whatsapp_connect")
         flash("Verbindung wird aufgebaut - der QR-Code erscheint gleich. Scanne ihn mit dem Handy dieser Stelle.")
     return _wa_zurueck()
+
+@app.route("/whatsapp/qr-link/<int:sid>", methods=["POST"])
+@login_required
+def whatsapp_qr_link(sid):
+    """Erzeugt einen login-freien, 48h gueltigen Link, der NUR den WhatsApp-QR-Code dieser einen
+    Beratungsstelle zeigt (#10069, catrin) -- fuer Stellen ohne eigenen Login/ohne Tailscale."""
+    import secrets as _secrets
+    from datetime import datetime, timedelta
+    with get_conn() as conn:
+        row = conn.execute("SELECT id, name FROM beratungsstellen WHERE id=? AND aktiv=1", (sid,)).fetchone()
+        if not row:
+            flash("Beratungsstelle nicht gefunden.")
+            return redirect(url_for("verwaltung", bereich="stellen"))
+        token = _secrets.token_urlsafe(24)
+        laeuft_ab = (datetime.utcnow() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("INSERT INTO wa_qr_links(token, stelle_id, laeuft_ab) VALUES (?,?,?)",
+                     (token, sid, laeuft_ab))
+        audit_log(conn, session["user"], "whatsapp_qr_link_erzeugt", None, "Stelle %s" % sid)
+    link = request.url_root.rstrip("/") + url_for("whatsapp_qr_oeffentlich", token=token)
+    flash("QR-Link für '%s' (48h gültig): %s" % (row["name"], link))
+    return redirect(url_for("verwaltung", bereich="stellen"))
+
+WHATSAPP_QR_OEFFENTLICH = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>WhatsApp verbinden - {{stelle_name}}</title>
+{% if pending %}<meta http-equiv=refresh content=6>{% endif %}
+<style>""" + _TOP + """
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:24px;max-width:420px;text-align:center}
+.qr img{width:260px;height:260px;border:1px solid #e2e8f0;border-radius:10px}
+.ok{color:#4D7C0F;font-weight:bold}.bad{color:#b00020;font-weight:bold}
+.step{color:#475569;font-size:14px;text-align:left}
+.muted{color:#6b7280;font-size:13px}</style>
+<div class=card>
+<h2 style="margin:0 0 6px;color:#0B2545">{{stelle_name}}</h2>
+{% if fehler %}
+  <p class=bad>{{fehler}}</p>
+{% elif wa.state == 'connected' %}
+  <p class=ok>&#x2705; WhatsApp ist bereits verbunden.</p>
+  <p class=muted">Nummer: {{wa.me or '—'}}</p>
+{% elif wa.state == 'qr' and wa.qr %}
+  <div class=qr><img src="{{wa.qr}}" alt="WhatsApp QR"></div>
+  <ol class=step style="max-width:360px;margin:12px auto 0">
+    <li>WhatsApp auf dem Handy <b>dieser Stelle</b> öffnen</li>
+    <li>Einstellungen &rarr; <b>Verknüpfte Geräte</b> &rarr; <b>Gerät verknüpfen</b></li>
+    <li>Diesen QR-Code scannen</li></ol>
+  <p class=muted>Die Seite aktualisiert sich automatisch.</p>
+{% else %}
+  <p class=muted>QR-Code wird vorbereitet &hellip; bitte kurz warten, die Seite aktualisiert sich automatisch.</p>
+{% endif %}
+</div>"""
+
+@app.route("/whatsapp/qr/<token>")
+def whatsapp_qr_oeffentlich(token):
+    """Login-freie Seite fuer eine einzelne Beratungsstelle, nur der QR-Code, 48h gueltiger Token.
+    Bewusst OHNE @login_required -- das ist der ganze Sinn dieser Route (#10069)."""
+    from datetime import datetime
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT l.stelle_id, l.laeuft_ab, b.name FROM wa_qr_links l "
+            "JOIN beratungsstellen b ON b.id = l.stelle_id WHERE l.token=?", (token,)).fetchone()
+    if not row:
+        return render_template_string(WHATSAPP_QR_OEFFENTLICH, stelle_name="Link ungültig",
+                                       fehler="Dieser Link ist ungültig.", wa={}, pending=False)
+    if row["laeuft_ab"] < datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+        return render_template_string(WHATSAPP_QR_OEFFENTLICH, stelle_name=row["name"],
+                                       fehler="Dieser Link ist abgelaufen (48h-Gültigkeit). Bitte einen neuen Link anfordern.",
+                                       wa={}, pending=False)
+    st, err = _wa_call("/status", session=row["stelle_id"], timeout=6)
+    wa = st or {"state": "nicht_verbunden", "qr": None, "me": None}
+    pending = wa.get("state") in ("qr", "init", "closed")
+    fehler = ("WhatsApp-Dienst gerade nicht erreichbar, bitte kurz später erneut versuchen."
+              if err else None)
+    return render_template_string(WHATSAPP_QR_OEFFENTLICH, stelle_name=row["name"],
+                                   fehler=fehler, wa=wa, pending=pending)
 
 @app.route("/whatsapp/logout/<int:sid>", methods=["POST"])
 @login_required
