@@ -3971,13 +3971,22 @@ def verwaltung():
             elif formular == "stelle_save":
                 name = request.form.get("name", "").strip(); ort = request.form.get("ort", "").strip()
                 if name and ort:
+                    bestehend = conn.execute(
+                        "SELECT leitung, fb_seite, homepage_url, buchungs_url FROM beratungsstellen WHERE name=?",
+                        (name,)).fetchone()
+                    def _wert(feld):
+                        eingabe = request.form.get(feld, "").strip()
+                        if eingabe:
+                            return eingabe
+                        return bestehend[feld] if bestehend else ""
+                    leitung = _wert("leitung"); fb_seite = _wert("fb_seite")
+                    homepage_url = _wert("homepage_url"); buchungs_url = _wert("buchungs_url")
                     conn.execute(
                         "INSERT INTO beratungsstellen(name, ort, leitung, fb_seite, homepage_url, buchungs_url, aktiv) "
                         "VALUES (?,?,?,?,?,?,1) ON CONFLICT(name) DO UPDATE SET ort=excluded.ort, "
                         "leitung=excluded.leitung, fb_seite=excluded.fb_seite, homepage_url=excluded.homepage_url, "
                         "buchungs_url=excluded.buchungs_url",
-                        (name, ort, request.form.get("leitung", "").strip(), request.form.get("fb_seite", "").strip(),
-                         request.form.get("homepage_url", "").strip(), request.form.get("buchungs_url", "").strip()))
+                        (name, ort, leitung, fb_seite, homepage_url, buchungs_url))
                     audit_log(conn, session["user"], "beratungsstelle_gespeichert", None, name)
                     flash("Beratungsstelle '%s' gespeichert." % name)
                 else:
