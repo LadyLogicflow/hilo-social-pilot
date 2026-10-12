@@ -88,3 +88,23 @@ def test_pdf_export_ohne_filter_enthaelt_alle(client):
     r = client.get("/geplant/pdf")
     assert r.status_code == 200
     assert r.data[:4] == b"%PDF"
+
+
+def test_pdf_export_fehler_liefert_lesbare_meldung_statt_generischem_500(client, monkeypatch):
+    """Catrin bekam live einen nackten 'Internal Server Error' ohne Hinweis auf die Ursache
+    (12.10.2026, #10388ff) -- der Fehler ist in der Produktionsumgebung nicht reproduzierbar
+    aufgetaucht, das Journal zeigte nichts. Statt weiter zu raten: /geplant/pdf faengt jetzt
+    jede Exception selbst ab, loggt sie (log.exception, landet sicher im App-Logger statt sich
+    auf Werkzeug/journald zu verlassen) und gibt eine lesbare 500-Meldung zurueck."""
+    import reportlab.platypus
+
+    def _kaputt(*a, **k):
+        raise RuntimeError("Simulierter PDF-Fehler fuer den Test")
+
+    monkeypatch.setattr(reportlab.platypus.SimpleDocTemplate, "build", _kaputt)
+    r = client.get("/geplant/pdf")
+    assert r.status_code == 500
+    body = r.get_data(as_text=True)
+    assert "PDF-Export fehlgeschlagen" in body
+    assert "RuntimeError" in body
+    assert "Simulierter PDF-Fehler" in body

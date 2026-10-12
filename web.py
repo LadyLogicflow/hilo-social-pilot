@@ -3861,65 +3861,69 @@ def geplant():
 @login_required
 def geplant_pdf():
     rows, ziele, stelle_filter, von, bis = _geplant_rows()
-    import io
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import ParagraphStyle
+    try:
+        import io
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import ParagraphStyle
 
-    NAVY = colors.HexColor("#0B2545")
-    LIME = colors.HexColor("#A3E635")
+        NAVY = colors.HexColor("#0B2545")
+        LIME = colors.HexColor("#A3E635")
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=16 * mm, bottomMargin=14 * mm,
-                             leftMargin=14 * mm, rightMargin=14 * mm)
-    titel_stil = ParagraphStyle("titel", fontName="Helvetica-Bold", fontSize=15, textColor=NAVY,
-                                 spaceAfter=2)
-    unter_stil = ParagraphStyle("unter", fontName="Helvetica", fontSize=9,
-                                 textColor=colors.HexColor("#4B5563"), spaceAfter=10)
-    unter_teile = []
-    if stelle_filter:
-        unter_teile.append(stelle_filter)
-    if von or bis:
-        unter_teile.append("Zeitraum: %s – %s" % (von or "offen", bis or "offen"))
-    unter_text = " · ".join(unter_teile) if unter_teile else "Alle Beratungsstellen"
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=16 * mm, bottomMargin=14 * mm,
+                                 leftMargin=14 * mm, rightMargin=14 * mm)
+        titel_stil = ParagraphStyle("titel", fontName="Helvetica-Bold", fontSize=15, textColor=NAVY,
+                                     spaceAfter=2)
+        unter_stil = ParagraphStyle("unter", fontName="Helvetica", fontSize=9,
+                                     textColor=colors.HexColor("#4B5563"), spaceAfter=10)
+        unter_teile = []
+        if stelle_filter:
+            unter_teile.append(stelle_filter)
+        if von or bis:
+            unter_teile.append("Zeitraum: %s – %s" % (von or "offen", bis or "offen"))
+        unter_text = " · ".join(unter_teile) if unter_teile else "Alle Beratungsstellen"
 
-    story = [Paragraph("Geplante Veröffentlichungen", titel_stil),
-             Paragraph(unter_text, unter_stil), Spacer(1, 4)]
+        story = [Paragraph("Geplante Veröffentlichungen", titel_stil),
+                 Paragraph(unter_text, unter_stil), Spacer(1, 4)]
 
-    daten = [["Beitrag", "Ziel", "Kanal", "Wann", "Status"]]
-    for r in rows:
-        daten.append([r["titel"], r["ziel"], r["kanal"],
-                      ("%s, %s Uhr" % (r["geplant_de"], r["zeit"])) if r["zeit"] else r["geplant_de"],
-                      r["status"]])
-    if len(daten) == 1:
-        daten.append(["Keine Einträge für diese Auswahl.", "", "", "", ""])
+        daten = [["Beitrag", "Ziel", "Kanal", "Wann", "Status"]]
+        for r in rows:
+            daten.append([r["titel"], r["ziel"], r["kanal"],
+                          ("%s, %s Uhr" % (r["geplant_de"], r["zeit"])) if r["zeit"] else r["geplant_de"],
+                          r["status"]])
+        if len(daten) == 1:
+            daten.append(["Keine Einträge für diese Auswahl.", "", "", "", ""])
 
-    tbl = Table(daten, colWidths=[55 * mm, 42 * mm, 22 * mm, 38 * mm, 23 * mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.2, LIME),
-        ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#E3E7EE")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.append(tbl)
-    doc.build(story)
-    buf.seek(0)
-    dateiname = "Geplante-Veroeffentlichungen"
-    if stelle_filter:
-        dateiname += "-" + secure_filename(stelle_filter)
-    return send_file(buf, mimetype="application/pdf", as_attachment=True,
-                      download_name=dateiname + ".pdf")
+        tbl = Table(daten, colWidths=[55 * mm, 42 * mm, 22 * mm, 38 * mm, 23 * mm], repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+            ("LINEBELOW", (0, 0), (-1, 0), 1.2, LIME),
+            ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#E3E7EE")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(tbl)
+        doc.build(story)
+        buf.seek(0)
+        dateiname = "Geplante-Veroeffentlichungen"
+        if stelle_filter:
+            dateiname += "-" + secure_filename(stelle_filter)
+        return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                          download_name=dateiname + ".pdf")
+    except Exception as ex:
+        log.exception("Geplant-PDF-Export fehlgeschlagen (stelle=%r, von=%r, bis=%r)", stelle_filter, von, bis)
+        return ("PDF-Export fehlgeschlagen: %s: %s" % (type(ex).__name__, ex), 500)
 
 @app.route("/geplant-aendern/<int:gpid>", methods=["POST"])
 @rolle_required("freigeber")
