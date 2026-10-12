@@ -1075,6 +1075,12 @@ table.gp{max-width:1120px;margin:0 auto;width:100%}
 <div class=bar><h2 style="margin:0;color:#0B2545">Geplante Veröffentlichungen</h2><a href="/einplanung">&larr; Einplanung</a></div>
 <div class=box style="max-width:1120px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if ziele %}<form method=get style="margin-bottom:10px">
+  <select name=stelle onchange="this.form.submit()">
+    <option value=""{% if not stelle_filter %} selected{% endif %}>Alle Beratungsstellen</option>
+    {% for z in ziele %}<option value="{{z}}"{% if z==stelle_filter %} selected{% endif %}>{{z}}</option>{% endfor %}
+  </select>
+</form>{% endif %}
 {% if posts %}
 <p class=hint>Diese Beiträge werden <b>automatisch zur angegebenen Uhrzeit</b> (deutsche Zeit) veröffentlicht – der Pi muss dafür laufen. Uhrzeit/Datum unten anpassbar; Eintrag entfernbar.</p>
 <table class=gp><tr><th>Beitrag</th><th>Ziel</th><th>Kanal</th><th>Format</th><th>Wann (deutsche Zeit)</th><th>Status</th><th></th></tr>
@@ -1087,6 +1093,7 @@ table.gp{max-width:1120px;margin:0 auto;width:100%}
   <td><span class="st {{p.status}}">{{p.status}}</span>{% if p.info %} <span class=hint title="{{p.info}}">&#9432;</span>{% endif %}</td>
   <td>{% if p.status in ['geplant','laeuft'] %}<form method=post action="/geplant-loeschen/{{p.id}}" style="margin:0" onsubmit="return confirm('Diese geplante Veröffentlichung entfernen?')"><button style="background:#b00020">&times;</button></form>{% endif %}</td>
 </tr>{% endfor %}</table>
+{% elif stelle_filter %}<p style="text-align:center">Keine geplanten Veröffentlichungen für „{{stelle_filter}}".</p>
 {% else %}<p style="text-align:center">Keine geplanten Veröffentlichungen. Auf der Einplanungs-Seite „<b>Automatisch einplanen</b>" wählen.</p>{% endif %}
 </div>"""
 
@@ -3826,7 +3833,11 @@ def geplant():
                          "format": "Einzelbild",
                          "datum": d, "zeit": t, "geplant_de": _de_datum(d),
                          "status": gp["status"], "info": gp["info"]})
-    return render_template_string(GEPLANT, **_ctx(posts=rows))
+    ziele = sorted({r["ziel"] for r in rows})
+    stelle_filter = request.args.get("stelle", "").strip()
+    if stelle_filter:
+        rows = [r for r in rows if r["ziel"] == stelle_filter]
+    return render_template_string(GEPLANT, **_ctx(posts=rows, ziele=ziele, stelle_filter=stelle_filter))
 
 @app.route("/geplant-aendern/<int:gpid>", methods=["POST"])
 @rolle_required("freigeber")
