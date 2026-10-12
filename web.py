@@ -1075,11 +1075,15 @@ table.gp{max-width:1120px;margin:0 auto;width:100%}
 <div class=bar><h2 style="margin:0;color:#0B2545">Geplante Veröffentlichungen</h2><a href="/einplanung">&larr; Einplanung</a></div>
 <div class=box style="max-width:1120px">
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
-{% if ziele %}<form method=get style="margin-bottom:10px">
+{% if ziele %}<form method=get style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
   <select name=stelle onchange="this.form.submit()">
     <option value=""{% if not stelle_filter %} selected{% endif %}>Alle Beratungsstellen</option>
     {% for z in ziele %}<option value="{{z}}"{% if z==stelle_filter %} selected{% endif %}>{{z}}</option>{% endfor %}
   </select>
+  <label class=hint>von <input type=date name=von value="{{von}}"></label>
+  <label class=hint>bis <input type=date name=bis value="{{bis}}"></label>
+  <button type=submit>Filtern</button>
+  <a href="/geplant/pdf?stelle={{stelle_filter|urlencode}}&von={{von}}&bis={{bis}}" style="background:#0B2545;color:#fff;padding:5px 11px;border-radius:8px;text-decoration:none;font-size:13px">PDF exportieren</a>
 </form>{% endif %}
 {% if posts %}
 <p class=hint>Diese Beiträge werden <b>automatisch zur angegebenen Uhrzeit</b> (deutsche Zeit) veröffentlicht – der Pi muss dafür laufen. Uhrzeit/Datum unten anpassbar; Eintrag entfernbar.</p>
@@ -3808,9 +3812,9 @@ def auto_einplanen(eid):
               "„Geplante Veröffentlichungen“ anpassen." % (n, _de_datum(datum)))
     return redirect(url_for("geplant"))
 
-@app.route("/geplant")
-@login_required
-def geplant():
+def _geplant_rows():
+    """Liefert (rows_gefiltert, ziele, stelle_filter, von, bis) fuer /geplant und
+    /geplant/pdf -- gemeinsame Filterlogik (Beratungsstelle + Zeitraum)."""
     rows = []
     with get_conn() as conn:
         for gp in conn.execute(
@@ -3835,9 +3839,87 @@ def geplant():
                          "status": gp["status"], "info": gp["info"]})
     ziele = sorted({r["ziel"] for r in rows})
     stelle_filter = request.args.get("stelle", "").strip()
+    von = request.args.get("von", "").strip()
+    bis = request.args.get("bis", "").strip()
+    gefiltert = rows
     if stelle_filter:
-        rows = [r for r in rows if r["ziel"] == stelle_filter]
-    return render_template_string(GEPLANT, **_ctx(posts=rows, ziele=ziele, stelle_filter=stelle_filter))
+        gefiltert = [r for r in gefiltert if r["ziel"] == stelle_filter]
+    if von:
+        gefiltert = [r for r in gefiltert if r["datum"] and r["datum"] >= von]
+    if bis:
+        gefiltert = [r for r in gefiltert if r["datum"] and r["datum"] <= bis]
+    return gefiltert, ziele, stelle_filter, von, bis
+
+@app.route("/geplant")
+@login_required
+def geplant():
+    rows, ziele, stelle_filter, von, bis = _geplant_rows()
+    return render_template_string(GEPLANT, **_ctx(
+        posts=rows, ziele=ziele, stelle_filter=stelle_filter, von=von, bis=bis))
+
+@app.route("/geplant/pdf")
+@login_required
+def geplant_pdf():
+    rows, ziele, stelle_filter, von, bis = _geplant_rows()
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle
+
+    NAVY = colors.HexColor("#0B2545")
+    LIME = colors.HexColor("#A3E635")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=16 * mm, bottomMargin=14 * mm,
+                             leftMargin=14 * mm, rightMargin=14 * mm)
+    titel_stil = ParagraphStyle("titel", fontName="Helvetica-Bold", fontSize=15, textColor=NAVY,
+                                 spaceAfter=2)
+    unter_stil = ParagraphStyle("unter", fontName="Helvetica", fontSize=9,
+                                 textColor=colors.HexColor("#4B5563"), spaceAfter=10)
+    unter_teile = []
+    if stelle_filter:
+        unter_teile.append(stelle_filter)
+    if von or bis:
+        unter_teile.append("Zeitraum: %s – %s" % (von or "offen", bis or "offen"))
+    unter_text = " · ".join(unter_teile) if unter_teile else "Alle Beratungsstellen"
+
+    story = [Paragraph("Geplante Veröffentlichungen", titel_stil),
+             Paragraph(unter_text, unter_stil), Spacer(1, 4)]
+
+    daten = [["Beitrag", "Ziel", "Kanal", "Wann", "Status"]]
+    for r in rows:
+        daten.append([r["titel"], r["ziel"], r["kanal"],
+                      ("%s, %s Uhr" % (r["geplant_de"], r["zeit"])) if r["zeit"] else r["geplant_de"],
+                      r["status"]])
+    if len(daten) == 1:
+        daten.append(["Keine Einträge für diese Auswahl.", "", "", "", ""])
+
+    tbl = Table(daten, colWidths=[55 * mm, 42 * mm, 22 * mm, 38 * mm, 23 * mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.2, LIME),
+        ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#E3E7EE")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(tbl)
+    doc.build(story)
+    buf.seek(0)
+    dateiname = "Geplante-Veroeffentlichungen"
+    if stelle_filter:
+        dateiname += "-" + secure_filename(stelle_filter)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                      download_name=dateiname + ".pdf")
 
 @app.route("/geplant-aendern/<int:gpid>", methods=["POST"])
 @rolle_required("freigeber")
