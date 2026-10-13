@@ -90,6 +90,29 @@ def test_pdf_export_ohne_filter_enthaelt_alle(client):
     assert r.data[:4] == b"%PDF"
 
 
+def test_pdf_export_zeigt_saubere_labels_statt_db_codes(client):
+    """catrin fand das erste PDF 'noch nicht optimal' (12./13.10.2026, #10412) -- u.a. weil
+    rohe DB-Statuscodes ('veroeffentlicht' ohne Umlaut) und Kanal-Codes ('whatsapp_kanal')
+    unuebersetzt auftauchten. Prueft per Text-Extraktion, dass die PDF-Ausgabe die sauberen
+    deutschen Labels zeigt, nicht die internen Codes."""
+    import io
+    from pypdf import PdfReader
+
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO entwuerfe(id,text) VALUES (4,'{\"ueberschrift\":\"WA-Kanal-Post\"}')")
+        conn.execute(
+            "INSERT INTO geplante_posts(id,entwurf_id,stelle_id,kanal,format,geplant_am,status) "
+            "VALUES (4,4,1,'whatsapp_kanal','einzelbild','2026-10-20T08:00:00','veroeffentlicht')")
+
+    r = client.get("/geplant/pdf?stelle=HILO+Neuss+%C2%B7+Neuss")
+    assert r.status_code == 200
+    text = PdfReader(io.BytesIO(r.data)).pages[0].extract_text()
+    assert "Veröffentlicht" in text
+    assert "WhatsApp-Kanal" in text
+    assert "veroeffentlicht" not in text
+    assert "whatsapp_kanal" not in text
+
+
 def test_pdf_export_fehler_liefert_lesbare_meldung_statt_generischem_500(client, monkeypatch):
     """Catrin bekam live einen nackten 'Internal Server Error' ohne Hinweis auf die Ursache
     (12.10.2026, #10388ff) -- der Fehler ist in der Produktionsumgebung nicht reproduzierbar

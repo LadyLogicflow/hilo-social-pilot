@@ -3889,23 +3889,36 @@ def geplant_pdf():
         story = [Paragraph("Geplante Veröffentlichungen", titel_stil),
                  Paragraph(unter_text, unter_stil), Spacer(1, 4)]
 
-        daten = [["Beitrag", "Ziel", "Kanal", "Wann", "Status"]]
-        for r in rows:
-            daten.append([r["titel"], r["ziel"], r["kanal"],
-                          ("%s, %s Uhr" % (r["geplant_de"], r["zeit"])) if r["zeit"] else r["geplant_de"],
-                          r["status"]])
-        if len(daten) == 1:
-            daten.append(["Keine Einträge für diese Auswahl.", "", "", "", ""])
+        # Status-Codes sind interne DB-Werte (z.B. "veroeffentlicht" ohne Umlaut) -- fuers PDF
+        # eigene, saubere Anzeige-Labels, ohne die bestehende Web-Oberflaeche anzufassen.
+        STATUS_LABEL = {"geplant": "Geplant", "veroeffentlicht": "Veröffentlicht",
+                        "fehler": "Fehler", "laeuft": "Läuft"}
+        KANAL_LABEL_PDF = {"whatsapp_kanal": "WhatsApp-Kanal", "whatsapp_status": "WhatsApp-Status"}
 
-        tbl = Table(daten, colWidths=[55 * mm, 42 * mm, 22 * mm, 38 * mm, 23 * mm], repeatRows=1)
+        zelle_stil = ParagraphStyle("zelle", fontName="Helvetica", fontSize=8.5,
+                                     textColor=colors.HexColor("#15191F"), leading=10.5)
+        kopf_stil = ParagraphStyle("kopf", fontName="Helvetica-Bold", fontSize=8.5,
+                                    textColor=colors.white, leading=10.5)
+
+        def _z(text):
+            return Paragraph((text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+                              zelle_stil)
+
+        kopf = [Paragraph(t, kopf_stil) for t in ("Beitrag", "Ziel", "Kanal", "Wann", "Status")]
+        daten = [kopf]
+        for r in rows:
+            wann = ("%s, %s Uhr" % (r["geplant_de"], r["zeit"])) if r["zeit"] else r["geplant_de"]
+            kanal_anzeige = KANAL_LABEL_PDF.get(r["kanal"], r["kanal"])
+            status_anzeige = STATUS_LABEL.get(r["status"], r["status"])
+            daten.append([_z(r["titel"]), _z(r["ziel"]), _z(kanal_anzeige), _z(wann), _z(status_anzeige)])
+        if len(daten) == 1:
+            daten.append([_z("Keine Einträge für diese Auswahl."), "", "", "", ""])
+
+        tbl = Table(daten, colWidths=[56 * mm, 34 * mm, 30 * mm, 32 * mm, 26 * mm], repeatRows=1)
         tbl.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
             ("LINEBELOW", (0, 0), (-1, 0), 1.2, LIME),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
             ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#E3E7EE")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
