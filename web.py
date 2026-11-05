@@ -8,7 +8,7 @@ from flask import (Flask, request, redirect, url_for, session, send_file,
                    render_template_string, flash, abort)
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from db import get_conn, init_db, audit_log
+from db import get_conn, init_db, audit_log, get_einstellung, set_einstellung
 from secrets_store import get_secret
 from config import BASE_DIR, DATA_DIR, WHATSAPP_URL
 import textgen, bildgen
@@ -81,6 +81,16 @@ def _pages(force=False):
     return _pages_cache["data"], _pages_cache["err"]
 
 _KANAL_DE = {"facebook": "Facebook", "instagram": "Instagram", "beide": "Facebook + Instagram"}
+
+# Recruiting-Entwuerfe tragen im Entwurf-JSON die Markierung fields['kampagne']='recruiting'. json.dumps
+# (Default-Separatoren) serialisiert das als der untenstehende Teilstring. Damit sich Steuer- und
+# Recruiting-Beitraege NIE vermischen, filtern die Steuer-Ansichten (/entwuerfe, Pool-Sammelaufnahme,
+# Startseiten-Zaehler) Recruiting-Entwuerfe per 'text NOT LIKE _RECRUITING_LIKE' heraus.
+_RECRUITING_LIKE = '%"kampagne": "recruiting"%'
+# Analog Kanalwerbung (bewirbt den kostenlosen WhatsApp-Kanal): eigene Markierung, damit sich Steuer-,
+# Recruiting- und Kanalwerbung-Beitraege NIE vermischen (dieselben Steuer-Ansichten schirmen beide
+# Sonder-Kampagnen ueber 'text NOT LIKE ...' ab).
+_KANALWERBUNG_LIKE = '%"kampagne": "kanalwerbung"%'
 
 def _kanal_fuer(prefix, tid):
     """Liest den je Ziel gewaehlten Kanal aus dem Formular (kanal_s<id> bzw. kanal_p<id>).
@@ -325,7 +335,11 @@ def _publiziere_geplant(gpid):
     # Pool-Beitraege (gp['pool']==1) tragen den Status 'pool' (einmalige Freigabe beim Topf-Eintrag)
     # und sind ebenfalls postbar - sie bleiben aber wiederverwendbar (siehe Status-Flip unten).
     pool_post = bool(gp["pool"])
-    erlaubte_status = ("freigegeben", "pool") if pool_post else ("freigegeben",)
+    # Recruiting-Pool-Beitraege tragen den Status 'pool_recruiting' (eigene Freigabe beim Recruiting-
+    # Topf-Eintrag), Kanalwerbung-Beitraege 'pool_kanalwerbung' - beide sind wie die Steuer-Pool-
+    # Beitraege postbar und wiederverwendbar.
+    erlaubte_status = ("freigegeben", "pool", "pool_recruiting", "pool_kanalwerbung") if pool_post \
+        else ("freigegeben",)
     if not e or e["status"] not in erlaubte_status:
         with get_conn() as conn:
             conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
@@ -469,8 +483,27 @@ def _kanal_verfuegbarkeit(stellen):
         return key in s.keys()
     wa_status_ids = {int(s["id"]) for s in stellen
                      if _hat(s, "wa_status_aktiv") and s["wa_status_aktiv"]}
-    wa_kanal_ids = {int(s["id"]) for s in stellen
-                    if _hat(s, "wa_kanal_invite") and (s["wa_kanal_invite"] or "").strip()}
+    # whatsapp_kanal: Stellen mit hinterlegtem Einladungslink. Bei einem GETEILTEN Kanal (mehrere Stellen
+    # mit DEMSELBEN Link) postet nur die markierte Posterin (wa_kanal_poster=1) die Kanal-Beitraege -
+    # sonst laege derselbe Beitrag doppelt im Kanal. Der Status-Funnel bleibt bei allen Stellen (er nutzt
+    # den Link nur als Einladung, nicht zum Posten).
+    _kanal_gruppen = {}
+    for s in stellen:
+        inv = (s["wa_kanal_invite"] or "").strip() if _hat(s, "wa_kanal_invite") else ""
+        if inv:
+            _kanal_gruppen.setdefault(inv, []).append(s)
+    wa_kanal_ids = set()
+    for inv, gruppe in _kanal_gruppen.items():
+        if len(gruppe) == 1:
+            wa_kanal_ids.add(int(gruppe[0]["id"]))
+            continue
+        poster = [s for s in gruppe if _hat(s, "wa_kanal_poster") and s["wa_kanal_poster"]]
+        if poster:
+            wa_kanal_ids.add(int(poster[0]["id"]))
+        else:
+            log.warning("Geteilter WhatsApp-Kanal (%d Stellen, gleicher Link) ohne markierte Kanal-Posterin"
+                        " - Kanal-Beitrag uebersprungen. Bitte in der Verwaltung EINE Stelle markieren.",
+                        len(gruppe))
     return {
         "facebook": fb_ids,
         "instagram": ig_ids,
@@ -734,6 +767,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 .run{color:#4D7C0F;font-weight:bold;font-size:13px;margin-top:8px}</style>
 """ + _NAV + """
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+{% if wa_getrennt %}<div style="max-width:1040px;margin:0 auto 16px;background:#fde8e8;border:2px solid #b00020;border-radius:10px;padding:11px 16px;color:#7f1d1d;font-size:14px"><b>&#x26A0;&#xFE0F; {{wa_getrennt|length}} WhatsApp-Verbindung(en) getrennt – es gehen KEINE WhatsApp-Posts dieser Stellen raus:</b><ul style="margin:6px 0 4px">{% for w in wa_getrennt %}<li>{{w.name}}{% if w.ort %} · {{w.ort}}{% endif %}</li>{% endfor %}</ul><a href="/whatsapp" style="color:#b00020;font-weight:bold">&rarr; Jetzt verbinden</a></div>{% endif %}
 <div class=info>&#x1F552; Themen werden täglich um 7:00 Uhr automatisch aus allen Quellen geholt.</div>
 <div class=grid>
   <a class=tile href="/themen">{% if themen_offen %}<span class=badge>{{themen_offen}}</span>{% endif %}<h3>1. Freigabe: Themen</h3><p>Themen für die Kampagne auswählen (Stufe 1).</p></a>
@@ -743,6 +777,8 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 </div>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/pool"><h3>&#x267B;&#xFE0F; Zufalls-Pool (Topf)</h3><p>Zeitlose Beiträge sammeln – das Tool spielt sie automatisch und je Beratungsstelle unterschiedlich aus (jeder Beitrag je Stelle genau einmal pro Kanal). Anlass-Tage und Fristen bleiben in der Einplanung.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/eigener"><h3>&#x270F;&#xFE0F; Eigenen Beitrag erstellen</h3><p>Thema und Tag angeben – das Tool erstellt einen Entwurf, den du freigibst und der dann fest für diesen Tag eingeplant wird.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#0B2545" href="/recruiting">{% if recruiting_offen %}<span class=badge>{{recruiting_offen}}</span>{% endif %}<h3>&#x1F4BC; Recruiting-Kampagne</h3><p>Beratungsstellenleiter/in (m/w/d) deutschlandweit anwerben: 5 Beiträge auf einmal erzeugen, freigeben, eigener Recruiting-Pool – einmal pro Woche automatisch je Stelle ausgespielt (Facebook, Instagram, WhatsApp-Status).</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#0B2545" href="/kanalwerbung">{% if kanalwerbung_offen %}<span class=badge>{{kanalwerbung_offen}}</span>{% endif %}<h3>&#x1F4E3; Kanalwerbung (WhatsApp-Kanal)</h3><p>Den kostenlosen WhatsApp-Kanal bewerben: Beiträge erzeugen, freigeben, eigener Kanalwerbung-Pool – in zufälligem Abstand (7–15 Tage) automatisch je Stelle ausgespielt (Facebook, Instagram). Höchstens 2 Posts pro Tag: nie zusammen mit einem Recruiting-Post am selben Tag.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#f59e0b;background:linear-gradient(180deg,#fffbeb,#fff)" href="/sharenext"><h3>🚀 ShareNext - Premium Bildgenerierung</h3><p>KI-basierte 6-Stufen-Pipeline für hochwertige Social-Media-Bilder (~$0.10/Bild, 30-60 Sek.)</p></a>"""
@@ -881,9 +917,152 @@ button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6
       </form>
       <form method=post action="/pool-aufnehmen/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen zeitlosen Beitrag direkt in den Zufalls-Pool legen?\n\nDas gilt als Freigabe für ALLE Beratungsstellen – er wird automatisch ausgespielt (je Stelle ein anderer, jeder Beitrag je Stelle genau einmal pro Kanal). Nur für zeitlose Inhalte; Anlass-Tage und Fristen bleiben in der Einplanung.')">
         <button class=ok style="background:#4D7C0F" title="Zeitlosen Beitrag direkt freigeben und in den Topf legen – wird automatisch je Stelle ausgespielt">&#x267B;&#xFE0F; In den Pool</button></form>
+      <form method=post action="/whatsapp/kanal-jetzt/{{e.id}}" style="margin:6px 0;display:inline" onsubmit="return confirm('Diesen Beitrag JETZT in den WhatsApp-Kanal stellen (über deine Poster-Nummer)?')">
+        <button class=ok style="background:#0B2545" title="Diesen Beitrag sofort manuell in den WhatsApp-Kanal posten (über die Poster-Nummer)">&#x1F4E2; In den WhatsApp-Kanal</button></form>
+    </div>
+    <div style="margin-top:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px">
+      <form method=post action="/reel-test/{{e.id}}" style="margin:0;display:inline" onsubmit="return confirm('Aus diesem Motiv ein Test-Reel (kurzer Hochkant-Clip) erzeugen? Dauert ca. 1–3 Minuten und kostet ein paar Cent (fal.ai).')">
+        <button class=gr title="Das fertige Motiv (mit Überschrift + Logo) zu einem kurzen 9:16-Video animieren (Test)">&#x1F3AC; Test-Reel erzeugen</button></form>
+      <a class=gr href="/reel/{{e.id}}" style="margin-left:6px" target="_blank" title="Zuletzt erzeugtes Test-Reel ansehen (falls vorhanden)">&#x25B6;&#xFE0F; Reel ansehen</a>
+      <span class=hint style="display:block;margin-top:4px">Video-MVP (fal.ai) – erst Test, Veröffentlichung später und nur nach Freigabe.</span>
     </div>
   </div></div>
 {% else %}<p style="text-align:center">Keine offenen Entwürfe. Erst Themen auswählen und Beiträge erzeugen.</p>{% endfor %}
+"""
+
+RECRUITING = """<!doctype html><meta charset=utf-8><title>Recruiting-Kampagne</title>
+<style>""" + _TOP + """
+.card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
+.card img{width:280px;height:280px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
+.cta{display:inline-block;background:#0B2545;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
+button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6px;color:#fff}
+.ok{background:#4D7C0F}.re{background:#0B2545}.del{background:#b00020}.gr{background:#6b7280}
+.status{max-width:1040px;margin:0 auto 16px;background:#eef2f8;border-radius:10px;padding:12px 16px;color:#0B2545;font-size:14px}
+.sec{max-width:1040px;margin:22px auto 8px;color:#0B2545}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Recruiting-Kampagne (Beratungsstellenleiter/in gesucht)</h2><a href="/">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=status>
+  <b>Recruiting-Pool:</b> {{aktiv_pool}} freigegebene Beiträge{% if aktiv_pool < min_pool %} &nbsp;<span style="color:#b00020">(knapp – Auto-Nachschub aktiv ab &lt; {{min_pool}})</span>{% endif %}
+  &middot; <b>Nächste Wochen-Ausspielung geplant für Woche:</b> {{plan}}
+  &middot; Kanäle: {{kanaele|join(', ')}}
+  {% if laeuft %}<br><b>&#x23F3; Es werden gerade Recruiting-Beiträge im Hintergrund erzeugt – Seite in 1–2 Min. neu laden.</b>{% endif %}
+</div>
+<div style="max-width:1040px;margin:0 auto 14px;text-align:right">
+  <form method=post action="/recruiting-erzeugen" style="display:inline">
+    <button class=ok{% if laeuft %} disabled{% endif %} title="{{schwung}} neue(n) Recruiting-Beitrag/-Beiträge (Text + Bild) erzeugen">&#x2795; Recruiting-Beitrag erzeugen{% if schwung != 1 %} ({{schwung}}){% endif %}</button></form>
+</div>
+<h3 class=sec>Offene Recruiting-Entwürfe ({{entwuerfe|length}})</h3>
+{% for e in entwuerfe %}
+<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Bild wird gerade im Hintergrund erstellt – Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}<img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p><span class=cta>{{e.f.cta}}</span></p>
+    {% if e.f.captions %}<details><summary>Begleittexte je Kanal anzeigen</summary>{% for k,v in e.f.captions.items() %}<p><b>{{k}}:</b> {{v}}</p>{% endfor %}</details>{% endif %}
+    """ + _WARUM_PANEL + """
+    <div style="margin-top:10px">
+      <form method=post action="/bild-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Nur ein neues Foto erzeugen? Text bleibt unverändert.')">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=gr title="Nur ein neues Foto (Recruiting-Bildpipeline) – Text bleibt gleich">&#x1F3B2; Bild neu</button></form>
+      {% if e.f.sharenext_state %}<form method=post action="/umsetzung-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Gleiche Idee behalten und nur das Bild neu rendern?')">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=gr title="Dieselbe Idee behalten, nur das Bild neu rendern">&#x1F504; Idee behalten</button></form>{% endif %}
+      <form method=post action="/recruiting-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Text UND Bild komplett neu erzeugen?')">
+        <button class=re title="Frischen Recruiting-Text und ein neues Bild erzeugen">&#x270F;&#xFE0F; Bild + Text neu</button></form>
+    </div>
+    <div style="margin-top:12px">
+      <form method=post action="/recruiting-freigeben/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Recruiting-Beitrag freigeben und in den Recruiting-Pool legen? Er wird dann automatisch einmal pro Woche je Beratungsstelle ausgespielt.')">
+        <button class=ok>&#x2714;&#xFE0F; Freigeben &rarr; Recruiting-Pool</button></form>
+      <form method=post action="/aktion/{{e.id}}" style="display:inline">
+        <input type=hidden name=zurueck value=recruiting>
+        <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Recruiting-Entwurf wirklich löschen?')">Löschen</button></form>
+    </div>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Keine offenen Recruiting-Entwürfe. Oben „Recruiting-Beitrag erzeugen“ klicken.</p>{% endfor %}
+<h3 class=sec>Recruiting-Pool ({{pool_items|length}} freigegeben)</h3>
+{% for e in pool_items %}
+<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p style="color:#6b7280;font-size:13px">Freigegeben: {{e.freigegeben_de}} &middot; bereits ausgespielt: {{e.bespielt}}×</p>
+    <form method=post action="/recruiting-pool-entfernen/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Recruiting-Pool nehmen?')">
+      <button class=gr>Aus dem Recruiting-Pool nehmen</button></form>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Noch keine Beiträge im Recruiting-Pool.</p>{% endfor %}
+"""
+
+KANALWERBUNG = """<!doctype html><meta charset=utf-8><title>Kanalwerbung (WhatsApp-Kanal)</title>
+<style>""" + _TOP + """
+.card{display:flex;gap:18px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;max-width:1040px;margin:0 auto 18px}
+.card img{width:280px;height:280px;object-fit:cover;border-radius:10px;border:1px solid #e3e7ee}
+.t{flex:1}.t h3{color:#15191F;margin:.2em 0}.sub{color:#4D7C0F;font-weight:bold}
+.cta{display:inline-block;background:#0B2545;color:#fff;padding:5px 10px;border-radius:14px;font-size:13px}
+button{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;margin-right:6px;color:#fff}
+.ok{background:#4D7C0F}.re{background:#0B2545}.del{background:#b00020}.gr{background:#6b7280}
+.status{max-width:1040px;margin:0 auto 16px;background:#eef2f8;border-radius:10px;padding:12px 16px;color:#0B2545;font-size:14px}
+.sec{max-width:1040px;margin:22px auto 8px;color:#0B2545}</style>
+<div class=top><h2 style="margin:0;color:#0B2545">Kanalwerbung (kostenlosen WhatsApp-Kanal bewerben)</h2><a href="/">&larr; Startseite</a></div>
+{% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
+<div class=status>
+  <b>Kanalwerbung-Pool:</b> {{aktiv_pool}} freigegebene Beiträge{% if aktiv_pool < min_pool %} &nbsp;<span style="color:#b00020">(knapp – Auto-Nachschub aktiv ab &lt; {{min_pool}})</span>{% endif %}
+  &middot; <b>Nächste Ausspielung geplant für (frühestens):</b> {{plan}}
+  &middot; Kanäle: {{kanaele|join(', ')}}
+  &middot; <span style="color:#6b7280">Zufälliger Abstand 7–15 Tage · höchstens 2 Posts/Tag (nie am selben Tag wie ein Recruiting-Post)</span>
+  {% if laeuft %}<br><b>&#x23F3; Es werden gerade Kanalwerbung-Beiträge im Hintergrund erzeugt – Seite in 1–2 Min. neu laden.</b>{% endif %}
+</div>
+<div style="max-width:1040px;margin:0 auto 14px;text-align:right">
+  <form method=post action="/kanalwerbung-erzeugen" style="display:inline">
+    <button class=ok{% if laeuft %} disabled{% endif %} title="{{schwung}} neue(n) Kanalwerbung-Beitrag/-Beiträge (Text + Bild) erzeugen">&#x2795; Kanalwerbung-Beitrag erzeugen{% if schwung != 1 %} ({{schwung}}){% endif %}</button></form>
+</div>
+<div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <h3 class=sec style="margin:0">Offene Kanalwerbung-Entwürfe ({{entwuerfe|length}})</h3>
+  {% if entwuerfe %}<form method=post action="/kanalwerbung-alle-loeschen" style="margin:0" onsubmit="return confirm('Wirklich ALLE {{entwuerfe|length}} offenen Kanalwerbung-Entwürfe löschen? Das lässt sich nicht rückgängig machen. Freigegebene Pool-Beiträge bleiben unberührt.')">
+    <button class=del title="Alle offenen Kanalwerbung-Entwürfe auf einmal löschen">&#x1F5D1;&#xFE0F; Alle {{entwuerfe|length}} löschen</button></form>{% endif %}
+</div>
+{% for e in entwuerfe %}
+<div class=card>{% if e.f.bild_wird_erstellt %}<p style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⏳ Bild wird gerade im Hintergrund erstellt – Seite neu laden.</p>{% endif %}{% if e.f.bild_fehler %}<p style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;margin:0 0 8px;font-size:14px">⚠️ Letzte Bild-Erstellung fehlgeschlagen: {{e.f.bild_fehler}}</p>{% endif %}<img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p><span class=cta>{{e.f.cta}}</span></p>
+    {% if e.f.captions %}<details><summary>Begleittexte je Kanal anzeigen</summary>{% for k,v in e.f.captions.items() %}<p><b>{{k}}:</b> {{v}}</p>{% endfor %}</details>{% endif %}
+    """ + _WARUM_PANEL + """
+    <div style="margin-top:10px">
+      <form method=post action="/bild-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Nur ein neues Foto erzeugen? Text bleibt unverändert.')">
+        <input type=hidden name=zurueck value=kanalwerbung>
+        <button class=gr title="Nur ein neues Foto (Kanalwerbung-Bildpipeline) – Text bleibt gleich">&#x1F3B2; Bild neu</button></form>
+      {% if e.f.sharenext_state %}<form method=post action="/umsetzung-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Gleiche Idee behalten und nur das Bild neu rendern?')">
+        <input type=hidden name=zurueck value=kanalwerbung>
+        <button class=gr title="Dieselbe Idee behalten, nur das Bild neu rendern">&#x1F504; Idee behalten</button></form>{% endif %}
+      <form method=post action="/kanalwerbung-neu/{{e.id}}" style="display:inline" onsubmit="return confirm('Text UND Bild komplett neu erzeugen?')">
+        <button class=re title="Frischen Kanalwerbung-Text und ein neues Bild erzeugen">&#x270F;&#xFE0F; Bild + Text neu</button></form>
+    </div>
+    <div style="margin-top:12px">
+      <form method=post action="/kanalwerbung-freigeben/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Kanalwerbung-Beitrag freigeben und in den Kanalwerbung-Pool legen? Er wird dann automatisch in zufälligem Abstand je Beratungsstelle ausgespielt.')">
+        <button class=ok>&#x2714;&#xFE0F; Freigeben &rarr; Kanalwerbung-Pool</button></form>
+      <form method=post action="/aktion/{{e.id}}" style="display:inline">
+        <input type=hidden name=zurueck value=kanalwerbung>
+        <button class=del name=aktion value=loeschen onclick="return confirm('Diesen Kanalwerbung-Entwurf wirklich löschen?')">Löschen</button></form>
+    </div>
+    <div style="margin-top:10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px">
+      <form method=post action="/whatsapp/status-test/{{e.id}}" style="margin:0" onsubmit="return confirm('Dieses Bild als WhatsApp-Status senden? Ohne Häkchen nur an die eingegebene Test-Nummer, mit Häkchen an ALLE Kontakte.')">
+        <b style="font-size:13px">&#x1F4F2; Als WhatsApp-Status testen</b><br>
+        <input name=empfaenger placeholder="deine Nummer, z.B. 49160…" style="padding:5px;min-width:200px;margin:4px 6px 4px 0">
+        <label style="font-size:12px;font-weight:normal"><input type=checkbox name=an_alle value=1> an alle Kontakte</label>
+        <button class=gr style="margin-left:6px">Status senden</button>
+      </form>
+    </div>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Keine offenen Kanalwerbung-Entwürfe. Oben „Kanalwerbung-Beitrag erzeugen“ klicken.</p>{% endfor %}
+<h3 class=sec>Kanalwerbung-Pool ({{pool_items|length}} freigegeben)</h3>
+{% for e in pool_items %}
+<div class=card><img src="/bild/{{e.id}}" alt="Vorschau">
+  <div class=t><h3>{{e.f.ueberschrift}}</h3><p class=sub>{{e.f.subline}}</p>
+    <ul>{% for b in e.f.bullets %}<li>{{b}}</li>{% endfor %}</ul>
+    <p style="color:#6b7280;font-size:13px">Freigegeben: {{e.freigegeben_de}} &middot; bereits ausgespielt: {{e.bespielt}}×</p>
+    <form method=post action="/kanalwerbung-pool-entfernen/{{e.id}}" style="display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Kanalwerbung-Pool nehmen?')">
+      <button class=gr>Aus dem Kanalwerbung-Pool nehmen</button></form>
+  </div></div>
+{% else %}<p style="text-align:center;color:#6b7280">Noch keine Beiträge im Kanalwerbung-Pool.</p>{% endfor %}
 """
 
 EINPLANUNG = """<!doctype html><meta charset=utf-8><title>Einplanung Veröffentlichung</title>
@@ -1006,6 +1185,8 @@ button{border:0;background:#6b7280;color:#fff;cursor:pointer;padding:8px 12px;bo
     """ + _WARUM_PANEL + """
     <form method=post action="/pool-entfernen/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag aus dem Topf nehmen? Er wird nicht mehr automatisch ausgespielt (bereits Ausgespieltes bleibt gespeichert). Du findest ihn danach wieder unter „Einplanung".')">
       <button title="Aus dem Topf nehmen">Aus dem Pool nehmen</button></form>
+    <form method=post action="/whatsapp/kanal-jetzt/{{e.id}}" style="margin-top:8px;display:inline" onsubmit="return confirm('Diesen Beitrag JETZT in den WhatsApp-Kanal stellen (über deine Poster-Nummer)?')">
+      <button style="background:#0B2545;color:#fff" title="Diesen Beitrag sofort manuell in den WhatsApp-Kanal posten (über die Poster-Nummer)">&#x1F4E2; In den WhatsApp-Kanal</button></form>
     <details style="margin-top:8px">
       <summary style="cursor:pointer;color:#6b7280;font-size:13px">Weitere (alte) Bild-Optionen</summary>
       <form method=post action="/bild-generieren/{{e.id}}" style="margin-top:6px">
@@ -1341,7 +1522,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
           <input name=wa_kanal_invite value="{{b.wa_kanal_invite or ''}}" placeholder="https://whatsapp.com/channel/…" title="Einladungslink des WhatsApp-Kanals dieser Stelle - leer = kein Kanalbeitrag aus dem Pool" style="flex:1;min-width:260px">
           <button style="padding:7px 13px">OK</button>
-        </div></form>
+        </div>
+        <label style="font-weight:normal;font-size:13px;display:block;margin:8px 0 0"><input type=checkbox name=wa_kanal_poster value="1"{% if b.wa_kanal_poster %} checked{% endif %}> Diese Stelle postet die Kanal-Beiträge <span class=hint>(bei einem geteilten Kanal nur EINE Stelle aktivieren)</span></label>
+        </form>
     </div>
     <div class=stfield><label>WhatsApp-Verbindung</label>
       {% if wa_dienst_err %}<div class=hint>WhatsApp-Dienst nicht erreichbar.</div>{% endif %}
@@ -1830,18 +2013,29 @@ def index():
         themen_offen = conn.execute("SELECT COUNT(*) FROM themen WHERE status='vorgeschlagen'").fetchone()[0]
         bereit = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
                               "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
-        entwuerfe_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf'").fetchone()[0]
+        entwuerfe_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' "
+                                       "AND text NOT LIKE ? AND text NOT LIKE ?",
+                                       (_RECRUITING_LIKE, _KANALWERBUNG_LIKE)).fetchone()[0]
+        recruiting_offen = conn.execute(
+            "SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+            (_RECRUITING_LIKE,)).fetchone()[0]
+        kanalwerbung_offen = conn.execute(
+            "SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+            (_KANALWERBUNG_LIKE,)).fetchone()[0]
         freigegeben_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='freigegeben'").fetchone()[0]
     return render_template_string(HOME, **_ctx(themen_offen=themen_offen, bereit=bereit,
                                   entwuerfe_offen=entwuerfe_offen, freigegeben_offen=freigegeben_offen,
-                                  gen_running=_generation_running()))
+                                  recruiting_offen=recruiting_offen, kanalwerbung_offen=kanalwerbung_offen,
+                                  gen_running=_generation_running(), wa_getrennt=_wa_getrennte_stellen()))
 
 @app.route("/entwuerfe")
 @login_required
 def entwuerfe():
     rows = []
     with get_conn() as conn:
-        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' ORDER BY id DESC"):
+        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' "
+                              "AND text NOT LIKE ? AND text NOT LIKE ? ORDER BY id DESC",
+                              (_RECRUITING_LIKE, _KANALWERBUNG_LIKE)):
             row = _parse(e)
             # NUR NOCH ShareNext Premium-Bilder - keine has_premium Flag mehr!
             rows.append(row)
@@ -1977,6 +2171,18 @@ def pool_export():
     resp.headers["Content-Disposition"] = 'attachment; filename="sharenext-pool-export.txt"'
     return resp
 
+def _zurueck_ziel(zurueck):
+    """Rueckleitziel fuer die Bild-/Aktions-Buttons anhand des versteckten Feldes 'zurueck'.
+    Additiv um 'recruiting' erweitert, damit die Buttons auf der Recruiting-Uebersicht dorthin
+    zurueckfuehren; Default bleibt die Entwuerfe-Seite (unveraendertes Steuer-Verhalten)."""
+    if zurueck == "recruiting":
+        return url_for("recruiting_seite")
+    if zurueck == "kanalwerbung":
+        return url_for("kanalwerbung_seite")
+    if zurueck == "einplanung":
+        return url_for("einplanung")
+    return url_for("entwuerfe")
+
 def _pool_back():
     """Nach einer Pool-Aufnahme NICHT auf die Pool-Seite umleiten (ueberfluessig), sondern zurueck
     zur Ausgangsseite (Freigabe oder Einplanung). Die Pool-Seite erreicht man nur ueber die
@@ -2033,7 +2239,10 @@ def pool_aufnehmen_alle():
     user = session["user"]
     n = 0
     with get_conn() as conn:
-        ids = [r["id"] for r in conn.execute("SELECT id FROM entwuerfe WHERE status='entwurf'")]
+        # Recruiting-/Kanalwerbung-Entwuerfe NICHT in den Steuer-Pool aufnehmen (eigene Pools).
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM entwuerfe WHERE status='entwurf' AND text NOT LIKE ? AND text NOT LIKE ?",
+            (_RECRUITING_LIKE, _KANALWERBUNG_LIKE))]
         for eid in ids:
             conn.execute("INSERT OR IGNORE INTO pool(entwurf_id, freigegeben_von) VALUES (?,?)", (eid, user))
             conn.execute("UPDATE pool SET aktiv=1 WHERE entwurf_id=?", (eid,))  # frueher entfernten reaktivieren
@@ -2047,6 +2256,784 @@ def pool_aufnehmen_alle():
     else:
         flash("Es gab keine offenen Entwürfe, die in den Pool aufgenommen werden konnten.")
     return _pool_back()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECRUITING-KAMPAGNE (Etappen 3-5): PARALLELE Content-Maschinerie zur Anwerbung neuer
+# selbststaendiger HILO-Beratungsstellenleiter. Vollstaendig ADDITIV und von der Steuer-Maschinerie
+# getrennt: EIGENE Pool-Tabellen (pool_recruiting/pool_nutzung_recruiting), eigene Erzeugung, eigener
+# WOECHENTLICHER Scheduler. Der taegliche Steuer-Scheduler zieht ausschliesslich aus `pool` und kann
+# Recruiting-Beitraege daher nie erwischen. Deutschlandweit beworben (keine Regionalisierung).
+# ─────────────────────────────────────────────────────────────────────────────
+RECRUITING_KANAELE = ["facebook", "instagram", "whatsapp_status"]   # Vorgabe catrin (kein WhatsApp-Kanal)
+RECRUITING_POOL_TABLE = "pool_recruiting"
+RECRUITING_NUTZUNG_TABLE = "pool_nutzung_recruiting"
+RECRUITING_SCHWUNG = 1              # Testphase (catrin 2026-08-26): pro Klick nur EINEN Beitrag. Spaeter wieder 5.
+RECRUITING_MIN_POOL = 5             # aktive Recruiting-Pool-Beitraege, ab deren Unterschreitung Auto-Nachschub laeuft
+_recruiting_gen_lock = threading.Lock()
+_recruiting_gen = {"running": False}
+
+
+def _recruiting_generation_running():
+    return _recruiting_gen.get("running", False)
+
+
+def _recruiting_erzeuge_schwung(anzahl, user):
+    """Erzeugt SYNCHRON einen Schwung Recruiting-Entwuerfe (Text + Bild) - laeuft in einem
+    Hintergrund-Thread (siehe _recruiting_start_schwung). Pro Entwurf: EIN KI-Textaufruf
+    (textgen.generate(..., kampagne='recruiting', variation_index=i) fuer Diversitaet der 5) und
+    EIN Recruiting-Bildlauf (ShareNext-Pipeline im Recruiting-Modus, Auto-Retry). Entwuerfe werden
+    mit status='entwurf' + fields['kampagne']='recruiting' angelegt (im Steuer-Fluss unsichtbar).
+    Robust: ein fehlgeschlagener Einzel-Beitrag stoppt den Schwung nicht."""
+    created = 0
+    # Variation (catrin 2026-08-27): rotierender Basis-Zaehler ueber einstellungen, damit auch bei
+    # SCHWUNG=1 (Schleife laeuft nur mit i=0) JEDER Klick einen ANDEREN Schwerpunkt-Index nimmt. Ohne
+    # das stand variation_index fest auf 0 -> immer derselbe Schwerpunkt -> immer dieselbe Headline.
+    try:
+        _basis = int(get_einstellung("recruiting_variation_zaehler", "0") or "0")
+    except (TypeError, ValueError):
+        _basis = 0
+    for i in range(anzahl):
+        try:
+            data = textgen.generate({}, kampagne="recruiting", variation_index=_basis + i)
+            # HARTE Markierung: ueberall als Recruiting-Beitrag erkennbar; der Steuer-Pfad ignoriert ihn.
+            data["kampagne"] = "recruiting"
+            with get_conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) "
+                    "VALUES (NULL, 'facebook', ?, 'entwurf', NULL)",
+                    (json.dumps(data, ensure_ascii=False),))
+                eid = cur.lastrowid
+                audit_log(conn, user, "recruiting_entwurf", eid, "Recruiting-Beitrag erzeugt (Variante %d)" % i)
+                conn.commit()
+            # Bild im Recruiting-Modus (Auto-Retry, Best of N). Fehler -> bild_fehler im JSON, Entwurf bleibt.
+            try:
+                _sharenext_bild_mit_retry(data, eid, kampagne="recruiting")
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), data.get("bild_pfad"), eid))
+                    conn.commit()
+            except Exception as ex:
+                log.error("Recruiting-Bild fehlgeschlagen (Entwurf %s): %s", eid, ex, exc_info=True)
+                data["bild_fehler"] = str(ex)
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), eid))
+                    conn.commit()
+            created += 1
+            log.info("Recruiting-Entwurf %s erzeugt (%d/%d).", eid, i + 1, anzahl)
+        except Exception as ex:
+            log.warning("Recruiting-Texterzeugung fehlgeschlagen (Variante %d): %s", i, ex)
+    # Zaehler um die Anzahl weiterdrehen, damit der naechste Klick beim naechsten Schwerpunkt startet.
+    try:
+        set_einstellung("recruiting_variation_zaehler", str(_basis + anzahl))
+    except Exception as ex:
+        log.warning("Recruiting-Variation-Zaehler nicht gespeichert: %s", ex)
+    log.info("Recruiting-Schwung fertig: %d/%d Beitraege erzeugt.", created, anzahl)
+    return created
+
+
+def _recruiting_start_schwung(anzahl=RECRUITING_SCHWUNG, user="system"):
+    """Startet die Recruiting-Erzeugung EINMAL im Hintergrund (kein Doppelstart). Rueckgabe:
+    True = gestartet, False = laeuft bereits."""
+    with _recruiting_gen_lock:
+        if _recruiting_generation_running():
+            return False
+        _recruiting_gen["running"] = True
+
+    def runner():
+        try:
+            _recruiting_erzeuge_schwung(anzahl, user)
+        finally:
+            _recruiting_gen["running"] = False
+
+    threading.Thread(target=runner, daemon=True).start()
+    return True
+
+
+def _recruiting_auto_nachschub(user="system"):
+    """Auto-Nachschub: faellt der aktive Recruiting-Pool unter RECRUITING_MIN_POOL Beitraege, wird EIN
+    neuer 5er-Schwung erzeugt (im Hintergrund). Rueckgabe: True = Nachschub angestossen. Der zaehl-
+    basierte Schwellwert ist fuer die WOECHENTLICHE, deutschlandweite Recruiting-Ausspielung robuster
+    als die (fuer den taeglichen Steuer-Betrieb gedachte) WARNSCHWELLE von pool.knappe_vorraete."""
+    import pool as poolmod
+    with get_conn() as conn:
+        aktiv = len(poolmod.aktive_pool_ids(conn, pool_table=RECRUITING_POOL_TABLE))
+        # RUNAWAY-FIX (catrin-Incident 2026-08-27): auch die noch NICHT freigegebenen Entwuerfe zaehlen,
+        # sonst erzeugt der Nachschub bei manueller Freigabe endlos weiter (Pool bleibt 0). Recruiting
+        # laeuft nur woechentlich, war also weniger exponiert - selbe Absicherung trotzdem.
+        offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                             (_RECRUITING_LIKE,)).fetchone()[0]
+    vorrat = aktiv + offen
+    if vorrat < RECRUITING_MIN_POOL and not _recruiting_generation_running():
+        if _recruiting_start_schwung(RECRUITING_SCHWUNG, user):
+            log.info("Recruiting-Auto-Nachschub: Vorrat %d (Pool %d + offen %d, < %d) - Schwung gestartet.",
+                     vorrat, aktiv, offen, RECRUITING_MIN_POOL)
+            return True
+    return False
+
+
+def _recruiting_wochenziehung(conn, datum, zeit, rng):
+    """Zieht je aktive Beratungsstelle und je Recruiting-Kanal (facebook/instagram/whatsapp_status)
+    einen noch offenen Recruiting-Pool-Beitrag und legt dafuer einen geplante_posts-Eintrag (pool=1)
+    zur uebergebenen Uhrzeit am uebergebenen Datum an; danach markiere_verbraucht auf die
+    Recruiting-Nutzungstabelle. Nur Stellen, die den jeweiligen Kanal tatsaechlich haben, werden
+    bespielt (_kanal_verfuegbarkeit). Rueckgabe: Anzahl neu eingeplanter Beitraege.
+    Nur FREIGEGEBENE Beitraege liegen im Recruiting-Pool -> Veroeffentlichung erst nach menschlicher
+    Freigabe (Vorgabe catrin)."""
+    import pool as poolmod
+    stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                           "AND fb_seite!='' ORDER BY id").fetchall()
+    stelle_ids = [int(r["id"]) for r in stellen]
+    if not stelle_ids:
+        return 0
+    verfuegbar = _kanal_verfuegbarkeit(stellen)   # dict[kanal] -> set(stelle_id)
+    geplant_am = "%sT%s" % (datum, zeit)
+    n = 0
+    for kanal in RECRUITING_KANAELE:
+        kanal_stellen = [sid for sid in stelle_ids if sid in verfuegbar.get(kanal, set())]
+        if not kanal_stellen:
+            continue
+        auswahl = poolmod.ziehe_tagesauswahl(
+            conn, kanal_stellen, kanal, rng,
+            pool_table=RECRUITING_POOL_TABLE, nutzung_table=RECRUITING_NUTZUNG_TABLE)
+        for sid, eid in auswahl.items():
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
+                         "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
+                         (eid, sid, kanal, "einzelbild", "einzelbild", "einzelbild", geplant_am))
+            poolmod.markiere_verbraucht(conn, eid, sid, kanal, nutzung_table=RECRUITING_NUTZUNG_TABLE)
+            n += 1
+    if n:
+        audit_log(conn, "system", "recruiting_wochenziehung", None,
+                  "%d Recruiting-Beitrag/-Beitraege fuer %s %s" % (n, datum, zeit))
+    conn.commit()
+    return n
+
+
+def _recruiting_wochenplan(now, rng, ist_belegt=None):
+    """Legt fuer die aktuelle ISO-Woche EINMAL Zufalls-Tag + Zufalls-Uhrzeit (06:00-07:59) fest -
+    ohne erkennbares Muster (Vorgabe catrin). Waehlt nur Tage, deren 06-08-Fenster noch in der
+    ZUKUNFT liegt (damit der Verpasst-Schutz von _publiziere_geplant nicht zuschlaegt): kuenftige
+    Tage dieser ISO-Woche, plus heute nur, wenn es vor 06:00 Uhr ist. Rueckgabe: (datum_iso, 'HH:MM')
+    oder (None, None), wenn in dieser Woche kein solcher Tag mehr uebrig ist (sehr seltener
+    Spaet-Start am Wochenende -> diese Woche einmalig kein Recruiting-Post).
+
+    ist_belegt (optional, 2-pro-Tag-Regel): Callable(datum_iso)->bool. Tage, an denen bereits ein
+    Sonderpost (Recruiting ODER Kanalwerbung) liegt, werden als Kandidaten ausgeschlossen - so kollidiert
+    Recruiting nie mit einem Kanalwerbung-Post am selben Kalendertag (mutual mit _kanalwerbung_scheduler)."""
+    import datetime
+    iso_year, iso_week, _ = now.isocalendar()
+    montag = datetime.date.fromisocalendar(iso_year, iso_week, 1)
+    heute = now.date()
+    kandidaten = []
+    for offset in range(7):
+        d = montag + datetime.timedelta(days=offset)
+        if d > heute or (d == heute and now.hour < 6):
+            if ist_belegt is None or not ist_belegt(d.isoformat()):
+                kandidaten.append(d)
+    if not kandidaten:
+        return None, None
+    tag = rng.choice(kandidaten)
+    minute = rng.randint(6 * 60, 8 * 60 - 1)   # 06:00 .. 07:59
+    return tag.isoformat(), "%02d:%02d" % (minute // 60, minute % 60)
+
+
+def _recruiting_scheduler():
+    """Woechentlicher Recruiting-Scheduler: plant EINMAL pro ISO-Woche an einem ZUFAELLIGEN Wochentag
+    zu einer ZUFAELLIGEN Uhrzeit zwischen 06:00 und 08:00 die Recruiting-Ausspielung ein (legt die
+    geplante_posts-Eintraege im Voraus an; das eigentliche Posten uebernimmt der bestehende
+    _publish_scheduler zur geplanten Uhrzeit). Tag/Zeit werden pro Woche EINMAL gewuerfelt und in der
+    Ziehung materialisiert -> stabil, kein Muster. Doppelausfuehrung pro Woche verhindert der
+    einstellungen-Marker 'recruiting_geplante_woche'. Loest ausserdem den Auto-Nachschub aus, wenn der
+    Recruiting-Pool knapp wird. Faengt jeden Fehler ab - der Thread darf nie sterben."""
+    import datetime, random
+    while True:
+        try:
+            now = datetime.datetime.now()
+            iso_year, iso_week, _ = now.isocalendar()
+            wochen_key = "%04d-W%02d" % (iso_year, iso_week)
+            if get_einstellung("recruiting_geplante_woche") != wochen_key:
+                # Deterministischer Seed je Woche -> Tag/Zeit sind stabil, falls der Scheduler mehrfach
+                # in derselben Iteration prueft, bleiben aber ueber die Wochen zufaellig/musterlos.
+                rng = random.Random("recruiting-%s" % wochen_key)
+                # 2-pro-Tag-Regel (mutual): Tage mit bereits geplantem Kanalwerbung-/Recruiting-Sonderpost
+                # als Kandidaten ausschliessen, damit sich Recruiting und Kanalwerbung nie denselben Tag teilen.
+                with get_conn() as conn:
+                    datum, zeit = _recruiting_wochenplan(
+                        now, rng, ist_belegt=lambda diso: _extra_post_am_tag(conn, diso))
+                    if datum:
+                        n = _recruiting_wochenziehung(conn, datum, zeit, rng)
+                if datum:
+                    log.info("Recruiting-Wochenplan %s: %d Beitrag/Beitraege fuer %s %s eingeplant.",
+                             wochen_key, n, datum, zeit)
+                else:
+                    log.info("Recruiting-Wochenplan %s: kein passender Tag mehr in dieser Woche - "
+                             "uebersprungen.", wochen_key)
+                set_einstellung("recruiting_geplante_woche", wochen_key)
+                # Nach der Ziehung pruefen, ob Nachschub noetig ist (Pool koennte jetzt knapp sein).
+                _recruiting_auto_nachschub("scheduler")
+        except Exception:
+            log.exception("Recruiting-Scheduler-Fehler")
+        time.sleep(300)
+
+
+@app.route("/recruiting")
+@login_required
+def recruiting_seite():
+    """Recruiting-Uebersicht: offene Recruiting-Entwuerfe (zur Freigabe) und der Recruiting-Pool
+    (freigegebene, automatisch woechentlich ausgespielte Beitraege). Analog zu /entwuerfe bzw. /pool,
+    aber strikt auf die Recruiting-Kampagne gefiltert."""
+    import pool as poolmod
+    entwuerfe, pool_items = [], []
+    with get_conn() as conn:
+        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' AND text LIKE ? "
+                              "ORDER BY id DESC", (_RECRUITING_LIKE,)):
+            entwuerfe.append(_parse(e))
+        nutzung = {r["entwurf_id"]: r["n"] for r in conn.execute(
+            "SELECT entwurf_id, COUNT(*) n FROM %s GROUP BY entwurf_id" % RECRUITING_NUTZUNG_TABLE)}
+        for e in conn.execute(
+                "SELECT p.entwurf_id id, p.freigegeben_am, e.text FROM %s p "
+                "JOIN entwuerfe e ON e.id=p.entwurf_id WHERE p.aktiv=1 "
+                "ORDER BY p.freigegeben_am, p.entwurf_id" % RECRUITING_POOL_TABLE):
+            row = _parse(e)
+            row["freigegeben_de"] = _de_datum((e["freigegeben_am"] or "")[:10])
+            row["bespielt"] = nutzung.get(e["id"], 0)
+            pool_items.append(row)
+        stellen = conn.execute("SELECT id FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                               "AND fb_seite!='' ORDER BY id").fetchall()
+        stelle_ids = [s["id"] for s in stellen]
+        aktiv_pool = len(poolmod.aktive_pool_ids(conn, pool_table=RECRUITING_POOL_TABLE))
+        knapp = poolmod.knappe_vorraete(conn, stelle_ids, kanaele=RECRUITING_KANAELE,
+                                        pool_table=RECRUITING_POOL_TABLE,
+                                        nutzung_table=RECRUITING_NUTZUNG_TABLE) if stelle_ids else []
+    plan = get_einstellung("recruiting_geplante_woche") or "(noch nicht geplant)"
+    return render_template_string(RECRUITING, **_ctx(
+        entwuerfe=entwuerfe, pool_items=pool_items, aktiv_pool=aktiv_pool,
+        min_pool=RECRUITING_MIN_POOL, knapp=len(knapp), plan=plan, schwung=RECRUITING_SCHWUNG,
+        laeuft=_recruiting_generation_running(), kanaele=RECRUITING_KANAELE))
+
+
+@app.route("/recruiting-erzeugen", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_erzeugen():
+    """Erzeugt einen Schwung (5) Recruiting-Entwuerfe im Hintergrund."""
+    if _recruiting_start_schwung(RECRUITING_SCHWUNG, session["user"]):
+        flash("Erzeuge %d Recruiting-Beiträge im Hintergrund – in ein bis zwei Minuten die Seite neu "
+              "laden." % RECRUITING_SCHWUNG)
+    else:
+        flash("Es läuft bereits eine Recruiting-Erzeugung – bitte kurz warten und die Seite neu laden.")
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-freigeben/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_freigeben(eid):
+    """Gibt einen Recruiting-Entwurf frei und legt ihn in den EIGENEN Recruiting-Pool (pool_recruiting).
+    Status wechselt auf 'pool_recruiting' -> woechentliche Auto-Ausspielung, nie im Steuer-Pool."""
+    user = session["user"]
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        try:
+            is_recruiting = (json.loads(e["text"]) or {}).get("kampagne") == "recruiting"
+        except Exception:
+            is_recruiting = False
+        if not is_recruiting:
+            flash("Beitrag %d ist kein Recruiting-Beitrag." % eid)
+            return redirect(url_for("recruiting_seite"))
+        conn.execute("INSERT OR IGNORE INTO %s(entwurf_id) VALUES (?)" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE %s SET aktiv=1 WHERE entwurf_id=?" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='pool_recruiting' WHERE id=?", (eid,))
+        audit_log(conn, user, "recruiting_freigegeben", eid, "in den Recruiting-Pool aufgenommen")
+        conn.commit()
+    flash("Recruiting-Beitrag %d ist freigegeben und im Recruiting-Pool – er wird ab jetzt automatisch "
+          "einmal pro Woche je Beratungsstelle ausgespielt (Facebook, Instagram, WhatsApp-Status)." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-pool-entfernen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_pool_entfernen(eid):
+    """Nimmt einen Beitrag aus dem Recruiting-Pool (aktiv=0). Das 'nie doppelt'-Gedaechtnis bleibt.
+    Der Beitrag geht zurueck auf 'entwurf' (Recruiting) -> wieder in der Recruiting-Uebersicht."""
+    user = session["user"]
+    with get_conn() as conn:
+        conn.execute("UPDATE %s SET aktiv=0 WHERE entwurf_id=?" % RECRUITING_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='entwurf' WHERE id=? AND status='pool_recruiting'", (eid,))
+        audit_log(conn, user, "recruiting_pool_entfernt", eid, "aus dem Recruiting-Pool genommen")
+        conn.commit()
+    flash("Recruiting-Beitrag %d ist nicht mehr im Recruiting-Pool." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+@app.route("/recruiting-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def recruiting_neu(eid):
+    """"Bild + Text neu" fuer einen Recruiting-Entwurf: erzeugt Text UND Bild komplett neu
+    (frischer Recruiting-Aufhaenger). Laeuft im Hintergrund, Status/Kampagne bleiben."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("entwurf", "pool_recruiting"):
+        flash("Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+        return redirect(url_for("recruiting_seite"))
+    try:
+        data = json.loads(e["text"]) if e["text"] else {}
+    except Exception:
+        data = {}
+    if data.get("kampagne") != "recruiting":
+        flash("Beitrag %d ist kein Recruiting-Beitrag." % eid)
+        return redirect(url_for("recruiting_seite"))
+    data["bild_wird_erstellt"] = True
+    data.pop("bild_fehler", None)
+    with get_conn() as conn:
+        conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
+        conn.commit()
+    _bg_start(_recruiting_neu_hintergrund, eid, session["user"])
+    flash("Recruiting-Beitrag %d wird mit frischem Text und Bild neu erzeugt (im Hintergrund)." % eid)
+    return redirect(url_for("recruiting_seite"))
+
+
+def _recruiting_neu_hintergrund(eid, user):
+    """Erzeugt Text + Bild eines Recruiting-Entwurfs komplett neu (Hintergrund-Thread)."""
+    try:
+        neu = textgen.generate({}, kampagne="recruiting")
+        neu["kampagne"] = "recruiting"
+        _sharenext_bild_mit_retry(neu, eid, kampagne="recruiting")
+        neu["bild_wird_erstellt"] = False
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(neu, ensure_ascii=False), neu.get("bild_pfad"), eid))
+            audit_log(conn, user, "recruiting_neu", eid)
+            conn.commit()
+        log.info("Recruiting-Neuerzeugung (Hintergrund) fertig fuer Entwurf %d", eid)
+    except Exception as ex:
+        log.error("Recruiting-Neuerzeugung (Hintergrund) fehlgeschlagen fuer Entwurf %d: %s",
+                  eid, ex, exc_info=True)
+        try:
+            with get_conn() as conn:
+                row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+                d = json.loads(row["text"]) if row and row["text"] else {}
+                d["bild_wird_erstellt"] = False
+                d["bild_fehler"] = "Neuerzeugung fehlgeschlagen: %s" % ex
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(d, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KANALWERBUNG-KAMPAGNE (Phase 2): PARALLELE Content-Maschinerie zur Bewerbung des KOSTENLOSEN
+# WhatsApp-Kanals von HILO (Ziel: mehr Abonnenten). Vollstaendig ADDITIV und - wie Recruiting - von
+# der Steuer-Maschinerie getrennt: EIGENE Pool-Tabellen (pool_kanalwerbung/pool_nutzung_kanalwerbung),
+# eigene Erzeugung, eigener Scheduler mit ZUFAELLIGEM Abstand (7-15 Tage). Der taegliche Steuer-
+# Scheduler zieht ausschliesslich aus `pool`, der Recruiting-Scheduler aus `pool_recruiting` - beide
+# koennen Kanalwerbung-Beitraege nie erwischen. Ausgespielt wird ueber den BESTEHENDEN FB/IG-Weg
+# (_veroeffentliche_ziel), NICHT ueber WhatsApp. 2-PRO-TAG-REGEL: pro Tag hoechstens EIN Sonder-Post
+# (Recruiting ODER Kanalwerbung) zusaetzlich zum regulaeren Steuer-Post -> Recruiting und Kanalwerbung
+# blockieren sich gegenseitig (_extra_post_am_tag).
+# ─────────────────────────────────────────────────────────────────────────────
+KANALWERBUNG_KANAELE = ["facebook", "instagram"]     # Vorgabe catrin (NICHT WhatsApp; nur FB + IG)
+KANALWERBUNG_POOL_TABLE = "pool_kanalwerbung"
+KANALWERBUNG_NUTZUNG_TABLE = "pool_nutzung_kanalwerbung"
+KANALWERBUNG_SCHWUNG = 1            # Testphase (catrin 2026-08-26): pro Klick nur EINEN Beitrag (wie Recruiting). Spaeter wieder hoch.
+KANALWERBUNG_MIN_POOL = 3          # aktive Kanalwerbung-Pool-Beitraege, ab deren Unterschreitung Auto-Nachschub laeuft
+_kanalwerbung_gen_lock = threading.Lock()
+_kanalwerbung_gen = {"running": False}
+
+
+def _kanalwerbung_generation_running():
+    return _kanalwerbung_gen.get("running", False)
+
+
+def _kanalwerbung_erzeuge_schwung(anzahl, user):
+    """Erzeugt SYNCHRON einen Schwung Kanalwerbung-Entwuerfe (Text + Bild) - laeuft in einem
+    Hintergrund-Thread (siehe _kanalwerbung_start_schwung). Pro Entwurf: EIN KI-Textaufruf
+    (textgen.generate(..., kampagne='kanalwerbung', variation_index=i)) und EIN Kanalwerbung-Bildlauf
+    (ShareNext-Pipeline, Auto-Retry). Entwuerfe werden mit status='entwurf' + fields['kampagne']=
+    'kanalwerbung' angelegt (im Steuer- und Recruiting-Fluss unsichtbar). Robust: ein fehlgeschlagener
+    Einzel-Beitrag stoppt den Schwung nicht."""
+    created = 0
+    # Variation (catrin 2026-08-27): rotierender Basis-Zaehler, damit auch bei SCHWUNG=1 (Schleife nur mit
+    # i=0) JEDER Klick einen anderen Blickwinkel nimmt. Ohne das begann jeder Beitrag mit derselben Zeile
+    # ('Nie wieder eine Steuerfrist verpassen').
+    try:
+        _basis = int(get_einstellung("kanalwerbung_variation_zaehler", "0") or "0")
+    except (TypeError, ValueError):
+        _basis = 0
+    for i in range(anzahl):
+        try:
+            data = textgen.generate({}, kampagne="kanalwerbung", variation_index=_basis + i)
+            # HARTE Markierung: ueberall als Kanalwerbung-Beitrag erkennbar; Steuer-/Recruiting-Pfad ignorieren ihn.
+            data["kampagne"] = "kanalwerbung"
+            with get_conn() as conn:
+                cur = conn.execute(
+                    "INSERT INTO entwuerfe(thema_id, kanal, text, status, bild_pfad) "
+                    "VALUES (NULL, 'facebook', ?, 'entwurf', NULL)",
+                    (json.dumps(data, ensure_ascii=False),))
+                eid = cur.lastrowid
+                audit_log(conn, user, "kanalwerbung_entwurf", eid, "Kanalwerbung-Beitrag erzeugt (Variante %d)" % i)
+                conn.commit()
+            # Bild (Auto-Retry, Best of N). Fehler -> bild_fehler im JSON, Entwurf bleibt.
+            try:
+                _sharenext_bild_mit_retry(data, eid, kampagne="kanalwerbung")
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), data.get("bild_pfad"), eid))
+                    conn.commit()
+            except Exception as ex:
+                log.error("Kanalwerbung-Bild fehlgeschlagen (Entwurf %s): %s", eid, ex, exc_info=True)
+                data["bild_fehler"] = str(ex)
+                data["bild_wird_erstellt"] = False
+                with get_conn() as conn:
+                    conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                                 (json.dumps(data, ensure_ascii=False), eid))
+                    conn.commit()
+            created += 1
+            log.info("Kanalwerbung-Entwurf %s erzeugt (%d/%d).", eid, i + 1, anzahl)
+        except Exception as ex:
+            log.warning("Kanalwerbung-Texterzeugung fehlgeschlagen (Variante %d): %s", i, ex)
+    # Zaehler weiterdrehen, damit der naechste Klick beim naechsten Blickwinkel startet.
+    try:
+        set_einstellung("kanalwerbung_variation_zaehler", str(_basis + anzahl))
+    except Exception as ex:
+        log.warning("Kanalwerbung-Variation-Zaehler nicht gespeichert: %s", ex)
+    log.info("Kanalwerbung-Schwung fertig: %d/%d Beitraege erzeugt.", created, anzahl)
+    return created
+
+
+def _kanalwerbung_start_schwung(anzahl=KANALWERBUNG_SCHWUNG, user="system"):
+    """Startet die Kanalwerbung-Erzeugung EINMAL im Hintergrund (kein Doppelstart). Rueckgabe:
+    True = gestartet, False = laeuft bereits."""
+    with _kanalwerbung_gen_lock:
+        if _kanalwerbung_generation_running():
+            return False
+        _kanalwerbung_gen["running"] = True
+
+    def runner():
+        try:
+            _kanalwerbung_erzeuge_schwung(anzahl, user)
+        finally:
+            _kanalwerbung_gen["running"] = False
+
+    threading.Thread(target=runner, daemon=True).start()
+    return True
+
+
+def _kanalwerbung_auto_nachschub(user="system"):
+    """Auto-Nachschub: faellt der aktive Kanalwerbung-Pool unter KANALWERBUNG_MIN_POOL Beitraege, wird
+    EIN neuer Schwung erzeugt (im Hintergrund). Rueckgabe: True = Nachschub angestossen."""
+    import pool as poolmod
+    with get_conn() as conn:
+        aktiv = len(poolmod.aktive_pool_ids(conn, pool_table=KANALWERBUNG_POOL_TABLE))
+        # RUNAWAY-FIX (catrin-Incident 2026-08-27): auch die noch NICHT freigegebenen Entwuerfe zaehlen.
+        # Vorher pruefte der Nachschub nur den FREIGEGEBENEN Pool - der bleibt bei manueller Freigabe
+        # dauerhaft 0, also erzeugte der Scheduler alle 5 Min neue Entwuerfe (endlos -> 196 Bilder).
+        offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                             (_KANALWERBUNG_LIKE,)).fetchone()[0]
+    vorrat = aktiv + offen
+    if vorrat < KANALWERBUNG_MIN_POOL and not _kanalwerbung_generation_running():
+        if _kanalwerbung_start_schwung(KANALWERBUNG_SCHWUNG, user):
+            log.info("Kanalwerbung-Auto-Nachschub: Vorrat %d (Pool %d + offen %d, < %d) - Schwung gestartet.",
+                     vorrat, aktiv, offen, KANALWERBUNG_MIN_POOL)
+            return True
+    return False
+
+
+def _extra_post_am_tag(conn, datum_iso):
+    """2-PRO-TAG-KOLLISIONSREGEL (Vorgabe catrin): True, wenn am Kalendertag 'datum_iso' (YYYY-MM-DD)
+    bereits ein RECRUITING- ODER KANALWERBUNG-Sonderpost eingeplant/gelaufen/veroeffentlicht ist.
+
+    Der regulaere Steuer-Pool-Post zaehlt hier bewusst NICHT als 'extra' - er laeuft immer. So blockiert
+    ein bereits geplanter Sonderpost (egal ob Recruiting oder Kanalwerbung) jeden weiteren Sonderpost am
+    selben Tag; Recruiting und Kanalwerbung landen dadurch nie auf demselben Kalendertag (max. 2 Posts/
+    Tag: 1x Steuer + hoechstens 1x Sonder)."""
+    row = conn.execute(
+        "SELECT 1 FROM geplante_posts g JOIN entwuerfe e ON e.id=g.entwurf_id "
+        "WHERE g.geplant_am LIKE ? AND g.status IN ('geplant','laeuft','veroeffentlicht') "
+        "AND (e.text LIKE ? OR e.text LIKE ?) LIMIT 1",
+        (datum_iso + "T%", _RECRUITING_LIKE, _KANALWERBUNG_LIKE)).fetchone()
+    return row is not None
+
+
+def _kanalwerbung_ziehung(conn, datum, zeit, rng):
+    """Zieht je aktive Beratungsstelle und je Kanalwerbung-Kanal (facebook/instagram) einen noch offenen
+    Kanalwerbung-Pool-Beitrag und legt dafuer einen geplante_posts-Eintrag (pool=1) zur uebergebenen
+    Uhrzeit am uebergebenen Datum an; danach markiere_verbraucht auf die Kanalwerbung-Nutzungstabelle.
+    Nur Stellen, die den jeweiligen Kanal tatsaechlich haben, werden bespielt (_kanal_verfuegbarkeit).
+    Rueckgabe: Anzahl neu eingeplanter Beitraege. Nur FREIGEGEBENE Beitraege liegen im Kanalwerbung-Pool
+    -> Veroeffentlichung erst nach menschlicher Freigabe (Vorgabe catrin)."""
+    import pool as poolmod
+    stellen = conn.execute("SELECT * FROM beratungsstellen WHERE aktiv=1 AND fb_seite IS NOT NULL "
+                           "AND fb_seite!='' ORDER BY id").fetchall()
+    # LINK-PFLICHT (catrin-Incident 2026-08-27): Kanalwerbung NUR fuer Stellen mit hinterlegtem
+    # WhatsApp-Kanal-Einladungslink - ein Kanal-Werbebeitrag ohne Link darf nie raus. Stellen ohne
+    # eigenen Kanal (z.B. Doreen) werden dadurch automatisch aus der Kanalwerbung ausgeschlossen.
+    def _hat_invite(r):
+        try:
+            return bool((r["wa_kanal_invite"] or "").strip())
+        except (IndexError, KeyError):
+            return False
+    ohne_link = [r["name"] for r in stellen if not _hat_invite(r)]
+    stellen = [r for r in stellen if _hat_invite(r)]
+    if ohne_link:
+        log.info("Kanalwerbung-Ziehung: %d Stelle(n) ohne Kanal-Link uebersprungen: %s",
+                 len(ohne_link), ", ".join(ohne_link))
+    stelle_ids = [int(r["id"]) for r in stellen]
+    if not stelle_ids:
+        return 0
+    verfuegbar = _kanal_verfuegbarkeit(stellen)   # dict[kanal] -> set(stelle_id)
+    geplant_am = "%sT%s" % (datum, zeit)
+    n = 0
+    for kanal in KANALWERBUNG_KANAELE:
+        kanal_stellen = [sid for sid in stelle_ids if sid in verfuegbar.get(kanal, set())]
+        if not kanal_stellen:
+            continue
+        auswahl = poolmod.ziehe_tagesauswahl(
+            conn, kanal_stellen, kanal, rng,
+            pool_table=KANALWERBUNG_POOL_TABLE, nutzung_table=KANALWERBUNG_NUTZUNG_TABLE)
+        for sid, eid in auswahl.items():
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, stelle_id, kanal, format, format_fb, "
+                         "format_ig, geplant_am, status, pool) VALUES (?,?,?,?,?,?,?, 'geplant', 1)",
+                         (eid, sid, kanal, "einzelbild", "einzelbild", "einzelbild", geplant_am))
+            poolmod.markiere_verbraucht(conn, eid, sid, kanal, nutzung_table=KANALWERBUNG_NUTZUNG_TABLE)
+            n += 1
+    if n:
+        audit_log(conn, "system", "kanalwerbung_ziehung", None,
+                  "%d Kanalwerbung-Beitrag/-Beitraege fuer %s %s" % (n, datum, zeit))
+    conn.commit()
+    return n
+
+
+def _kanalwerbung_freier_tag(conn, start_datum, max_versuche=5):
+    """Findet ab 'start_datum' (datetime.date) den naechsten Tag, an dem noch KEIN Sonderpost liegt
+    (_extra_post_am_tag False) - so kollidiert Kanalwerbung nie mit Recruiting am selben Tag. Schiebt bis
+    zu max_versuche Tage vor. Rueckgabe: datetime.date des freien Tages oder None, wenn keiner frei ist."""
+    import datetime
+    tag = start_datum
+    for _ in range(max_versuche + 1):
+        if not _extra_post_am_tag(conn, tag.isoformat()):
+            return tag
+        tag = tag + datetime.timedelta(days=1)
+    return None
+
+
+def _kanalwerbung_scheduler():
+    """Kanalwerbung-Scheduler mit ZUFAELLIGEM Abstand (7-15 Tage, kein Muster). Der einstellungen-Key
+    'kanalwerbung_naechster' (ISO-Datum) haelt den naechsten faelligen Termin. Ist heute >= naechster
+    (oder der Key leer), wird der Ziel-Tag = heute gewaehlt, aber nur wenn dort noch KEIN Sonderpost liegt
+    (2-pro-Tag-Regel via _extra_post_am_tag) - sonst um Tage weitergeschoben (bis zu 5 Versuche). An dem
+    freien Tag wird je Stelle und Kanal (facebook/instagram) aus pool_kanalwerbung gezogen und ein
+    geplante_posts-Eintrag (pool=1) zu einer vormittaeglichen Uhrzeit angelegt; das eigentliche Posten
+    uebernimmt der bestehende _publish_scheduler ueber _veroeffentliche_ziel. Danach wird der naechste
+    Termin auf heute + random(7..15) Tage gesetzt und der Auto-Nachschub geprueft. Faengt jeden Fehler ab
+    - der Thread darf nie sterben."""
+    import datetime, random
+    while True:
+        try:
+            now = datetime.datetime.now()
+            heute = now.date()
+            naechster = get_einstellung("kanalwerbung_naechster")
+            faellig = True
+            if naechster:
+                try:
+                    faellig = heute >= datetime.date.fromisoformat(naechster[:10])
+                except Exception:
+                    faellig = True
+            if faellig:
+                rng = random.Random()   # laeuft auf dem Pi -> normaler Zufall (kein fester Seed)
+                with get_conn() as conn:
+                    tag = _kanalwerbung_freier_tag(conn, heute, max_versuche=5)
+                    if tag is None:
+                        # In den naechsten Tagen ueberall schon ein Sonderpost - diesen Zyklus auslassen
+                        # (Termin NICHT verschieben), beim naechsten Lauf erneut versuchen.
+                        log.info("Kanalwerbung-Scheduler: kein kollisionsfreier Tag (2/Tag-Regel) - "
+                                 "uebersprungen, erneuter Versuch beim naechsten Lauf.")
+                    else:
+                        minute = rng.randint(9 * 60, 11 * 60 - 1)   # vormittags 09:00 .. 10:59
+                        zeit = "%02d:%02d" % (minute // 60, minute % 60)
+                        n = _kanalwerbung_ziehung(conn, tag.isoformat(), zeit, rng)
+                        if n:
+                            # Naechster Termin erst NACH einem echten Post: zufaelliger Abstand 7-15 Tage
+                            # (kein Muster). So verpufft der erste Slot nicht, wenn der Pool noch leer ist.
+                            next_d = heute + datetime.timedelta(days=rng.randint(7, 15))
+                            set_einstellung("kanalwerbung_naechster", next_d.isoformat())
+                            log.info("Kanalwerbung-Ziehung: %d Beitrag/Beitraege fuer %s %s eingeplant; "
+                                     "naechster Termin %s.", n, tag.isoformat(), zeit, next_d.isoformat())
+                        else:
+                            log.info("Kanalwerbung faellig, aber kein freigegebener Pool-Beitrag - warte "
+                                     "auf Freigabe (erneuter Versuch beim naechsten Lauf).")
+                # Nach der Ziehung pruefen, ob Nachschub noetig ist (Pool koennte jetzt knapp sein).
+                _kanalwerbung_auto_nachschub("scheduler")
+        except Exception:
+            log.exception("Kanalwerbung-Scheduler-Fehler")
+        time.sleep(300)
+
+
+@app.route("/kanalwerbung")
+@login_required
+def kanalwerbung_seite():
+    """Kanalwerbung-Uebersicht: offene Kanalwerbung-Entwuerfe (zur Freigabe) und der Kanalwerbung-Pool
+    (freigegebene, automatisch in zufaelligem Abstand ausgespielte Beitraege). Analog zu /recruiting,
+    aber strikt auf die Kanalwerbung-Kampagne gefiltert."""
+    import pool as poolmod
+    entwuerfe, pool_items = [], []
+    with get_conn() as conn:
+        for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' AND text LIKE ? "
+                              "ORDER BY id DESC", (_KANALWERBUNG_LIKE,)):
+            entwuerfe.append(_parse(e))
+        nutzung = {r["entwurf_id"]: r["n"] for r in conn.execute(
+            "SELECT entwurf_id, COUNT(*) n FROM %s GROUP BY entwurf_id" % KANALWERBUNG_NUTZUNG_TABLE)}
+        for e in conn.execute(
+                "SELECT p.entwurf_id id, p.freigegeben_am, e.text FROM %s p "
+                "JOIN entwuerfe e ON e.id=p.entwurf_id WHERE p.aktiv=1 "
+                "ORDER BY p.freigegeben_am, p.entwurf_id" % KANALWERBUNG_POOL_TABLE):
+            row = _parse(e)
+            row["freigegeben_de"] = _de_datum((e["freigegeben_am"] or "")[:10])
+            row["bespielt"] = nutzung.get(e["id"], 0)
+            pool_items.append(row)
+        aktiv_pool = len(poolmod.aktive_pool_ids(conn, pool_table=KANALWERBUNG_POOL_TABLE))
+    plan = get_einstellung("kanalwerbung_naechster") or "(noch nicht geplant)"
+    return render_template_string(KANALWERBUNG, **_ctx(
+        entwuerfe=entwuerfe, pool_items=pool_items, aktiv_pool=aktiv_pool,
+        min_pool=KANALWERBUNG_MIN_POOL, plan=plan, schwung=KANALWERBUNG_SCHWUNG,
+        laeuft=_kanalwerbung_generation_running(), kanaele=KANALWERBUNG_KANAELE))
+
+
+@app.route("/kanalwerbung-erzeugen", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_erzeugen():
+    """Erzeugt einen Schwung Kanalwerbung-Entwuerfe im Hintergrund."""
+    if _kanalwerbung_start_schwung(KANALWERBUNG_SCHWUNG, session["user"]):
+        flash("Erzeuge %d Kanalwerbung-Beiträge im Hintergrund – in ein bis zwei Minuten die Seite neu "
+              "laden." % KANALWERBUNG_SCHWUNG)
+    else:
+        flash("Es läuft bereits eine Kanalwerbung-Erzeugung – bitte kurz warten und die Seite neu laden.")
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/kanalwerbung-alle-loeschen", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_alle_loeschen():
+    """Loescht ALLE offenen (noch nicht freigegebenen) Kanalwerbung-Entwuerfe auf einmal. Freigegebene
+    Pool-Beitraege (status='pool_kanalwerbung') bleiben unberuehrt. Notfall-Aufraeumung nach dem
+    Auto-Nachschub-Runaway (catrin-Incident 2026-08-27)."""
+    user = session["user"]
+    with get_conn() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
+                         (_KANALWERBUNG_LIKE,)).fetchone()[0]
+        conn.execute("DELETE FROM entwuerfe WHERE status='entwurf' AND text LIKE ?", (_KANALWERBUNG_LIKE,))
+        audit_log(conn, user, "kanalwerbung_alle_geloescht", 0,
+                  "%d offene Kanalwerbung-Entwuerfe auf einmal geloescht" % n)
+        conn.commit()
+    flash("%d offene Kanalwerbung-Entwürfe gelöscht. Freigegebene Pool-Beiträge sind unberührt." % n)
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/kanalwerbung-freigeben/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_freigeben(eid):
+    """Gibt einen Kanalwerbung-Entwurf frei und legt ihn in den EIGENEN Kanalwerbung-Pool
+    (pool_kanalwerbung). Status wechselt auf 'pool_kanalwerbung' -> automatische Ausspielung in
+    zufaelligem Abstand, nie im Steuer- oder Recruiting-Pool."""
+    user = session["user"]
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        try:
+            is_kw = (json.loads(e["text"]) or {}).get("kampagne") == "kanalwerbung"
+        except Exception:
+            is_kw = False
+        if not is_kw:
+            flash("Beitrag %d ist kein Kanalwerbung-Beitrag." % eid)
+            return redirect(url_for("kanalwerbung_seite"))
+        conn.execute("INSERT OR IGNORE INTO %s(entwurf_id) VALUES (?)" % KANALWERBUNG_POOL_TABLE, (eid,))
+        conn.execute("UPDATE %s SET aktiv=1 WHERE entwurf_id=?" % KANALWERBUNG_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='pool_kanalwerbung' WHERE id=?", (eid,))
+        audit_log(conn, user, "kanalwerbung_freigegeben", eid, "in den Kanalwerbung-Pool aufgenommen")
+        conn.commit()
+    flash("Kanalwerbung-Beitrag %d ist freigegeben und im Kanalwerbung-Pool – er wird ab jetzt "
+          "automatisch in zufälligem Abstand (7–15 Tage) je Beratungsstelle ausgespielt "
+          "(Facebook, Instagram)." % eid)
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/kanalwerbung-pool-entfernen/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_pool_entfernen(eid):
+    """Nimmt einen Beitrag aus dem Kanalwerbung-Pool (aktiv=0). Das 'nie doppelt'-Gedaechtnis bleibt.
+    Der Beitrag geht zurueck auf 'entwurf' (Kanalwerbung) -> wieder in der Kanalwerbung-Uebersicht."""
+    user = session["user"]
+    with get_conn() as conn:
+        conn.execute("UPDATE %s SET aktiv=0 WHERE entwurf_id=?" % KANALWERBUNG_POOL_TABLE, (eid,))
+        conn.execute("UPDATE entwuerfe SET status='entwurf' WHERE id=? AND status='pool_kanalwerbung'", (eid,))
+        audit_log(conn, user, "kanalwerbung_pool_entfernt", eid, "aus dem Kanalwerbung-Pool genommen")
+        conn.commit()
+    flash("Kanalwerbung-Beitrag %d ist nicht mehr im Kanalwerbung-Pool." % eid)
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/kanalwerbung-neu/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def kanalwerbung_neu(eid):
+    """"Bild + Text neu" fuer einen Kanalwerbung-Entwurf: erzeugt Text UND Bild komplett neu
+    (frischer Kanalwerbung-Aufhaenger). Laeuft im Hintergrund, Status/Kampagne bleiben."""
+    with get_conn() as conn:
+        e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+    if not e:
+        abort(404)
+    if e["status"] not in ("entwurf", "pool_kanalwerbung"):
+        flash("Beitrag %d kann nicht neu erzeugt werden (Status: %s)." % (eid, e["status"]))
+        return redirect(url_for("kanalwerbung_seite"))
+    try:
+        data = json.loads(e["text"]) if e["text"] else {}
+    except Exception:
+        data = {}
+    if data.get("kampagne") != "kanalwerbung":
+        flash("Beitrag %d ist kein Kanalwerbung-Beitrag." % eid)
+        return redirect(url_for("kanalwerbung_seite"))
+    data["bild_wird_erstellt"] = True
+    data.pop("bild_fehler", None)
+    with get_conn() as conn:
+        conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
+        conn.commit()
+    _bg_start(_kanalwerbung_neu_hintergrund, eid, session["user"])
+    flash("Kanalwerbung-Beitrag %d wird mit frischem Text und Bild neu erzeugt (im Hintergrund)." % eid)
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+def _kanalwerbung_neu_hintergrund(eid, user):
+    """Erzeugt Text + Bild eines Kanalwerbung-Entwurfs komplett neu (Hintergrund-Thread)."""
+    try:
+        neu = textgen.generate({}, kampagne="kanalwerbung")
+        neu["kampagne"] = "kanalwerbung"
+        _sharenext_bild_mit_retry(neu, eid, kampagne="kanalwerbung")
+        neu["bild_wird_erstellt"] = False
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(neu, ensure_ascii=False), neu.get("bild_pfad"), eid))
+            audit_log(conn, user, "kanalwerbung_neu", eid)
+            conn.commit()
+        log.info("Kanalwerbung-Neuerzeugung (Hintergrund) fertig fuer Entwurf %d", eid)
+    except Exception as ex:
+        log.error("Kanalwerbung-Neuerzeugung (Hintergrund) fehlgeschlagen fuer Entwurf %d: %s",
+                  eid, ex, exc_info=True)
+        try:
+            with get_conn() as conn:
+                row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+                d = json.loads(row["text"]) if row and row["text"] else {}
+                d["bild_wird_erstellt"] = False
+                d["bild_fehler"] = "Neuerzeugung fehlgeschlagen: %s" % ex
+                conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(d, ensure_ascii=False), eid))
+                conn.commit()
+        except Exception:
+            pass
+
 
 @app.route("/umplanen/<int:eid>", methods=["POST"])
 @rolle_required("freigeber")
@@ -2152,12 +3139,12 @@ def bild_neu(eid):
     Ueberschrift, Bullets, CTA und Begleittext (Caption) bleiben UNVERAENDERT - es wird kein
     einziges Wort neu generiert, nur ein neues Foto mit der bestehenden Ueberschrift."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    ziel = _zurueck_ziel(zurueck)
     with get_conn() as conn:
         e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
-    if e["status"] not in ("freigegeben", "entwurf"):
+    if e["status"] not in ("freigegeben", "entwurf", "pool_recruiting"):
         flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
@@ -2168,6 +3155,8 @@ def bild_neu(eid):
             conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(data, ensure_ascii=False), eid))
             conn.commit()
         # Im Hintergrund erzeugen (voller ShareNext-Bildlauf) - UI blockiert nicht, direkt weiterarbeiten.
+        # _premium_foto_hintergrund leitet die Kampagne aus data['kampagne'] ab (Recruiting-Entwuerfe
+        # laufen so automatisch im Recruiting-Bildmodus).
         _bg_start(_premium_foto_hintergrund, eid, session["user"])
         flash("Neues Bild für Beitrag %d wird im Hintergrund erzeugt – du kannst direkt weiterarbeiten." % eid)
     except Exception as ex:
@@ -2180,12 +3169,12 @@ def umsetzung_neu(eid):
     """"Nur Umsetzung neu (Idee behalten)": rendert das Bild mit der GESPEICHERTEN Gewinner-Idee
     (Route + Art Direction) neu - gleiche Idee, frische Ausfuehrung. Laeuft im Hintergrund."""
     zurueck = request.form.get("zurueck", "entwuerfe")
-    ziel = url_for("entwuerfe") if zurueck == "entwuerfe" else url_for("einplanung")
+    ziel = _zurueck_ziel(zurueck)
     with get_conn() as conn:
         e = conn.execute("SELECT id, text, status FROM entwuerfe WHERE id=?", (eid,)).fetchone()
     if not e:
         abort(404)
-    if e["status"] not in ("freigegeben", "entwurf"):
+    if e["status"] not in ("freigegeben", "entwurf", "pool_recruiting"):
         flash("Bild von Beitrag %d kann nicht geändert werden (Status: %s)." % (eid, e["status"]))
         return redirect(ziel)
     try:
@@ -2399,14 +3388,22 @@ def _umsetzung_neu_hintergrund(eid, user):
             pass
 
 
-def _sharenext_bild_synchron(data, eid):
+def _sharenext_bild_synchron(data, eid, kampagne=None):
     """Erzeugt SYNCHRON ein Bild ueber die ShareNext-Pipeline (GPT integriert die Ueberschrift
     direkt ins Foto, Pillow ergaenzt danach nur noch die beiden CI-Kreise) und schreibt die
     Ergebnisfelder in `data`. Ersetzt die alte 'Standard'-Pipeline (bildmotiv.ensure_photo_fuer +
     bildgen.render mit Karte/Bullets/CTA), die nicht mehr verwendet wird.
 
+    kampagne: 'steuer' (Default) oder 'recruiting'. Wird nicht explizit uebergeben, leitet sich die
+    Kampagne aus dem Entwurf-JSON ab (data['kampagne']) - so laufen bild_neu/umsetzung_neu bei
+    Recruiting-Entwuerfen automatisch im richtigen Modus (run_sharenext_pipeline(..., kampagne=...)).
+    Die frueher fest verdrahtete stream='radar'-Vorgabe ist fuer Recruiting inhaltlich egal, weil der
+    Message-Brief-Generator bei kampagne='recruiting' den steuer-spezifischen Brief komplett ersetzt.
+
     Wirft bei Fehler eine Exception weiter (Aufrufer faengt/meldet). Rueckgabe: Pfad zum Bild."""
     from sharenext_pipeline import run_sharenext_pipeline
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     headline = data.get("ueberschrift", "")
     bullets = data.get("bullets", [])
     text = "\n".join(bullets) if bullets else ""
@@ -2419,6 +3416,7 @@ def _sharenext_bild_synchron(data, eid):
         headline=headline,
         size="1024x1024",
         quality="medium",
+        kampagne=kampagne,
     )
     # "Warum dieses Bild?"-Panel-Daten + Gewinner-Idee (fuer "Idee behalten") zentral aus dem
     # Result uebernehmen - dieselbe Quelle wie alle anderen Erzeugungs-Wege.
@@ -2432,7 +3430,8 @@ def _sharenext_bild_synchron(data, eid):
     # DATA_DIR/entwurf_{eid}.png, OHNE "bilder"-Unterordner.
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     result.image.save(out)
-    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    slogan = bildgen.pick_slogan(data.get("slogan", ""),
+                                 bildgen.RECRUITING_SLOGANS if kampagne == "recruiting" else None)
     tmp = out + ".tmp_logos.png"
     bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
     os.replace(tmp, out)
@@ -2450,8 +3449,10 @@ _SHARENEXT_MAX_VERSUCHE = 3
 _CONCEPT_FIDELITY_OK = 7.0   # ab hier gilt die Idee als gut umgesetzt -> nur Umsetzung neu rendern
 
 
-def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
+def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE, kampagne=None):
     """Erzeugt ein Bild und rendert bei QA-Ablehnung automatisch nach (Best of N).
+    kampagne (Default: aus data['kampagne'] abgeleitet, sonst 'steuer') wird an beide Bild-Pfade
+    (voller Lauf / nur Umsetzung) durchgereicht, damit Recruiting-Entwuerfe im Recruiting-Modus laufen.
     Kombinierte Logik je Nachlauf:
     - Idee laut Concept Fidelity gut umgesetzt (>= _CONCEPT_FIDELITY_OK), aber QA abgelehnt
       -> NUR Umsetzung neu (gleiche Idee, via sharenext_state).
@@ -2460,6 +3461,8 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     behalten. Vermerkt die Versuchszahl in data['pipeline_info']['versuche']."""
     import copy as _copy
     import shutil as _shutil
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     best_path = out + ".best"
     best_qa = -1.0
@@ -2474,14 +3477,14 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     while versuche < max_versuche and not approved:
         versuche += 1
         if versuche == 1:
-            _sharenext_bild_synchron(data, eid)
+            _sharenext_bild_synchron(data, eid, kampagne=kampagne)
         else:
             info = data.get("pipeline_info") or {}
             cf = info.get("concept_fidelity")
             if cf is not None and cf >= _CONCEPT_FIDELITY_OK and data.get("sharenext_state"):
-                _sharenext_rerender_synchron(data, eid)   # gute Idee -> gleiche Idee neu rendern
+                _sharenext_rerender_synchron(data, eid, kampagne=kampagne)   # gute Idee -> gleiche Idee neu rendern
             else:
-                _sharenext_bild_synchron(data, eid)       # schwaches Konzept -> neue Idee
+                _sharenext_bild_synchron(data, eid, kampagne=kampagne)       # schwaches Konzept -> neue Idee
         approved = bool(data.get("qa_approved"))
         qa_score = (data.get("pipeline_info") or {}).get("qa_score") or 0.0
         log.info("Auto-Retry Entwurf %d: Versuch %d/%d, QA=%.1f, freigegeben=%s",
@@ -2514,14 +3517,18 @@ def _sharenext_bild_mit_retry(data, eid, max_versuche=_SHARENEXT_MAX_VERSUCHE):
     return out
 
 
-def _sharenext_rerender_synchron(data, eid):
+def _sharenext_rerender_synchron(data, eid, kampagne=None):
     """"Nur Umsetzung neu (Idee behalten)": rendert das Bild NEU, aber mit der GESPEICHERTEN
     Gewinner-Idee (Route + Art Direction) - laeuft also NUR Image Producer + Visual QA, nicht die
-    volle Pipeline. Faellt auf den vollen Lauf zurueck, wenn keine gespeicherte Idee vorliegt."""
+    volle Pipeline. Faellt auf den vollen Lauf zurueck, wenn keine gespeicherte Idee vorliegt.
+    kampagne (Default aus data['kampagne'], sonst 'steuer') steuert die Recruiting-Direktive/Wortsperre
+    in Image Producer + Visual QA."""
+    if kampagne is None:
+        kampagne = data.get("kampagne", "steuer")
     state = data.get("sharenext_state")
     if not state:
         # Keine gespeicherte Idee (alter Entwurf) -> voller Lauf als Fallback.
-        return _sharenext_bild_synchron(data, eid)
+        return _sharenext_bild_synchron(data, eid, kampagne=kampagne)
 
     from message_brief import MessageBrief
     from creative_director import CreativeRoute
@@ -2541,13 +3548,15 @@ def _sharenext_rerender_synchron(data, eid):
 
     # NUR Stufe 5 (Image Producer) + Stufe 6 (Visual QA) - Idee bleibt unveraendert.
     image, _production_brief = produce_image(
-        brief, route, art_board, headline=headline, size="1024x1024", quality="medium"
+        brief, route, art_board, headline=headline, size="1024x1024", quality="medium",
+        kampagne=kampagne
     )
-    qa = check_raw_image(image, brief, route, art_board, headline=headline)
+    qa = check_raw_image(image, brief, route, art_board, headline=headline, kampagne=kampagne)
 
     out = os.path.join(DATA_DIR, f"entwurf_{eid}.png")
     image.save(out)
-    slogan = bildgen.pick_slogan(data.get("slogan", ""))
+    slogan = bildgen.pick_slogan(data.get("slogan", ""),
+                                 bildgen.RECRUITING_SLOGANS if kampagne == "recruiting" else None)
     tmp = out + ".tmp_logos.png"
     bildgen.add_logo_circles(out, slogan, tmp, pos="unten")
     os.replace(tmp, out)
@@ -3243,6 +4252,68 @@ def bild(eid):
         abort(404)
     return send_file(e["bild_pfad"], mimetype="image/png")
 
+
+# ─── Reels-MVP (Spur A): fertiges Motiv als Hochkant-Clip animieren (fal.ai) ───────────────────────
+# Bewusst schlank: EIN branded Motiv (Ueberschrift + Logo schon im Bild) -> 9:16 -> fal Image-to-Video
+# -> MP4. Kein Multi-Shot, kein Schnitt. Erzeugung laeuft im Hintergrund (fal dauert 1-3 Min).
+_reel_gen = {}          # eid -> {"running": bool, "info": str|None, "path": str|None}
+_reel_gen_lock = threading.Lock()
+
+def _reel_pfad(eid):
+    return os.path.join(DATA_DIR, "reels", "reel_%d.mp4" % int(eid))
+
+def _reel_erzeuge(eid, user="system"):
+    """Rendert das 9:16-Standbild und animiert es via fal zu einem Clip. Setzt _reel_gen[eid]."""
+    import falvideo
+    try:
+        with get_conn() as conn:
+            e = conn.execute("SELECT bild_pfad, text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+            if not e:
+                _reel_gen[eid] = {"running": False, "info": "Entwurf nicht gefunden", "path": None}
+                return
+            f = _parse(e)["f"]
+            still = _ensure_bild_pfad(conn, eid, f)
+        if not still or not os.path.exists(still):
+            _reel_gen[eid] = {"running": False, "info": "Kein Bild zum Animieren vorhanden", "path": None}
+            return
+        hoch = os.path.join(DATA_DIR, "reels", "reel_%d_src.png" % int(eid))
+        _status_hochkant(still, hoch)                       # 9:16-Standbild (mit eingebranntem Text/Logo)
+        out = _reel_pfad(eid)
+        ok, info = falvideo.generate_clip(hoch, out, get_einstellung=get_einstellung)
+        _reel_gen[eid] = {"running": False, "info": (None if ok else info),
+                          "path": (out if ok else None)}
+        with get_conn() as conn:
+            audit_log(conn, user, "reel_test_%s" % ("ok" if ok else "fehler"), eid, info)
+            conn.commit()
+    except Exception as ex:
+        log.exception("Reel-Erzeugung fehlgeschlagen (Entwurf %s): %s", eid, ex)
+        _reel_gen[eid] = {"running": False, "info": str(ex), "path": None}
+
+
+@app.route("/reel-test/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def reel_test(eid):
+    """Startet die Test-Reel-Erzeugung im Hintergrund (kein Doppelstart je Entwurf)."""
+    with _reel_gen_lock:
+        if _reel_gen.get(eid, {}).get("running"):
+            flash("Für Beitrag %d wird bereits ein Reel erzeugt – bitte kurz warten." % eid)
+            return redirect(request.referrer or url_for("entwuerfe"))
+        _reel_gen[eid] = {"running": True, "info": None, "path": None}
+    threading.Thread(target=_reel_erzeuge, args=(eid, session["user"]), daemon=True).start()
+    flash("Test-Reel für Beitrag %d wird erzeugt (dauert ca. 1–3 Minuten) – Seite dann neu laden." % eid)
+    return redirect(request.referrer or url_for("entwuerfe"))
+
+
+@app.route("/reel/<int:eid>")
+@login_required
+def reel(eid):
+    """Liefert das erzeugte Test-Reel (MP4) aus."""
+    p = _reel_pfad(eid)
+    if not os.path.exists(p):
+        abort(404)
+    return send_file(p, mimetype="video/mp4", max_age=0)
+
+
 @app.route("/strip-panel/<int:eid>/<int:idx>")
 @login_required
 def strip_panel(eid, idx):
@@ -3272,7 +4343,7 @@ def aktion(eid):
     feedback = request.form.get("feedback", "").strip()
     zurueck = request.form.get("zurueck", "entwuerfe")
     # NUR NOCH ShareNext Premium-Bilder - keine Varianten-Auswahl mehr!
-    ziel = url_for("einplanung") if zurueck == "einplanung" else url_for("entwuerfe")
+    ziel = _zurueck_ziel(zurueck)
     user = session["user"]
     with get_conn() as conn:
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
@@ -3482,6 +4553,14 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
+    # LINK-PFLICHT Kanalwerbung (catrin-Incident 2026-08-27): NIEMALS einen Kanal-Werbebeitrag ohne
+    # Einladungslink posten. Fehlt der wa_kanal_invite der Stelle, wird nichts veroeffentlicht.
+    if f.get("kampagne") == "kanalwerbung" and stelle is not None:
+        import personalisierung
+        if not personalisierung.kanal_invite(stelle):
+            log.warning("Kanalwerbung fuer Stelle %s ohne Kanal-Link NICHT veroeffentlicht "
+                        "(kein wa_kanal_invite).", ziel_name)
+            return (ziel_name, False, [(kanal, False, "kein Kanal-Link hinterlegt - nicht veroeffentlicht")])
     # Orts-ID (Geotag) der Beratungsstelle - gilt fuer Facebook (place) UND Instagram (location_id).
     loc_id = (stelle["ort_id"] if (stelle and "ort_id" in stelle.keys() and stelle["ort_id"]) else None)
     _cache = {}
@@ -3543,7 +4622,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         ergebnisse.append(("facebook", ok, info))
         # Erster Kommentar mit dem Termin-Link (FB-Caption verweist auf "Link in den Kommentaren").
         # Nur fuer Beratungsstellen mit hinterlegtem Buchungslink; rein protokolliert.
-        if ok and stelle:
+        # NICHT fuer Recruiting-/Kanalwerbung-Beitraege: die tragen ihren eigenen Link (Karriere bzw.
+        # WhatsApp-Kanal-Einladung) bereits in der Caption, kein steuerlicher Termin-Kommentar.
+        if ok and stelle and f.get("kampagne") not in ("recruiting", "kanalwerbung"):
             import personalisierung
             link = personalisierung.buchungslink(stelle)
             if link:
@@ -3627,8 +4708,17 @@ def _veroeffentliche_whatsapp(conn, e, eid, f, kanal, stelle, user):
         kanal_text, story_text = (f.get("caption") or ""), ""
         log.exception("WhatsApp-Texte fuer Beitrag %s nicht erzeugbar: %s", eid, ex)
 
+    # Disconnect-Alarm (Vorab-Check): nur posten, wenn die Nummer der Stelle wirklich verbunden ist -
+    # sonst eine klare Fehlmeldung statt stillem Ins-Leere-Posten.
+    _wa_st, _wa_serr = _wa_call("/status", session=(stelle["id"] if stelle else None), timeout=6)
+    _verbunden = bool(_wa_st and _wa_st.get("state") == "connected")
+
     ok, info = False, ""
-    if kanal == "whatsapp_status":
+    if not _verbunden:
+        ok, info = False, (("WhatsApp-Dienst nicht erreichbar: %s" % _wa_serr) if _wa_serr
+                           else "WhatsApp-Stelle nicht verbunden (Status: %s) – kein Post gesendet"
+                                % ((_wa_st or {}).get("state", "nicht_verbunden")))
+    elif kanal == "whatsapp_status":
         # Personalisiertes 9:16-Status-Bild (Portraet/Ort), Fallback: allgemeines Hochkant-Bild.
         bild = None
         try:
@@ -4129,13 +5219,14 @@ def verwaltung():
                 sid = request.form.get("stelle_id", "").strip()
                 wa_status = 1 if request.form.get("wa_status_aktiv") else 0
                 wa_invite = request.form.get("wa_kanal_invite", "").strip()
+                wa_poster = 1 if request.form.get("wa_kanal_poster") else 0
                 if wa_invite and not (wa_invite.startswith("http://") or wa_invite.startswith("https://")):
                     flash("Der WhatsApp-Kanal-Link muss mit http:// oder https:// beginnen.")
                 elif sid and sid.isdigit():
-                    conn.execute("UPDATE beratungsstellen SET wa_status_aktiv=?, wa_kanal_invite=? WHERE id=?",
-                                 (wa_status, wa_invite or None, sid))
+                    conn.execute("UPDATE beratungsstellen SET wa_status_aktiv=?, wa_kanal_invite=?, wa_kanal_poster=? WHERE id=?",
+                                 (wa_status, wa_invite or None, wa_poster, sid))
                     audit_log(conn, session["user"], "beratungsstelle_whatsapp_gesetzt", None,
-                              "Stelle %s -> Status=%d, Kanal=%s" % (sid, wa_status, "ja" if wa_invite else "nein"))
+                              "Stelle %s -> Status=%d, Kanal=%s, Poster=%d" % (sid, wa_status, "ja" if wa_invite else "nein", wa_poster))
                     flash("WhatsApp-Einstellungen der Beratungsstelle gespeichert.")
             elif formular == "stelle_portrait":
                 sid = request.form.get("stelle_id", "").strip()
@@ -4622,6 +5713,32 @@ def _wa_call(path, method="GET", payload=None, timeout=6, session=None):
     except Exception as e:  # noqa: BLE001
         return None, str(e)
 
+def _wa_getrennte_stellen():
+    """Liefert die aktiven Beratungsstellen, die posten SOLLEN (Status aktiv oder Kanal hinterlegt),
+    deren WhatsApp-Verbindung aber NICHT 'connected' ist - fuer den Dashboard-Alarm. Ein einziger
+    /sessions-Aufruf (alle Verbindungen auf einmal). Faellt der Dienst aus, wird [] geliefert -
+    das Dashboard darf davon NIE brechen."""
+    try:
+        with get_conn() as conn:
+            rows = conn.execute("SELECT id, name, ort, wa_status_aktiv, wa_kanal_invite "
+                                "FROM beratungsstellen WHERE aktiv=1 ORDER BY ort").fetchall()
+        soll = [r for r in rows if r["wa_status_aktiv"] or (r["wa_kanal_invite"] or "").strip()]
+        if not soll:
+            return []
+        sess, err = _wa_call("/sessions", timeout=4)
+        if err or not isinstance(sess, dict):
+            return []
+        smap = sess.get("sessions") or {}
+        getrennt = []
+        for r in soll:
+            st = smap.get(str(r["id"])) or {}
+            if st.get("state") != "connected":
+                getrennt.append({"name": r["name"], "ort": r["ort"] or ""})
+        return getrennt
+    except Exception:
+        log.exception("WhatsApp-Disconnect-Check fehlgeschlagen")
+        return []
+
 WHATSAPP = """<!doctype html><meta charset=utf-8><title>ShareNext - WhatsApp</title>
 {% if any_pending %}<meta http-equiv=refresh content=6>{% endif %}
 <style>""" + _TOP + """
@@ -4678,7 +5795,7 @@ button.g{background:#4D7C0F}button.r{background:#b00020}
 </div>"""
 
 @app.route("/whatsapp")
-@login_required
+@rolle_required("freigeber")
 def whatsapp():
     """Multi-Session-Uebersicht: je aktiver Beratungsstelle eine eigene WhatsApp-Verbindung
     (eigene Nummer -> eigener Status an eigene Kontakte). session-Schluessel = Beratungsstellen-ID."""
@@ -4708,7 +5825,7 @@ def _wa_zurueck():
     return redirect(url_for("whatsapp"))
 
 @app.route("/whatsapp/connect/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_connect(sid):
     res, err = _wa_call("/connect", method="POST", payload={}, session=sid, timeout=15)
     if err:
@@ -4793,7 +5910,7 @@ def whatsapp_qr_oeffentlich(token):
                                    fehler=fehler, wa=wa, pending=pending)
 
 @app.route("/whatsapp/logout/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_logout(sid):
     _wa_call("/logout", method="POST", payload={}, session=sid)
     audit_log_safe("whatsapp_logout")
@@ -4801,7 +5918,7 @@ def whatsapp_logout(sid):
     return _wa_zurueck()
 
 @app.route("/whatsapp/test-status/<int:sid>", methods=["POST"])
-@login_required
+@rolle_required("freigeber")
 def whatsapp_test_status(sid):
     import re
     caption = request.form.get("caption", "").strip() or "ShareNext Test-Status"
@@ -4824,6 +5941,109 @@ def whatsapp_test_status(sid):
         n = res.get("recipients") if res else None
         flash("Test-Status gesendet%s." % ((" (an %d Empfaenger)" % n) if n else ""))
     return redirect(url_for("whatsapp"))
+
+
+@app.route("/whatsapp/status-test/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def whatsapp_status_test(eid):
+    """Postet das BILD eines Beitrags als WhatsApp-Status (9:16) - zum kontrollierten Test des echten
+    Bild-Status-Wegs (zuverlaessiger als der reine Text-Test). Standard: nur an die eingegebene
+    Test-Nummer. Mit Haekchen 'an_alle' bewusst an alle synchronisierten Kontakte. Postet ueber die
+    aktuell VERBUNDENE Stelle (deren Nummer)."""
+    import re
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        f = _parse(e)["f"]
+        # Verbundene Stelle finden (Status wird von ihrer Nummer gepostet).
+        sess, serr = _wa_call("/sessions", timeout=4)
+        connected_sid = None
+        if sess and isinstance(sess.get("sessions"), dict):
+            for k, v in sess["sessions"].items():
+                if isinstance(v, dict) and v.get("state") == "connected":
+                    connected_sid = k
+                    break
+        if not connected_sid:
+            flash("Keine verbundene WhatsApp-Stelle gefunden%s – bitte zuerst unter „WhatsApp“ verbinden."
+                  % ((": " + serr) if serr else ""))
+            return redirect(url_for("kanalwerbung_seite"))
+        # 9:16-Status-Bild aus dem Beitragsbild aufbereiten (gleicher Weg wie der Automatik-Status).
+        bild = None
+        try:
+            _bp = _ensure_bild_pfad(conn, eid, f)
+            if _bp and os.path.exists(_bp):
+                bild = _status_hochkant(_bp, os.path.join(DATA_DIR, "preview", "status_test_%d.png" % eid))
+        except Exception as ex:
+            log.exception("Status-Test-Bild fuer Beitrag %s fehlgeschlagen: %s", eid, ex)
+            bild = None
+    caption = ((f.get("captions") or {}).get("whatsapp_story")
+               or (f.get("captions") or {}).get("whatsapp_kanal")
+               or f.get("ueberschrift") or "HILO")
+    payload = {"caption": caption}
+    if bild:
+        payload["imagePath"] = bild
+    an_alle = bool(request.form.get("an_alle"))
+    if an_alle:
+        payload["toContacts"] = True
+    else:
+        digits = re.sub(r"\D", "", request.form.get("empfaenger", ""))
+        if digits.startswith("00"):
+            digits = digits[2:]
+        elif digits.startswith("0"):
+            digits = "49" + digits[1:]
+        if not digits:
+            flash("Bitte eine Test-Nummer eingeben (oder „an alle Kontakte“ wählen).")
+            return redirect(url_for("kanalwerbung_seite"))
+        payload["statusJidList"] = [digits + "@s.whatsapp.net"]
+    res, err = _wa_call("/post-status", method="POST", payload=payload, timeout=60, session=connected_sid)
+    if err:
+        flash("Fehler: " + err)
+    elif res and res.get("error"):
+        flash("WhatsApp: " + res["error"])
+    else:
+        n = res.get("recipients") if res else None
+        ziel = "alle Kontakte" if an_alle else "die Test-Nummer"
+        flash("Bild-Status an %s gesendet%s.%s" % (
+            ziel, ((" (%d Empfänger)" % n) if n else ""),
+            "" if bild else " (Hinweis: kein Bild gefunden – als Text gesendet.)"))
+    return redirect(url_for("kanalwerbung_seite"))
+
+
+@app.route("/whatsapp/kanal-jetzt/<int:eid>", methods=["POST"])
+@rolle_required("freigeber")
+def whatsapp_kanal_jetzt(eid):
+    """Stellt EINEN Beitrag SOFORT manuell in den gemeinsamen WhatsApp-Kanal - ueber die Kanal-Posterin
+    (aktive Stelle mit gesetztem Poster-Haekchen + hinterlegtem Kanal-Link). Ergaenzt den automatischen
+    Di/Fr-Rhythmus um eine Hand-Ausloesung (Vorgabe catrin). Nach Erfolg wird der Beitrag fuer diese
+    Stelle/Kanal als verbraucht markiert, damit die automatische Ziehung ihn nicht nochmal postet."""
+    import pool as poolmod
+    with get_conn() as conn:
+        e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not e:
+            abort(404)
+        stelle = conn.execute(
+            "SELECT * FROM beratungsstellen WHERE aktiv=1 AND wa_kanal_poster=1 "
+            "AND wa_kanal_invite IS NOT NULL AND TRIM(wa_kanal_invite)!='' ORDER BY id LIMIT 1").fetchone()
+        if not stelle:
+            stelle = conn.execute(
+                "SELECT * FROM beratungsstellen WHERE aktiv=1 AND wa_kanal_invite IS NOT NULL "
+                "AND TRIM(wa_kanal_invite)!='' ORDER BY id LIMIT 1").fetchone()
+        if not stelle:
+            flash("Keine Stelle mit hinterlegtem WhatsApp-Kanal gefunden - bitte in der Verwaltung den "
+                  "Kanal-Link setzen und das Haekchen 'Diese Stelle postet die Kanal-Beitraege' aktivieren.")
+            return redirect(request.referrer or url_for("entwuerfe"))
+        f = _parse(e)["f"]
+        _ziel, ok, erg = _veroeffentliche_whatsapp(conn, e, eid, f, "whatsapp_kanal", stelle, session["user"])
+        if ok:
+            poolmod.markiere_verbraucht(conn, eid, int(stelle["id"]), "whatsapp_kanal")
+            conn.commit()
+    if ok:
+        flash("Beitrag %d in den WhatsApp-Kanal gestellt (ueber %s)." % (eid, stelle["name"]))
+    else:
+        info = (erg[0][2] if erg else "") or "unbekannter Fehler"
+        flash("Konnte Beitrag %d nicht in den Kanal stellen: %s" % (eid, info))
+    return redirect(request.referrer or url_for("entwuerfe"))
 
 @app.route("/sharenext", methods=["GET", "POST"])
 @login_required
@@ -4934,6 +6154,8 @@ def serve(host="0.0.0.0", port=None):
     threading.Thread(target=_daily_scheduler, daemon=True).start()
     threading.Thread(target=_publish_scheduler, daemon=True).start()   # Auto-Veroeffentlichung zur Uhrzeit
     threading.Thread(target=_pool_scheduler, daemon=True).start()      # Taegliche Auto-Ziehung aus dem Topf (#126)
+    threading.Thread(target=_recruiting_scheduler, daemon=True).start()  # Woechentliche Recruiting-Ausspielung + Auto-Nachschub
+    threading.Thread(target=_kanalwerbung_scheduler, daemon=True).start()  # Kanalwerbung-Ausspielung (Zufallsabstand 7-15 Tage) + Auto-Nachschub
     threading.Thread(target=_cache_cleanup_scheduler, daemon=True).start()  # Taegliches Cache-Aufraeumen (#134)
     threading.Thread(target=_insights_scheduler, daemon=True).start()  # Taegliche Auto-Aktualisierung der Insights
     port = int(port or os.environ.get("HILO_DASHBOARD_PORT", "8530"))

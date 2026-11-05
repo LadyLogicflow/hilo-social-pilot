@@ -324,7 +324,8 @@ def evaluate_routes(
     model: str = "gpt-5-nano",
     recent_heroes: "list[str] | None" = None,
     recent_environments: "list[str] | None" = None,
-    recent_message_angles: "list[str] | None" = None
+    recent_message_angles: "list[str] | None" = None,
+    kampagne: str = "steuer"
 ) -> ConceptJuryVerdict:
     """Bewertet 5 kreative Routen und wählt die beste aus.
 
@@ -578,6 +579,11 @@ Bewerte jede Route nach den 7 Kriterien (1-10).
 Begründe Stärken und Schwächen je Route.
 Der gewichtete Gesamtscore und der Gewinner werden vom System berechnet - du musst nicht rechnen.
 """
+
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + getattr(_cmp, "JURY_HINT", "")
 
     log.info(f"Concept Jury bewertet 5 Routen für: {brief.kernaussage}")
 

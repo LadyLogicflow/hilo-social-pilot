@@ -171,7 +171,8 @@ class CreativeTerritories(BaseModel):
 
 def generate_creative_routes(
     brief: MessageBrief,
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> CreativeTerritories:
     """Generiert 5 kreative Routen aus einem Message Brief.
 
@@ -424,6 +425,11 @@ Jede Route braucht:
 - Message-Angle (1-3 Wörter: welcher Kernnutzen wird visualisiert? z.B. freiwillig/keine Pflicht,
   rückwirkend/Jahre zurück, Erstattung/Geld zurück, rücknehmbar/flexibel)
 """
+
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + _cmp.BILD_DIREKTIVE + getattr(_cmp, "CREATIVE_DIREKTIVE", "")
 
     log.info(f"Generiere 5 kreative Routen für: {brief.kernaussage}")
 

@@ -13,12 +13,22 @@ _BEGRIFFE_TABU = [
 ]
 
 
-def _korrigiere_begriffe(data):
+def _korrigiere_begriffe(data, kampagne="steuer"):
     """Ersetzt in ALLEN Textfeldern (auch verschachtelt: Listen wie bullets, dict captions) verbotene
-    Umgangsbegriffe durch den korrekten Fachbegriff. Gibt data zurueck."""
+    Begriffe deterministisch. Fuer die Recruiting-Kampagne kommt die harte Sperre fuer 'Steuerberater'/
+    'Kanzlei' hinzu (catrin: duerfen NIE erscheinen). Gibt data zurueck."""
+    tabu = list(_BEGRIFFE_TABU)
+    if kampagne and kampagne != "steuer":
+        try:
+            import campaigns
+            _cmp = campaigns.get(kampagne)
+            if _cmp:
+                tabu = tabu + list(getattr(_cmp, "BEGRIFFE_TABU", [])) + list(getattr(_cmp, "NORMALISIERUNG", []))
+        except Exception:
+            log.exception("Kampagnen-Tabu-Liste nicht ladbar")
     def fix(v):
         if isinstance(v, str):
-            for rx, repl in _BEGRIFFE_TABU:
+            for rx, repl in tabu:
                 v = rx.sub(repl, v)
             return v
         if isinstance(v, list):
@@ -611,16 +621,24 @@ def extract_topics(volltext, quelle_titel=""):
             out.append({"titel": str(t["titel"])[:300], "inhalt": str(t.get("inhalt", ""))})
     return out
 
-def generate(thema, kanal=None):
+def generate(thema, kanal=None, kampagne="steuer", variation_index=None):
     key = get_secret("anthropic_api_key", required=True)
     import anthropic  # lazy
     client = anthropic.Anthropic(api_key=key)
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system = _cmp.SYSTEM
+        user = _cmp.build_prompt(kanal, variation_index)
+    else:
+        system = SYSTEM
+        user = _build_prompt(thema)
     msg = client.messages.create(
-        model=_model(), max_tokens=1600, system=SYSTEM,
-        messages=[{"role": "user", "content": _build_prompt(thema)}],
+        model=_model(), max_tokens=1600, system=system,
+        messages=[{"role": "user", "content": user}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _korrigiere_begriffe(_normalize_bild(_normalize_captions(_parse_json(raw))))
+    return _korrigiere_begriffe(_normalize_bild(_normalize_captions(_parse_json(raw))), kampagne)
 
 
 def _create_drafts(rows, kanal):

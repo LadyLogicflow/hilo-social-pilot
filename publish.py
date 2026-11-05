@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """M6 - Veroeffentlichung auf Meta-Plattformen (Facebook-Seiten, Instagram).
 
-Facebook: direkter Binaer-Upload des Bildes nach POST /{page-id}/photos.
+Facebook: Bild als echter Feed-Beitrag - Foto unveroeffentlicht nach /{page-id}/photos hochladen,
+dann ueber /{page-id}/feed (attached_media) veroeffentlichen (sonst erscheint es nur unter "Fotos").
 Instagram: zweistufig (Media-Container -> Publish); benoetigt eine OEFFENTLICHE Bild-URL.
 
 Secrets (aus secrets_store):
@@ -139,28 +140,47 @@ def page_token_map():
 # Facebook: Foto-Beitrag
 # ---------------------------------------------------------------------------
 def publish_facebook(page_id, image_path, caption, place=None, alt_text=None):
-    """Veroeffentlicht ein Foto mit Begleittext auf einer Facebook-Seite.
-    place = optionale Facebook-Orts-ID fuer die Standort-Markierung. Schlaegt der Post MIT Ort fehl
-    (z.B. ungueltige Orts-ID), wird OHNE Ort erneut versucht, damit der Beitrag trotzdem erscheint.
-    alt_text = optionaler Alt-Text fuer Barrierefreiheit (Feld 'alt_text_custom' - das schreibbare
-    Feld der Graph API; 'alt_text' selbst ist schreibgeschuetzt/automatisch generiert).
-    Rueckgabe: (ok, info) - info ist die Post-/Foto-ID oder die Fehlermeldung."""
+    """Veroeffentlicht ein Bild als echten FEED-BEITRAG auf einer Facebook-Seite.
+
+    Zweistufig (wie beim Karussell): Foto zuerst UNVEROEFFENTLICHT hochladen
+    (POST /{page_id}/photos?published=false), dann als Beitrag ueber POST /{page_id}/feed
+    mit attached_media veroeffentlichen. Grund (catrin 2026-09-13): Ein direkter Upload nach
+    /photos gilt fuer Facebook primaer als Foto (Album) und erscheint bei Besuchern vor allem
+    unter "Fotos" statt als vollwertiger Beitrag in der Chronik. Der Umweg ueber /feed erzeugt
+    einen richtigen Beitrag. (Das Bild liegt zusaetzlich weiterhin im Album - das ist bei jedem
+    Bild-Beitrag so und laesst sich nicht vermeiden.)
+
+    place = optionale Facebook-Orts-ID; schlaegt der Beitrag MIT Ort fehl, wird OHNE Ort erneut
+    versucht. alt_text = optionaler Alt-Text (Feld 'alt_text_custom', am Foto gesetzt).
+    Rueckgabe: (ok, info) - info ist die Beitrags-ID oder die Fehlermeldung."""
     token = _page_token(page_id)
-    def _post(with_place):
-        data = {"message": caption or "", "access_token": token}
+    # 1) Foto unveroeffentlicht hochladen -> media_fbid
+    up_data = {"published": "false", "access_token": token}
+    if alt_text:
+        up_data["alt_text_custom"] = alt_text
+    with open(image_path, "rb") as fh:
+        up = requests.post(GRAPH + "/%s/photos" % page_id, timeout=120,
+                           data=up_data, files={"source": fh})
+    if up.status_code != 200:
+        return False, _err(up)
+    mid = up.json().get("id")
+    if not mid:
+        return False, "Foto-Upload ohne ID-Rueckgabe."
+    # 2) Als Feed-Beitrag veroeffentlichen (Bild als attached_media)
+    base = {"message": caption or "", "attached_media[0]": json.dumps({"media_fbid": mid}),
+            "access_token": token}
+    def _feed(with_place):
+        data = dict(base)
         if with_place and place:
             data["place"] = place
-        if alt_text:
-            data["alt_text_custom"] = alt_text
-        with open(image_path, "rb") as fh:
-            return requests.post(GRAPH + "/%s/photos" % page_id, timeout=120, data=data, files={"source": fh})
-    r = _post(True)
+        return requests.post(GRAPH + "/%s/feed" % page_id, timeout=120, data=data)
+    r = _feed(True)
     if r.status_code != 200 and place:
-        log.warning("Facebook-Foto-Post mit Ort fehlgeschlagen, erneut ohne Ort: %s", _err(r))
-        r = _post(False)
+        log.warning("Facebook-Beitrag mit Ort fehlgeschlagen, erneut ohne Ort: %s", _err(r))
+        r = _feed(False)
     if r.status_code == 200:
-        j = r.json()
-        return True, (j.get("post_id") or j.get("id") or "")
+        return True, (r.json().get("id") or "")
+    _delete_fb_photos([mid], token)   # Feed-Beitrag fehlgeschlagen -> Foto nicht verwaisen lassen
     return False, _err(r)
 
 

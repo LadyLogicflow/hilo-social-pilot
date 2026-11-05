@@ -27,39 +27,48 @@ KANAL_LABEL = {
 WARNSCHWELLE = 14
 
 
-def aktive_pool_ids(conn):
+# Tabellen-Parametrisierung (Recruiting-Erweiterung 2026-08): Alle Funktionen bespielen per Default
+# die Steuer-Tabellen `pool`/`pool_nutzung` (heutiges Verhalten, BYTE-IDENTISCH). Ueber die optionalen
+# Parameter pool_table/nutzung_table koennen dieselben Funktionen die Recruiting-Tabellen
+# (`pool_recruiting`/`pool_nutzung_recruiting`) bedienen. Die Tabellennamen sind INTERNE Konstanten
+# (kein User-Input) und werden per %-Format in die SQL-Strings gesetzt - kein Injection-Risiko.
+
+
+def aktive_pool_ids(conn, pool_table="pool"):
     """IDs aller aktiven Topf-Beitraege (aeltester zuerst)."""
     return [r[0] for r in conn.execute(
-        "SELECT entwurf_id FROM pool WHERE aktiv=1 ORDER BY freigegeben_am, entwurf_id")]
+        "SELECT entwurf_id FROM %s WHERE aktiv=1 ORDER BY freigegeben_am, entwurf_id" % pool_table)]
 
 
-def ist_im_pool(conn, eid):
+def ist_im_pool(conn, eid, pool_table="pool"):
     """True, wenn der Entwurf aktiv im Topf liegt."""
-    return conn.execute("SELECT 1 FROM pool WHERE entwurf_id=? AND aktiv=1", (eid,)).fetchone() is not None
+    return conn.execute("SELECT 1 FROM %s WHERE entwurf_id=? AND aktiv=1" % pool_table,
+                        (eid,)).fetchone() is not None
 
 
-def verbrauchte_paare(conn):
+def verbrauchte_paare(conn, nutzung_table="pool_nutzung"):
     """Menge bereits verbrauchter (entwurf_id, stelle_id, kanal)-Tripel - das 'nie doppelt'-Gedaechtnis."""
     return {(r["entwurf_id"], r["stelle_id"], r["kanal"])
-            for r in conn.execute("SELECT entwurf_id, stelle_id, kanal FROM pool_nutzung")}
+            for r in conn.execute("SELECT entwurf_id, stelle_id, kanal FROM %s" % nutzung_table)}
 
 
-def offene_beitraege(conn, stelle_id, kanal, pool_ids=None, verbraucht=None):
+def offene_beitraege(conn, stelle_id, kanal, pool_ids=None, verbraucht=None,
+                     pool_table="pool", nutzung_table="pool_nutzung"):
     """Topf-Beitraege, die diese Stelle auf diesem Kanal NOCH NICHT hatte (= ziehbar).
     pool_ids/verbraucht koennen vorberechnet uebergeben werden (spart Queries bei Schleifen)."""
     if pool_ids is None:
-        pool_ids = aktive_pool_ids(conn)
+        pool_ids = aktive_pool_ids(conn, pool_table)
     if verbraucht is None:
-        verbraucht = verbrauchte_paare(conn)
+        verbraucht = verbrauchte_paare(conn, nutzung_table)
     return [eid for eid in pool_ids if (eid, stelle_id, kanal) not in verbraucht]
 
 
-def restbestand(conn, stelle_ids, kanaele=None):
+def restbestand(conn, stelle_ids, kanaele=None, pool_table="pool", nutzung_table="pool_nutzung"):
     """Vorrat je (Stelle, Kanal): wie viele Topf-Beitraege die Stelle auf dem Kanal noch ziehen kann.
     Rueckgabe: dict[(stelle_id, kanal)] -> Anzahl offener Beitraege."""
     kanaele = kanaele or POOL_KANAELE
-    pool_ids = aktive_pool_ids(conn)
-    verbraucht = verbrauchte_paare(conn)
+    pool_ids = aktive_pool_ids(conn, pool_table)
+    verbraucht = verbrauchte_paare(conn, nutzung_table)
     out = {}
     for sid in stelle_ids:
         for kanal in kanaele:
@@ -67,22 +76,24 @@ def restbestand(conn, stelle_ids, kanaele=None):
     return out
 
 
-def knappe_vorraete(conn, stelle_ids, kanaele=None, schwelle=WARNSCHWELLE):
+def knappe_vorraete(conn, stelle_ids, kanaele=None, schwelle=WARNSCHWELLE,
+                    pool_table="pool", nutzung_table="pool_nutzung"):
     """Liste (stelle_id, kanal, rest) fuer alle Kombinationen unter der Warnschwelle - fuer den
     Nachschub-Hinweis. Leere Liste = Vorrat ueberall ausreichend."""
-    rest = restbestand(conn, stelle_ids, kanaele)
+    rest = restbestand(conn, stelle_ids, kanaele, pool_table, nutzung_table)
     return sorted([(sid, kanal, n) for (sid, kanal), n in rest.items() if n < schwelle],
                   key=lambda t: t[2])
 
 
-def markiere_verbraucht(conn, entwurf_id, stelle_id, kanal):
+def markiere_verbraucht(conn, entwurf_id, stelle_id, kanal, nutzung_table="pool_nutzung"):
     """Schreibt ein (entwurf, stelle, kanal)-Tripel ins 'nie doppelt'-Gedaechtnis.
     INSERT OR IGNORE -> idempotent (der UNIQUE-Schluessel verhindert Doppelte)."""
-    conn.execute("INSERT OR IGNORE INTO pool_nutzung(entwurf_id, stelle_id, kanal) VALUES (?,?,?)",
+    conn.execute("INSERT OR IGNORE INTO %s(entwurf_id, stelle_id, kanal) VALUES (?,?,?)" % nutzung_table,
                  (entwurf_id, stelle_id, kanal))
 
 
-def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None, tabu=None):
+def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None, tabu=None,
+                       pool_table="pool", nutzung_table="pool_nutzung"):
     """Zieht fuer EINEN Kanal je Stelle einen zufaelligen, noch offenen Topf-Beitrag - so, dass an
     EINEM Tag keine zwei Stellen denselben Beitrag bekommen ('fuer jede Stelle ein anderer').
 
@@ -99,8 +110,8 @@ def ziehe_tagesauswahl(conn, stelle_ids, kanal, rng, erlaubte_eids=None, tabu=No
 
     Markiert NICHTS - der Aufrufer entscheidet, ob/wann er markiere_verbraucht() schreibt (z.B. erst
     nach erfolgreicher Einplanung)."""
-    pool_ids = aktive_pool_ids(conn)
-    verbraucht = verbrauchte_paare(conn)
+    pool_ids = aktive_pool_ids(conn, pool_table)
+    verbraucht = verbrauchte_paare(conn, nutzung_table)
     offen = {sid: offene_beitraege(conn, sid, kanal, pool_ids, verbraucht) for sid in stelle_ids}
     if erlaubte_eids is not None:
         erlaubt = set(erlaubte_eids)

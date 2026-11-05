@@ -67,7 +67,7 @@ class CompositionCheck(BaseModel):
     primary_focus: str = Field(description="Position des Hauptmotivs")
     text_zone: str = Field(description="Position der ruhigen Textfläche")
     bottom_left_safe: bool = Field(description="Untere linke Schutzzone frei?")
-    top_right_safe: bool = Field(description="Obere rechte Schutzzone frei?")
+    bottom_right_safe: bool = Field(description="Untere rechte Schutzzone frei?")
 
 
 class Preflight(BaseModel):
@@ -130,7 +130,8 @@ def create_production_brief(
     route: CreativeRoute,
     art_board: ArtDirectionBoard,
     headline: str = "",
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> ImageProductionBrief:
     """Erstellt Production Brief nach ShareNext-Spezifikation (Catrin).
 
@@ -186,7 +187,7 @@ PRIORITÄT A - UNVERHANDELBAR
 - NUR DEUTSCHE SPRACHE - absolut kein Englisch.
 - EURO (€) - NIEMALS Dollar ($) oder USD.
 - Zielgruppe strikt beachten - siehe konkrete Zielgruppe im User-Prompt, nicht pauschalisieren.
-- Logo-Schutzzonen (unten links + oben rechts, Maße im User-Prompt) MÜSSEN frei von wichtigem
+- Logo-Schutzzonen (unten links + unten rechts, Maße im User-Prompt) MÜSSEN frei von wichtigem
   Bildinhalt bleiben.
 - Keine zusätzlichen Labels, Captions oder Wasserzeichen (außer HILO-Logo).
 - **KEINE echten oder erkennbar nachgebildeten Hoheitszeichen, Institutions- oder Marken-Logos**
@@ -302,7 +303,7 @@ Layoutvorgaben:
 - Überschrift: {headline if headline else "(keine - wird später gesetzt)"}
 - Textmodus: {text_mode}
 - Logo-Schutzzone unten links: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
-- Logo-Schutzzone oben rechts: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
+- Logo-Schutzzone unten rechts: {SAFE_ZONE_WIDTH} Bildbreite × {SAFE_ZONE_HEIGHT} Bildhöhe
 
 AUSGABEFORMAT
 
@@ -319,10 +320,15 @@ Stelle sicher dass:
 WICHTIG:
 - Bei text_mode = "exact_headline": Verwende EXAKT die Überschrift "{headline}"!
 - Bei text_mode = "no_text": KEINE Schrift im Bild!
-- Schutzzonen unten links + oben rechts MÜSSEN frei bleiben!
+- Schutzzonen unten links + unten rechts MÜSSEN frei bleiben!
 - NUR DEUTSCHE SPRACHE, NIEMALS Englisch!
 - EURO (€) verwenden, NIEMALS Dollar ($)!
 """
+
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + _cmp.BILD_DIREKTIVE
 
     log.info(f"Prompt Director erstellt Bildgenerierungs-Prompt für: {route.titel}")
 
@@ -356,7 +362,7 @@ WICHTIG:
             f"   Keywords: {', '.join(production_brief.style_keywords[:3])}...\n"
             f"   Text-Modus: {production_brief.visible_text.mode}\n"
             f"   Schutzzonen: BL={production_brief.composition_check.bottom_left_safe}, "
-            f"TR={production_brief.composition_check.top_right_safe}"
+            f"BR={production_brief.composition_check.bottom_right_safe}"
         )
 
         return production_brief
@@ -557,7 +563,8 @@ def produce_image(
     headline: str = "",
     size: str = "1024x1024",
     quality: str = "medium",
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    kampagne: str = "steuer"
 ) -> tuple[Image.Image, ImageProductionBrief]:
     """High-Level API: Erstellt Production Brief + generiert Bild.
 
@@ -583,7 +590,8 @@ def produce_image(
         >>> print(prod_brief.alt_text)
     """
     # Schritt 1: Production Brief erstellen (mit headline!)
-    production_brief = create_production_brief(brief, route, art_board, headline=headline)
+    production_brief = create_production_brief(brief, route, art_board, headline=headline,
+                                               kampagne=kampagne)
 
     # Schritt 2: Bild generieren
     image = generate_image(production_brief, size, quality, output_path)

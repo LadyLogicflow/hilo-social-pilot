@@ -98,7 +98,8 @@ def generate_message_brief(
     thema: str,
     text: str,
     kanal: str,
-    model: str = "gpt-5.6-terra"
+    model: str = "gpt-5.6-terra",
+    kampagne: str = "steuer"
 ) -> MessageBrief:
     """Generiert automatisch ein Message Brief aus Post-Daten via KI.
 
@@ -209,7 +210,14 @@ Erstelle ein strukturiertes Message Brief mit:
 - kanal: {kanal}
 """
 
-    log.info(f"Generiere Message Brief für: {thema} ({stream}/{kanal})")
+    # Recruiting-Kampagne: kompletter Prompt-Wechsel (der Standard-Brief ist voll steuer-spezifisch).
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = _cmp.MESSAGE_BRIEF_SYSTEM
+        user_prompt = _cmp.message_brief_user(thema, text, kanal)
+
+    log.info(f"Generiere Message Brief für: {thema} ({stream}/{kanal}, Kampagne={kampagne})")
 
     try:
         # OpenAI API-Call mit Structured Output
@@ -250,7 +258,8 @@ class GeneratedHeadline(BaseModel):
     )
 
 
-def generate_headline(brief: MessageBrief, text: str = "", model: str = "gpt-5.6-terra") -> str:
+def generate_headline(brief: MessageBrief, text: str = "", model: str = "gpt-5.6-terra",
+                      kampagne: str = "steuer") -> str:
     """Erzeugt eine Bild-Überschrift, wenn keine freigegebene Überschrift vorliegt.
 
     #Headline-Fallback: Ohne Überschrift laeuft der Image Producer im Modus 'no_text' und
@@ -301,6 +310,11 @@ RECHTLICH KRITISCH:
 - Gewünschte Reaktion: {brief.reaktion}
 - Quelltext (Faktenbasis, nichts hinzuerfinden): {text or "(nicht angegeben)"}
 """
+
+    import campaigns
+    _cmp = campaigns.get(kampagne)
+    if _cmp:
+        system_prompt = system_prompt + getattr(_cmp, "HEADLINE_HINT", "")
 
     log.info("Keine Überschrift übergeben - generiere Fallback-Überschrift...")
 
