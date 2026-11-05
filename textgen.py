@@ -638,7 +638,17 @@ def generate(thema, kanal=None, kampagne="steuer", variation_index=None):
         messages=[{"role": "user", "content": user}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
-    return _korrigiere_begriffe(_normalize_bild(_normalize_captions(_parse_json(raw))), kampagne)
+    try:
+        data = _parse_json(raw)
+    except Exception:
+        # Diagnose (Recruiting-Abbruch 05.11.2026): bisher stand nur "Expecting value: line 1 column 1" im
+        # Log. Jetzt: Kampagne, stop_reason, Laenge und Anfang der Antwort, damit sichtbar ist, WAS die
+        # Text-KI statt JSON geliefert hat (Ablehnung, Fliesstext, leer, abgeschnitten).
+        log.warning("Text-KI-Antwort nicht als JSON lesbar (Kampagne=%s, Modell=%s, stop_reason=%s, "
+                    "%d Zeichen). Anfang: %r", kampagne, getattr(msg, "model", "?"),
+                    getattr(msg, "stop_reason", "?"), len(raw or ""), (raw or "")[:300])
+        raise
+    return _korrigiere_begriffe(_normalize_bild(_normalize_captions(data)), kampagne)
 
 
 def _create_drafts(rows, kanal):
