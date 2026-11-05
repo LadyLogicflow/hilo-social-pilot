@@ -605,7 +605,7 @@ def extract_topics(volltext, quelle_titel=""):
         "Quelle: %s\n\nText:\n%s" % (quelle_titel or "-", (volltext or "")[:8000])
     )
     msg = client.messages.create(
-        model=_model(), max_tokens=1500,
+        model=_model(), max_tokens=8000,
         system="Du analysierst deutsche Steuer-Fachtexte und zerlegst sie sauber in einzelne Themen.",
         messages=[{"role": "user", "content": prompt}],
     )
@@ -634,7 +634,7 @@ def generate(thema, kanal=None, kampagne="steuer", variation_index=None):
         system = SYSTEM
         user = _build_prompt(thema)
     msg = client.messages.create(
-        model=_model(), max_tokens=1600, system=system,
+        model=_model(), max_tokens=8000, system=system,
         messages=[{"role": "user", "content": user}],
     )
     raw = "".join(getattr(b, "text", "") for b in msg.content)
@@ -839,7 +839,7 @@ def regenerate(thema, previous, feedback, kanal="google"):
            (thema.get("volltext") or "")[:1500],
            CHANNEL_GUIDE["facebook"], CHANNEL_GUIDE["instagram"], feedback)
     )
-    msg = client.messages.create(model=_model(), max_tokens=1600, system=SYSTEM,
+    msg = client.messages.create(model=_model(), max_tokens=8000, system=SYSTEM,
                                  messages=[{"role": "user", "content": prompt}])
     raw = "".join(getattr(b, "text", "") for b in msg.content)
     return _korrigiere_begriffe(_normalize_captions(_parse_json(raw)))
