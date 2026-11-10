@@ -6179,8 +6179,14 @@ def audit_log_safe(aktion):
 
 # BSt Next (eigener Mandant, Seite /bstnext + Weichen). HILO-Pfade bleiben unveraendert.
 import bstnext.routes as _bstnext_routes
+def _bstnext_veroeffentlichen(conn, e, eid, f, kanal, page_id, user):
+    """Veroeffentlicht einen freigegebenen BSt-Next-Beitrag (Weichen: _veroeffentliche_ziel/bstnext.guard)."""
+    import publish
+    return _veroeffentliche_ziel(conn, e, eid, f, "einzelbild", "einzelbild", kanal, None, page_id, user,
+                                 publish, story=False, story_fb=False)
+
 _bstnext_routes.register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung,
-                         DATA_DIR, _STYLE, pages_fn=_pages)
+                         DATA_DIR, _STYLE, pages_fn=_pages, publish_fn=_bstnext_veroeffentlichen)
 
 def serve(host="0.0.0.0", port=None):
     init_db()

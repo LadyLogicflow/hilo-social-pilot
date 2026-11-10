@@ -23,7 +23,8 @@ MAX_CAPTION = 2000
 _cfg = {"data_dir": None,          # wird von register() gesetzt; Tests duerfen es ueberschreiben
         "szene_fn": None,          # Foto-Erzeugung (Standard: szene.erzeuge_szene)
         "sync": False,             # True: Foto-Job im Aufruf statt im Hintergrund (Tests)
-        "pages_fn": None}          # liefert (Liste der Facebook-Seiten, Fehlertext); von register() gesetzt
+        "pages_fn": None,
+        "publish_fn": None}        # (conn, entwurf, eid, fields, kanal, page_id, user) -> (ziel, erfolg, [(kanal, ok, info)])          # liefert (Liste der Facebook-Seiten, Fehlertext); von register() gesetzt
 MOTIVE = (("belege", "Belege"), ("termine", "Termine"), ("telefon", "Telefon"), ("werbung", "Werbung"),
           ("challenge", "Challenge"))
 
@@ -83,7 +84,20 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 {% if rows %}<table><tr><th></th><th>Beitrag</th><th>Status</th><th>Tag</th><th></th></tr>
 {% for r in rows %}<tr><td>{% if r.bild_status=='fertig' %}<img class=th src="/bild/{{r.id}}" alt="">{% endif %}</td><td>{{r.titel}}{% if r.typ=='foto' %} <span class="hint">(Foto-Look)</span>{% endif %}</td>
 <td>{{r.status}}{% if r.bild_status=='laeuft' %}<br><span class="hint">Bild wird erzeugt …</span>{% elif r.bild_status=='fehler' %}<br><span class="hint">Bild fehlgeschlagen: {{r.info}}</span>{% endif %}</td><td>{{r.datum}}</td>
-<td>{% if r.bild_status=='fertig' %}<a href="/beitrag/{{r.id}}">öffnen / freigeben</a>{% else %}<form method=post action="{{ url_for('bstnext.foto_neu', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Bild neu erzeugen</button></form>{% endif %}</td></tr>{% endfor %}</table>
+<td>{% if r.bild_status!='fertig' %}<form method=post action="{{ url_for('bstnext.foto_neu', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Bild neu erzeugen</button></form>
+{% elif r.status=='entwurf' %}<form method=post action="{{ url_for('bstnext.freigeben', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Freigeben</button></form>
+{% elif r.status=='freigegeben' %}
+{% if seiten_ids %}<form method=post action="{{ url_for('bstnext.veroeffentlichen', eid=r.id) }}" style="margin:0 0 8px" onsubmit="return confirm('Jetzt auf der BSt-Next-Seite veröffentlichen? Das ist ein echter Post.')">
+<select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
+<select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
+<button type=submit style="margin:0;padding:6px 10px">Jetzt veröffentlichen</button></form>
+<form method=post action="{{ url_for('bstnext.einplanen', eid=r.id) }}" style="margin:0">
+<input type=date name=datum required style="width:auto"> <input type=time name=zeit required style="width:auto">
+<select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
+<select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
+<button type=submit style="margin:0;padding:6px 10px">Einplanen</button></form>
+{% else %}<span class="hint">Erst oben die BSt-Next-Facebook-Seite hinterlegen.</span>{% endif %}
+{% else %}<a href="/beitrag/{{r.id}}">ansehen</a>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="hint">Noch keine.</p>{% endif %}</div>
 </div>"""
 
@@ -101,10 +115,11 @@ def _caption_mit_hashtags(text):
 
 
 def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung, data_dir, style,
-             pages_fn=None):
+             pages_fn=None, publish_fn=None):
     bp = Blueprint("bstnext", __name__)
     _cfg["data_dir"] = data_dir
     _cfg["pages_fn"] = pages_fn
+    _cfg["publish_fn"] = publish_fn
 
     def _rows(conn):
         try:
@@ -141,7 +156,7 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": "",
                   "bildtyp": "kachel", "motiv": "belege"}
         return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
-                                      seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv,
+                                      seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv, seiten_ids=sorted(aktiv),
                                       rolle=session.get("rolle"), f=f,
                                       laeuft=any(r["bild_status"] == "laeuft" for r in rows))
 
@@ -309,6 +324,99 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             audit_log(conn, session.get("user"), "bstnext_seite", None, "%d Seite(n)" % len(ids))
             conn.commit()
         flash("BSt-Next-Facebook-Seite gespeichert." if ids else "BSt-Next-Facebook-Seite entfernt.")
+        return redirect(url_for("bstnext.index"))
+
+    def _lade(conn, eid):
+        row = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+        if not row:
+            abort(404)
+        try:
+            f = json.loads(row["text"])
+        except Exception:
+            f = {}
+        if not guard.ist_bstnext(f):
+            abort(404)
+        return row, f
+
+    @bp.route("/bstnext/freigeben/<int:eid>", methods=["POST"])
+    @rolle_required("freigeber")
+    def freigeben(eid):
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            if not guard.bild_bereit(f) or not (row["bild_pfad"] and os.path.exists(row["bild_pfad"])):
+                flash(guard.MELDUNG_BILD_NICHT_FERTIG)
+            elif row["status"] != "entwurf":
+                flash("Der Beitrag ist nicht mehr im Entwurf.")
+            else:
+                conn.execute("UPDATE entwuerfe SET status='freigegeben' WHERE id=?", (eid,))
+                audit_log(conn, session.get("user"), "bstnext_freigabe", eid, f.get("ueberschrift", "")[:60])
+                conn.commit()
+                flash("Beitrag %d freigegeben – jetzt veröffentlichen oder einplanen." % eid)
+        return redirect(url_for("bstnext.index"))
+
+    def _ziel(f):
+        """Prueft Seite und Kanal aus dem Formular; Rueckgabe (page_id, kanal, Fehlertext)."""
+        page_id = (request.form.get("page_id") or "").strip()
+        kanal = (request.form.get("kanal") or "beide").strip()
+        if kanal not in ("facebook", "instagram", "beide"):
+            return None, None, "Unbekannter Kanal."
+        ok, msg = guard.ziel_erlaubt(f, None, page_id, guard.seiten_ids(get_einstellung(guard.EINSTELLUNG_SEITEN, "")))
+        if not ok:
+            return None, None, msg
+        return page_id, kanal, None
+
+    @bp.route("/bstnext/veroeffentlichen/<int:eid>", methods=["POST"])
+    @rolle_required("freigeber")
+    def veroeffentlichen(eid):
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            page_id, kanal, fehler = _ziel(f)
+            if fehler:
+                flash(fehler)
+                return redirect(url_for("bstnext.index"))
+            if row["status"] != "freigegeben":
+                flash("Der Beitrag muss zuerst freigegeben werden.")
+                return redirect(url_for("bstnext.index"))
+            if not _cfg["publish_fn"]:
+                flash("Veröffentlichung ist nicht angebunden.")
+                return redirect(url_for("bstnext.index"))
+            ziel, erfolg, ergebnisse = _cfg["publish_fn"](conn, row, eid, f, kanal, page_id, session.get("user"))
+            if erfolg:
+                conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (eid,))
+            conn.commit()
+        teile = ["%s: %s" % (k.capitalize(), ("OK" if ok else "Fehler – %s" % info)) for k, ok, info in ergebnisse]
+        flash("Beitrag %d: %s" % (eid, " | ".join(teile)))
+        return redirect(url_for("bstnext.index"))
+
+    @bp.route("/bstnext/einplanen/<int:eid>", methods=["POST"])
+    @rolle_required("freigeber")
+    def einplanen(eid):
+        datum = (request.form.get("datum") or "").strip()
+        zeit = (request.form.get("zeit") or "").strip()
+        try:
+            wann = datetime.datetime.strptime("%sT%s" % (datum, zeit[:5]), "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Bitte Datum und Uhrzeit angeben.")
+            return redirect(url_for("bstnext.index"))
+        if wann < datetime.datetime.now():
+            flash("Der Zeitpunkt liegt in der Vergangenheit.")
+            return redirect(url_for("bstnext.index"))
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            page_id, kanal, fehler = _ziel(f)
+            if fehler:
+                flash(fehler)
+                return redirect(url_for("bstnext.index"))
+            if row["status"] != "freigegeben":
+                flash("Der Beitrag muss zuerst freigegeben werden.")
+                return redirect(url_for("bstnext.index"))
+            conn.execute("INSERT INTO geplante_posts(entwurf_id, page_id, kanal, format, format_fb, format_ig, "
+                         "geplant_am, status) VALUES (?,?,?,?,?,?,?, 'geplant')",
+                         (eid, page_id, kanal, "einzelbild", "einzelbild", "einzelbild",
+                          wann.strftime("%Y-%m-%dT%H:%M:00")))
+            audit_log(conn, session.get("user"), "bstnext_eingeplant", eid, "%s %s" % (datum, zeit))
+            conn.commit()
+        flash("Beitrag %d eingeplant für %s um %s Uhr." % (eid, datum, zeit))
         return redirect(url_for("bstnext.index"))
 
     app.register_blueprint(bp)
