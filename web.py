@@ -6173,7 +6173,7 @@ def audit_log_safe(aktion):
 # BSt Next (eigener Mandant, Seite /bstnext + Weichen). HILO-Pfade bleiben unveraendert.
 import bstnext.routes as _bstnext_routes
 _bstnext_routes.register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung,
-                         DATA_DIR, _STYLE)
+                         DATA_DIR, _STYLE, pages_fn=_pages)
 
 def serve(host="0.0.0.0", port=None):
     init_db()

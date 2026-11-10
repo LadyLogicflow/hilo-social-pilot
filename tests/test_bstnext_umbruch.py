@@ -59,3 +59,31 @@ def test_neu_zu_viele_zeilen_bleibt_fehler(env):
     assert "Zu viele Zeilen" in r.get_data(as_text=True)
     with db.get_conn() as conn:
         assert conn.execute("SELECT COUNT(*) FROM entwuerfe").fetchone()[0] == 0
+
+
+def test_seite_waehlen_statt_id(env, monkeypatch):
+    monkeypatch.setitem(bs_routes._cfg, "pages_fn", lambda: ([
+        {"id": "111", "name": "HILO Neuss", "ig_id": "9", "ig_username": "hilo_neuss"},
+        {"id": "222", "name": "BSt Next", "ig_id": None, "ig_username": None}], None))
+    html = env.get("/bstnext").get_data(as_text=True)
+    assert "BSt Next (222)" in html and "kein Instagram verknüpft" in html and "@hilo_neuss" in html
+    env.post("/bstnext/seite", data={"seite_wahl": "222", "seiten": "999"}, follow_redirects=True)
+    assert db.get_einstellung("bstnext_fb_seiten") == "222"          # Auswahl hat Vorrang
+    assert 'value="222" selected' in env.get("/bstnext").get_data(as_text=True)
+    env.post("/bstnext/seite", data={"seite_wahl": "", "seiten": ""}, follow_redirects=True)
+    assert db.get_einstellung("bstnext_fb_seiten") == ""             # beides leer = entfernt
+
+
+def test_seitenliste_fehler_sichtbar_und_manuell_moeglich(env, monkeypatch):
+    monkeypatch.setitem(bs_routes._cfg, "pages_fn", lambda: ([], "Invalid OAuth access token"))
+    html = env.get("/bstnext").get_data(as_text=True)
+    assert "Invalid OAuth access token" in html and "name=seiten" in html
+    env.post("/bstnext/seite", data={"seiten": "333"}, follow_redirects=True)
+    assert db.get_einstellung("bstnext_fb_seiten") == "333"
+
+
+def test_seitenliste_nur_fuer_admin(env, monkeypatch):
+    monkeypatch.setitem(bs_routes._cfg, "pages_fn", lambda: ([{"id": "111", "name": "Geheim", "ig_id": None, "ig_username": None}], None))
+    with env.session_transaction() as s:
+        s["rolle"] = "freigeber"
+    assert "Geheim" not in env.get("/bstnext").get_data(as_text=True)

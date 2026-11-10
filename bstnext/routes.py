@@ -22,7 +22,8 @@ FORMATE_FEED = (("quadrat", "Quadrat 1080×1080 (Feed)"), ("hochformat", "Hochfo
 MAX_CAPTION = 2000
 _cfg = {"data_dir": None,          # wird von register() gesetzt; Tests duerfen es ueberschreiben
         "szene_fn": None,          # Foto-Erzeugung (Standard: szene.erzeuge_szene)
-        "sync": False}             # True: Foto-Job im Aufruf statt im Hintergrund (Tests)
+        "sync": False,             # True: Foto-Job im Aufruf statt im Hintergrund (Tests)
+        "pages_fn": None}          # liefert (Liste der Facebook-Seiten, Fehlertext); von register() gesetzt
 MOTIVE = (("belege", "Belege"), ("termine", "Termine"), ("telefon", "Telefon"), ("werbung", "Werbung"),
           ("challenge", "Challenge"))
 
@@ -71,7 +72,12 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt Next</h3>
 {% if seiten %}<p>Hinterlegt: <b>{{ seiten }}</b></p>{% else %}<p class="hint">Noch keine Seite hinterlegt – ohne sie kann nichts veröffentlicht werden.</p>{% endif %}
 {% if rolle == 'admin' %}<form method=post action="{{ url_for('bstnext.seite') }}">
-<label>Facebook-Page-ID(s) (kommagetrennt)</label><input type=text name=seiten value="{{ seiten }}" placeholder="123456789012345">
+{% if seiten_liste %}<label>Seite wählen (alle Facebook-Seiten, die der Zugang des Programms erreicht)</label>
+<select name=seite_wahl><option value="">– keine Auswahl (unten ID eintragen oder Seite entfernen) –</option>
+{% for p in seiten_liste %}<option value="{{p.id}}" {% if p.id in seiten_aktiv %}selected{% endif %}>{{p.name}} ({{p.id}}){% if p.ig_username %} · Instagram @{{p.ig_username}}{% else %} · kein Instagram verknüpft{% endif %}</option>{% endfor %}</select>
+{% elif seiten_fehler %}<p class="hint">Die Seitenliste von Facebook konnte nicht geladen werden: {{seiten_fehler}}</p>{% endif %}
+<label>Oder Facebook-Page-ID von Hand (kommagetrennt)</label><input type=text name=seiten value="{{ seiten if not seiten_liste else '' }}" placeholder="123456789012345">
+<p class="hint">Die Auswahl hat Vorrang, wenn beides gefüllt ist. Beide Felder leer = Seite entfernen.</p>
 <button type=submit>Speichern</button></form>{% else %}<p class="hint">Hinterlegen darf nur ein Admin.</p>{% endif %}</div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Bisherige BSt-Next-Entwürfe</h3>
 {% if rows %}<table><tr><th></th><th>Beitrag</th><th>Status</th><th>Tag</th><th></th></tr>
@@ -94,9 +100,11 @@ def _caption_mit_hashtags(text):
     return t
 
 
-def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung, data_dir, style):
+def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung, data_dir, style,
+             pages_fn=None):
     bp = Blueprint("bstnext", __name__)
     _cfg["data_dir"] = data_dir
+    _cfg["pages_fn"] = pages_fn
 
     def _rows(conn):
         try:
@@ -121,11 +129,20 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
     def _seite(f=None):
         with get_conn() as conn:
             rows = _rows(conn)
-        seiten = ", ".join(sorted(guard.seiten_ids(get_einstellung(guard.EINSTELLUNG_SEITEN, ""))))
+        aktiv = guard.seiten_ids(get_einstellung(guard.EINSTELLUNG_SEITEN, ""))
+        seiten = ", ".join(sorted(aktiv))
+        liste, fehler = [], None
+        if _cfg["pages_fn"] and session.get("rolle") == "admin":
+            try:
+                liste, fehler = _cfg["pages_fn"]()
+                liste = [p for p in (liste or []) if p.get("id")]
+            except Exception as ex:
+                liste, fehler = [], str(ex)
         f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": "",
                   "bildtyp": "kachel", "motiv": "belege"}
         return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
-                                      seiten=seiten, rolle=session.get("rolle"), f=f,
+                                      seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv,
+                                      rolle=session.get("rolle"), f=f,
                                       laeuft=any(r["bild_status"] == "laeuft" for r in rows))
 
     def _foto_job(eid):
@@ -282,7 +299,8 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
     @bp.route("/bstnext/seite", methods=["POST"])
     @rolle_required("admin")
     def seite():
-        ids = sorted(guard.seiten_ids(request.form.get("seiten", "")))
+        wahl = (request.form.get("seite_wahl") or "").strip()
+        ids = sorted({wahl} if wahl else guard.seiten_ids(request.form.get("seiten", "")))
         if any(not i.isdigit() for i in ids):
             flash("Eine Facebook-Page-ID besteht nur aus Ziffern.")
             return redirect(url_for("bstnext.index"))
