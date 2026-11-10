@@ -177,3 +177,52 @@ def test_freigeben_nur_mit_fertigem_bild(env):
         conn.commit()
     r = c.post("/bstnext/freigeben/1", follow_redirects=True)
     assert "noch nicht fertig" in r.get_data(as_text=True) and _status() == "entwurf"
+
+
+def test_facebook_story_zusaetzlich(env, monkeypatch):
+    c, calls = env
+    storys = []
+    monkeypatch.setattr(publish, "publish_facebook_story", lambda page, bild, alt_text=None: storys.append((page, bild)) or (True, "s1"))
+    _seite_setzen(c)
+    _neu(c)
+    c.post("/bstnext/freigeben/1", follow_redirects=True)
+    r = c.post("/bstnext/veroeffentlichen/1", data={"page_id": SEITE, "kanal": "beide", "story_fb": "1"}, follow_redirects=True)
+    assert "Facebook-story: OK" in r.get_data(as_text=True)
+    assert len(storys) == 1 and storys[0][0] == SEITE
+    from PIL import Image
+    assert Image.open(storys[0][1]).size == (1080, 1920)
+    assert len(calls["fb"]) == 1 and len(calls["ig"]) == 1      # Feed wie gehabt, keine Instagram-Story
+
+
+def test_story_nur_mit_haken_und_nicht_bei_instagram(env, monkeypatch):
+    c, calls = env
+    storys = []
+    monkeypatch.setattr(publish, "publish_facebook_story", lambda *a, **k: storys.append(a) or (True, "s"))
+    _seite_setzen(c)
+    _neu(c)
+    c.post("/bstnext/freigeben/1", follow_redirects=True)
+    c.post("/bstnext/veroeffentlichen/1", data={"page_id": SEITE, "kanal": "facebook"}, follow_redirects=True)
+    assert storys == []
+    _neu(c)
+    c.post("/bstnext/freigeben/2", follow_redirects=True)
+    c.post("/bstnext/veroeffentlichen/2", data={"page_id": SEITE, "kanal": "instagram", "story_fb": "1"}, follow_redirects=True)
+    assert storys == []
+
+
+def test_story_fehler_wird_gemeldet_feed_bleibt_ok(env, monkeypatch):
+    c, _ = env
+    monkeypatch.setattr(publish, "publish_facebook_story", lambda *a, **k: (False, "Story abgelehnt"))
+    _seite_setzen(c)
+    _neu(c)
+    c.post("/bstnext/freigeben/1", follow_redirects=True)
+    r = c.post("/bstnext/veroeffentlichen/1", data={"page_id": SEITE, "kanal": "facebook", "story_fb": "1"}, follow_redirects=True)
+    t = r.get_data(as_text=True)
+    assert "Facebook: OK" in t and "Story abgelehnt" in t and _status() == "veroeffentlicht"
+
+
+def test_status_hochkant_erhaelt_seitenverhaeltnis(tmp_path):
+    from PIL import Image
+    src = tmp_path / "h.png"; Image.new("RGB", (1080, 1350), (10, 20, 60)).save(src)
+    out = web._status_hochkant(str(src), str(tmp_path / "o.png"))
+    im = Image.open(out)
+    assert im.size == (1080, 1920) and im.getpixel((540, 960)) == (10, 20, 60)

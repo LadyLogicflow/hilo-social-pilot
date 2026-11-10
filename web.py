@@ -3945,7 +3945,8 @@ def _status_hochkant(square_path, out_path):
     # dezent abdunkeln, damit das scharfe Bild vorne besser abhebt
     bg = Image.blend(bg, Image.new("RGB", (W, H), (0, 0, 0)), 0.20)
     # Vordergrund: scharfes Originalbild in voller Breite (1080), mittig
-    bg.paste(src.resize((W, W), Image.LANCZOS), (0, (H - W) // 2))
+    vh = min(H, max(1, round(W * src.height / src.width)))      # Seitenverhaeltnis erhalten (Quadrat: W x W)
+    bg.paste(src.resize((W, vh), Image.LANCZOS), (0, (H - vh) // 2))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     bg.save(out_path)
     return out_path
@@ -4571,7 +4572,8 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     if _bsg.ist_bstnext(f):
         # Nur Feed-Einzelbild (die vorgerenderte Kachel); kein Karussell/Story ueber die HILO-Pipeline.
         fmt_fb = fmt_ig = "einzelbild"
-        story = story_fb = False
+        story = False
+        story_fb = bool(story_fb) and kanal in ("facebook", "beide")      # nur Facebook-Story, Instagram nie
         _bs_bild = e["bild_pfad"] if (e is not None and "bild_pfad" in e.keys()) else None
         if not _bsg.bild_bereit(f) or not (_bs_bild and os.path.exists(_bs_bild)):
             return (ziel_name, False, [(kanal, False, _bsg.MELDUNG_BILD_NICHT_FERTIG)])
@@ -4665,13 +4667,14 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         # Story-Ergebnis wird nur protokolliert (Stories sind fluechtig).
         if story_fb and ok:
             try:
-                slides = _render("karussell")
+                slides = _render("einzelbild" if _bsg.ist_bstnext(f) else "karussell")
                 sf_ok, sf_info = _publish_story(publish, ziel_seite, slides, eid, stelle_id,
                                                 do_ig=False, do_fb=True)
             except Exception as ex:
                 sf_ok, sf_info = False, str(ex)
             audit_log(conn, user, "facebook_story_%s" % ("ok" if sf_ok else "fehler"), eid,
                       "Ziel %s / %s" % (ziel_seite, sf_info))
+            _STORY_ERGEBNIS[eid] = (sf_ok, sf_info)
     if kanal in ("instagram", "beide"):
         bilder = []
         try:
@@ -6179,11 +6182,18 @@ def audit_log_safe(aktion):
 
 # BSt Next (eigener Mandant, Seite /bstnext + Weichen). HILO-Pfade bleiben unveraendert.
 import bstnext.routes as _bstnext_routes
-def _bstnext_veroeffentlichen(conn, e, eid, f, kanal, page_id, user):
+_STORY_ERGEBNIS = {}     # eid -> (ok, info) der zuletzt gepostete Facebook-Story (nur zur Anzeige in /bstnext)
+
+
+def _bstnext_veroeffentlichen(conn, e, eid, f, kanal, page_id, user, story_fb=False):
     """Veroeffentlicht einen freigegebenen BSt-Next-Beitrag (Weichen: _veroeffentliche_ziel/bstnext.guard)."""
     import publish
-    return _veroeffentliche_ziel(conn, e, eid, f, "einzelbild", "einzelbild", kanal, None, page_id, user,
-                                 publish, story=False, story_fb=False)
+    res = _veroeffentliche_ziel(conn, e, eid, f, "einzelbild", "einzelbild", kanal, None, page_id, user,
+                                 publish, story=False, story_fb=story_fb)
+    if story_fb and eid in _STORY_ERGEBNIS:
+        sok, sinfo = _STORY_ERGEBNIS.pop(eid)
+        res = (res[0], res[1], list(res[2]) + [("facebook-story", sok, sinfo)])
+    return res
 
 _bstnext_routes.register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung,
                          DATA_DIR, _STYLE, pages_fn=_pages, publish_fn=_bstnext_veroeffentlichen)
