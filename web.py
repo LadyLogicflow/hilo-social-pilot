@@ -781,6 +781,7 @@ HOME = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#0B2545" href="/kanalwerbung">{% if kanalwerbung_offen %}<span class=badge>{{kanalwerbung_offen}}</span>{% endif %}<h3>&#x1F4E3; Kanalwerbung (WhatsApp-Kanal)</h3><p>Den kostenlosen WhatsApp-Kanal bewerben: Beiträge erzeugen, freigeben, eigener Kanalwerbung-Pool – in zufälligem Abstand (7–15 Tage) automatisch je Stelle ausgespielt (Facebook, Instagram). Höchstens 2 Posts pro Tag: nie zusammen mit einem Recruiting-Post am selben Tag.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/kalender"><h3>&#x1F4C5; Content-Kalender</h3><p>Monatsübersicht: geplante Beiträge und besondere Tage (Anlass-Tage, Fristen) auf einen Blick.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#4D7C0F" href="/auswertung"><h3>&#x1F4CA; Was funktioniert</h3><p>Auswertung der veröffentlichten Beiträge nach Reichweite – welcher Stream, welches Bild und welche Uhrzeit am besten ankommen.</p></a>
+<a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#A3E635" href="/bstnext"><h3>BSt Next – Beitrag erstellen</h3><p>Eigene Marke neben HILO: Spruchkachel in der BSt-Next-CI erstellen, freigeben und nur auf der BSt-Next-Facebook-Seite veröffentlichen.</p></a>
 <a class=tile style="display:block;max-width:1040px;margin:16px auto 0;border-top-color:#f59e0b;background:linear-gradient(180deg,#fffbeb,#fff)" href="/sharenext"><h3>🚀 ShareNext - Premium Bildgenerierung</h3><p>KI-basierte 6-Stufen-Pipeline für hochwertige Social-Media-Bilder (~$0.10/Bild, 30-60 Sek.)</p></a>"""
 
 ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title><style>""" + _STYLE + """
@@ -4553,6 +4554,19 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
     stelle_id = str(stelle["id"]) if stelle else ""
     ziel_name = (stelle["name"] if stelle else page_id)
     ziel_seite = (stelle["fb_seite"] if stelle else page_id)
+    # BSt-Next-Weiche (bstnext.guard): BSt-Next-Beitraege nur an die hinterlegte BSt-Next-Seite, HILO nie dorthin.
+    import bstnext.guard as _bsg
+    _bs_seiten = _bsg.seiten_ids(get_einstellung(_bsg.EINSTELLUNG_SEITEN, ""))
+    _bs_ok, _bs_msg = _bsg.ziel_erlaubt(f, stelle, page_id, _bs_seiten)
+    if not _bs_ok:
+        log.warning("Veroeffentlichung Beitrag %s abgelehnt: %s", eid, _bs_msg)
+        return (ziel_name, False, [(kanal, False, _bs_msg)])
+    if _bsg.ist_bstnext(f):
+        # Nur Feed-Einzelbild (die vorgerenderte Kachel); kein Karussell/Story ueber die HILO-Pipeline.
+        fmt_fb = fmt_ig = "einzelbild"
+        story = story_fb = False
+        if kanal not in ("facebook", "instagram", "beide"):
+            return (ziel_name, False, [(kanal, False, "Kanal nicht fuer BSt Next vorgesehen")])
     # LINK-PFLICHT Kanalwerbung (catrin-Incident 2026-08-27): NIEMALS einen Kanal-Werbebeitrag ohne
     # Einladungslink posten. Fehlt der wa_kanal_invite der Stelle, wird nichts veroeffentlicht.
     if f.get("kampagne") == "kanalwerbung" and stelle is not None:
@@ -4826,6 +4840,10 @@ def veroeffentlichen(eid):
             f = json.loads(e["text"])
         except Exception:
             f = {}
+        import bstnext.guard as _bsg
+        _bs_fehler = _bsg.ziele_pruefen(f, stelle_ids, page_ids, _bsg.seiten_ids(get_einstellung(_bsg.EINSTELLUNG_SEITEN, "")))
+        if _bs_fehler:
+            flash(_bs_fehler); return redirect(url_for("einplanung"))
         # Ziele zusammenstellen: gewaehlte Beratungsstellen (personalisiert) + gewaehlte Facebook-Seiten;
         # jeder Eintrag traegt seinen eigenen Kanal (pro Beratungsstelle waehlbar).
         ziele = []   # (stelle_row | None, page_id | None, kanal)
@@ -4873,6 +4891,14 @@ def auto_einplanen(eid):
         e = conn.execute("SELECT * FROM entwuerfe WHERE id=?", (eid,)).fetchone()
         if not e:
             abort(404)
+        try:
+            _f_bs = json.loads(e["text"])
+        except Exception:
+            _f_bs = {}
+        import bstnext.guard as _bsg
+        _bs_fehler = _bsg.ziele_pruefen(_f_bs, stelle_ids, page_ids, _bsg.seiten_ids(get_einstellung(_bsg.EINSTELLUNG_SEITEN, "")))
+        if _bs_fehler:
+            flash(_bs_fehler); return redirect(url_for("einplanung"))
         datum = e["geplant_fuer"] or now.date().isoformat()
         # heute: Zeit muss in der Zukunft liegen; spaeteres Datum: ab 07:00
         min_m = (now.hour * 60 + now.minute + 2) if datum == now.date().isoformat() else 7 * 60
@@ -6140,6 +6166,11 @@ def audit_log_safe(aktion):
             conn.commit()
     except Exception:
         pass
+
+# BSt Next (eigener Mandant, Seite /bstnext + Weichen). HILO-Pfade bleiben unveraendert.
+import bstnext.routes as _bstnext_routes
+_bstnext_routes.register(app, get_conn, rolle_required, audit_log, get_einstellung, set_einstellung,
+                         DATA_DIR, _STYLE)
 
 def serve(host="0.0.0.0", port=None):
     init_db()
