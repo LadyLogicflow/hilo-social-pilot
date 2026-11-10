@@ -204,7 +204,7 @@ def test_foto_formularfehler(env, monkeypatch):
     monkeypatch.setitem(bs_routes._cfg, "szene_fn", _fake_fn(True))
     assert "Unbekannter Bildtyp" in c.post("/bstnext/neu", data=_form(motiv="x"), follow_redirects=True).get_data(as_text=True)
     assert "Format" in c.post("/bstnext/neu", data=_form(format="story"), follow_redirects=True).get_data(as_text=True)
-    assert "Kachel nicht erzeugbar" in c.post("/bstnext/neu", data=_form(weiss="Das ist eine viel zu lange Headline Zeile"),
+    assert "Kachel nicht erzeugbar" in c.post("/bstnext/neu", data=_form(weiss="Donaudampfschifffahrtsgesellschaft"),
                                               follow_redirects=True).get_data(as_text=True)
     with db.get_conn() as conn:
         assert conn.execute("SELECT COUNT(*) FROM entwuerfe").fetchone()[0] == 0

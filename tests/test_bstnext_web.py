@@ -80,7 +80,7 @@ def test_hochformat(env):
 
 def test_zu_breite_zeile_legt_nichts_an(env):
     c, _ = env
-    r = _neu(c, weiss="Das ist eine viel zu lange Headline Zeile")
+    r = _neu(c, weiss="Donaudampfschifffahrtsgesellschaft")
     assert "Kachel nicht erzeugbar" in r.get_data(as_text=True)
     with db.get_conn() as conn:
         assert conn.execute("SELECT COUNT(*) FROM entwuerfe").fetchone()[0] == 0

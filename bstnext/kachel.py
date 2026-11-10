@@ -91,7 +91,9 @@ def _bereinigen(weisse_zeilen, lime_zeilen, format):
     logo = _logo_weiss(_LOGO_BREITE)
     logo_oben = hoehe - _LOGO_UNTEN - logo.size[1]
     if _OBEN + (len(weisse) + len(lime) - 1) * _ZEILENABSTAND + _SCHRIFT > logo_oben - 40:
-        raise KachelFehler("Zu viele Zeilen fuer dieses Format (%d)." % (len(weisse) + len(lime)))
+        maximal = int((logo_oben - 40 - _OBEN - _SCHRIFT) // _ZEILENABSTAND) + 1
+        raise KachelFehler("Zu viele Zeilen fuer dieses Format (%d, hoechstens %d). Bitte den Text kuerzen."
+                           % (len(weisse) + len(lime), maximal))
     return weisse, lime, font, logo, logo_oben, (breite, hoehe)
 
 
@@ -138,3 +140,32 @@ def render_foto(foto, weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat"):
     im.paste(logo, (_RAND_X, logo_oben), logo)
     im.save(ziel_pfad, "PNG")
     return ziel_pfad
+
+
+def umbrechen(zeilen, format="quadrat"):
+    """Bricht zu breite Zeilen nach Woertern so um, dass jede Zeile in die Kachel passt.
+    Bestehende Zeilenumbrueche des Aufrufers bleiben erhalten. Ein einzelnes Wort, das allein zu
+    breit ist, bleibt stehen (render/pruefe_zeilen melden es dann als Fehler)."""
+    if format not in brand.FORMATE:
+        raise KachelFehler("Unbekanntes Format: %s" % format)
+    max_breite = brand.FORMATE[format][0] - 2 * _RAND_X
+    font = ImageFont.truetype(brand.FONT_HEADLINE, _SCHRIFT)
+    aus = []
+    for z in zeilen or []:
+        z = (z or "").strip()
+        if not z:
+            continue
+        if font.getlength(z) <= max_breite:
+            aus.append(z)
+            continue
+        aktuell = ""
+        for wort in z.split():
+            probe = (aktuell + " " + wort).strip()
+            if aktuell and font.getlength(probe) > max_breite:
+                aus.append(aktuell)
+                aktuell = wort
+            else:
+                aktuell = probe
+        if aktuell:
+            aus.append(aktuell)
+    return aus

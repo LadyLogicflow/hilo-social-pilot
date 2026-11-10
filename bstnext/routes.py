@@ -54,7 +54,7 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <div><label>Lime-Zeilen (Akzent, optional)</label>
 <textarea name=lime placeholder="Ihren Belegen an.">{{ f.lime }}</textarea></div></div>
 <p class="hint">Foto-Look: Die KI erzeugt nur das Foto (ohne Schrift, nur fiktive Personen); Headline und Logo setzt das Programm. Danach prüft eine Bildkontrolle gegen die Vermeidungsliste.</p>
-<p class="hint">Der Zeilenumbruch ist Ihr Umbruch; eine Zeile darf nicht breiter als die Kachel werden (ca. 18 Zeichen).</p>
+<p class="hint">Eigene Zeilenumbrüche bleiben erhalten; zu lange Zeilen bricht das Programm nach Wörtern selbst um (eine Zeile hat etwa 18 Zeichen Platz, höchstens 5–6 Zeilen insgesamt).</p>
 <div class=row><div><label>Bildtyp</label><select name=bildtyp>
 <option value="kachel" {% if f.bildtyp!='foto' %}selected{% endif %}>Spruchkachel (sofort fertig)</option>
 <option value="foto" {% if f.bildtyp=='foto' %}selected{% endif %}>Foto-Look mit KI (dauert 1–2 Minuten)</option></select></div>
@@ -195,9 +195,12 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
     @bp.route("/bstnext/neu", methods=["POST"])
     @rolle_required("freigeber")
     def neu():
+        fmt = request.form.get("format", "quadrat")
         weiss = _zeilen(request.form.get("weiss"))
         lime = _zeilen(request.form.get("lime"))
-        fmt = request.form.get("format", "quadrat")
+        if fmt in dict(FORMATE_FEED):
+            # Zu lange Zeilen werden nach Woertern umgebrochen (eigene Umbrueche bleiben erhalten)
+            weiss, lime = kachel.umbrechen(weiss, fmt), kachel.umbrechen(lime, fmt)
         datum = (request.form.get("datum") or "").strip()
         caption = (request.form.get("caption") or "").strip()
         alt = (request.form.get("alt") or "").strip()
