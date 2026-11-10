@@ -87,3 +87,28 @@ def test_seitenliste_nur_fuer_admin(env, monkeypatch):
     with env.session_transaction() as s:
         s["rolle"] = "freigeber"
     assert "Geheim" not in env.get("/bstnext").get_data(as_text=True)
+
+
+def test_scheduler_blockt_bstnext_an_beratungsstelle_und_whatsapp(env, monkeypatch):
+    import datetime
+    import publish
+    aufrufe = []
+    monkeypatch.setattr(publish, "publish_facebook", lambda *a, **k: aufrufe.append(a) or (True, "x"))
+    monkeypatch.setattr(web, "_veroeffentliche_whatsapp", lambda *a, **k: aufrufe.append("wa") or ("x", True, []))
+    jetzt = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    f = json.dumps({"marke": "bstnext", "ueberschrift": "x", "caption": "c"})
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO beratungsstellen(id,name,ort,aktiv,fb_seite) VALUES (1,'HILO X','X',1,'555')")
+        conn.execute("INSERT INTO entwuerfe(id,text,status) VALUES (1,?,'freigegeben')", (f,))
+        conn.execute("INSERT INTO entwuerfe(id,text,status) VALUES (2,?,'pool')", (f,))
+        conn.execute("INSERT INTO geplante_posts(id,entwurf_id,stelle_id,kanal,format,geplant_am,status) "
+                     "VALUES (1,1,1,'facebook','einzelbild',?, 'geplant')", (jetzt,))
+        conn.execute("INSERT INTO geplante_posts(id,entwurf_id,stelle_id,kanal,format,geplant_am,status,pool) "
+                     "VALUES (2,2,1,'whatsapp_kanal','einzelbild',?, 'geplant',1)", (jetzt,))
+        conn.commit()
+    web._publiziere_geplant(1)
+    web._publiziere_geplant(2)
+    assert aufrufe == []
+    with db.get_conn() as conn:
+        st = [r[0] for r in conn.execute("SELECT status FROM geplante_posts ORDER BY id")]
+    assert st == ["fehler", "fehler"]

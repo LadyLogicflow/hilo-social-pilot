@@ -364,6 +364,13 @@ def _publiziere_geplant(gpid):
     fmt_ig = gp["format_ig"] or gp["format"] or "einzelbild"
     kanal = gp["kanal"] or "facebook"
     ziel_name = "?"
+    # BSt-Next-Beitraege nie an Beratungsstellen/WhatsApp/Pool-Wege (zweite Sicherung neben bstnext.guard).
+    import bstnext.guard as _bsg
+    if _bsg.ist_bstnext(f) and (gp["stelle_id"] or pool_post or kanal not in ("facebook", "instagram", "beide")):
+        with get_conn() as conn:
+            conn.execute("UPDATE geplante_posts SET status='fehler', info=? WHERE id=?",
+                         ("BSt-Next-Beitraege gehen nur an die BSt-Next-Facebook-Seite", gpid)); conn.commit()
+        return
     with get_conn() as conn:
         stelle = conn.execute("SELECT * FROM beratungsstellen WHERE id=?", (gp["stelle_id"],)).fetchone() \
             if gp["stelle_id"] else None
