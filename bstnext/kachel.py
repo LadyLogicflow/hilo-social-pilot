@@ -74,3 +74,67 @@ def render(weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat"):
     im.paste(logo, (_RAND_X, logo_oben), logo)
     im.save(ziel_pfad, "PNG")
     return ziel_pfad
+
+
+def _bereinigen(weisse_zeilen, lime_zeilen, format):
+    if format not in brand.FORMATE:
+        raise KachelFehler("Unbekanntes Format: %s" % format)
+    weisse = [z.strip() for z in (weisse_zeilen or []) if z and z.strip()]
+    lime = [z.strip() for z in (lime_zeilen or []) if z and z.strip()]
+    if not weisse:
+        raise KachelFehler("Keine Headline-Zeilen.")
+    breite, hoehe = brand.FORMATE[format]
+    font = ImageFont.truetype(brand.FONT_HEADLINE, _SCHRIFT)
+    for z in weisse + lime:
+        if font.getlength(z) > breite - 2 * _RAND_X:
+            raise KachelFehler("Zeile zu breit (%d > %d px): %s" % (font.getlength(z), breite - 2 * _RAND_X, z))
+    logo = _logo_weiss(_LOGO_BREITE)
+    logo_oben = hoehe - _LOGO_UNTEN - logo.size[1]
+    if _OBEN + (len(weisse) + len(lime) - 1) * _ZEILENABSTAND + _SCHRIFT > logo_oben - 40:
+        raise KachelFehler("Zu viele Zeilen fuer dieses Format (%d)." % (len(weisse) + len(lime)))
+    return weisse, lime, font, logo, logo_oben, (breite, hoehe)
+
+
+def pruefe_zeilen(weisse_zeilen, lime_zeilen, format="quadrat"):
+    """Wie render(), aber nur die Pruefung (Breite, Zeilenzahl); wirft KachelFehler."""
+    _bereinigen(weisse_zeilen, lime_zeilen, format)
+
+
+def render_foto(foto, weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat"):
+    """Foto-Look (Typ C): KI-Foto als Hintergrund (zugeschnitten auf das Format), oben und unten
+    ein Navy-Verlauf, darueber Headline (weiss, Lime-Akzent) und Logo mit Claim - gesetzt per Pillow,
+    nie von der KI. Gibt den Pfad zurueck."""
+    weisse, lime, font, logo, logo_oben, (breite, hoehe) = _bereinigen(weisse_zeilen, lime_zeilen, format)
+    bild = foto.convert("RGB")
+    # Cover-Zuschnitt auf das Zielformat
+    faktor = max(breite / bild.size[0], hoehe / bild.size[1])
+    neu = (round(bild.size[0] * faktor), round(bild.size[1] * faktor))
+    bild = bild.resize(neu, Image.LANCZOS)
+    links, oben = (neu[0] - breite) // 2, (neu[1] - hoehe) // 2
+    bild = bild.crop((links, oben, links + breite, oben + hoehe)).convert("RGBA")
+    # Navy-Verlauf oben (Headline) und unten (Logo): Alpha-Maske als 1-Pixel-Spalte, dann gestreckt
+    oben_h, unten_h = int(hoehe * 0.55), int(hoehe * 0.28)
+    werte = []
+    for y in range(hoehe):
+        a = 0.0
+        if y < oben_h:
+            a = max(a, 0.88 * (1 - y / oben_h))
+        if y > hoehe - unten_h:
+            a = max(a, 0.85 * ((y - (hoehe - unten_h)) / unten_h))
+        werte.append(round(255 * a))
+    spalte = Image.new("L", (1, hoehe))
+    spalte.putdata(werte)
+    maske = spalte.resize((breite, hoehe))
+    im = Image.composite(Image.new("RGBA", (breite, hoehe), brand.NAVY + (255,)), bild, maske).convert("RGB")
+    d = ImageDraw.Draw(im)
+    captop = font.getbbox("W")[1]
+    y = _OBEN
+    for z in weisse:
+        d.text((_RAND_X, y - captop), z, font=font, fill=brand.WHITE)
+        y += _ZEILENABSTAND
+    for z in lime:
+        d.text((_RAND_X, y - captop), z, font=font, fill=brand.LIME)
+        y += _ZEILENABSTAND
+    im.paste(logo, (_RAND_X, logo_oben), logo)
+    im.save(ziel_pfad, "PNG")
+    return ziel_pfad

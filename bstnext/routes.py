@@ -9,19 +9,24 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import uuid
 
 from flask import Blueprint, request, redirect, url_for, session, flash, abort, render_template_string
 
-from . import brand, kachel, guard
+from . import brand, kachel, guard, szene
 
 log = logging.getLogger("hilo.bstnext")
 
 FORMATE_FEED = (("quadrat", "Quadrat 1080×1080 (Feed)"), ("hochformat", "Hochformat 1080×1350 (Feed)"))
 MAX_CAPTION = 2000
-_cfg = {"data_dir": None}      # wird von register() gesetzt; Tests duerfen es ueberschreiben
+_cfg = {"data_dir": None,          # wird von register() gesetzt; Tests duerfen es ueberschreiben
+        "szene_fn": None,          # Foto-Erzeugung (Standard: szene.erzeuge_szene)
+        "sync": False}             # True: Foto-Job im Aufruf statt im Hintergrund (Tests)
+MOTIVE = (("belege", "Belege"), ("termine", "Termine"), ("telefon", "Telefon"), ("werbung", "Werbung"),
+          ("challenge", "Challenge"))
 
-SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</title><style>{{ style|safe }}
+SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</title>{% if laeuft %}<meta http-equiv=refresh content=8>{% endif %}<style>{{ style|safe }}
 .bn{max-width:960px;margin:0 auto}
 .bn h2{color:#001942}
 .bn label{display:block;font-weight:600;margin:14px 0 4px}
@@ -48,7 +53,13 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <textarea name=weiss required placeholder="Wir fangen mit">{{ f.weiss }}</textarea></div>
 <div><label>Lime-Zeilen (Akzent, optional)</label>
 <textarea name=lime placeholder="Ihren Belegen an.">{{ f.lime }}</textarea></div></div>
+<p class="hint">Foto-Look: Die KI erzeugt nur das Foto (ohne Schrift, nur fiktive Personen); Headline und Logo setzt das Programm. Danach prüft eine Bildkontrolle gegen die Vermeidungsliste.</p>
 <p class="hint">Der Zeilenumbruch ist Ihr Umbruch; eine Zeile darf nicht breiter als die Kachel werden (ca. 18 Zeichen).</p>
+<div class=row><div><label>Bildtyp</label><select name=bildtyp>
+<option value="kachel" {% if f.bildtyp!='foto' %}selected{% endif %}>Spruchkachel (sofort fertig)</option>
+<option value="foto" {% if f.bildtyp=='foto' %}selected{% endif %}>Foto-Look mit KI (dauert 1–2 Minuten)</option></select></div>
+<div><label>Motiv (nur Foto-Look)</label><select name=motiv>
+{% for k, n in motive %}<option value="{{k}}" {% if f.motiv==k %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div>
 <div class=row><div><label>Format</label><select name=format>
 {% for k, n in formate %}<option value="{{k}}" {% if f.format==k %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
 <div><label>Tag der Veröffentlichung (optional)</label><input type=date name=datum value="{{ f.datum }}"></div></div>
@@ -64,8 +75,9 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <button type=submit>Speichern</button></form>{% else %}<p class="hint">Hinterlegen darf nur ein Admin.</p>{% endif %}</div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Bisherige BSt-Next-Entwürfe</h3>
 {% if rows %}<table><tr><th></th><th>Beitrag</th><th>Status</th><th>Tag</th><th></th></tr>
-{% for r in rows %}<tr><td><img class=th src="/bild/{{r.id}}" alt=""></td><td>{{r.titel}}</td><td>{{r.status}}</td><td>{{r.datum}}</td>
-<td><a href="/beitrag/{{r.id}}">öffnen / freigeben</a></td></tr>{% endfor %}</table>
+{% for r in rows %}<tr><td>{% if r.bild_status=='fertig' %}<img class=th src="/bild/{{r.id}}" alt="">{% endif %}</td><td>{{r.titel}}{% if r.typ=='foto' %} <span class="hint">(Foto-Look)</span>{% endif %}</td>
+<td>{{r.status}}{% if r.bild_status=='laeuft' %}<br><span class="hint">Bild wird erzeugt …</span>{% elif r.bild_status=='fehler' %}<br><span class="hint">Bild fehlgeschlagen: {{r.info}}</span>{% endif %}</td><td>{{r.datum}}</td>
+<td>{% if r.bild_status=='fertig' %}<a href="/beitrag/{{r.id}}">öffnen / freigeben</a>{% else %}<form method=post action="{{ url_for('bstnext.foto_neu', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Bild neu erzeugen</button></form>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="hint">Noch keine.</p>{% endif %}</div>
 </div>"""
 
@@ -98,19 +110,82 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         out = []
         for r in res:
             try:
-                titel = json.loads(r["text"]).get("ueberschrift") or "Beitrag"
+                fl = json.loads(r["text"])
             except Exception:
-                titel = "Beitrag"
-            out.append({"id": r["id"], "titel": titel, "status": r["status"], "datum": r["geplant_fuer"] or ""})
+                fl = {}
+            out.append({"id": r["id"], "titel": fl.get("ueberschrift") or "Beitrag", "status": r["status"],
+                        "datum": r["geplant_fuer"] or "", "typ": (fl.get("bstnext") or {}).get("typ", "kachel"),
+                        "bild_status": fl.get("bild_status", "fertig"), "info": fl.get("bild_info", "")})
         return out
 
     def _seite(f=None):
         with get_conn() as conn:
             rows = _rows(conn)
         seiten = ", ".join(sorted(guard.seiten_ids(get_einstellung(guard.EINSTELLUNG_SEITEN, ""))))
-        f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": ""}
-        return render_template_string(SEITE, style=style, formate=FORMATE_FEED, rows=rows, seiten=seiten,
-                                      rolle=session.get("rolle"), f=f)
+        f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": "",
+                  "bildtyp": "kachel", "motiv": "belege"}
+        return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
+                                      seiten=seiten, rolle=session.get("rolle"), f=f,
+                                      laeuft=any(r["bild_status"] == "laeuft" for r in rows))
+
+    def _foto_job(eid):
+        """Erzeugt das Foto (Typ C) und traegt das Ergebnis in den Entwurf ein. Fehler werden sichtbar
+        gespeichert (bild_status='fehler'), nie verschluckt."""
+        try:
+            with get_conn() as conn:
+                row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+            fl = json.loads(row["text"])
+            bs = fl["bstnext"]
+            ziel = os.path.join(_cfg["data_dir"], "bilder", "bstnext_%d.png" % eid)
+            fn = _cfg["szene_fn"] or szene.erzeuge_szene
+            prot = fn(fl["ueberschrift"], bs["weiss"], bs["lime"], bs["format"], bs.get("motiv"), ziel)
+            fl["bild_status"], fl["bild_info"] = "fertig", ""
+            fl["bstnext"]["protokoll"] = {k: prot.get(k) for k in ("route", "kategorie", "prompt", "jury", "qa", "versuche")}
+            pfad = prot.get("pfad") or ziel
+        except Exception as ex:
+            log.warning("BSt-Next-Foto %s fehlgeschlagen: %s", eid, ex)
+            try:
+                with get_conn() as conn:
+                    row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+                    fl = json.loads(row["text"])
+                    fl["bild_status"], fl["bild_info"] = "fehler", str(ex)[:300]
+                    conn.execute("UPDATE entwuerfe SET text=? WHERE id=?",
+                                 (json.dumps(fl, ensure_ascii=False), eid))
+                    conn.commit()
+            except Exception:
+                log.exception("Fehlerstatus fuer Foto %s nicht speicherbar", eid)
+            return
+        with get_conn() as conn:
+            conn.execute("UPDATE entwuerfe SET text=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(fl, ensure_ascii=False), pfad, eid))
+            audit_log(conn, "system", "bstnext_foto_fertig", eid, "Route %s" % (fl["bstnext"]["protokoll"].get("route") or ""))
+            conn.commit()
+
+    def _foto_starten(eid):
+        if _cfg["sync"]:
+            _foto_job(eid)
+        else:
+            threading.Thread(target=_foto_job, args=(eid,), daemon=True).start()
+
+    @bp.route("/bstnext/foto-neu/<int:eid>", methods=["POST"])
+    @rolle_required("freigeber")
+    def foto_neu(eid):
+        with get_conn() as conn:
+            row = conn.execute("SELECT text FROM entwuerfe WHERE id=?", (eid,)).fetchone()
+            if not row:
+                abort(404)
+            fl = json.loads(row["text"])
+            if not guard.ist_bstnext(fl) or (fl.get("bstnext") or {}).get("typ") != "foto":
+                abort(404)
+            if fl.get("bild_status") == "fertig":
+                flash("Das Bild ist schon fertig.")
+                return redirect(url_for("bstnext.index"))
+            fl["bild_status"], fl["bild_info"] = "laeuft", ""
+            conn.execute("UPDATE entwuerfe SET text=? WHERE id=?", (json.dumps(fl, ensure_ascii=False), eid))
+            conn.commit()
+        _foto_starten(eid)
+        flash("Das Foto wird neu erzeugt (1–2 Minuten).")
+        return redirect(url_for("bstnext.index"))
 
     @bp.route("/bstnext")
     @rolle_required("freigeber")
@@ -126,8 +201,13 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         datum = (request.form.get("datum") or "").strip()
         caption = (request.form.get("caption") or "").strip()
         alt = (request.form.get("alt") or "").strip()
+        bildtyp = request.form.get("bildtyp", "kachel")
+        motiv = request.form.get("motiv", "belege")
         eingabe = {"weiss": "\n".join(weiss), "lime": "\n".join(lime), "format": fmt, "datum": datum,
-                   "caption": caption, "alt": alt}
+                   "caption": caption, "alt": alt, "bildtyp": bildtyp, "motiv": motiv}
+        if bildtyp not in ("kachel", "foto") or motiv not in dict(MOTIVE):
+            flash("Unbekannter Bildtyp oder Motiv.")
+            return _seite(eingabe)
         if fmt not in dict(FORMATE_FEED):
             flash("Unbekanntes Format.")
             return _seite(eingabe)
@@ -152,20 +232,26 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 return _seite(eingabe)
         out_dir = os.path.join(_cfg["data_dir"], "bilder")
         os.makedirs(out_dir, exist_ok=True)
+        titel = " ".join(weiss + lime)
+        foto = bildtyp == "foto"
         tmp = os.path.join(out_dir, "bstnext_tmp_%s.png" % uuid.uuid4().hex)
         try:
-            kachel.render(weiss, lime, tmp, fmt)
+            if foto:
+                kachel.pruefe_zeilen(weiss, lime, fmt)        # keine KI-Kosten bei unbrauchbaren Zeilen
+            else:
+                kachel.render(weiss, lime, tmp, fmt)
         except kachel.KachelFehler as ex:
             flash("Kachel nicht erzeugbar: %s" % ex)
             return _seite(eingabe)
-        titel = " ".join(weiss + lime)
         fields = {
             "marke": guard.MARKE, "kampagne": guard.MARKE,
             "ueberschrift": titel,
             "caption": caption, "captions": {"facebook": caption, "instagram": caption},
             "alt_text": alt or titel,
             "bild_format": fmt,
-            "bstnext": {"weiss": weiss, "lime": lime, "format": fmt},
+            "bild_status": "laeuft" if foto else "fertig",
+            "bstnext": {"typ": "foto" if foto else "kachel", "weiss": weiss, "lime": lime, "format": fmt,
+                        "motiv": motiv},
         }
         h = hashlib.sha256(("bstnext:%s:%s" % (titel, datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
         with get_conn() as conn:
@@ -176,11 +262,17 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                                "VALUES (?, 'facebook', ?, 'entwurf', ?)",
                                (cur.lastrowid, json.dumps(fields, ensure_ascii=False), datum or None))
             eid = cur.lastrowid
-            ziel = os.path.join(out_dir, "bstnext_%d.png" % eid)
-            os.replace(tmp, ziel)
-            conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (ziel, eid))
-            audit_log(conn, session.get("user"), "bstnext_beitrag", eid, "Kachel '%s'" % titel[:60])
+            if not foto:
+                ziel = os.path.join(out_dir, "bstnext_%d.png" % eid)
+                os.replace(tmp, ziel)
+                conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (ziel, eid))
+            audit_log(conn, session.get("user"), "bstnext_beitrag", eid,
+                      "%s '%s'" % ("Foto-Look" if foto else "Kachel", titel[:60]))
             conn.commit()
+        if foto:
+            _foto_starten(eid)
+            flash("BSt-Next-Entwurf %d angelegt – das Foto wird erzeugt (1–2 Minuten); danach unter „Freigabe“ prüfen." % eid)
+            return redirect(url_for("bstnext.index"))
         flash("BSt-Next-Entwurf %d erstellt – jetzt unter „Freigabe“ prüfen und freigeben." % eid)
         return redirect(url_for("bstnext.index"))
 
@@ -208,7 +300,9 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         eid = (request.view_args or {}).get("eid")
         if eid is None or request.method != "POST":
             return None
-        if not guard.endpoint_gesperrt(ep, request.form.get("aktion")):
+        aktion = request.form.get("aktion")
+        relevant = guard.endpoint_gesperrt(ep, aktion) or (ep == "aktion" and aktion == "freigeben")
+        if not relevant:
             return None
         try:
             with get_conn() as conn:
@@ -216,7 +310,13 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             f = json.loads(row["text"]) if row else {}
         except Exception:
             return None
-        if guard.ist_bstnext(f):
+        if not guard.ist_bstnext(f):
+            return None
+        if guard.endpoint_gesperrt(ep, aktion):
             flash(guard.MELDUNG_GESPERRT)
+            return redirect(url_for("bstnext.index"))
+        msg = guard.freigabe_blockiert(ep, aktion, f)
+        if msg:
+            flash(msg)
             return redirect(url_for("bstnext.index"))
         return None

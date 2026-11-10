@@ -4565,6 +4565,9 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         # Nur Feed-Einzelbild (die vorgerenderte Kachel); kein Karussell/Story ueber die HILO-Pipeline.
         fmt_fb = fmt_ig = "einzelbild"
         story = story_fb = False
+        _bs_bild = e["bild_pfad"] if (e is not None and "bild_pfad" in e.keys()) else None
+        if not _bsg.bild_bereit(f) or not (_bs_bild and os.path.exists(_bs_bild)):
+            return (ziel_name, False, [(kanal, False, _bsg.MELDUNG_BILD_NICHT_FERTIG)])
         if kanal not in ("facebook", "instagram", "beide"):
             return (ziel_name, False, [(kanal, False, "Kanal nicht fuer BSt Next vorgesehen")])
     # LINK-PFLICHT Kanalwerbung (catrin-Incident 2026-08-27): NIEMALS einen Kanal-Werbebeitrag ohne

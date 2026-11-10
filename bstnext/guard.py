@@ -80,3 +80,18 @@ def endpoint_gesperrt(endpoint, aktion=None):
     if endpoint in GESPERRTE_ENDPOINTS:
         return True
     return endpoint == "aktion" and (aktion or "") in GESPERRTE_AKTIONEN
+
+
+def bild_bereit(fields):
+    """Spruchkacheln sind sofort fertig; Foto-Beitraege (Typ C) erst, wenn der Hintergrundjob 'fertig' meldet."""
+    return (fields or {}).get("bild_status", "fertig") == "fertig"
+
+
+MELDUNG_BILD_NICHT_FERTIG = "Das Bild ist noch nicht fertig (oder die Erzeugung ist fehlgeschlagen). Bitte unter „BSt Next“ prüfen."
+
+
+def freigabe_blockiert(endpoint, aktion, fields):
+    """Meldung, wenn ein BSt-Next-Entwurf ohne fertiges Bild freigegeben werden soll, sonst None."""
+    if ist_bstnext(fields) and endpoint == "aktion" and aktion == "freigeben" and not bild_bereit(fields):
+        return MELDUNG_BILD_NICHT_FERTIG
+    return None
