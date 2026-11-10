@@ -66,7 +66,7 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <label>Begleittext (Facebook und Instagram)</label>
 <textarea name=caption required placeholder="Ihr Text. Die BSt-Next-Hashtags werden angehängt, wenn sie fehlen.">{{ f.caption }}</textarea>
 <label>Alt-Text (für Screenreader, optional)</label><input type=text name=alt value="{{ f.alt }}">
-<button type=submit>Kachel erstellen und als Entwurf speichern</button>
+<button type=submit>Beitrag erstellen und als Entwurf speichern</button>
 </form></div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt Next</h3>
 {% if seiten %}<p>Hinterlegt: <b>{{ seiten }}</b></p>{% else %}<p class="hint">Noch keine Seite hinterlegt – ohne sie kann nichts veröffentlicht werden.</p>{% endif %}
