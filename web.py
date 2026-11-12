@@ -4576,13 +4576,19 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         log.warning("Veroeffentlichung Beitrag %s abgelehnt: %s", eid, _bs_msg)
         return (ziel_name, False, [(kanal, False, _bs_msg)])
     if _bsg.ist_bstnext(f):
-        # Nur Feed-Einzelbild (die vorgerenderte Kachel); kein Karussell/Story ueber die HILO-Pipeline.
-        fmt_fb = fmt_ig = "einzelbild"
+        # Feed-Einzelbild (die vorgerenderte Kachel) ODER das vorgerenderte 3-Slide-Karussell; nie die
+        # HILO-Karussell-Pipeline. Story nur beim Einzelbild.
+        _bs_karussell = (f.get("bstnext") or {}).get("typ") == "karussell"
+        fmt_fb = fmt_ig = "karussell" if _bs_karussell else "einzelbild"
         story = False
-        story_fb = bool(story_fb) and kanal in ("facebook", "beide")      # nur Facebook-Story, Instagram nie
+        story_fb = bool(story_fb) and kanal in ("facebook", "beide") and not _bs_karussell   # nur Facebook-Story, Instagram nie
         _bs_bild = e["bild_pfad"] if (e is not None and "bild_pfad" in e.keys()) else None
         if not _bsg.bild_bereit(f) or not (_bs_bild and os.path.exists(_bs_bild)):
             return (ziel_name, False, [(kanal, False, _bsg.MELDUNG_BILD_NICHT_FERTIG)])
+        if _bs_karussell:
+            _bs_slides = (f.get("bstnext") or {}).get("bilder") or []
+            if len(_bs_slides) != 3 or not all(b and os.path.exists(b) for b in _bs_slides):
+                return (ziel_name, False, [(kanal, False, "Das Karussell hat nicht alle 3 Bilder. Bitte neu erstellen.")])
         if kanal not in ("facebook", "instagram", "beide"):
             return (ziel_name, False, [(kanal, False, "Kanal nicht fuer BSt Next vorgesehen")])
     # LINK-PFLICHT Kanalwerbung (catrin-Incident 2026-08-27): NIEMALS einen Kanal-Werbebeitrag ohne
@@ -4608,6 +4614,10 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         """Bilderliste fuer dieses Format (gecacht). Das Bild ist kanalunabhaengig -
         nur der Begleittext (siehe _caption) unterscheidet sich je Kanal."""
         if fmt in _cache:
+            return _cache[fmt]
+        if _bsg.ist_bstnext(f) and fmt == "karussell":
+            # BSt-Next-Karussell: die drei vorgerenderten Slides, nie die HILO-Bildpipeline.
+            _cache[fmt] = [b for b in (f.get("bstnext") or {}).get("bilder", []) if b and os.path.exists(b)]
             return _cache[fmt]
         if stelle:
             import personalisierung

@@ -55,11 +55,17 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <textarea name=weiss required placeholder="Wir fangen mit">{{ f.weiss }}</textarea></div>
 <div><label>Lime-Zeilen (Akzent, optional)</label>
 <textarea name=lime placeholder="Ihren Belegen an.">{{ f.lime }}</textarea></div></div>
+<p class="hint"><b>Nur bei Karussell:</b> Die Zeilen oben sind Slide 1. Slide 1 und 2 haben nur Text, Slide 3 hat Text und unten das Logo mit Claim.</p>
+<div class=row><div><label>Slide 2 – weiße Zeilen</label><textarea name=weiss2>{{ f.weiss2 }}</textarea></div>
+<div><label>Slide 2 – Lime-Zeilen (optional)</label><textarea name=lime2>{{ f.lime2 }}</textarea></div></div>
+<div class=row><div><label>Slide 3 – weiße Zeilen</label><textarea name=weiss3>{{ f.weiss3 }}</textarea></div>
+<div><label>Slide 3 – Lime-Zeilen (optional)</label><textarea name=lime3>{{ f.lime3 }}</textarea></div></div>
 <p class="hint">Foto-Look: Die KI erzeugt nur das Foto (ohne Schrift, nur fiktive Personen); Headline und Logo setzt das Programm. Danach prüft eine Bildkontrolle gegen die Vermeidungsliste.</p>
 <p class="hint">Eigene Zeilenumbrüche bleiben erhalten; zu lange Zeilen bricht das Programm nach Wörtern selbst um (eine Zeile hat etwa 18 Zeichen Platz, höchstens 5–6 Zeilen insgesamt).</p>
 <div class=row><div><label>Bildtyp</label><select name=bildtyp>
 <option value="kachel" {% if f.bildtyp!='foto' %}selected{% endif %}>Spruchkachel (sofort fertig)</option>
-<option value="foto" {% if f.bildtyp=='foto' %}selected{% endif %}>Foto-Look mit KI (dauert 1–2 Minuten)</option></select></div>
+<option value="foto" {% if f.bildtyp=='foto' %}selected{% endif %}>Foto-Look mit KI (dauert 1–2 Minuten)</option>
+<option value="karussell" {% if f.bildtyp=='karussell' %}selected{% endif %}>Karussell mit 3 Slides (Facebook + Instagram)</option></select></div>
 <div><label>Motiv (nur Foto-Look)</label><select name=motiv>
 {% for k, n in motive %}<option value="{{k}}" {% if f.motiv==k %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div>
 <div class=row><div><label>Format</label><select name=format>
@@ -82,7 +88,7 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <button type=submit>Speichern</button></form>{% else %}<p class="hint">Hinterlegen darf nur ein Admin.</p>{% endif %}</div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Bisherige BSt-Next-Entwürfe</h3>
 {% if rows %}<table><tr><th></th><th>Beitrag</th><th>Status</th><th>Tag</th><th></th></tr>
-{% for r in rows %}<tr><td>{% if r.bild_status=='fertig' %}<img class=th src="/bild/{{r.id}}" alt="">{% endif %}</td><td>{{r.titel}}{% if r.typ=='foto' %} <span class="hint">(Foto-Look)</span>{% endif %}</td>
+{% for r in rows %}<tr><td>{% if r.bild_status=='fertig' %}<img class=th src="/bild/{{r.id}}" alt="">{% endif %}</td><td>{{r.titel}}{% if r.typ=='foto' %} <span class="hint">(Foto-Look)</span>{% elif r.typ=='karussell' %} <span class="hint">(Karussell, 3 Slides)</span>{% endif %}</td>
 <td>{{r.status}}{% if r.bild_status=='laeuft' %}<br><span class="hint">Bild wird erzeugt …</span>{% elif r.bild_status=='fehler' %}<br><span class="hint">Bild fehlgeschlagen: {{r.info}}</span>{% endif %}</td><td>{{r.datum}}</td>
 <td>{% if r.bild_status!='fertig' %}<form method=post action="{{ url_for('bstnext.foto_neu', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Bild neu erzeugen</button></form>
 {% elif r.status=='entwurf' %}<form method=post action="{{ url_for('bstnext.freigeben', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Freigeben</button></form>
@@ -90,13 +96,13 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 {% if seiten_ids %}<form method=post action="{{ url_for('bstnext.veroeffentlichen', eid=r.id) }}" style="margin:0 0 8px" onsubmit="return confirm('Jetzt auf der BSt-Next-Seite veröffentlichen? Das ist ein echter Post.')">
 <select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
 <select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
-<label style="display:inline-block;margin:0 8px"><input type=checkbox name=story_fb value="1"> Zusätzlich als Facebook-Story</label>
+{% if r.typ!='karussell' %}<label style="display:inline-block;margin:0 8px"><input type=checkbox name=story_fb value="1"> Zusätzlich als Facebook-Story</label>{% endif %}
 <button type=submit style="margin:0;padding:6px 10px">Jetzt veröffentlichen</button></form>
-<form method=post action="{{ url_for('bstnext.einplanen', eid=r.id) }}" style="margin:0">
+{% if r.typ=='karussell' %}<span class="hint">Einplanen mit Karussell folgt später.</span>{% else %}<form method=post action="{{ url_for('bstnext.einplanen', eid=r.id) }}" style="margin:0">
 <input type=date name=datum required style="width:auto"> <input type=time name=zeit required style="width:auto">
 <select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
 <select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
-<button type=submit style="margin:0;padding:6px 10px">Einplanen</button></form>
+<button type=submit style="margin:0;padding:6px 10px">Einplanen</button></form>{% endif %}
 {% else %}<span class="hint">Erst oben die BSt-Next-Facebook-Seite hinterlegen.</span>{% endif %}
 {% else %}<a href="/beitrag/{{r.id}}">ansehen</a>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="hint">Noch keine.</p>{% endif %}</div>
@@ -155,7 +161,8 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             except Exception as ex:
                 liste, fehler = [], str(ex)
         f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": "",
-                  "bildtyp": "kachel", "motiv": "belege"}
+                  "bildtyp": "kachel", "motiv": "belege",
+                  "weiss2": "", "lime2": "", "weiss3": "", "lime3": ""}
         return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
                                       seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv, seiten_ids=sorted(aktiv),
                                       rolle=session.get("rolle"), f=f,
@@ -239,9 +246,20 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         alt = (request.form.get("alt") or "").strip()
         bildtyp = request.form.get("bildtyp", "kachel")
         motiv = request.form.get("motiv", "belege")
+        karussell = bildtyp == "karussell"
+        folien = [(weiss, lime, False)]
+        if karussell and fmt in dict(FORMATE_FEED):
+            for nr in ("2", "3"):
+                w2 = kachel.umbrechen(_zeilen(request.form.get("weiss" + nr)), fmt)
+                l2 = kachel.umbrechen(_zeilen(request.form.get("lime" + nr)), fmt)
+                folien.append((w2, l2, nr == "3"))       # Slide 3 traegt das Logo mit Claim
         eingabe = {"weiss": "\n".join(weiss), "lime": "\n".join(lime), "format": fmt, "datum": datum,
-                   "caption": caption, "alt": alt, "bildtyp": bildtyp, "motiv": motiv}
-        if bildtyp not in ("kachel", "foto") or motiv not in dict(MOTIVE):
+                   "caption": caption, "alt": alt, "bildtyp": bildtyp, "motiv": motiv,
+                   "weiss2": "\n".join(folien[1][0]) if len(folien) > 1 else "",
+                   "lime2": "\n".join(folien[1][1]) if len(folien) > 1 else "",
+                   "weiss3": "\n".join(folien[2][0]) if len(folien) > 2 else "",
+                   "lime3": "\n".join(folien[2][1]) if len(folien) > 2 else ""}
+        if bildtyp not in ("kachel", "foto", "karussell") or motiv not in dict(MOTIVE):
             flash("Unbekannter Bildtyp oder Motiv.")
             return _seite(eingabe)
         if fmt not in dict(FORMATE_FEED):
@@ -249,6 +267,9 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             return _seite(eingabe)
         if not weiss:
             flash("Bitte mindestens eine weiße Zeile angeben.")
+            return _seite(eingabe)
+        if karussell and any(not w for w, _l, _g in folien):
+            flash("Beim Karussell braucht jeder der 3 Slides mindestens eine weiße Zeile.")
             return _seite(eingabe)
         if not caption:
             flash("Bitte einen Begleittext angeben.")
@@ -271,12 +292,24 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         titel = " ".join(weiss + lime)
         foto = bildtyp == "foto"
         tmp = os.path.join(out_dir, "bstnext_tmp_%s.png" % uuid.uuid4().hex)
+        tmps = []
         try:
             if foto:
                 kachel.pruefe_zeilen(weiss, lime, fmt)        # keine KI-Kosten bei unbrauchbaren Zeilen
+            elif karussell:
+                for nr, (w, l, mit_logo) in enumerate(folien, 1):
+                    t = os.path.join(out_dir, "bstnext_tmp_%s_s%d.png" % (uuid.uuid4().hex, nr))
+                    tmps.append(t)
+                    try:
+                        kachel.render(w, l, t, fmt, mit_logo=mit_logo)
+                    except kachel.KachelFehler as ex:
+                        raise kachel.KachelFehler("Slide %d: %s" % (nr, ex))
             else:
                 kachel.render(weiss, lime, tmp, fmt)
         except kachel.KachelFehler as ex:
+            for t in tmps:
+                if os.path.exists(t):
+                    os.remove(t)
             flash("Kachel nicht erzeugbar: %s" % ex)
             return _seite(eingabe)
         fields = {
@@ -286,9 +319,11 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             "alt_text": alt or titel,
             "bild_format": fmt,
             "bild_status": "laeuft" if foto else "fertig",
-            "bstnext": {"typ": "foto" if foto else "kachel", "weiss": weiss, "lime": lime, "format": fmt,
-                        "motiv": motiv},
+            "bstnext": {"typ": "foto" if foto else ("karussell" if karussell else "kachel"),
+                        "weiss": weiss, "lime": lime, "format": fmt, "motiv": motiv},
         }
+        if karussell:
+            fields["bstnext"]["slides"] = [{"weiss": w, "lime": l, "logo": g} for w, l, g in folien]
         h = hashlib.sha256(("bstnext:%s:%s" % (titel, datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
         with get_conn() as conn:
             # Thema als 'erledigt': nie vom HILO-Generator ('ausgewaehlt') aufgegriffen
@@ -298,12 +333,21 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                                "VALUES (?, 'facebook', ?, 'entwurf', ?)",
                                (cur.lastrowid, json.dumps(fields, ensure_ascii=False), datum or None))
             eid = cur.lastrowid
-            if not foto:
+            if karussell:
+                pfade = []
+                for nr, t in enumerate(tmps, 1):
+                    ziel = os.path.join(out_dir, "bstnext_%d_s%d.png" % (eid, nr))
+                    os.replace(t, ziel)
+                    pfade.append(ziel)
+                fields["bstnext"]["bilder"] = pfade
+                conn.execute("UPDATE entwuerfe SET bild_pfad=?, text=? WHERE id=?",
+                             (pfade[0], json.dumps(fields, ensure_ascii=False), eid))
+            elif not foto:
                 ziel = os.path.join(out_dir, "bstnext_%d.png" % eid)
                 os.replace(tmp, ziel)
                 conn.execute("UPDATE entwuerfe SET bild_pfad=? WHERE id=?", (ziel, eid))
             audit_log(conn, session.get("user"), "bstnext_beitrag", eid,
-                      "%s '%s'" % ("Foto-Look" if foto else "Kachel", titel[:60]))
+                      "%s '%s'" % ("Foto-Look" if foto else ("Karussell" if karussell else "Kachel"), titel[:60]))
             conn.commit()
         if foto:
             _foto_starten(eid)
@@ -381,8 +425,9 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             if not _cfg["publish_fn"]:
                 flash("Veröffentlichung ist nicht angebunden.")
                 return redirect(url_for("bstnext.index"))
+            ist_karussell = (f.get("bstnext") or {}).get("typ") == "karussell"
             ziel, erfolg, ergebnisse = _cfg["publish_fn"](conn, row, eid, f, kanal, page_id, session.get("user"),
-                                                          request.form.get("story_fb") == "1")
+                                                          request.form.get("story_fb") == "1" and not ist_karussell)
             if erfolg:
                 conn.execute("UPDATE entwuerfe SET status='veroeffentlicht' WHERE id=?", (eid,))
             conn.commit()
@@ -411,6 +456,9 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 return redirect(url_for("bstnext.index"))
             if row["status"] != "freigegeben":
                 flash("Der Beitrag muss zuerst freigegeben werden.")
+                return redirect(url_for("bstnext.index"))
+            if (f.get("bstnext") or {}).get("typ") == "karussell":
+                flash("Ein Karussell lässt sich noch nicht einplanen – bitte „Jetzt veröffentlichen“ nutzen.")
                 return redirect(url_for("bstnext.index"))
             conn.execute("INSERT INTO geplante_posts(entwurf_id, page_id, kanal, format, format_fb, format_ig, "
                          "geplant_am, status) VALUES (?,?,?,?,?,?,?, 'geplant')",
