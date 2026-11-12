@@ -10,11 +10,13 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 
-from flask import Blueprint, request, redirect, url_for, session, flash, abort, render_template_string, send_file
+from flask import (Blueprint, request, redirect, url_for, session, flash, abort, render_template_string,
+                   send_file, jsonify)
 
-from . import brand, kachel, guard, szene
+from . import begleittext, brand, kachel, guard, szene
 
 log = logging.getLogger("hilo.bstnext")
 
@@ -24,6 +26,8 @@ _cfg = {"data_dir": None,          # wird von register() gesetzt; Tests duerfen 
         "szene_fn": None,          # Foto-Erzeugung (Standard: szene.erzeuge_szene)
         "sync": False,             # True: Foto-Job im Aufruf statt im Hintergrund (Tests)
         "pages_fn": None,
+        "text_fn": None,           # KI-Textvorschlag (Standard: begleittext.erzeuge); Tests duerfen es ersetzen
+        "text_sperre_s": 5,        # Mindestabstand zwischen zwei Textvorschlaegen je Nutzer (Kostenschutz)
         "publish_fn": None}        # (conn, entwurf, eid, fields, kanal, page_id, user) -> (ziel, erfolg, [(kanal, ok, info)])          # liefert (Liste der Facebook-Seiten, Fehlertext); von register() gesetzt
 MOTIVE = (("belege", "Belege"), ("termine", "Termine"), ("telefon", "Telefon"), ("werbung", "Werbung"),
           ("challenge", "Challenge"))
@@ -70,7 +74,7 @@ SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</tit
 (Navy, weiße Headline, Lime als Akzent, Logo mit Claim) erzeugt, danach unter „Freigabe“ geprüft und freigegeben und
 nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) veröffentlicht.</p>
 {% if bearb %}<p class="hint"><b>Bearbeiten:</b> Beim Speichern wird das Bild neu erzeugt und der Beitrag steht wieder auf „entwurf“ (danach neu freigeben). <a href="{{ url_for('bstnext.index') }}">Abbrechen</a></p>{% endif %}
-<form method=post action="{{ form_action }}">
+<form method=post action="{{ form_action }}" id="bn-form">
 <div class=row><div><label>Weiße Zeilen (eine Bildzeile pro Zeile)</label>
 <textarea name=weiss required placeholder="Wir fangen mit">{{ f.weiss }}</textarea></div>
 <div><label>Lime-Zeilen (Akzent, optional)</label>
@@ -96,10 +100,31 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 {% for k, n in formate %}<option value="{{k}}" {% if f.format==k %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
 <div><label>Tag der Veröffentlichung (optional)</label><input type=date name=datum value="{{ f.datum }}"></div></div>
 <label>Begleittext (Facebook und Instagram)</label>
-<textarea name=caption required placeholder="Ihr Text. Die BSt-Next-Hashtags werden angehängt, wenn sie fehlen.">{{ f.caption }}</textarea>
+<div style="margin:0 0 6px"><button type=button id="bn-textvorschlag" style="margin:0;padding:6px 12px;background:#A3E635;color:#001942">Text vorschlagen</button>
+<span class="hint" id="bn-textstatus">Die KI entwirft den Text zum Spruch, danach ist er frei bearbeitbar.</span></div>
+<textarea id="bn-caption" name=caption required placeholder="Ihr Text. Die BSt-Next-Hashtags werden angehängt, wenn sie fehlen.">{{ f.caption }}</textarea>
 <label>Alt-Text (für Screenreader, optional)</label><input type=text name=alt value="{{ f.alt }}">
 <button type=submit>{% if bearb %}Änderungen speichern und Bild neu erzeugen{% else %}Beitrag erstellen und als Entwurf speichern{% endif %}</button>
-</form></div>
+</form>
+<script>
+(function(){
+var b=document.getElementById('bn-textvorschlag');
+if(!b){return;}
+b.addEventListener('click',function(){
+  var f=document.getElementById('bn-form'),c=document.getElementById('bn-caption'),s=document.getElementById('bn-textstatus');
+  if(c.value.trim()&&!confirm('Der vorhandene Begleittext wird ersetzt. Fortfahren?')){return;}
+  b.disabled=true;s.textContent='Die KI schreibt den Text …';
+  fetch('{{ url_for("bstnext.text_vorschlag") }}',{method:'POST',body:new FormData(f),credentials:'same-origin'})
+   .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+   .then(function(x){
+     if(x.ok&&x.d.text){c.value=x.d.text;s.textContent='Vorschlag eingetragen. Bitte prüfen und bei Bedarf bearbeiten.';}
+     else{s.textContent=(x.d&&x.d.fehler)||'Der Textvorschlag ist gerade nicht möglich.';}
+   })
+   .catch(function(){s.textContent='Der Textvorschlag ist gerade nicht möglich.';})
+   .then(function(){b.disabled=false;});
+});
+})();
+</script></div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt Next</h3>
 {% if seiten %}<p>Hinterlegt: <b>{{ seiten }}</b></p>{% else %}<p class="hint">Noch keine Seite hinterlegt – ohne sie kann nichts veröffentlicht werden.</p>{% endif %}
 {% if rolle == 'admin' %}<form method=post action="{{ url_for('bstnext.seite') }}">
@@ -344,6 +369,40 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         if nr < 1 or nr > len(pfade):
             abort(404)
         return send_file(pfade[nr - 1], mimetype="image/png", max_age=0)
+
+    _text_zeit = _cfg.setdefault("text_zeit", {})   # je Nutzer: Zeitpunkt des letzten Vorschlags
+
+    @bp.route("/bstnext/text-vorschlag", methods=["POST"])
+    @rolle_required("freigeber")
+    def text_vorschlag():
+        """KI-Entwurf des Begleittextes aus den Spruchzeilen des Formulars. Speichert nichts; die Antwort
+        fuellt nur das Textfeld, das danach frei bearbeitbar bleibt."""
+        felder = [""]
+        if request.form.get("bildtyp") == "karussell":
+            felder += ["2", "3"]
+        zeilen = []
+        for suffix in felder:
+            for feld in ("weiss", "lime", "weiss_nach"):
+                zeilen += _zeilen(request.form.get(feld + suffix))
+        if not _zeilen(request.form.get("weiss")):
+            return jsonify({"fehler": "Bitte zuerst den Spruch (weiße Zeilen) eintragen."}), 400
+        nutzer = session.get("user") or "?"
+        jetzt = time.monotonic()
+        if jetzt - _text_zeit.get(nutzer, -1e9) < _cfg["text_sperre_s"]:
+            return jsonify({"fehler": "Bitte einen Moment warten, der letzte Vorschlag läuft noch."}), 429
+        _text_zeit[nutzer] = jetzt
+        fn = _cfg["text_fn"] or begleittext.erzeuge
+        try:
+            text = fn(zeilen)
+        except begleittext.BegleittextFehler as ex:
+            return jsonify({"fehler": str(ex)}), 502
+        except Exception:
+            log.exception("BSt-Next-Textvorschlag: unerwarteter Fehler")
+            return jsonify({"fehler": "Der Textvorschlag ist gerade nicht möglich."}), 502
+        with get_conn() as conn:
+            audit_log(conn, session.get("user"), "bstnext_text_vorschlag", None, " ".join(zeilen)[:60])
+            conn.commit()
+        return jsonify({"text": text})
 
     @bp.route("/bstnext/neu", methods=["POST"])
     @rolle_required("freigeber")
