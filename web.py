@@ -91,6 +91,10 @@ _RECRUITING_LIKE = '%"kampagne": "recruiting"%'
 # Recruiting- und Kanalwerbung-Beitraege NIE vermischen (dieselben Steuer-Ansichten schirmen beide
 # Sonder-Kampagnen ueber 'text NOT LIKE ...' ab).
 _KANALWERBUNG_LIKE = '%"kampagne": "kanalwerbung"%'
+# BSt Next ist ein eigener Mandant (Seite /bstnext). Seine Beitraege duerfen in den HILO-Listen
+# (Einplanung, Entwuerfe, Startseiten-Zaehler) weder erscheinen noch mitgezaehlt werden; dort gaebe es
+# Beratungsstellen-Auswahl und Pool-Knopf. Gleiche Schreibweise wie bstnext.routes (json.dumps-Default).
+_BSTNEXT_LIKE = '%"marke": "bstnext"%'
 
 def _kanal_fuer(prefix, tid):
     """Liest den je Ziel gewaehlten Kanal aus dem Formular (kanal_s<id> bzw. kanal_p<id>).
@@ -2022,15 +2026,16 @@ def index():
         bereit = conn.execute("SELECT COUNT(*) FROM themen t WHERE t.status='ausgewaehlt' "
                               "AND NOT EXISTS (SELECT 1 FROM entwuerfe e WHERE e.thema_id=t.id)").fetchone()[0]
         entwuerfe_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' "
-                                       "AND text NOT LIKE ? AND text NOT LIKE ?",
-                                       (_RECRUITING_LIKE, _KANALWERBUNG_LIKE)).fetchone()[0]
+                                       "AND text NOT LIKE ? AND text NOT LIKE ? AND text NOT LIKE ?",
+                                       (_RECRUITING_LIKE, _KANALWERBUNG_LIKE, _BSTNEXT_LIKE)).fetchone()[0]
         recruiting_offen = conn.execute(
             "SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
             (_RECRUITING_LIKE,)).fetchone()[0]
         kanalwerbung_offen = conn.execute(
             "SELECT COUNT(*) FROM entwuerfe WHERE status='entwurf' AND text LIKE ?",
             (_KANALWERBUNG_LIKE,)).fetchone()[0]
-        freigegeben_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='freigegeben'").fetchone()[0]
+        freigegeben_offen = conn.execute("SELECT COUNT(*) FROM entwuerfe WHERE status='freigegeben' "
+                                         "AND text NOT LIKE ?", (_BSTNEXT_LIKE,)).fetchone()[0]
     return render_template_string(HOME, **_ctx(themen_offen=themen_offen, bereit=bereit,
                                   entwuerfe_offen=entwuerfe_offen, freigegeben_offen=freigegeben_offen,
                                   recruiting_offen=recruiting_offen, kanalwerbung_offen=kanalwerbung_offen,
@@ -2042,8 +2047,8 @@ def entwuerfe():
     rows = []
     with get_conn() as conn:
         for e in conn.execute("SELECT id, text FROM entwuerfe WHERE status='entwurf' "
-                              "AND text NOT LIKE ? AND text NOT LIKE ? ORDER BY id DESC",
-                              (_RECRUITING_LIKE, _KANALWERBUNG_LIKE)):
+                              "AND text NOT LIKE ? AND text NOT LIKE ? AND text NOT LIKE ? ORDER BY id DESC",
+                              (_RECRUITING_LIKE, _KANALWERBUNG_LIKE, _BSTNEXT_LIKE)):
             row = _parse(e)
             # NUR NOCH ShareNext Premium-Bilder - keine has_premium Flag mehr!
             rows.append(row)
@@ -2057,7 +2062,8 @@ def einplanung():
     rows = []
     with get_conn() as conn:
         for e in conn.execute("SELECT id, text, geplant_fuer, format FROM entwuerfe WHERE status='freigegeben' "
-                              "ORDER BY geplant_fuer IS NULL, geplant_fuer, id"):
+                              "AND text NOT LIKE ? ORDER BY geplant_fuer IS NULL, geplant_fuer, id",
+                              (_BSTNEXT_LIKE,)):
             rows.append(_parse(e))
         # Fuer noch nicht geplante Beitraege je einen fortlaufenden Werktags-Vorschlag berechnen
         # (jeder Vorschlag belegt den Tag fuer den naechsten ungeplanten Beitrag).
