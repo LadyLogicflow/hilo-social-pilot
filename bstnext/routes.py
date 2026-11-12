@@ -114,7 +114,7 @@ b.addEventListener('click',function(){
   var f=document.getElementById('bn-form'),c=document.getElementById('bn-caption'),s=document.getElementById('bn-textstatus');
   if(c.value.trim()&&!confirm('Der vorhandene Begleittext wird ersetzt. Fortfahren?')){return;}
   b.disabled=true;s.textContent='Die KI schreibt den Text …';
-  fetch('{{ url_for("bstnext.text_vorschlag") }}',{method:'POST',body:new FormData(f),credentials:'same-origin'})
+  fetch('{{ url_for("bstnext.text_vorschlag") }}{% if bearb %}?eid={{ bearb }}{% endif %}',{method:'POST',body:new FormData(f),credentials:'same-origin'})
    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
    .then(function(x){
      if(x.ok&&x.d.text){c.value=x.d.text;s.textContent='Vorschlag eingetragen. Bitte prüfen und bei Bedarf bearbeiten.';}
@@ -370,6 +370,26 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             abort(404)
         return send_file(pfade[nr - 1], mimetype="image/png", max_age=0)
 
+    def _fruehere_anfaenge(conn, ausser=None, n=6):
+        """Erste Absaetze der letzten BSt-Next-Begleittexte (ohne den Beitrag, der gerade bearbeitet wird),
+        damit die KI sich nicht wiederholt."""
+        out = []
+        for r in conn.execute("SELECT id, text FROM entwuerfe ORDER BY id DESC LIMIT 200").fetchall():
+            if r["id"] == ausser:
+                continue
+            try:
+                f = json.loads(r["text"])
+            except Exception:
+                continue
+            if not guard.ist_bstnext(f):
+                continue
+            anfang = ((f.get("caption") or "").strip().split("\n\n")[0]).strip()
+            if anfang:
+                out.append(anfang[:200])
+            if len(out) >= n:
+                break
+        return out
+
     _text_zeit = _cfg.setdefault("text_zeit", {})   # je Nutzer: Zeitpunkt des letzten Vorschlags
 
     @bp.route("/bstnext/text-vorschlag", methods=["POST"])
@@ -393,7 +413,9 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         _text_zeit[nutzer] = jetzt
         fn = _cfg["text_fn"] or begleittext.erzeuge
         try:
-            text = fn(zeilen)
+            with get_conn() as conn:
+                vermeiden = _fruehere_anfaenge(conn, request.args.get("eid", type=int))
+            text = fn(zeilen, vermeiden=vermeiden)
         except begleittext.BegleittextFehler as ex:
             return jsonify({"fehler": str(ex)}), 502
         except Exception:

@@ -57,7 +57,7 @@ class BegleittextFehler(Exception):
     """Der Textvorschlag ist nicht moeglich oder nicht brauchbar; str(e) ist die Meldung fuer catrin."""
 
 
-def baue_prompt(spruch_zeilen, hinweis=""):
+def baue_prompt(spruch_zeilen, hinweis="", vermeiden=()):
     produkte = "\n".join("- %s: %s" % (n, s) for n, s in PRODUKTE)
     schluss = "\n".join("- " + s for s in SCHLUSSZEILEN)
     text = (
@@ -70,26 +70,30 @@ def baue_prompt(spruch_zeilen, hinweis=""):
         "„Der Beleg fällt nicht weit vom Stapel.“, „Eine Datei macht noch keine Digitalisierung.“\n"
         "2. Übergang und Nutzen: beginne mit „Mit <Produkt> ändert sich das.“ oder „Mit <Produkt> wird es "
         "besser.“ (mit dem passenden Produkt) und erkläre den Nutzen in 2 bis 3 Sätzen. Nenne nur Produkte, "
-        "die zum Spruch passen (eines oder mehrere), und erkläre den Nutzen ausschließlich mit diesen "
-        "Aussagen:\n%s\n"
+        "die zum Spruch passen (eines oder mehrere), und stütze den Nutzen auf diese Aussagen. "
+        "Werbliche Nutzenformulierungen ohne konkrete Zusicherung sind erlaubt (zum Beispiel Zeit und "
+        "Fehlerquellen sparen, Übersicht statt Chaos):\n%s\n"
         "3. Schlusszeile: genau eine der folgenden, wörtlich, passend zum Thema:\n%s\n\n"
         "Regeln:\n"
         "- Kurz und prägnant: insgesamt höchstens fünf Sätze vor der Schlusszeile. Sachlich-motivierend, "
         "nicht generisch.\n"
         "- Stil: konkrete Details statt Abstraktion (zum Beispiel „Belegestapel“ statt „viel zu tun“). "
         "Erst der Schmerzpunkt, dann die Wende mit dem Übergangssatz. Den Nutzen aus Sicht der Beratungsstelle "
-        "schildern statt Funktionen aufzuzählen, aber nur mit den oben genannten Aussagen. Persönlich, aber "
+        "schildern statt Funktionen aufzuzählen, gestützt auf die oben genannten Aussagen. Persönlich, aber "
         "professionell, nicht süßlich. Wenn passend, ein konkreter Vergleich (zum Beispiel „Papier im falschen "
         "Format“). Kurze und lange Sätze abwechseln.\n"
         "- Ansprache „Sie“, Zielgruppe Beratungsstellen und ihre Mitglieder. Schreibe „Beratungsstelle“, "
         "nie „Stelle“ allein.\n"
         "- Keine Ziffern und keine Zahlen- oder Zeitangaben (auch nicht „Stunden“, „Minuten“, „Tage“), keine "
         "Preise, keine Aussagen zur Verfügbarkeit oder zum Starttermin.\n"
-        "- Keine unbelegten Versprechen oder Superlative (zum Beispiel vollautomatisch, schneller, "
-        "zuverlässiger, garantiert, revolutionär). Keine Steuerberatung.\n"
+        "- Keine Zusicherung konkreter Eigenschaften, keine Garantien, keine Superlative (zum Beispiel "
+        "vollautomatisch, schneller, zuverlässiger, garantiert, revolutionär). Keine Steuerberatung.\n"
         "- Keine Hashtags, keine Links, kein Markdown, keine Aufzählungen, keine Emojis.\n"
         "- Antworte nur mit dem Text, ohne Überschrift und ohne Einleitung."
         % ("\n".join(spruch_zeilen), produkte, schluss))
+    if vermeiden:
+        text += ("\n\nDiese Anfänge wurden in früheren Beiträgen schon verwendet. Schreibe deutlich anders "
+                 "(anderer Aufhänger, anderer Satzbau, andere Bilder):\n" + "\n".join("- " + v for v in vermeiden))
     if hinweis:
         text += "\n\nDein letzter Entwurf wurde abgelehnt: %s Bitte schreibe ihn neu und halte die Regeln ein." % hinweis
     return text
@@ -127,7 +131,7 @@ def _modell():
     return textgen._model()
 
 
-def erzeuge(spruch_zeilen, client=None, versuche=2):
+def erzeuge(spruch_zeilen, client=None, versuche=2, vermeiden=()):
     """Liefert den fertigen Begleittext (Fliesstext + Link-Zeile + Hashtags). Wirft BegleittextFehler.
     'client' ist mockbar (Objekt mit messages.create(...))."""
     zeilen = [z.strip() for z in spruch_zeilen if z and z.strip()]
@@ -139,7 +143,7 @@ def erzeuge(spruch_zeilen, client=None, versuche=2):
     for _ in range(max(1, versuche)):
         try:
             msg = client.messages.create(model=_modell(), max_tokens=700, system=SYSTEM,
-                                         messages=[{"role": "user", "content": baue_prompt(zeilen, hinweis)}])
+                                         messages=[{"role": "user", "content": baue_prompt(zeilen, hinweis, vermeiden)}])
             roh = "".join(getattr(b, "text", "") for b in msg.content).strip()
         except BegleittextFehler:
             raise

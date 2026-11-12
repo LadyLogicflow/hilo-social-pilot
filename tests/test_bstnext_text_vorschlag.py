@@ -51,7 +51,7 @@ def test_prompt_enthaelt_spruch_produktfakten_und_schlusszeilen_aber_nicht_smart
     assert "wird es besser" in p and "Der Beleg fällt nicht weit vom Stapel." in p      # Vorgaben von Casty
     assert "höchstens fünf Sätze" in p and "Schmerzpunkt" in p and "Kurze und lange Sätze abwechseln" in p
     assert "SmartNext" not in p.split("Regeln:")[0] and "CheckNext" not in p.split("Regeln:")[0]
-    produkte_teil = p.split("Nutzen ausschließlich mit diesen Aussagen:")[1].split("3. Schlusszeile")[0]
+    produkte_teil = p.split("Übersicht statt Chaos):")[1].split("3. Schlusszeile")[0]
     assert "€" not in produkte_teil and not any(ch.isdigit() for ch in produkte_teil)
 
 
@@ -69,6 +69,26 @@ def test_unbrauchbarer_text_wird_abgelehnt_und_einmal_neu_angefragt(schlecht):
     text = begleittext.erzeuge(["Gut Ding will"], client=c)
     assert len(c.prompts) == 2 and "abgelehnt" in c.prompts[1]
     assert text.startswith(GUTER_TEXT)
+
+
+def test_werbliche_nutzenaussage_ohne_zusicherung_ist_erlaubt():
+    werbend = GUTER_TEXT.replace("liefert", "liefert Ihnen Übersicht statt Chaos. Sie sparen Zeit und Fehlerquellen und bekommt")
+    assert begleittext.pruefe(werbend) is None
+    assert begleittext.pruefe(GUTER_TEXT) is None
+
+
+def test_prompt_hat_keine_beispieltexte_aber_werbliche_nutzenaussage_und_aufhaenger():
+    p = begleittext.baue_prompt(["Gut Ding will"])
+    assert "Werbliche Nutzenformulierungen" in p and "Der Beleg fällt nicht weit vom Stapel." in p
+    assert "Beispieltexte" not in p and "Papier im falschen Format" in p      # nur als Vergleich in den Stilregeln
+    assert "Stunden Handarbeit" not in p and "schon verwendet" not in p
+
+
+def test_frueher_verwendete_anfaenge_kommen_in_den_prompt_und_die_ki_bekommt_sie():
+    c = FakeClient(GUTER_TEXT)
+    begleittext.erzeuge(["Gut Ding will"], client=c, vermeiden=["Belege sind wie Post.", "Eine Datei macht nichts."])
+    assert "schon verwendet" in c.prompts[0]
+    assert "- Belege sind wie Post." in c.prompts[0] and "- Eine Datei macht nichts." in c.prompts[0]
 
 
 def test_zweimal_unbrauchbar_gibt_klare_meldung():
@@ -121,7 +141,7 @@ def _anzahl():
 
 def test_route_liefert_text_speichert_aber_nichts(client, monkeypatch):
     gesehen = {}
-    def fake(zeilen):
+    def fake(zeilen, **kw):
         gesehen["zeilen"] = zeilen
         return "VORSCHLAG"
     monkeypatch.setitem(bs_routes._cfg, "text_fn", fake)
@@ -134,7 +154,7 @@ def test_route_liefert_text_speichert_aber_nichts(client, monkeypatch):
 
 def test_route_nimmt_beim_karussell_alle_slides_sonst_nicht(client, monkeypatch):
     gesehen = []
-    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z: gesehen.append(z) or "X")
+    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z, **kw: gesehen.append(z) or "X")
     daten = {"weiss": "Eins", "weiss2": "Zwei", "lime3": "Drei"}
     client.post("/bstnext/text-vorschlag", data=dict(daten, bildtyp="karussell"))
     client.post("/bstnext/text-vorschlag", data=dict(daten, bildtyp="kachel"))
@@ -143,13 +163,13 @@ def test_route_nimmt_beim_karussell_alle_slides_sonst_nicht(client, monkeypatch)
 
 def test_route_ohne_spruch_400_ohne_ki_aufruf(client, monkeypatch):
     aufrufe = []
-    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z: aufrufe.append(z) or "X")
+    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z, **kw: aufrufe.append(z) or "X")
     r = client.post("/bstnext/text-vorschlag", data={"weiss": "  "})
     assert r.status_code == 400 and "Spruch" in r.get_json()["fehler"] and aufrufe == []
 
 
 def test_route_fehler_der_ki_wird_als_meldung_durchgereicht(client, monkeypatch):
-    def fake(zeilen):
+    def fake(zeilen, **kw):
         raise begleittext.BegleittextFehler("Meldung für catrin")
     monkeypatch.setitem(bs_routes._cfg, "text_fn", fake)
     r = client.post("/bstnext/text-vorschlag", data={"weiss": "Gut Ding will"})
@@ -157,7 +177,7 @@ def test_route_fehler_der_ki_wird_als_meldung_durchgereicht(client, monkeypatch)
 
 
 def test_route_unerwarteter_fehler_zeigt_keine_interna(client, monkeypatch):
-    def fake(zeilen):
+    def fake(zeilen, **kw):
         raise RuntimeError("Token abc123")
     monkeypatch.setitem(bs_routes._cfg, "text_fn", fake)
     r = client.post("/bstnext/text-vorschlag", data={"weiss": "Gut Ding will"})
@@ -168,7 +188,7 @@ def test_route_kostenschutz_zweiter_klick_sofort_danach_wird_gebremst(client, mo
     aufrufe = []
     bs_routes._cfg["text_zeit"].clear()
     monkeypatch.setitem(bs_routes._cfg, "text_sperre_s", 60)
-    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z: aufrufe.append(z) or "X")
+    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z, **kw: aufrufe.append(z) or "X")
     erster = client.post("/bstnext/text-vorschlag", data={"weiss": "Gut Ding will"})
     zweiter = client.post("/bstnext/text-vorschlag", data={"weiss": "Gut Ding will"})
     assert erster.status_code == 200 and zweiter.status_code == 429 and len(aufrufe) == 1
@@ -197,3 +217,15 @@ def test_vorgeschlagener_text_laesst_sich_speichern_hashtags_nicht_doppelt(clien
     with db.get_conn() as conn:
         f = json.loads(conn.execute("SELECT text FROM entwuerfe WHERE id=1").fetchone()["text"])
     assert f["caption"].count("#BStNext") == 1 and "http://www.bst-next.de" in f["caption"]
+
+
+def test_route_gibt_fruehere_anfaenge_weiter_und_schliesst_den_bearbeiteten_beitrag_aus(client, monkeypatch):
+    for weiss, cap in (("Eins", "Erster Anfang.\n\nRest eins."), ("Zwei", "Zweiter Anfang.\n\nRest zwei.")):
+        client.post("/bstnext/neu", data={"weiss": weiss, "lime": "x", "format": "quadrat", "caption": cap,
+                                          "bildtyp": "kachel", "motiv": "belege"})
+    gesehen = []
+    monkeypatch.setitem(bs_routes._cfg, "text_fn", lambda z, **kw: gesehen.append(kw["vermeiden"]) or "X")
+    client.post("/bstnext/text-vorschlag", data={"weiss": "Neu"})
+    client.post("/bstnext/text-vorschlag?eid=2", data={"weiss": "Neu"})
+    assert gesehen[0][:2] == ["Zweiter Anfang.", "Erster Anfang."]
+    assert "Zweiter Anfang." not in gesehen[1] and "Erster Anfang." in gesehen[1]
