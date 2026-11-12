@@ -92,6 +92,7 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <td>{{r.status}}{% if r.bild_status=='laeuft' %}<br><span class="hint">Bild wird erzeugt …</span>{% elif r.bild_status=='fehler' %}<br><span class="hint">Bild fehlgeschlagen: {{r.info}}</span>{% endif %}</td><td>{{r.datum}}</td>
 <td>{% if r.bild_status!='fertig' %}<form method=post action="{{ url_for('bstnext.foto_neu', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Bild neu erzeugen</button></form>
 {% elif r.status=='entwurf' %}<form method=post action="{{ url_for('bstnext.freigeben', eid=r.id) }}" style="margin:0"><button type=submit style="margin:0;padding:6px 10px">Freigeben</button></form>
+{% elif r.status=='freigegeben' and r.eingeplant %}<b>eingeplant für {{r.eingeplant}}</b><br><span class="hint">Ändern oder löschen unter „Geplante Veröffentlichungen“ (<a href="/geplant">öffnen</a>).</span>
 {% elif r.status=='freigegeben' %}
 {% if seiten_ids %}<form method=post action="{{ url_for('bstnext.veroeffentlichen', eid=r.id) }}" style="margin:0 0 8px" onsubmit="return confirm('Jetzt auf der BSt-Next-Seite veröffentlichen? Das ist ein echter Post.')">
 <select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
@@ -145,8 +146,26 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 fl = {}
             out.append({"id": r["id"], "titel": fl.get("ueberschrift") or "Beitrag", "status": r["status"],
                         "datum": r["geplant_fuer"] or "", "typ": (fl.get("bstnext") or {}).get("typ", "kachel"),
-                        "bild_status": fl.get("bild_status", "fertig"), "info": fl.get("bild_info", "")})
+                        "bild_status": fl.get("bild_status", "fertig"), "info": fl.get("bild_info", ""),
+                        "eingeplant": _einplanung_text(conn, r["id"])})
         return out
+
+    def _einplanung(conn, eid):
+        """Fruehester noch offener geplanter Post dieses Beitrags (geplant_am) oder None.
+        Gelöscht (/geplant-loeschen) oder gepostet = nicht mehr offen."""
+        row = conn.execute("SELECT MIN(geplant_am) FROM geplante_posts WHERE entwurf_id=? "
+                           "AND status IN ('geplant','laeuft')", (eid,)).fetchone()
+        return row[0] if row and row[0] else None
+
+    def _einplanung_text(conn, eid):
+        t = _einplanung(conn, eid)
+        if not t:
+            return ""
+        try:
+            d = datetime.datetime.strptime(t[:16], "%Y-%m-%dT%H:%M")
+            return d.strftime("%d.%m.%Y um %H:%M Uhr")
+        except ValueError:
+            return t
 
     def _seite(f=None):
         with get_conn() as conn:
@@ -422,6 +441,11 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             if row["status"] != "freigegeben":
                 flash("Der Beitrag muss zuerst freigegeben werden.")
                 return redirect(url_for("bstnext.index"))
+            eingeplant = _einplanung_text(conn, eid)
+            if eingeplant:
+                flash("Der Beitrag ist schon eingeplant für %s. Ändern oder löschen unter „Geplante "
+                      "Veröffentlichungen“." % eingeplant)
+                return redirect(url_for("bstnext.index"))
             if not _cfg["publish_fn"]:
                 flash("Veröffentlichung ist nicht angebunden.")
                 return redirect(url_for("bstnext.index"))
@@ -456,6 +480,11 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 return redirect(url_for("bstnext.index"))
             if row["status"] != "freigegeben":
                 flash("Der Beitrag muss zuerst freigegeben werden.")
+                return redirect(url_for("bstnext.index"))
+            eingeplant = _einplanung_text(conn, eid)
+            if eingeplant:
+                flash("Der Beitrag ist schon eingeplant für %s. Ändern oder löschen unter „Geplante "
+                      "Veröffentlichungen“." % eingeplant)
                 return redirect(url_for("bstnext.index"))
             if (f.get("bstnext") or {}).get("typ") == "karussell":
                 flash("Ein Karussell lässt sich noch nicht einplanen – bitte „Jetzt veröffentlichen“ nutzen.")
