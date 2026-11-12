@@ -12,7 +12,7 @@ import os
 import threading
 import uuid
 
-from flask import Blueprint, request, redirect, url_for, session, flash, abort, render_template_string
+from flask import Blueprint, request, redirect, url_for, session, flash, abort, render_template_string, send_file
 
 from . import brand, kachel, guard, szene
 
@@ -27,6 +27,25 @@ _cfg = {"data_dir": None,          # wird von register() gesetzt; Tests duerfen 
         "publish_fn": None}        # (conn, entwurf, eid, fields, kanal, page_id, user) -> (ziel, erfolg, [(kanal, ok, info)])          # liefert (Liste der Facebook-Seiten, Fehlertext); von register() gesetzt
 MOTIVE = (("belege", "Belege"), ("termine", "Termine"), ("telefon", "Telefon"), ("werbung", "Werbung"),
           ("challenge", "Challenge"))
+
+ANSICHT = """<!doctype html><meta charset=utf-8><title>BSt Next – Beitrag ansehen</title><style>{{ style|safe }}
+.bn{max-width:760px;margin:0 auto}
+.bn h2{color:#001942}
+.bn img.gross{width:100%;max-width:540px;border-radius:10px;border:1px solid #e3e7ee;display:block;margin:0 0 14px}
+.bn .cap{white-space:pre-wrap;background:#f6f8fb;border:1px solid #e3e7ee;border-radius:8px;padding:12px}
+.bn .hint{color:#4B5563;font-size:13px}
+.bn a.btn{display:inline-block;margin:0 8px 8px 0;padding:7px 13px;border-radius:8px;background:#001942;color:#fff;text-decoration:none;font-weight:700;font-size:14px}
+</style>
+<div class="bn">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<h2 style="margin:0">BSt Next – Beitrag {{ eid }}</h2><a class="btn" href="{{ url_for('bstnext.index') }}">&larr; zur Liste</a></div>
+<p class="hint">Status: <b>{{ status }}</b>{% if datum %} · Tag: {{ datum }}{% endif %}{% if typ == 'karussell' %} · Karussell, 3 Slides{% elif typ == 'foto' %} · Foto-Look{% endif %}{% if eingeplant %} · eingeplant für {{ eingeplant }}{% endif %}</p>
+{% if bilder %}{% for nr in bilder %}<img class="gross" src="{{ url_for('bstnext.bild', eid=eid, nr=nr) }}" alt="">{% endfor %}
+{% else %}<p class="hint">Das Bild ist noch nicht fertig.</p>{% endif %}
+<h3>Begleittext (Facebook und Instagram)</h3><div class="cap">{{ caption }}</div>
+<p class="hint">Alt-Text: {{ alt }}</p>
+{% if bearbeitbar %}<a class="btn" href="{{ url_for('bstnext.bearbeiten', eid=eid) }}">Bearbeiten</a>{% endif %}
+</div>"""
 
 SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</title>{% if laeuft %}<meta http-equiv=refresh content=8>{% endif %}<style>{{ style|safe }}
 .bn{max-width:960px;margin:0 auto}
@@ -44,13 +63,14 @@ SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</tit
 </style>
 <div class="bn">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<h2 style="margin:0">BSt Next – Beitrag erstellen</h2><a href="/" style="background:#001942;color:#fff;padding:7px 13px;border-radius:8px">&larr; Startseite</a></div>
+<h2 style="margin:0">BSt Next – {% if bearb %}Beitrag {{ bearb }} bearbeiten{% else %}Beitrag erstellen{% endif %}</h2><a href="/" style="background:#001942;color:#fff;padding:7px 13px;border-radius:8px">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=box>
 <p class="hint">BSt Next ist eine eigene Marke neben HILO. Der Beitrag wird als Spruchkachel in der BSt-Next-CI
 (Navy, weiße Headline, Lime als Akzent, Logo mit Claim) erzeugt, danach unter „Freigabe“ geprüft und freigegeben und
 nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) veröffentlicht.</p>
-<form method=post action="{{ url_for('bstnext.neu') }}">
+{% if bearb %}<p class="hint"><b>Bearbeiten:</b> Beim Speichern wird das Bild neu erzeugt und der Beitrag steht wieder auf „entwurf“ (danach neu freigeben). <a href="{{ url_for('bstnext.index') }}">Abbrechen</a></p>{% endif %}
+<form method=post action="{{ form_action }}">
 <div class=row><div><label>Weiße Zeilen (eine Bildzeile pro Zeile)</label>
 <textarea name=weiss required placeholder="Wir fangen mit">{{ f.weiss }}</textarea></div>
 <div><label>Lime-Zeilen (Akzent, optional)</label>
@@ -78,7 +98,7 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <label>Begleittext (Facebook und Instagram)</label>
 <textarea name=caption required placeholder="Ihr Text. Die BSt-Next-Hashtags werden angehängt, wenn sie fehlen.">{{ f.caption }}</textarea>
 <label>Alt-Text (für Screenreader, optional)</label><input type=text name=alt value="{{ f.alt }}">
-<button type=submit>Beitrag erstellen und als Entwurf speichern</button>
+<button type=submit>{% if bearb %}Änderungen speichern und Bild neu erzeugen{% else %}Beitrag erstellen und als Entwurf speichern{% endif %}</button>
 </form></div>
 <div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt Next</h3>
 {% if seiten %}<p>Hinterlegt: <b>{{ seiten }}</b></p>{% else %}<p class="hint">Noch keine Seite hinterlegt – ohne sie kann nichts veröffentlicht werden.</p>{% endif %}
@@ -110,6 +130,8 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <button type=submit style="margin:0;padding:6px 10px">Einplanen</button></form>{% endif %}
 {% else %}<span class="hint">Erst oben die BSt-Next-Facebook-Seite hinterlegen.</span>{% endif %}
 {% else %}<a href="/beitrag/{{r.id}}">ansehen</a>{% endif %}
+<a href="{{ url_for('bstnext.ansehen', eid=r.id) }}" style="display:inline-block;margin:8px 8px 0 0;padding:6px 10px;border:1px solid #001942;border-radius:8px;color:#001942;font-weight:700;font-size:13px;text-decoration:none">Ansehen</a>
+{% if r.status!='veroeffentlicht' and not r.eingeplant and r.bild_status!='laeuft' %}<a href="{{ url_for('bstnext.bearbeiten', eid=r.id) }}" style="display:inline-block;margin:8px 8px 0 0;padding:6px 10px;border:1px solid #001942;border-radius:8px;color:#001942;font-weight:700;font-size:13px;text-decoration:none">Bearbeiten</a>{% endif %}
 {% if r.status!='veroeffentlicht' and not r.eingeplant %}<form method=post action="{{ url_for('bstnext.loeschen', eid=r.id) }}" style="margin:8px 0 0" onsubmit="return confirm('Diesen Beitrag wirklich löschen?')"><button type=submit style="margin:0;padding:6px 10px;background:#b00020">Löschen</button></form>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="hint">Noch keine.</p>{% endif %}</div>
 </div>"""
@@ -172,7 +194,7 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         except ValueError:
             return t
 
-    def _seite(f=None):
+    def _seite(f=None, bearb=None):
         with get_conn() as conn:
             rows = _rows(conn)
         aktiv = guard.seiten_ids(get_einstellung(guard.EINSTELLUNG_SEITEN, ""))
@@ -190,7 +212,8 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                   "weiss_nach": "", "weiss_nach2": "", "weiss_nach3": ""}
         return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
                                       seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv, seiten_ids=sorted(aktiv),
-                                      rolle=session.get("rolle"), f=f,
+                                      rolle=session.get("rolle"), f=f, bearb=bearb,
+                                      form_action=url_for("bstnext.bearbeiten", eid=bearb) if bearb else url_for("bstnext.neu"),
                                       laeuft=any(r["bild_status"] == "laeuft" for r in rows))
 
     def _foto_job(eid):
@@ -257,9 +280,139 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
     def index():
         return _seite()
 
+    def _bearbeiten_sperre(conn, row, f, eid):
+        """Meldung, warum ein Beitrag nicht bearbeitbar ist, sonst leer."""
+        if row["status"] == "veroeffentlicht":
+            return "Ein veröffentlichter Beitrag bleibt als Nachweis erhalten und lässt sich nicht bearbeiten."
+        eingeplant = _einplanung_text(conn, eid)
+        if eingeplant:
+            return ("Der Beitrag ist eingeplant für %s. Bitte zuerst die Einplanung unter „Geplante "
+                    "Veröffentlichungen“ löschen." % eingeplant)
+        if f.get("bild_status") == "laeuft":
+            return "Das Foto wird gerade erzeugt – bitte warten, bis es fertig ist."
+        return ""
+
+    def _eingabe_aus(row, f):
+        """Formularwerte aus einem gespeicherten Beitrag (fuer Bearbeiten)."""
+        bs = f.get("bstnext") or {}
+        typ = bs.get("typ", "kachel")
+
+        def j(zeilen):
+            return "\n".join(zeilen or [])
+        titel = f.get("ueberschrift", "")
+        alt = f.get("alt_text") or ""
+        eingabe = {"weiss": j(bs.get("weiss")), "lime": j(bs.get("lime")), "weiss_nach": j(bs.get("weiss_nach")),
+                   "format": bs.get("format", "quadrat"), "datum": row["geplant_fuer"] or "",
+                   "caption": f.get("caption", ""), "alt": "" if alt == titel else alt,
+                   "bildtyp": typ, "motiv": bs.get("motiv", "belege"),
+                   "weiss2": "", "lime2": "", "weiss3": "", "lime3": "", "weiss_nach2": "", "weiss_nach3": ""}
+        if typ == "karussell":
+            slides = bs.get("slides") or []
+            for nr, i in (("2", 1), ("3", 2)):
+                if len(slides) > i:
+                    eingabe["weiss" + nr] = j(slides[i].get("weiss"))
+                    eingabe["lime" + nr] = j(slides[i].get("lime"))
+                    eingabe["weiss_nach" + nr] = j(slides[i].get("weiss_nach"))
+        return eingabe
+
+    def _bild_pfade(row, f):
+        bs = f.get("bstnext") or {}
+        pfade = list(bs.get("bilder") or []) or ([row["bild_pfad"]] if row["bild_pfad"] else [])
+        return [p for p in pfade if p and os.path.exists(p)]
+
+    @bp.route("/bstnext/ansehen/<int:eid>")
+    @rolle_required("freigeber")
+    def ansehen(eid):
+        """Grosse Ansicht: Bild(er), voller Begleittext, Alt-Text und Status."""
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            sperre = _bearbeiten_sperre(conn, row, f, eid)
+            eingeplant = _einplanung_text(conn, eid)
+        pfade = _bild_pfade(row, f)
+        return render_template_string(
+            ANSICHT, style=style, eid=eid, status=row["status"], datum=row["geplant_fuer"] or "",
+            typ=(f.get("bstnext") or {}).get("typ", "kachel"), eingeplant=eingeplant,
+            bilder=list(range(1, len(pfade) + 1)), caption=f.get("caption", ""),
+            alt=f.get("alt_text", ""), bearbeitbar=not sperre)
+
+    @bp.route("/bstnext/bild/<int:eid>/<int:nr>")
+    @rolle_required("freigeber")
+    def bild(eid, nr):
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+        pfade = _bild_pfade(row, f)
+        if nr < 1 or nr > len(pfade):
+            abort(404)
+        return send_file(pfade[nr - 1], mimetype="image/png", max_age=0)
+
     @bp.route("/bstnext/neu", methods=["POST"])
     @rolle_required("freigeber")
     def neu():
+        return _speichern(None)
+
+    @bp.route("/bstnext/bearbeiten/<int:eid>", methods=["GET", "POST"])
+    @rolle_required("freigeber")
+    def bearbeiten(eid):
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            sperre = _bearbeiten_sperre(conn, row, f, eid)
+            eingabe = _eingabe_aus(row, f)
+        if sperre:
+            flash(sperre)
+            return redirect(url_for("bstnext.index"))
+        if request.method == "POST":
+            return _speichern(eid)
+        return _seite(eingabe, eid)
+
+    def _aktualisieren(eid, fields, titel, datum, foto, karussell, tmp, tmps, out_dir):
+        """Bearbeiten: ersetzt Inhalt und Bild des Beitrags, Status zurueck auf 'entwurf'."""
+        with get_conn() as conn:
+            row, f_alt = _lade(conn, eid)
+            alt = {row["bild_pfad"]} | set((f_alt.get("bstnext") or {}).get("bilder") or [])
+            neue = set()
+            bild = None
+            if karussell:
+                pfade = []
+                for nr, t in enumerate(tmps, 1):
+                    ziel = os.path.join(out_dir, "bstnext_%d_s%d.png" % (eid, nr))
+                    os.replace(t, ziel)
+                    pfade.append(ziel)
+                fields["bstnext"]["bilder"] = pfade
+                bild, neue = pfade[0], set(pfade)
+            elif not foto:
+                ziel = os.path.join(out_dir, "bstnext_%d.png" % eid)
+                os.replace(tmp, ziel)
+                bild, neue = ziel, {ziel}
+            conn.execute("UPDATE entwuerfe SET text=?, status='entwurf', geplant_fuer=?, bild_pfad=? WHERE id=?",
+                         (json.dumps(fields, ensure_ascii=False), datum or None, bild, eid))
+            conn.execute("UPDATE themen SET titel=?, volltext=? WHERE id=(SELECT thema_id FROM entwuerfe WHERE id=?)",
+                         (titel[:300], titel, eid))
+            audit_log(conn, session.get("user"), "bstnext_bearbeitet", eid, titel[:60])
+            conn.commit()
+        for pfad in alt - neue:
+            if pfad and os.path.exists(pfad):
+                try:
+                    os.remove(pfad)
+                except OSError:
+                    log.warning("Altes Bild %s von BSt-Next-Beitrag %s nicht loeschbar", pfad, eid)
+        if foto:
+            _foto_starten(eid)
+            flash("Beitrag %d gespeichert – das Foto wird neu erzeugt (1–2 Minuten); danach neu freigeben." % eid)
+        else:
+            flash("Beitrag %d gespeichert – bitte prüfen und neu freigeben." % eid)
+        return redirect(url_for("bstnext.index"))
+
+    def _speichern(eid):
+        """Neu anlegen (eid=None) oder bestehenden Beitrag bearbeiten."""
+        alt_datum = None
+        if eid:
+            with get_conn() as conn:
+                row0, f0 = _lade(conn, eid)
+                sperre = _bearbeiten_sperre(conn, row0, f0, eid)
+            if sperre:
+                flash(sperre)
+                return redirect(url_for("bstnext.index"))
+            alt_datum = row0["geplant_fuer"] or ""
         fmt = request.form.get("format", "quadrat")
         weiss = _zeilen(request.form.get("weiss"))
         lime = _zeilen(request.form.get("lime"))
@@ -293,35 +446,35 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                    "lime3": "\n".join(folien[2][1]) if len(folien) > 2 else ""}
         if bildtyp not in ("kachel", "foto", "karussell") or motiv not in dict(MOTIVE):
             flash("Unbekannter Bildtyp oder Motiv.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if fmt not in dict(FORMATE_FEED):
             flash("Unbekanntes Format.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if not weiss:
             flash("Bitte mindestens eine weiße Zeile angeben.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if bildtyp == "foto" and (nach or request.form.get("weiss_nach2") or request.form.get("weiss_nach3")):
             flash("Weiße Zeilen nach dem Lime-Teil gehen bisher nur bei Spruchkachel und Karussell, nicht beim Foto-Look.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if karussell and any(not w for w, _l, _g, _n in folien):
             flash("Beim Karussell braucht jeder der 3 Slides mindestens eine weiße Zeile.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if not caption:
             flash("Bitte einen Begleittext angeben.")
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         caption = _caption_mit_hashtags(caption)
         if len(caption) > MAX_CAPTION:
             flash("Der Begleittext ist zu lang (höchstens %d Zeichen inklusive Hashtags)." % MAX_CAPTION)
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         if datum:
             try:
                 d = datetime.date.fromisoformat(datum)
             except ValueError:
                 flash("Ungültiges Datum.")
-                return _seite(eingabe)
-            if d < datetime.date.today():
+                return _seite(eingabe, eid)
+            if d < datetime.date.today() and not (eid and datum == alt_datum):
                 flash("Der Tag liegt in der Vergangenheit – bitte einen Tag ab heute wählen.")
-                return _seite(eingabe)
+                return _seite(eingabe, eid)
         out_dir = os.path.join(_cfg["data_dir"], "bilder")
         os.makedirs(out_dir, exist_ok=True)
         titel = " ".join(weiss + lime + nach)
@@ -346,7 +499,7 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 if os.path.exists(t):
                     os.remove(t)
             flash("Kachel nicht erzeugbar: %s" % ex)
-            return _seite(eingabe)
+            return _seite(eingabe, eid)
         fields = {
             "marke": guard.MARKE, "kampagne": guard.MARKE,
             "ueberschrift": titel,
@@ -360,6 +513,8 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         if karussell:
             fields["bstnext"]["slides"] = [{"weiss": w, "lime": l, "logo": g, "weiss_nach": n}
                                            for w, l, g, n in folien]
+        if eid:
+            return _aktualisieren(eid, fields, titel, datum, foto, karussell, tmp, tmps, out_dir)
         h = hashlib.sha256(("bstnext:%s:%s" % (titel, datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
         with get_conn() as conn:
             # Thema als 'erledigt': nie vom HILO-Generator ('ausgewaehlt') aufgegriffen
