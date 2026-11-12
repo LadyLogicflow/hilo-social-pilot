@@ -39,10 +39,11 @@ def _logo_weiss(breite):
     return logo.resize((breite, hoehe), Image.LANCZOS)
 
 
-def render(weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat", mit_logo=True):
+def render(weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat", mit_logo=True, weisse_nach=None):
     """Rendert die Kachel nach ziel_pfad (PNG). Gibt den Pfad zurueck.
 
     weisse_zeilen / lime_zeilen: Listen kurzer Zeilen (jede Zeile ist eine Bildzeile).
+    weisse_nach: optionale weisse Zeilen NACH dem Lime-Teil (z. B. ein Schlusssatz).
     mit_logo=False: Text-Slide ohne Logo (Karussell-Slide 1 und 2), die Zeilen duerfen weiter nach
     unten reichen.
     Wirft KachelFehler, wenn eine Zeile breiter als die Satzbreite ist oder nichts uebergeben wird."""
@@ -50,17 +51,18 @@ def render(weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat", mit_logo=Tru
         raise KachelFehler("Unbekanntes Format: %s" % format)
     weisse_zeilen = [z.strip() for z in weisse_zeilen if z and z.strip()]
     lime_zeilen = [z.strip() for z in (lime_zeilen or []) if z and z.strip()]
+    nach = [z.strip() for z in (weisse_nach or []) if z and z.strip()]
     if not weisse_zeilen:
         raise KachelFehler("Keine Headline-Zeilen.")
     breite, hoehe = brand.FORMATE[format]
     max_breite = breite - 2 * _RAND_X
     font = ImageFont.truetype(brand.FONT_HEADLINE, _SCHRIFT)
-    for z in weisse_zeilen + lime_zeilen:
+    for z in weisse_zeilen + lime_zeilen + nach:
         if font.getlength(z) > max_breite:
             raise KachelFehler("Zeile zu breit (%d > %d px): %s" % (font.getlength(z), max_breite, z))
     logo = _logo_weiss(_LOGO_BREITE) if mit_logo else None
     logo_oben = (hoehe - _LOGO_UNTEN - logo.size[1]) if mit_logo else (hoehe - _LOGO_UNTEN + 40)
-    zeilen = len(weisse_zeilen) + len(lime_zeilen)
+    zeilen = len(weisse_zeilen) + len(lime_zeilen) + len(nach)
     if _OBEN + (zeilen - 1) * _ZEILENABSTAND + _SCHRIFT > logo_oben - 40:
         raise KachelFehler("Zu viele Zeilen fuer dieses Format (%d)." % zeilen)
     im = Image.new("RGB", (breite, hoehe), brand.NAVY)
@@ -73,36 +75,40 @@ def render(weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat", mit_logo=Tru
     for z in lime_zeilen:
         d.text((_RAND_X, y - captop), z, font=font, fill=brand.LIME)
         y += _ZEILENABSTAND
+    for z in nach:
+        d.text((_RAND_X, y - captop), z, font=font, fill=brand.WHITE)
+        y += _ZEILENABSTAND
     if logo is not None:
         im.paste(logo, (_RAND_X, logo_oben), logo)
     im.save(ziel_pfad, "PNG")
     return ziel_pfad
 
 
-def _bereinigen(weisse_zeilen, lime_zeilen, format, mit_logo=True):
+def _bereinigen(weisse_zeilen, lime_zeilen, format, mit_logo=True, weisse_nach=None):
     if format not in brand.FORMATE:
         raise KachelFehler("Unbekanntes Format: %s" % format)
     weisse = [z.strip() for z in (weisse_zeilen or []) if z and z.strip()]
     lime = [z.strip() for z in (lime_zeilen or []) if z and z.strip()]
+    nach = [z.strip() for z in (weisse_nach or []) if z and z.strip()]
     if not weisse:
         raise KachelFehler("Keine Headline-Zeilen.")
     breite, hoehe = brand.FORMATE[format]
     font = ImageFont.truetype(brand.FONT_HEADLINE, _SCHRIFT)
-    for z in weisse + lime:
+    for z in weisse + lime + nach:
         if font.getlength(z) > breite - 2 * _RAND_X:
             raise KachelFehler("Zeile zu breit (%d > %d px): %s" % (font.getlength(z), breite - 2 * _RAND_X, z))
     logo = _logo_weiss(_LOGO_BREITE) if mit_logo else None
     logo_oben = (hoehe - _LOGO_UNTEN - logo.size[1]) if mit_logo else (hoehe - _LOGO_UNTEN + 40)
-    if _OBEN + (len(weisse) + len(lime) - 1) * _ZEILENABSTAND + _SCHRIFT > logo_oben - 40:
+    if _OBEN + (len(weisse) + len(lime) + len(nach) - 1) * _ZEILENABSTAND + _SCHRIFT > logo_oben - 40:
         maximal = int((logo_oben - 40 - _OBEN - _SCHRIFT) // _ZEILENABSTAND) + 1
         raise KachelFehler("Zu viele Zeilen fuer dieses Format (%d, hoechstens %d). Bitte den Text kuerzen."
-                           % (len(weisse) + len(lime), maximal))
+                           % (len(weisse) + len(lime) + len(nach), maximal))
     return weisse, lime, font, logo, logo_oben, (breite, hoehe)
 
 
-def pruefe_zeilen(weisse_zeilen, lime_zeilen, format="quadrat", mit_logo=True):
+def pruefe_zeilen(weisse_zeilen, lime_zeilen, format="quadrat", mit_logo=True, weisse_nach=None):
     """Wie render(), aber nur die Pruefung (Breite, Zeilenzahl); wirft KachelFehler."""
-    _bereinigen(weisse_zeilen, lime_zeilen, format, mit_logo)
+    _bereinigen(weisse_zeilen, lime_zeilen, format, mit_logo, weisse_nach)
 
 
 def render_foto(foto, weisse_zeilen, lime_zeilen, ziel_pfad, format="quadrat"):

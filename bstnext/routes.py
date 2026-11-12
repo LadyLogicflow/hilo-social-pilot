@@ -55,11 +55,15 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <textarea name=weiss required placeholder="Wir fangen mit">{{ f.weiss }}</textarea></div>
 <div><label>Lime-Zeilen (Akzent, optional)</label>
 <textarea name=lime placeholder="Ihren Belegen an.">{{ f.lime }}</textarea></div></div>
+<label>Weiße Zeilen nach dem Lime-Teil (optional, z. B. ein Schlusssatz)</label>
+<textarea name=weiss_nach placeholder="Nur SortNext in time.">{{ f.weiss_nach }}</textarea>
 <p class="hint"><b>Nur bei Karussell:</b> Die Zeilen oben sind Slide 1. Slide 1 und 2 haben nur Text, Slide 3 hat Text und unten das Logo mit Claim.</p>
 <div class=row><div><label>Slide 2 – weiße Zeilen</label><textarea name=weiss2>{{ f.weiss2 }}</textarea></div>
 <div><label>Slide 2 – Lime-Zeilen (optional)</label><textarea name=lime2>{{ f.lime2 }}</textarea></div></div>
+<label>Slide 2 – weiße Zeilen nach dem Lime-Teil (optional)</label><textarea name=weiss_nach2>{{ f.weiss_nach2 }}</textarea>
 <div class=row><div><label>Slide 3 – weiße Zeilen</label><textarea name=weiss3>{{ f.weiss3 }}</textarea></div>
 <div><label>Slide 3 – Lime-Zeilen (optional)</label><textarea name=lime3>{{ f.lime3 }}</textarea></div></div>
+<label>Slide 3 – weiße Zeilen nach dem Lime-Teil (optional)</label><textarea name=weiss_nach3>{{ f.weiss_nach3 }}</textarea>
 <p class="hint">Foto-Look: Die KI erzeugt nur das Foto (ohne Schrift, nur fiktive Personen); Headline und Logo setzt das Programm. Danach prüft eine Bildkontrolle gegen die Vermeidungsliste.</p>
 <p class="hint">Eigene Zeilenumbrüche bleiben erhalten; zu lange Zeilen bricht das Programm nach Wörtern selbst um (eine Zeile hat etwa 18 Zeichen Platz, höchstens 5–6 Zeilen insgesamt).</p>
 <div class=row><div><label>Bildtyp</label><select name=bildtyp>
@@ -105,7 +109,8 @@ nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) verö
 <select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
 <button type=submit style="margin:0;padding:6px 10px">Einplanen</button></form>{% endif %}
 {% else %}<span class="hint">Erst oben die BSt-Next-Facebook-Seite hinterlegen.</span>{% endif %}
-{% else %}<a href="/beitrag/{{r.id}}">ansehen</a>{% endif %}</td></tr>{% endfor %}</table>
+{% else %}<a href="/beitrag/{{r.id}}">ansehen</a>{% endif %}
+{% if r.status!='veroeffentlicht' and not r.eingeplant %}<form method=post action="{{ url_for('bstnext.loeschen', eid=r.id) }}" style="margin:8px 0 0" onsubmit="return confirm('Diesen Beitrag wirklich löschen?')"><button type=submit style="margin:0;padding:6px 10px;background:#b00020">Löschen</button></form>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="hint">Noch keine.</p>{% endif %}</div>
 </div>"""
 
@@ -181,7 +186,8 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 liste, fehler = [], str(ex)
         f = f or {"weiss": "", "lime": "", "format": "quadrat", "datum": "", "caption": "", "alt": "",
                   "bildtyp": "kachel", "motiv": "belege",
-                  "weiss2": "", "lime2": "", "weiss3": "", "lime3": ""}
+                  "weiss2": "", "lime2": "", "weiss3": "", "lime3": "",
+                  "weiss_nach": "", "weiss_nach2": "", "weiss_nach3": ""}
         return render_template_string(SEITE, style=style, formate=FORMATE_FEED, motive=MOTIVE, rows=rows,
                                       seiten=seiten, seiten_liste=liste, seiten_fehler=fehler, seiten_aktiv=aktiv, seiten_ids=sorted(aktiv),
                                       rolle=session.get("rolle"), f=f,
@@ -260,20 +266,27 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         if fmt in dict(FORMATE_FEED):
             # Zu lange Zeilen werden nach Woertern umgebrochen (eigene Umbrueche bleiben erhalten)
             weiss, lime = kachel.umbrechen(weiss, fmt), kachel.umbrechen(lime, fmt)
+            nach = kachel.umbrechen(_zeilen(request.form.get("weiss_nach")), fmt)
+        else:
+            nach = _zeilen(request.form.get("weiss_nach"))
         datum = (request.form.get("datum") or "").strip()
         caption = (request.form.get("caption") or "").strip()
         alt = (request.form.get("alt") or "").strip()
         bildtyp = request.form.get("bildtyp", "kachel")
         motiv = request.form.get("motiv", "belege")
         karussell = bildtyp == "karussell"
-        folien = [(weiss, lime, False)]
+        folien = [(weiss, lime, False, nach)]
         if karussell and fmt in dict(FORMATE_FEED):
             for nr in ("2", "3"):
                 w2 = kachel.umbrechen(_zeilen(request.form.get("weiss" + nr)), fmt)
                 l2 = kachel.umbrechen(_zeilen(request.form.get("lime" + nr)), fmt)
-                folien.append((w2, l2, nr == "3"))       # Slide 3 traegt das Logo mit Claim
+                n2 = kachel.umbrechen(_zeilen(request.form.get("weiss_nach" + nr)), fmt)
+                folien.append((w2, l2, nr == "3", n2))   # Slide 3 traegt das Logo mit Claim
         eingabe = {"weiss": "\n".join(weiss), "lime": "\n".join(lime), "format": fmt, "datum": datum,
                    "caption": caption, "alt": alt, "bildtyp": bildtyp, "motiv": motiv,
+                   "weiss_nach": "\n".join(nach),
+                   "weiss_nach2": "\n".join(folien[1][3]) if len(folien) > 1 else "",
+                   "weiss_nach3": "\n".join(folien[2][3]) if len(folien) > 2 else "",
                    "weiss2": "\n".join(folien[1][0]) if len(folien) > 1 else "",
                    "lime2": "\n".join(folien[1][1]) if len(folien) > 1 else "",
                    "weiss3": "\n".join(folien[2][0]) if len(folien) > 2 else "",
@@ -287,7 +300,10 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
         if not weiss:
             flash("Bitte mindestens eine weiße Zeile angeben.")
             return _seite(eingabe)
-        if karussell and any(not w for w, _l, _g in folien):
+        if bildtyp == "foto" and (nach or request.form.get("weiss_nach2") or request.form.get("weiss_nach3")):
+            flash("Weiße Zeilen nach dem Lime-Teil gehen bisher nur bei Spruchkachel und Karussell, nicht beim Foto-Look.")
+            return _seite(eingabe)
+        if karussell and any(not w for w, _l, _g, _n in folien):
             flash("Beim Karussell braucht jeder der 3 Slides mindestens eine weiße Zeile.")
             return _seite(eingabe)
         if not caption:
@@ -308,7 +324,7 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
                 return _seite(eingabe)
         out_dir = os.path.join(_cfg["data_dir"], "bilder")
         os.makedirs(out_dir, exist_ok=True)
-        titel = " ".join(weiss + lime)
+        titel = " ".join(weiss + lime + nach)
         foto = bildtyp == "foto"
         tmp = os.path.join(out_dir, "bstnext_tmp_%s.png" % uuid.uuid4().hex)
         tmps = []
@@ -316,15 +332,15 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             if foto:
                 kachel.pruefe_zeilen(weiss, lime, fmt)        # keine KI-Kosten bei unbrauchbaren Zeilen
             elif karussell:
-                for nr, (w, l, mit_logo) in enumerate(folien, 1):
+                for nr, (w, l, mit_logo, n) in enumerate(folien, 1):
                     t = os.path.join(out_dir, "bstnext_tmp_%s_s%d.png" % (uuid.uuid4().hex, nr))
                     tmps.append(t)
                     try:
-                        kachel.render(w, l, t, fmt, mit_logo=mit_logo)
+                        kachel.render(w, l, t, fmt, mit_logo=mit_logo, weisse_nach=n)
                     except kachel.KachelFehler as ex:
                         raise kachel.KachelFehler("Slide %d: %s" % (nr, ex))
             else:
-                kachel.render(weiss, lime, tmp, fmt)
+                kachel.render(weiss, lime, tmp, fmt, weisse_nach=nach)
         except kachel.KachelFehler as ex:
             for t in tmps:
                 if os.path.exists(t):
@@ -339,10 +355,11 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             "bild_format": fmt,
             "bild_status": "laeuft" if foto else "fertig",
             "bstnext": {"typ": "foto" if foto else ("karussell" if karussell else "kachel"),
-                        "weiss": weiss, "lime": lime, "format": fmt, "motiv": motiv},
+                        "weiss": weiss, "lime": lime, "weiss_nach": nach, "format": fmt, "motiv": motiv},
         }
         if karussell:
-            fields["bstnext"]["slides"] = [{"weiss": w, "lime": l, "logo": g} for w, l, g in folien]
+            fields["bstnext"]["slides"] = [{"weiss": w, "lime": l, "logo": g, "weiss_nach": n}
+                                           for w, l, g, n in folien]
         h = hashlib.sha256(("bstnext:%s:%s" % (titel, datetime.datetime.now().isoformat())).encode("utf-8")).hexdigest()
         with get_conn() as conn:
             # Thema als 'erledigt': nie vom HILO-Generator ('ausgewaehlt') aufgegriffen
@@ -496,6 +513,34 @@ def register(app, get_conn, rolle_required, audit_log, get_einstellung, set_eins
             audit_log(conn, session.get("user"), "bstnext_eingeplant", eid, "%s %s" % (datum, zeit))
             conn.commit()
         flash("Beitrag %d eingeplant für %s um %s Uhr." % (eid, datum, zeit))
+        return redirect(url_for("bstnext.index"))
+
+    @bp.route("/bstnext/loeschen/<int:eid>", methods=["POST"])
+    @rolle_required("freigeber")
+    def loeschen(eid):
+        """Loescht einen BSt-Next-Beitrag samt Bilddateien. Nicht: veroeffentlichte Beitraege (bleiben als
+        Nachweis) und eingeplante (erst die Einplanung unter 'Geplante Veroeffentlichungen' loeschen)."""
+        with get_conn() as conn:
+            row, f = _lade(conn, eid)
+            if row["status"] == "veroeffentlicht":
+                flash("Ein veröffentlichter Beitrag bleibt als Nachweis erhalten und lässt sich hier nicht löschen.")
+                return redirect(url_for("bstnext.index"))
+            eingeplant = _einplanung_text(conn, eid)
+            if eingeplant:
+                flash("Der Beitrag ist eingeplant für %s. Bitte zuerst die Einplanung unter „Geplante "
+                      "Veröffentlichungen“ löschen." % eingeplant)
+                return redirect(url_for("bstnext.index"))
+            pfade = {row["bild_pfad"]} | set((f.get("bstnext") or {}).get("bilder") or [])
+            for pfad in pfade:
+                if pfad and os.path.exists(pfad):
+                    try:
+                        os.remove(pfad)
+                    except OSError:
+                        log.warning("Bilddatei %s von BSt-Next-Beitrag %s nicht loeschbar", pfad, eid)
+            conn.execute("DELETE FROM entwuerfe WHERE id=?", (eid,))
+            audit_log(conn, session.get("user"), "bstnext_geloescht", eid, f.get("ueberschrift", "")[:60])
+            conn.commit()
+        flash("BSt-Next-Beitrag %d gelöscht." % eid)
         return redirect(url_for("bstnext.index"))
 
     app.register_blueprint(bp)
