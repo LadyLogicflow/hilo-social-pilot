@@ -23,9 +23,11 @@ class FakeClient:
     def __init__(self, *antworten):
         self.antworten = list(antworten)
         self.prompts = []
+        self.aufrufe = []
         self.messages = SimpleNamespace(create=self._create)
 
     def _create(self, **kw):
+        self.aufrufe.append(kw)
         self.prompts.append(kw["messages"][0]["content"])
         text = self.antworten.pop(0)
         return SimpleNamespace(content=[SimpleNamespace(text=text)])
@@ -69,6 +71,13 @@ def test_unbrauchbarer_text_wird_abgelehnt_und_einmal_neu_angefragt(schlecht):
     text = begleittext.erzeuge(["Gut Ding will"], client=c)
     assert len(c.prompts) == 2 and "abgelehnt" in c.prompts[1]
     assert text.startswith(GUTER_TEXT)
+
+
+def test_token_grenze_ist_reichlich_bemessen_wegen_modellen_mit_denkphase():
+    """Pi 13.11.2026: mit 700 kam Länge 0 zurück (Abbruchgrund max_tokens). Die Grenze darf nicht wieder knapp werden."""
+    c = FakeClient(GUTER_TEXT)
+    begleittext.erzeuge(["Gut Ding will"], client=c)
+    assert c.aufrufe[0]["max_tokens"] == begleittext.MAX_TOKENS >= 2000
 
 
 def test_zu_kurzer_text_bekommt_beim_zweiten_versuch_klaren_hinweis_und_log_mit_anfang(caplog):

@@ -18,6 +18,10 @@ log = logging.getLogger("hilo.bstnext")
 
 LINK_ZEILE = "Mehr über BSt Next: http://www.bst-next.de"
 
+# Reichlich bemessen: Modelle mit Denkphase verbrauchen vor dem Text Token. Mit 700 kam am 13.11.2026 auf dem Pi
+# ein leerer Text zurück (Abbruchgrund max_tokens, Länge 0). Der Text selbst braucht nur wenige hundert Token.
+MAX_TOKENS = 4096
+
 # Nur belegte Aussagen. Aenderungen nur anhand der oeffentlichen Produktuebersicht / Produkt-FAQ.
 PRODUKTE = (
     ("SortNext", "Belegsortierung für Beratungsstellen: SortNext analysiert und sortiert die Belege der "
@@ -142,7 +146,7 @@ def erzeuge(spruch_zeilen, client=None, versuche=2, vermeiden=()):
     hinweis = ""
     for _ in range(max(1, versuche)):
         try:
-            msg = client.messages.create(model=_modell(), max_tokens=700, system=SYSTEM,
+            msg = client.messages.create(model=_modell(), max_tokens=MAX_TOKENS, system=SYSTEM,
                                          messages=[{"role": "user", "content": baue_prompt(zeilen, hinweis, vermeiden)}])
             roh = "".join(getattr(b, "text", "") for b in msg.content).strip()
         except BegleittextFehler:
