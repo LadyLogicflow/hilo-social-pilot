@@ -71,6 +71,17 @@ def test_unbrauchbarer_text_wird_abgelehnt_und_einmal_neu_angefragt(schlecht):
     assert text.startswith(GUTER_TEXT)
 
 
+def test_zu_kurzer_text_bekommt_beim_zweiten_versuch_klaren_hinweis_und_log_mit_anfang(caplog):
+    c = FakeClient("Gerne, hier ein Vorschlag.", GUTER_TEXT)
+    with caplog.at_level("INFO", logger="hilo.bstnext"):
+        text = begleittext.erzeuge(["Möge der Scanner mit Dir sein!"], client=c)
+    assert text.startswith(GUTER_TEXT)
+    assert "alle drei Absätze vollständig aus" in c.prompts[1]
+    assert "alle drei Absätze vollständig aus" not in c.prompts[0]
+    meldung = " ".join(r.getMessage() for r in caplog.records)
+    assert "zu kurz" in meldung and "Gerne, hier ein Vorschlag." in meldung and "Länge=26" in meldung
+
+
 def test_werbliche_nutzenaussage_ohne_zusicherung_ist_erlaubt():
     werbend = GUTER_TEXT.replace("liefert", "liefert Ihnen Übersicht statt Chaos. Sie sparen Zeit und Fehlerquellen und bekommt")
     assert begleittext.pruefe(werbend) is None

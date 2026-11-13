@@ -154,6 +154,10 @@ def erzeuge(spruch_zeilen, client=None, versuche=2, vermeiden=()):
         grund = pruefe(text)
         if not grund:
             return "%s\n\n%s\n%s" % (text, LINK_ZEILE, brand.HASHTAGS)
-        log.info("BSt-Next-Textvorschlag abgelehnt: %s", grund)
+        log.info("BSt-Next-Textvorschlag abgelehnt: %s (Abbruchgrund=%s, Länge=%d, Anfang=%r)",
+                 grund, getattr(msg, "stop_reason", None), len(text), text[:120])
         hinweis = grund
+        if "zu kurz" in grund:
+            hinweis += (" Schreibe alle drei Absätze vollständig aus (Aufhänger, Nutzen, Schlusszeile), "
+                        "auch wenn der Spruch kurz ist.")
     raise BegleittextFehler("Die KI hat keinen brauchbaren Text geliefert. Bitte noch einmal auf „Text vorschlagen“ klicken.")
