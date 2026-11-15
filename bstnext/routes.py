@@ -146,7 +146,7 @@ b.addEventListener('click',function(){
 {% if seiten_ids %}<form method=post action="{{ url_for('bstnext.veroeffentlichen', eid=r.id) }}" style="margin:0 0 8px" onsubmit="return confirm('Jetzt auf der BSt-Next-Seite veröffentlichen? Das ist ein echter Post.')">
 <select name=page_id>{% for pid in seiten_ids %}<option value="{{pid}}">Seite {{pid}}</option>{% endfor %}</select>
 <select name=kanal><option value="beide">Facebook + Instagram</option><option value="facebook">nur Facebook</option><option value="instagram">nur Instagram</option></select>
-{% if r.typ!='karussell' %}<label style="display:inline-block;margin:0 8px"><input type=checkbox name=story_fb value="1"> Zusätzlich als Facebook-Story</label>{% endif %}
+{% if r.typ!='karussell' %}<label style="display:inline-block;margin:0 8px"><input type=checkbox name=story_fb value="1"> Zusätzlich als Story (Facebook/Instagram)</label>{% endif %}
 <button type=submit style="margin:0;padding:6px 10px">Jetzt veröffentlichen</button></form>
 {% if r.typ=='karussell' %}<span class="hint">Einplanen mit Karussell folgt später.</span>{% else %}<form method=post action="{{ url_for('bstnext.einplanen', eid=r.id) }}" style="margin:0">
 <input type=date name=datum required style="width:auto"> <input type=time name=zeit required style="width:auto">

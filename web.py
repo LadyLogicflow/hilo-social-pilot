@@ -4581,8 +4581,8 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
         # HILO-Karussell-Pipeline. Story nur beim Einzelbild.
         _bs_karussell = (f.get("bstnext") or {}).get("typ") == "karussell"
         fmt_fb = fmt_ig = "karussell" if _bs_karussell else "einzelbild"
-        story = False
-        story_fb = bool(story_fb) and kanal in ("facebook", "beide") and not _bs_karussell   # nur Facebook-Story, Instagram nie
+        story = bool(story) and kanal in ("instagram", "beide") and not _bs_karussell   # Instagram-Story (catrin 15.11.)
+        story_fb = bool(story_fb) and kanal in ("facebook", "beide") and not _bs_karussell
         _bs_bild = e["bild_pfad"] if (e is not None and "bild_pfad" in e.keys()) else None
         if not _bsg.bild_bereit(f) or not (_bs_bild and os.path.exists(_bs_bild)):
             return (ziel_name, False, [(kanal, False, _bsg.MELDUNG_BILD_NICHT_FERTIG)])
@@ -4710,7 +4710,7 @@ def _veroeffentliche_ziel(conn, e, eid, f, fmt_fb, fmt_ig, kanal, stelle, page_i
             try:
                 # Story = komplettes Karussell (alle Slides als Frames), unabhaengig vom Feed-Format.
                 # _render('karussell') ist kanalunabhaengig gecacht -> kein doppeltes Rendern.
-                slides = _render("karussell")
+                slides = _render("einzelbild" if _bsg.ist_bstnext(f) else "karussell")
                 s_ok, s_info = _publish_story(publish, ziel_seite, slides, eid, stelle_id)
             except Exception as ex:
                 s_ok, s_info = False, str(ex)
@@ -6206,7 +6206,7 @@ def _bstnext_veroeffentlichen(conn, e, eid, f, kanal, page_id, user, story_fb=Fa
     """Veroeffentlicht einen freigegebenen BSt-Next-Beitrag (Weichen: _veroeffentliche_ziel/bstnext.guard)."""
     import publish
     res = _veroeffentliche_ziel(conn, e, eid, f, "einzelbild", "einzelbild", kanal, None, page_id, user,
-                                 publish, story=False, story_fb=story_fb)
+                                 publish, story=story_fb, story_fb=story_fb)
     if story_fb and eid in _STORY_ERGEBNIS:
         sok, sinfo = _STORY_ERGEBNIS.pop(eid)
         res = (res[0], res[1], list(res[2]) + [("facebook-story", sok, sinfo)])
