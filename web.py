@@ -723,6 +723,7 @@ _FONTS = """@font-face{font-family:'Archivo Black';font-weight:400;font-display:
 @font-face{font-family:'JetBrains Mono';font-weight:700;font-display:swap;src:url('/fonts/jetbrainsmono-700.woff2') format('woff2')}
 :root{--navy900:#0B2545;--navy500:#1E4A8A;--navy100:#E8F0F8;--lime:#A3E635;--lime600:#4D7C0F;--paper:#F8FAFC;--ink:#15191F;--inksoft:#4B5563}
 .stx{display:inline-flex;align-items:center}
+.nx{color:var(--lime600)}
 .stx-chev{width:.42em;height:.58em;margin-left:.05em;margin-bottom:.17em;align-self:flex-end;color:#A3E635;flex:none}
 .chev{display:inline-block;width:.5em;height:.72em;vertical-align:-2px;background:no-repeat center/contain;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 32%22><path d=%22M6 4 L20 16 L6 28%22 fill=%22none%22 stroke=%22%23A3E635%22 stroke-width=%226.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>")}
 """
@@ -735,7 +736,7 @@ th{font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercas
 button{background:var(--navy900);color:#fff;border:0;padding:10px 15px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600}button:hover{filter:brightness(1.15)}
 .flash{color:var(--navy500);margin:8px 0;font-weight:700}.hint{font-family:'JetBrains Mono',monospace;color:var(--inksoft);font-size:12px}"""
 
-_NAV = """<div class=top><div class="stx" style="font-family:'Archivo Black',sans-serif;font-size:23px;color:var(--navy900)">ShareNext<svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+_NAV = """<div class=top><div class="stx" style="font-family:'Archivo Black',sans-serif;font-size:23px;color:var(--navy900)">Share<span class="nx">Next</span><svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
 <div><a href="/whatsapp">WhatsApp</a> &middot; <a href="/quellen">Eigene Quellen</a> &middot; {% if rolle=='admin' %}<a href="/verwaltung">Verwaltung</a> &middot; {% endif %}{{user}} &middot; <a href="/logout">Abmelden</a></div></div>"""
 
 LOGIN = """<!doctype html><meta charset=utf-8><title>ShareNext</title>
@@ -752,7 +753,7 @@ button{width:100%;background:var(--navy900);color:#fff;border:0;padding:12px;bor
 button:hover{filter:brightness(1.15)}
 .err{color:#b00020;font-size:13px;text-align:center}
 </style>
-<div class=box><div class=head><div class="wm"><span class="stx">ShareNext<svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><p class=tag>digital. effizient. besser.</p></div>
+<div class=box><div class=head><div class="wm"><span class="stx">Share<span class="nx">Next</span><svg class="stx-chev" viewBox="0 0 24 32" aria-hidden="true"><path d="M6 4 L20 16 L6 28" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><p class=tag>digital. effizient. besser.</p></div>
 <div class=eyebrow>Anmeldung</div>
 <div class=body>
 {% with m=get_flashed_messages() %}{% if m %}<p class=err>{{m[0]}}</p>{% endif %}{% endwith %}
@@ -815,7 +816,7 @@ ERZEUGEN = """<!doctype html><meta charset=utf-8><title>Themen auswählen</title
 <form method=post onsubmit="return chk(this)">
   <div style="margin-bottom:20px;padding:16px;background:#e6eef6;border-radius:8px;border:2px solid #0B2545">
     <label style="font-weight:bold;color:#0B2545;margin-bottom:8px;display:block;font-size:15px">🎨 Bildgenerierung</label>
-    <p style="color:#6b7280;font-size:14px;margin:8px 0">Alle Bilder werden mit <b>ShareNext Premium</b> generiert (~$0.10/Bild)</p>
+    <p style="color:#6b7280;font-size:14px;margin:8px 0">Alle Bilder werden mit <b>Share<span class="nx">Next</span> Premium</b> generiert (~$0.10/Bild)</p>
   </div>
   <label class=allrow><input type=checkbox onclick="toggleAll(this)"> Alle auswählen ({{themen|length}})</label>
   {% for g in gruppen %}{% set gi = loop.index %}
@@ -1442,7 +1443,7 @@ QUELLEN = """<!doctype html><meta charset=utf-8><title>Eigene Quellen</title><st
 .drop{border:2px dashed #ccd3df;border-radius:12px;padding:18px;margin:8px 0;background:#fafbfc}</style>
 <div class=box>
 <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Eigene Quellen einwerfen</h2><a href="/">&larr; Startseite</a></div>
-<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. ShareNext liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur öffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
+<p class=hint>Wirf hier ein <b>PDF</b> oder einen <b>Link</b> ein. Share<span class="nx">Next</span> liest den Inhalt, <b>zerlegt ihn in die einzelnen Themen</b> und merkt jedes direkt zur Texterstellung vor. <b>Wichtig:</b> Nur öffentliche/unkritische Inhalte &ndash; keine Mandantendaten.</p>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=drop><h3>PDF hochladen</h3>
 <form method=post enctype=multipart/form-data><input type=file name=pdf accept="application/pdf,.pdf" required>
@@ -1703,7 +1704,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 {% endif %}
 
 {% if bereich=='modelle' %}
-<p class=hint>Hier waehlst du, <b>welche KI-Modelle</b> ShareNext nutzt (Texte ueber Anthropic/Claude, Bilder ueber OpenAI) und welches Bild-Tool. Bei einem Modell-Update einfach den <b>neuen Modellnamen</b> eintragen und speichern. Leeres Feld = bewaehrtes Standardmodell.</p>
+<p class=hint>Hier waehlst du, <b>welche KI-Modelle</b> Share<span class="nx">Next</span> nutzt (Texte ueber Anthropic/Claude, Bilder ueber OpenAI) und welches Bild-Tool. Bei einem Modell-Update einfach den <b>neuen Modellnamen</b> eintragen und speichern. Leeres Feld = bewaehrtes Standardmodell.</p>
 
 <h3 style="margin-top:26px">Bild-Tool</h3>
 <p class=hint>Legt fest, <b>welche KI</b> das Foto erzeugt (unabhängig vom Bild-Stil oben). <b>OpenAI</b> ist die bewährte Standard-Wahl. <b>Ideogram</b> ist ein Text-Spezialist – die Schrift im Bild (z.&nbsp;B. auf der KI-Tafel) wird deutlich genauer; benötigt aber einen <b>eigenen API-Schlüssel</b> (in den Secrets als <code>ideogram_api_key</code> hinterlegen). So lassen sich beide am selben Beitrag vergleichen.</p>
@@ -1852,11 +1853,11 @@ textarea,input[type=text],select{width:100%;box-sizing:border-box;padding:10px;b
 textarea{min-height:84px;resize:vertical}
 button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:bold}
 .hint{background:#fef3c7;color:#92400e;padding:12px;border-radius:8px;font-size:14px;margin-bottom:16px}</style>
-<div class=top><h2 style="margin:0;color:#0B2545">ShareNext - Premium Bildgenerierung</h2><a href="/">&larr; Startseite</a></div>
+<div class=top><h2 style="margin:0;color:#0B2545">Share<span class="nx">Next</span> - Premium Bildgenerierung</h2><a href="/">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=card>
   <div class=hint>
-    <b>🚀 ShareNext</b> ist die Premium-Bildgenerierung mit KI-basierter 6-Stufen-Pipeline:<br>
+    <b>🚀 Share<span class="nx">Next</span></b> ist die Premium-Bildgenerierung mit KI-basierter 6-Stufen-Pipeline:<br>
     1️⃣ Message Brief → 2️⃣ Creative Director → 3️⃣ Concept Jury → 4️⃣ Art Director → 5️⃣ Image Producer → 6️⃣ Visual QA
   </div>
   <form method=post>
@@ -1890,7 +1891,7 @@ button{margin-top:18px;background:#4D7C0F;color:#fff;border:0;border-radius:8px;
       </label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
         <input type=radio name=modus value="premium">
-        <span><b>Premium</b><br><small style="color:#6b7280">ShareNext 6-Stufen-Pipeline (~$0.10)</small></span>
+        <span><b>Premium</b><br><small style="color:#6b7280">Share<span class="nx">Next</span> 6-Stufen-Pipeline (~$0.10)</small></span>
       </label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
         <input type=radio name=modus value="beides">
@@ -1935,7 +1936,7 @@ SHARENEXT_RESULT = """<!doctype html><meta charset=utf-8><title>Bildgenerierung 
 
     <!-- Premium -->
     <div class=result-card>
-      <div class="badge premium">Premium (ShareNext)</div>
+      <div class="badge premium">Premium (Share<span class="nx">Next</span>)</div>
       <img src="data:image/png;base64,{{ premium_b64 }}" alt="Premium" class=result-img>
       <div style="margin:16px 0">
         {% if premium_result.approved %}
@@ -1958,7 +1959,7 @@ SHARENEXT_RESULT = """<!doctype html><meta charset=utf-8><title>Bildgenerierung 
 
   {% elif modus == "premium" %}
   <div class="result-card single">
-    <div class="badge premium">Premium (ShareNext)</div>
+    <div class="badge premium">Premium (Share<span class="nx">Next</span>)</div>
     <img src="data:image/png;base64,{{ premium_b64 }}" alt="Premium" class=result-img>
     <div style="margin:16px 0">
       {% if premium_result.approved %}

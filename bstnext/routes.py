@@ -42,7 +42,7 @@ ANSICHT = """<!doctype html><meta charset=utf-8><title>BSt Next – Beitrag anse
 </style>
 <div class="bn">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<h2 style="margin:0">BSt Next – Beitrag {{ eid }}</h2><a class="btn" href="{{ url_for('bstnext.index') }}">&larr; zur Liste</a></div>
+<h2 style="margin:0">BSt <span class="nx">Next</span> – Beitrag {{ eid }}</h2><a class="btn" href="{{ url_for('bstnext.index') }}">&larr; zur Liste</a></div>
 <p class="hint">Status: <b>{{ status }}</b>{% if datum %} · Tag: {{ datum }}{% endif %}{% if typ == 'karussell' %} · Karussell, 3 Slides{% elif typ == 'foto' %} · Foto-Look{% endif %}{% if eingeplant %} · eingeplant für {{ eingeplant }}{% endif %}</p>
 {% if bilder %}{% for nr in bilder %}<img class="gross" src="{{ url_for('bstnext.bild', eid=eid, nr=nr) }}" alt="">{% endfor %}
 {% else %}<p class="hint">Das Bild ist noch nicht fertig.</p>{% endif %}
@@ -67,10 +67,10 @@ SEITE = """<!doctype html><meta charset=utf-8><title>BSt Next – ShareNext</tit
 </style>
 <div class="bn">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<h2 style="margin:0">BSt Next – {% if bearb %}Beitrag {{ bearb }} bearbeiten{% else %}Beitrag erstellen{% endif %}</h2><a href="/" style="background:#001942;color:#fff;padding:7px 13px;border-radius:8px">&larr; Startseite</a></div>
+<h2 style="margin:0">BSt <span class="nx">Next</span> – {% if bearb %}Beitrag {{ bearb }} bearbeiten{% else %}Beitrag erstellen{% endif %}</h2><a href="/" style="background:#001942;color:#fff;padding:7px 13px;border-radius:8px">&larr; Startseite</a></div>
 {% with m=get_flashed_messages() %}{% if m %}<div class=flash>{{m[0]}}</div>{% endif %}{% endwith %}
 <div class=box>
-<p class="hint">BSt Next ist eine eigene Marke neben HILO. Der Beitrag wird als Spruchkachel in der BSt-Next-CI
+<p class="hint">BSt <span class="nx">Next</span> ist eine eigene Marke neben HILO. Der Beitrag wird als Spruchkachel in der BSt-Next-CI
 (Navy, weiße Headline, Lime als Akzent, Logo mit Claim) erzeugt, danach unter „Freigabe“ geprüft und freigegeben und
 nur auf der BSt-Next-Facebook-Seite (und dem verknüpften Instagram-Konto) veröffentlicht.</p>
 {% if bearb %}<p class="hint"><b>Bearbeiten:</b> Beim Speichern wird das Bild neu erzeugt und der Beitrag steht wieder auf „entwurf“ (danach neu freigeben). <a href="{{ url_for('bstnext.index') }}">Abbrechen</a></p>{% endif %}
@@ -125,7 +125,7 @@ b.addEventListener('click',function(){
 });
 })();
 </script></div>
-<div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt Next</h3>
+<div class=box style="margin-top:16px"><h3 style="margin-top:0">Facebook-Seite von BSt <span class="nx">Next</span></h3>
 {% if seiten %}<p>Hinterlegt: <b>{{ seiten }}</b></p>{% else %}<p class="hint">Noch keine Seite hinterlegt – ohne sie kann nichts veröffentlicht werden.</p>{% endif %}
 {% if rolle == 'admin' %}<form method=post action="{{ url_for('bstnext.seite') }}">
 {% if seiten_liste %}<label>Seite wählen (alle Facebook-Seiten, die der Zugang des Programms erreicht)</label>
@@ -135,7 +135,7 @@ b.addEventListener('click',function(){
 <label>Oder Facebook-Page-ID von Hand (kommagetrennt)</label><input type=text name=seiten value="{{ seiten if not seiten_liste else '' }}" placeholder="123456789012345">
 <p class="hint">Die Auswahl hat Vorrang, wenn beides gefüllt ist. Beide Felder leer = Seite entfernen.</p>
 <button type=submit>Speichern</button></form>{% else %}<p class="hint">Hinterlegen darf nur ein Admin.</p>{% endif %}</div>
-<div class=box style="margin-top:16px"><h3 style="margin-top:0">Bisherige BSt-Next-Entwürfe</h3>
+<div class=box style="margin-top:16px"><h3 style="margin-top:0">Bisherige BSt-<span class="nx">Next</span>-Entwürfe</h3>
 {% if rows %}<table><tr><th></th><th>Beitrag</th><th>Status</th><th>Tag</th><th></th></tr>
 {% for r in rows %}<tr><td>{% if r.bild_status=='fertig' %}<img class=th src="/bild/{{r.id}}" alt="">{% endif %}</td><td>{{r.titel}}{% if r.typ=='foto' %} <span class="hint">(Foto-Look)</span>{% elif r.typ=='karussell' %} <span class="hint">(Karussell, 3 Slides)</span>{% endif %}</td>
 <td>{{r.status}}{% if r.bild_status=='laeuft' %}<br><span class="hint">Bild wird erzeugt …</span>{% elif r.bild_status=='fehler' %}<br><span class="hint">Bild fehlgeschlagen: {{r.info}}</span>{% endif %}</td><td>{{r.datum}}</td>
